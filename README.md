@@ -520,6 +520,75 @@ Body: form-data → Key: file (Type: File)
 * [ ] Optional advanced dashboard visualizations
 
 ---
+## Change log
+
+### fix 000001 - Activity lifecycle backend
+
+- Added activity editing through `PATCH /api/activities/:activityId` with company-scope access checks and protection for `STAGE_CHANGE` records.
+- Added follow-up completion and rescheduling endpoints.
+- Added completion metadata (`completedAt`, `completedById`, and `completionNote`) with a Prisma migration.
+- Excluded completed follow-ups from the due list; future reschedules naturally leave the due list.
+- Added DTO validation, safe empty-string normalization, and the `activity:update`, `follow-up:complete`, and `follow-up:reschedule` permissions for ADMIN, MANAGER, and REP.
+
+### fix 000002 - Advanced report filters backend
+
+- Added a shared validated report-filter DTO with comma-separated UUID and enum lists.
+- Added owner, team, stage, priority, industry, source, company, user, date-range, and activity-type filters to the relevant reports.
+- Added `GET /api/reports/activities/by-user`, `GET /api/reports/pipeline/by-owner`, and `GET /api/reports/filter-options`.
+- Applied data visibility consistently: ADMIN and BOARDS can report across all data, MANAGER is limited to the manager's team, and REP is limited to the rep's own scope when granted `report:view`.
+- Preserved existing unfiltered report response shapes and the activity report's default 30-day range.
+
+### fix 000003 - Admin libraries and data catalogs backend
+
+- Added admin-managed Lead Source CRUD with active/inactive filtering and soft deletion.
+- Added grouped lookup CRUD for teams, departments, seniority levels, persona tags, contact types, person social platforms, and company sources.
+- Added Prisma catalog models, indexes, uniqueness constraints, and a database migration.
+- Added and assigned lead-source and lookup view/manage permissions; Persona Library now enforces its existing permissions.
+- Catalog dropdown endpoints return active records by default and support `?active=false` for inactive records.
+
+### fix 000004 - Pipeline stage config and transition rules backend
+
+- Added editable display configuration for every existing `PipelineStage` enum value, including order, color, active visibility, and terminal status.
+- Added generic and role-specific transition rules with role rules taking precedence over generic rules.
+- Added admin stage-config and transition-rule CRUD endpoints with dedicated permissions.
+- Seeded Persian stage labels, terminal stages, ordering, and the default allowed sales flow.
+- Company stage changes now reject inactive targets and transitions that are not explicitly allowed.
+
+### fix 000006 - Owner options and user management API cleanup
+
+- Added `GET /api/users/owner-options` for active REP/MANAGER assignment candidates, scoped to the manager's own team.
+- Added pagination and search, role, team, and active-status filters to the admin users list.
+- User list responses now include `createdAt` and `updatedAt` with stable pagination metadata.
+- Centralized safe user selection so list/detail APIs never expose password hashes.
+- Added the `company:assign-owner` permission for ADMIN and MANAGER.
+
+### fix 000007 - Permission matrix contract cleanup
+
+- Added `GET /api/admin/permissions/matrix` with every permission and explicit booleans for ADMIN, MANAGER, REP, and BOARDS.
+- Kept the existing permission list and per-role detail endpoints stable.
+- Standardized permission administration endpoints on `permission:view` and `permission:manage`.
+- The supported bulk revoke contract remains `POST /api/admin/permissions/bulk-revoke`; clients should send `{ role, actions }` in the request body.
+- Seeded roadmap permissions for advanced reports, people directory access, user management, and permission management.
+
+### fix 000008 - Company archive and restore backend
+
+- Added company archive metadata with the archiving user and an optional reason; related CRM records are never deleted.
+- Added `PATCH /api/companies/:companyId/archive` and `PATCH /api/companies/:companyId/restore` for ADMIN and team-scoped MANAGER users.
+- Company lists hide archived records by default and support `includeArchived=true` or `archivedOnly=true`.
+- Added and assigned `company:archive` and `company:restore` permissions.
+
+### fix 000009 - Audit log backend
+
+- Added persistent audit logs with actor, entity, action, before/after snapshots, metadata, and indexed timestamps.
+- Added centralized recursive sanitization for password, hash, token, secret, and authorization fields.
+- Recorded key user, permission, company, activity, follow-up, and pipeline-transition changes.
+- Added the paginated and filterable `GET /api/admin/audit-logs` endpoint protected by `audit-log:view`.
+
+### fix 000010 - Navigation return-state support
+
+**Not applicable — frontend only.** No backend API, schema, or service changes are required.
+
+---
 
 **Built with ❤️ for the IAM sales team**
 
