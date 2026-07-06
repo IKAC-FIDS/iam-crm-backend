@@ -1,10 +1,23 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
-import { UserRole } from '@prisma/client';
+import { Prisma, UserRole } from '@prisma/client';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserRoleDto } from './dto/update-user-role.dto';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
+import { FindUsersDto } from './dto/find-users.dto';
+import { CurrentUserPayload } from '../common/decorators/current-user.decorator';
+
+const safeUserSelect = {
+  id: true,
+  fullName: true,
+  email: true,
+  role: true,
+  team: true,
+  isActive: true,
+  createdAt: true,
+  updatedAt: true,
+} satisfies Prisma.UserSelect;
 
 @Injectable()
 export class UsersService {
@@ -31,17 +44,54 @@ export class UsersService {
   // ============================================================
   // ۲. دریافت لیست کاربران
   // ============================================================
-  async findAll() {
+  async findAll(query: FindUsersDto) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const search = query.search?.trim();
+    const where: Prisma.UserWhereInput = {
+      ...(query.role && { role: query.role }),
+      ...(query.team?.trim() && { team: query.team.trim() }),
+      ...(query.isActive !== undefined && { isActive: query.isActive }),
+      ...(search && {
+        OR: [
+          { fullName: { contains: search, mode: 'insensitive' } },
+          { email: { contains: search, mode: 'insensitive' } },
+        ],
+      }),
+    };
+
+    const [data, total] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        select: safeUserSelect,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.user.count({ where }),
+    ]);
+    const totalPages = Math.ceil(total / limit);
+    return {
+      data,
+      meta: { total, page, limit, totalPages, hasNext: page < totalPages, hasPrevious: page > 1 },
+    };
+  }
+
+  getOwnerOptions(user: CurrentUserPayload) {
+    if (user.role !== UserRole.ADMIN && user.role !== UserRole.MANAGER) {
+      throw new ForbiddenException('You do not have access to owner options');
+    }
+    const teamScope: Prisma.UserWhereInput = user.role === UserRole.MANAGER
+      ? user.team ? { team: user.team } : { id: { in: [] } }
+      : {};
     return this.prisma.user.findMany({
-      select: {
-        id: true,
-        fullName: true,
-        email: true,
-        role: true,
-        team: true,
+      where: {
         isActive: true,
+        role: { in: [UserRole.REP, UserRole.MANAGER] },
+        ...teamScope,
       },
-      orderBy: { createdAt: 'desc' },
+      select: { id: true, fullName: true, email: true, role: true, team: true, isActive: true },
+      orderBy: [{ fullName: 'asc' }, { email: 'asc' }],
     });
   }
 
@@ -51,14 +101,7 @@ export class UsersService {
   async findOne(id: string) {
     const user = await this.prisma.user.findUnique({
       where: { id },
-      select: {
-        id: true,
-        fullName: true,
-        email: true,
-        role: true,
-        team: true,
-        isActive: true,
-      },
+      select: safeUserSelect,
     });
     if (!user) {
       throw new NotFoundException('کاربر پیدا نشد');

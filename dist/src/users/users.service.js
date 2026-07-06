@@ -48,6 +48,16 @@ const bcrypt = __importStar(require("bcryptjs"));
 const prisma_service_1 = require("../prisma/prisma.service");
 const client_1 = require("@prisma/client");
 const permissions_guard_1 = require("../common/guards/permissions.guard");
+const safeUserSelect = {
+    id: true,
+    fullName: true,
+    email: true,
+    role: true,
+    team: true,
+    isActive: true,
+    createdAt: true,
+    updatedAt: true,
+};
 let UsersService = class UsersService {
     constructor(prisma) {
         this.prisma = prisma;
@@ -66,30 +76,58 @@ let UsersService = class UsersService {
         const { passwordHash: _omit, ...safeUser } = user;
         return safeUser;
     }
-    async findAll() {
+    async findAll(query) {
+        const page = query.page ?? 1;
+        const limit = query.limit ?? 20;
+        const search = query.search?.trim();
+        const where = {
+            ...(query.role && { role: query.role }),
+            ...(query.team?.trim() && { team: query.team.trim() }),
+            ...(query.isActive !== undefined && { isActive: query.isActive }),
+            ...(search && {
+                OR: [
+                    { fullName: { contains: search, mode: 'insensitive' } },
+                    { email: { contains: search, mode: 'insensitive' } },
+                ],
+            }),
+        };
+        const [data, total] = await Promise.all([
+            this.prisma.user.findMany({
+                where,
+                select: safeUserSelect,
+                orderBy: { createdAt: 'desc' },
+                skip: (page - 1) * limit,
+                take: limit,
+            }),
+            this.prisma.user.count({ where }),
+        ]);
+        const totalPages = Math.ceil(total / limit);
+        return {
+            data,
+            meta: { total, page, limit, totalPages, hasNext: page < totalPages, hasPrevious: page > 1 },
+        };
+    }
+    getOwnerOptions(user) {
+        if (user.role !== client_1.UserRole.ADMIN && user.role !== client_1.UserRole.MANAGER) {
+            throw new common_1.ForbiddenException('You do not have access to owner options');
+        }
+        const teamScope = user.role === client_1.UserRole.MANAGER
+            ? user.team ? { team: user.team } : { id: { in: [] } }
+            : {};
         return this.prisma.user.findMany({
-            select: {
-                id: true,
-                fullName: true,
-                email: true,
-                role: true,
-                team: true,
+            where: {
                 isActive: true,
+                role: { in: [client_1.UserRole.REP, client_1.UserRole.MANAGER] },
+                ...teamScope,
             },
-            orderBy: { createdAt: 'desc' },
+            select: { id: true, fullName: true, email: true, role: true, team: true, isActive: true },
+            orderBy: [{ fullName: 'asc' }, { email: 'asc' }],
         });
     }
     async findOne(id) {
         const user = await this.prisma.user.findUnique({
             where: { id },
-            select: {
-                id: true,
-                fullName: true,
-                email: true,
-                role: true,
-                team: true,
-                isActive: true,
-            },
+            select: safeUserSelect,
         });
         if (!user) {
             throw new common_1.NotFoundException('کاربر پیدا نشد');

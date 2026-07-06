@@ -273,3 +273,11 @@ Body: form-data → Key: file (Type: File)
 - Added admin stage-config and transition-rule CRUD endpoints with dedicated permissions.
 - Seeded Persian stage labels, terminal stages, ordering, and the default allowed sales flow.
 - Company stage changes now reject inactive targets and transitions that are not explicitly allowed.
+
+### fix 000006 - Owner options and user management API cleanup
+
+- Added `GET /api/users/owner-options` for active REP/MANAGER assignment candidates, scoped to the manager's own team.
+- Added pagination and search, role, team, and active-status filters to the admin users list.
+- User list responses now include `createdAt` and `updatedAt` with stable pagination metadata.
+- Centralized safe user selection so list/detail APIs never expose password hashes.
+- Added the `company:assign-owner` permission for ADMIN and MANAGER.
