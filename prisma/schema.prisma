@@ -1,0 +1,502 @@
+// ============================================================
+// IAM Sales CRM - Database Schema (نسخه نهایی با ماژولار Industry)
+// ============================================================
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// Enums
+// ============================================================
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  REP
+  BOARDS
+}
+
+enum PipelineStage {
+  LEAD
+  CONTACTED
+  INTERESTED
+  QUALIFIED
+  NEEDS_ASSESSMENT
+  PENDING_PRE_INVOICE_APPROVAL
+  POC_PILOT_SCHEDULED
+  POC_PILOT_IN_PROGRESS
+  PENDING_POC_PILOT_APPROVAL
+  PENDING_PAYMENT_INVOICE_APPROVAL
+  INSTALLATION_SCHEDULED
+  INSTALLATION_IN_PROGRESS
+  PENDING_CUSTOMER_ACCEPTANCE
+  DONE
+  ON_HOLD
+  LOST
+  NO_RESPONSE
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  STRATEGIC
+}
+
+enum CompanyOwnership {
+  PRIVATE
+  STATE
+  SEMI_STATE
+  PUBLIC_LISTED
+  BANK
+  HOLDING
+}
+
+enum ActivityType {
+  CALL
+  EMAIL
+  LINKEDIN_MESSAGE
+  LINKEDIN_ENGAGEMENT
+  MEETING
+  NOTE
+  STAGE_CHANGE
+}
+
+enum SocialPlatform {
+  LINKEDIN
+  INSTAGRAM
+  TELEGRAM
+  BALE
+  EITAA
+  SOROUSH
+  ROOBIKA
+  APARAT
+  YOUTUBE
+  WEBSITE
+}
+
+// ============================================================
+// Users & Auth
+// ============================================================
+
+model User {
+  id           String   @id @default(uuid())
+  fullName     String
+  email        String   @unique
+  passwordHash String
+  role         UserRole @default(REP)
+  team         String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  ownedCompanies   Company[]             @relation("CompanyOwner")
+  activities       Activity[]
+  stageChangesMade PipelineStageHistory[]
+
+  @@map("users")
+}
+
+// ============================================================
+// Company
+// ============================================================
+
+model Company {
+  id       String @id @default(uuid())
+  leadCode String @unique @default(uuid())
+
+  legalName      String
+  brandName      String?
+  registrationNo String?
+  nationalId     String?
+  economicCode   String?
+  foundedYear    Int?
+  companyType    String?
+  ownership      CompanyOwnership?
+  activityStatus String?
+  activityGroup  String?
+  marketSize     String?
+
+  industry String? // نام صنعت (برای نگاشت به مدل Industry)
+
+  parentCompanyId String?
+  parentCompany   Company?  @relation("CompanyHierarchy", fields: [parentCompanyId], references: [id])
+  subsidiaries    Company[] @relation("CompanyHierarchy")
+
+  website      String?
+  publicEmail  String?
+  headOfficeProvince String?
+  headOfficeCity     String?
+  headOfficeAddress  String?
+  postalCode         String?
+  centralPhone       String?
+
+  registeredCapital BigInt?
+  employeeCount     Int?
+  annualRevenue     BigInt?
+
+  ownerId          String?
+  owner            User?          @relation("CompanyOwner", fields: [ownerId], references: [id])
+  priority         Priority       @default(MEDIUM)
+  stage            PipelineStage  @default(LEAD)
+  source           String?        @default("SAM_LIST")
+  nextActionDate   DateTime?
+
+  researchCompletion Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  branches       CompanyBranch[]
+  socialChannels CompanySocialChannel[]
+  people         Person[]
+  activities     Activity[]
+  callCard       CallCard?
+  stageHistory   PipelineStageHistory[]
+
+  @@index([ownerId])
+  @@index([stage])
+  @@index([priority])
+  @@index([industry])
+  @@index([createdAt])
+  @@index([updatedAt])
+  @@index([ownerId, stage])
+  @@index([stage, priority])
+
+  @@map("companies")
+}
+
+// ============================================================
+// Company Branch
+// ============================================================
+
+model CompanyBranch {
+  id        String  @id @default(uuid())
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  name    String?
+  city    String?
+  address String?
+  phone   String?
+
+  @@index([companyId])
+  @@map("company_branches")
+}
+
+// ============================================================
+// Company Social Channel
+// ============================================================
+
+model CompanySocialChannel {
+  id        String         @id @default(uuid())
+  companyId String
+  company   Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  platform  SocialPlatform
+  handle    String
+
+  @@index([companyId])
+  @@index([platform])
+  @@map("company_social_channels")
+}
+
+// ============================================================
+// Person (مخاطب)
+// ============================================================
+
+model Person {
+  id        String  @id @default(uuid())
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  fullName        String
+  title           String?
+  department      String?
+  seniorityLevel  String?
+  personaTag      String?
+  tenureInRole    String?
+  expertiseArea   String?
+  linkedinActive  Boolean?
+  bestChannel     String?
+
+  isPrimaryContact   Boolean @default(false)
+  isSecondaryContact Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // فیلدهای قدیمی (برای سازگاری)
+  linkedinUrl String?
+  email       String?
+  phone       String?
+
+  contacts PersonContact[]
+  socials  PersonSocial[]
+
+  activities Activity[]
+
+  @@index([companyId])
+  @@index([personaTag])
+  @@index([isPrimaryContact])
+  @@map("people")
+}
+
+// ============================================================
+// Person Contact (اطلاعات تماس)
+// ============================================================
+
+model PersonContact {
+  id        String   @id @default(uuid())
+  personId  String
+  person    Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  type      String   // MOBILE, WORK, HOME, INTERNAL, PERSONAL_EMAIL, WORK_EMAIL, OTHER_EMAIL
+  value     String   // شماره تلفن یا آدرس ایمیل
+  isPrimary Boolean  @default(false)
+  note      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([personId, type, value])
+  @@index([personId])
+  @@index([type])
+  @@map("person_contacts")
+}
+
+// ============================================================
+// Person Social (شبکه‌های اجتماعی)
+// ============================================================
+
+model PersonSocial {
+  id        String   @id @default(uuid())
+  personId  String
+  person    Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  platform  String   // TELEGRAM, WHATSAPP, INSTAGRAM, LINKEDIN, TWITTER, YOUTUBE, ...
+  handle    String   // نام کاربری یا لینک پروفایل
+  isPrimary Boolean  @default(false)
+  note      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([personId, platform, handle])
+  @@index([personId])
+  @@index([platform])
+  @@map("person_socials")
+}
+
+// ============================================================
+// Activity (فعالیت‌ها)
+// ============================================================
+
+model Activity {
+  id        String   @id @default(uuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  personId  String?
+  person    Person?  @relation(fields: [personId], references: [id])
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+
+  type           ActivityType
+  notes          String?
+  outcome        String?
+  occurredAt     DateTime @default(now())
+  nextActionDate DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([companyId])
+  @@index([userId])
+  @@index([nextActionDate])
+  @@index([type])
+  @@index([occurredAt])
+  @@index([userId, nextActionDate])
+  @@index([companyId, occurredAt])
+  @@map("activities")
+}
+
+// ============================================================
+// Pipeline Stage History
+// ============================================================
+
+model PipelineStageHistory {
+  id        String        @id @default(uuid())
+  companyId String
+  company   Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  fromStage PipelineStage?
+  toStage   PipelineStage
+  changedById String?
+  changedBy   User?       @relation(fields: [changedById], references: [id])
+  changedAt DateTime      @default(now())
+
+  @@index([companyId])
+  @@index([changedAt])
+  @@index([toStage])
+  @@index([companyId, changedAt])
+  @@map("pipeline_stage_history")
+}
+
+// ============================================================
+// Call Card
+// ============================================================
+
+model CallCard {
+  id        String  @id @default(uuid())
+  companyId String  @unique
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  primaryContactId   String?
+  secondaryContactId String?
+
+  entryAngle    String?
+  painPoint     String?
+  useCase       String?
+  openingLine   String?
+  firstEmail    String?
+  linkedinMsg   String?
+  discoveryQs   Json?
+  objections    Json?
+  meetingAsk    String?
+  callGoal      String?
+
+  followUpNoResponseAt String?
+  followUpInterestAt   String?
+
+  qualificationCriteria   String?
+  disqualificationCriteria String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([primaryContactId])
+  @@index([secondaryContactId])
+  @@map("call_cards")
+}
+
+// ============================================================
+// Persona Library (قدیمی، حفظ شده)
+// ============================================================
+
+model PersonaLibrary {
+  id              String @id @default(uuid())
+  titlePattern    String
+  defaultPainPoint String?
+  defaultUseCase   String?
+  notes            String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([titlePattern])
+  @@map("persona_library")
+}
+
+// ============================================================
+// ✅ جدید: مدیریت صنایع، نقاط درد و کاربردها (ماژولار)
+// ============================================================
+
+model Industry {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  painPoints IndustryPainPoint[]
+  useCases   IndustryUseCase[]
+
+  @@map("industries")
+}
+
+model PainPoint {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  category    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  industries IndustryPainPoint[]
+
+  @@map("pain_points")
+}
+
+model UseCase {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  category    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  industries IndustryUseCase[]
+
+  @@map("use_cases")
+}
+
+model IndustryPainPoint {
+  id           String   @id @default(uuid())
+  industryId   String
+  industry     Industry @relation(fields: [industryId], references: [id], onDelete: Cascade)
+  painPointId  String
+  painPoint    PainPoint @relation(fields: [painPointId], references: [id], onDelete: Cascade)
+  priority     Int?     @default(0)
+  createdAt    DateTime @default(now())
+
+  @@unique([industryId, painPointId])
+  @@index([industryId])
+  @@index([painPointId])
+  @@map("industry_pain_points")
+}
+
+model IndustryUseCase {
+  id          String   @id @default(uuid())
+  industryId  String
+  industry    Industry @relation(fields: [industryId], references: [id], onDelete: Cascade)
+  useCaseId   String
+  useCase     UseCase  @relation(fields: [useCaseId], references: [id], onDelete: Cascade)
+  priority    Int?     @default(0)
+  createdAt   DateTime @default(now())
+
+  @@unique([industryId, useCaseId])
+  @@index([industryId])
+  @@index([useCaseId])
+  @@map("industry_use_cases")
+}
+
+// ============================================================
+// مدیریت دسترسی‌ها (Policy)
+// ============================================================
+
+model Permission {
+  id          String   @id @default(uuid())
+  action      String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  rolePermissions RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  id           String   @id @default(uuid())
+  role         UserRole
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([role, permissionId])
+  @@map("role_permissions")
+}
