@@ -16,6 +16,31 @@ export class AdminPermissionsService {
     });
   }
 
+  async getPermissionMatrix() {
+    const roles = Object.values(UserRole);
+    const permissions = await this.prisma.permission.findMany({
+      orderBy: { action: 'asc' },
+      include: { rolePermissions: { select: { role: true } } },
+    });
+
+    return {
+      roles,
+      permissions: permissions.map((permission) => {
+        const assignedRoles = new Set(permission.rolePermissions.map((item) => item.role));
+        return {
+          action: permission.action,
+          description: permission.description,
+          roles: {
+            [UserRole.ADMIN]: assignedRoles.has(UserRole.ADMIN),
+            [UserRole.MANAGER]: assignedRoles.has(UserRole.MANAGER),
+            [UserRole.REP]: assignedRoles.has(UserRole.REP),
+            [UserRole.BOARDS]: assignedRoles.has(UserRole.BOARDS),
+          },
+        };
+      }),
+    };
+  }
+
   // ============================================================
   // ۲. دریافت دسترسی‌های یک نقش
   // ============================================================

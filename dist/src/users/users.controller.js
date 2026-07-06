@@ -55,7 +55,7 @@ exports.UsersController = UsersController;
 __decorate([
     (0, common_1.Post)(),
     (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN),
-    (0, permissions_decorator_1.Permissions)('user:create'),
+    (0, permissions_decorator_1.Permissions)('user:manage'),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [create_user_dto_1.CreateUserDto]),
@@ -91,7 +91,7 @@ __decorate([
 __decorate([
     (0, common_1.Patch)(':id/deactivate'),
     (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN),
-    (0, permissions_decorator_1.Permissions)('user:deactivate'),
+    (0, permissions_decorator_1.Permissions)('user:manage'),
     __param(0, (0, common_1.Param)('id')),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),
@@ -100,7 +100,7 @@ __decorate([
 __decorate([
     (0, common_1.Patch)(':id/activate'),
     (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN),
-    (0, permissions_decorator_1.Permissions)('user:activate'),
+    (0, permissions_decorator_1.Permissions)('user:manage'),
     __param(0, (0, common_1.Param)('id')),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),
@@ -109,7 +109,7 @@ __decorate([
 __decorate([
     (0, common_1.Patch)(':id/role'),
     (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN),
-    (0, permissions_decorator_1.Permissions)('user:create'),
+    (0, permissions_decorator_1.Permissions)('user:manage'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),

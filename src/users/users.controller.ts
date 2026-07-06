@@ -21,7 +21,7 @@ export class UsersController {
   // ============================================================
   @Post()
   @Roles(UserRole.ADMIN)
-  @Permissions('user:create')
+  @Permissions('user:manage')
   create(@Body() dto: CreateUserDto) {
     return this.usersService.create(dto);
   }
@@ -58,7 +58,7 @@ export class UsersController {
   // ============================================================
   @Patch(':id/deactivate')
   @Roles(UserRole.ADMIN)
-  @Permissions('user:deactivate')
+  @Permissions('user:manage')
   deactivate(@Param('id') id: string) {
     return this.usersService.deactivate(id);
   }
@@ -68,7 +68,7 @@ export class UsersController {
   // ============================================================
   @Patch(':id/activate')
   @Roles(UserRole.ADMIN)
-  @Permissions('user:activate') // یا می‌توانید از 'user:deactivate' استفاده کنید
+  @Permissions('user:manage')
   activate(@Param('id') id: string) {
     return this.usersService.activate(id);
   }
@@ -78,7 +78,7 @@ export class UsersController {
   // ============================================================
   @Patch(':id/role')
   @Roles(UserRole.ADMIN)
-  @Permissions('user:create')
+  @Permissions('user:manage')
   updateUserRole(
     @Param('id') id: string,
     @Body() dto: UpdateUserRoleDto,

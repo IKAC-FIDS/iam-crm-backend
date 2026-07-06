@@ -281,3 +281,11 @@ Body: form-data → Key: file (Type: File)
 - User list responses now include `createdAt` and `updatedAt` with stable pagination metadata.
 - Centralized safe user selection so list/detail APIs never expose password hashes.
 - Added the `company:assign-owner` permission for ADMIN and MANAGER.
+
+### fix 000007 - Permission matrix contract cleanup
+
+- Added `GET /api/admin/permissions/matrix` with every permission and explicit booleans for ADMIN, MANAGER, REP, and BOARDS.
+- Kept the existing permission list and per-role detail endpoints stable.
+- Standardized permission administration endpoints on `permission:view` and `permission:manage`.
+- The supported bulk revoke contract remains `POST /api/admin/permissions/bulk-revoke`; clients should send `{ role, actions }` in the request body.
+- Seeded roadmap permissions for advanced reports, people directory access, user management, and permission management.

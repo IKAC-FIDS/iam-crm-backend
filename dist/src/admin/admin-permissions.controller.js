@@ -28,6 +28,9 @@ let AdminPermissionsController = class AdminPermissionsController {
     getAllPermissions() {
         return this.adminPermissionsService.getAllPermissions();
     }
+    getPermissionMatrix() {
+        return this.adminPermissionsService.getPermissionMatrix();
+    }
     getRolePermissions(role) {
         if (!Object.values(client_1.UserRole).includes(role)) {
             throw new common_1.BadRequestException('نقش نامعتبر است');
@@ -83,14 +86,21 @@ let AdminPermissionsController = class AdminPermissionsController {
 exports.AdminPermissionsController = AdminPermissionsController;
 __decorate([
     (0, common_1.Get)(),
-    (0, permissions_decorator_1.Permissions)('user:view'),
+    (0, permissions_decorator_1.Permissions)('permission:view'),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", void 0)
 ], AdminPermissionsController.prototype, "getAllPermissions", null);
 __decorate([
+    (0, common_1.Get)('matrix'),
+    (0, permissions_decorator_1.Permissions)('permission:view'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], AdminPermissionsController.prototype, "getPermissionMatrix", null);
+__decorate([
     (0, common_1.Get)('roles/:role'),
-    (0, permissions_decorator_1.Permissions)('user:view'),
+    (0, permissions_decorator_1.Permissions)('permission:view'),
     __param(0, (0, common_1.Param)('role')),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),
@@ -98,7 +108,7 @@ __decorate([
 ], AdminPermissionsController.prototype, "getRolePermissions", null);
 __decorate([
     (0, common_1.Post)('assign'),
-    (0, permissions_decorator_1.Permissions)('user:create'),
+    (0, permissions_decorator_1.Permissions)('permission:manage'),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
@@ -106,7 +116,7 @@ __decorate([
 ], AdminPermissionsController.prototype, "assignPermissionToRole", null);
 __decorate([
     (0, common_1.Delete)('revoke'),
-    (0, permissions_decorator_1.Permissions)('user:deactivate'),
+    (0, permissions_decorator_1.Permissions)('permission:manage'),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
@@ -114,7 +124,7 @@ __decorate([
 ], AdminPermissionsController.prototype, "revokePermissionFromRole", null);
 __decorate([
     (0, common_1.Post)('create'),
-    (0, permissions_decorator_1.Permissions)('user:create'),
+    (0, permissions_decorator_1.Permissions)('permission:manage'),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
@@ -122,7 +132,7 @@ __decorate([
 ], AdminPermissionsController.prototype, "createPermission", null);
 __decorate([
     (0, common_1.Delete)(':action'),
-    (0, permissions_decorator_1.Permissions)('user:deactivate'),
+    (0, permissions_decorator_1.Permissions)('permission:manage'),
     __param(0, (0, common_1.Param)('action')),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),
@@ -130,7 +140,7 @@ __decorate([
 ], AdminPermissionsController.prototype, "deletePermission", null);
 __decorate([
     (0, common_1.Post)('bulk-assign'),
-    (0, permissions_decorator_1.Permissions)('user:create'),
+    (0, permissions_decorator_1.Permissions)('permission:manage'),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
@@ -138,7 +148,7 @@ __decorate([
 ], AdminPermissionsController.prototype, "bulkAssignPermissions", null);
 __decorate([
     (0, common_1.Post)('bulk-revoke'),
-    (0, permissions_decorator_1.Permissions)('user:deactivate'),
+    (0, permissions_decorator_1.Permissions)('permission:manage'),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
@@ -146,7 +156,7 @@ __decorate([
 ], AdminPermissionsController.prototype, "bulkRevokePermissions", null);
 __decorate([
     (0, common_1.Get)('roles/:role/with-details'),
-    (0, permissions_decorator_1.Permissions)('user:view'),
+    (0, permissions_decorator_1.Permissions)('permission:view'),
     __param(0, (0, common_1.Param)('role')),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),

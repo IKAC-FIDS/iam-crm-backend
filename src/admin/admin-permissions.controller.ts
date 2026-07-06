@@ -27,16 +27,22 @@ export class AdminPermissionsController {
   // ۱. دریافت لیست تمام دسترسی‌ها
   // ============================================================
   @Get()
-  @Permissions('user:view')
+  @Permissions('permission:view')
   getAllPermissions() {
     return this.adminPermissionsService.getAllPermissions();
+  }
+
+  @Get('matrix')
+  @Permissions('permission:view')
+  getPermissionMatrix() {
+    return this.adminPermissionsService.getPermissionMatrix();
   }
 
   // ============================================================
   // ۲. دریافت دسترسی‌های یک نقش خاص
   // ============================================================
   @Get('roles/:role')
-  @Permissions('user:view')
+  @Permissions('permission:view')
   getRolePermissions(@Param('role') role: UserRole) {
     if (!Object.values(UserRole).includes(role)) {
       throw new BadRequestException('نقش نامعتبر است');
@@ -48,7 +54,7 @@ export class AdminPermissionsController {
   // ۳. اختصاص یک دسترسی به نقش
   // ============================================================
   @Post('assign')
-  @Permissions('user:create')
+  @Permissions('permission:manage')
   assignPermissionToRole(
     @Body() body: { role: UserRole; action: string },
   ) {
@@ -65,7 +71,7 @@ export class AdminPermissionsController {
   // ۴. حذف یک دسترسی از نقش
   // ============================================================
   @Delete('revoke')
-  @Permissions('user:deactivate')
+  @Permissions('permission:manage')
   revokePermissionFromRole(
     @Body() body: { role: UserRole; action: string },
   ) {
@@ -82,7 +88,7 @@ export class AdminPermissionsController {
   // ۵. ایجاد دسترسی جدید
   // ============================================================
   @Post('create')
-  @Permissions('user:create')
+  @Permissions('permission:manage')
   createPermission(
     @Body() body: { action: string; description?: string },
   ) {
@@ -99,7 +105,7 @@ export class AdminPermissionsController {
   // ۶. حذف دسترسی
   // ============================================================
   @Delete(':action')
-  @Permissions('user:deactivate')
+  @Permissions('permission:manage')
   deletePermission(@Param('action') action: string) {
     return this.adminPermissionsService.deletePermission(action);
   }
@@ -108,7 +114,7 @@ export class AdminPermissionsController {
   // ✅ ۷. Bulk Assign Permissions به یک نقش
   // ============================================================
   @Post('bulk-assign')
-  @Permissions('user:create')
+  @Permissions('permission:manage')
   async bulkAssignPermissions(
     @Body() body: { role: UserRole; actions: string[] },
   ) {
@@ -128,7 +134,7 @@ export class AdminPermissionsController {
   // ✅ ۸. Bulk Revoke Permissions از یک نقش
   // ============================================================
   @Post('bulk-revoke')
-  @Permissions('user:deactivate')
+  @Permissions('permission:manage')
   async bulkRevokePermissions(
     @Body() body: { role: UserRole; actions: string[] },
   ) {
@@ -148,7 +154,7 @@ export class AdminPermissionsController {
   // ✅ ۹. دریافت وضعیت کامل دسترسی‌های یک نقش
   // ============================================================
   @Get('roles/:role/with-details')
-  @Permissions('user:view')
+  @Permissions('permission:view')
   async getRolePermissionsWithDetails(@Param('role') role: UserRole) {
     if (!Object.values(UserRole).includes(role)) {
       throw new BadRequestException('نقش نامعتبر است');

@@ -12,6 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.AdminPermissionsService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../prisma/prisma.service");
+const client_1 = require("@prisma/client");
 const permissions_guard_1 = require("../common/guards/permissions.guard");
 let AdminPermissionsService = class AdminPermissionsService {
     constructor(prisma) {
@@ -21,6 +22,29 @@ let AdminPermissionsService = class AdminPermissionsService {
         return this.prisma.permission.findMany({
             orderBy: { action: 'asc' },
         });
+    }
+    async getPermissionMatrix() {
+        const roles = Object.values(client_1.UserRole);
+        const permissions = await this.prisma.permission.findMany({
+            orderBy: { action: 'asc' },
+            include: { rolePermissions: { select: { role: true } } },
+        });
+        return {
+            roles,
+            permissions: permissions.map((permission) => {
+                const assignedRoles = new Set(permission.rolePermissions.map((item) => item.role));
+                return {
+                    action: permission.action,
+                    description: permission.description,
+                    roles: {
+                        [client_1.UserRole.ADMIN]: assignedRoles.has(client_1.UserRole.ADMIN),
+                        [client_1.UserRole.MANAGER]: assignedRoles.has(client_1.UserRole.MANAGER),
+                        [client_1.UserRole.REP]: assignedRoles.has(client_1.UserRole.REP),
+                        [client_1.UserRole.BOARDS]: assignedRoles.has(client_1.UserRole.BOARDS),
+                    },
+                };
+            }),
+        };
     }
     async getRolePermissions(role) {
         const rolePermissions = await this.prisma.rolePermission.findMany({
