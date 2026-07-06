@@ -23,12 +23,16 @@ const people_service_1 = require("./people.service");
 const create_person_dto_1 = require("./dto/create-person.dto");
 const update_person_dto_1 = require("./dto/update-person.dto");
 const find_people_dto_1 = require("./dto/find-people.dto");
+const find_people_directory_dto_1 = require("./dto/find-people-directory.dto");
 let PeopleController = class PeopleController {
     constructor(peopleService) {
         this.peopleService = peopleService;
     }
     findByCompany(query, user) {
         return this.peopleService.findByCompany(query.companyId, query, user);
+    }
+    findDirectory(query, user) {
+        return this.peopleService.findDirectory(query, user);
     }
     findOne(id, user) {
         return this.peopleService.findOne(id, user);
@@ -53,6 +57,15 @@ __decorate([
     __metadata("design:paramtypes", [find_people_dto_1.FindPeopleDto, Object]),
     __metadata("design:returntype", void 0)
 ], PeopleController.prototype, "findByCompany", null);
+__decorate([
+    (0, common_1.Get)('directory'),
+    (0, permissions_decorator_1.Permissions)('people:directory:view'),
+    __param(0, (0, common_1.Query)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [find_people_directory_dto_1.FindPeopleDirectoryDto, Object]),
+    __metadata("design:returntype", void 0)
+], PeopleController.prototype, "findDirectory", null);
 __decorate([
     (0, common_1.Get)(':id'),
     (0, permissions_decorator_1.Permissions)('person:view'),

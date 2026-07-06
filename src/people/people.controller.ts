@@ -19,6 +19,7 @@ import { CreatePersonDto } from './dto/create-person.dto';
 import { UpdatePersonDto } from './dto/update-person.dto';
 import { PaginationDto } from '../common/dto/pagination.dto'; // ← اضافه شد
 import { FindPeopleDto } from './dto/find-people.dto';
+import { FindPeopleDirectoryDto } from './dto/find-people-directory.dto';
 
 
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
@@ -36,6 +37,15 @@ export class PeopleController {
     @CurrentUser() user: CurrentUserPayload,
   ) {
     return this.peopleService.findByCompany(query.companyId, query, user);
+  }
+
+  @Get('directory')
+  @Permissions('people:directory:view')
+  findDirectory(
+    @Query() query: FindPeopleDirectoryDto,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.peopleService.findDirectory(query, user);
   }
 
   // ============================================================

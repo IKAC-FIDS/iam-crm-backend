@@ -588,6 +588,13 @@ Body: form-data → Key: file (Type: File)
 
 **Not applicable — frontend only.** No backend API, schema, or service changes are required.
 
+### fix 000011 - Global People Directory endpoint
+
+- Added the separate paginated `GET /api/people/directory` endpoint without changing the existing company-scoped People API.
+- Added search plus company, owner, team, department, persona, primary-contact, email, and phone filters.
+- Applied role visibility using `people:directory:view`: ADMIN sees all active-company people, MANAGER sees the manager's team, REP sees owned-company people, and BOARDS remains unauthorized by default.
+- Included safe company owner, contact, and social details with derived primary email and phone summaries.
+
 ---
 
 **Built with ❤️ for sales team**
