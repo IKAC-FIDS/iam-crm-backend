@@ -22,6 +22,9 @@ const current_user_decorator_1 = require("../common/decorators/current-user.deco
 const activities_service_1 = require("./activities.service");
 const create_activity_dto_1 = require("./dto/create-activity.dto");
 const find_activities_dto_1 = require("./dto/find-activities.dto");
+const update_activity_dto_1 = require("./dto/update-activity.dto");
+const complete_activity_dto_1 = require("./dto/complete-activity.dto");
+const reschedule_activity_dto_1 = require("./dto/reschedule-activity.dto");
 const pagination_dto_1 = require("../common/dto/pagination.dto");
 let ActivitiesController = class ActivitiesController {
     constructor(activitiesService) {
@@ -35,6 +38,15 @@ let ActivitiesController = class ActivitiesController {
     }
     create(dto, user) {
         return this.activitiesService.create(dto, user);
+    }
+    update(activityId, dto, user) {
+        return this.activitiesService.updateActivity(activityId, dto, user);
+    }
+    complete(activityId, dto, user) {
+        return this.activitiesService.completeActivity(activityId, dto, user);
+    }
+    reschedule(activityId, dto, user) {
+        return this.activitiesService.rescheduleActivity(activityId, dto, user);
     }
 };
 exports.ActivitiesController = ActivitiesController;
@@ -65,6 +77,36 @@ __decorate([
     __metadata("design:paramtypes", [create_activity_dto_1.CreateActivityDto, Object]),
     __metadata("design:returntype", void 0)
 ], ActivitiesController.prototype, "create", null);
+__decorate([
+    (0, common_1.Patch)(':activityId'),
+    (0, permissions_decorator_1.Permissions)('activity:update'),
+    __param(0, (0, common_1.Param)('activityId')),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, update_activity_dto_1.UpdateActivityDto, Object]),
+    __metadata("design:returntype", void 0)
+], ActivitiesController.prototype, "update", null);
+__decorate([
+    (0, common_1.Patch)(':activityId/complete'),
+    (0, permissions_decorator_1.Permissions)('follow-up:complete'),
+    __param(0, (0, common_1.Param)('activityId')),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, complete_activity_dto_1.CompleteActivityDto, Object]),
+    __metadata("design:returntype", void 0)
+], ActivitiesController.prototype, "complete", null);
+__decorate([
+    (0, common_1.Patch)(':activityId/reschedule'),
+    (0, permissions_decorator_1.Permissions)('follow-up:reschedule'),
+    __param(0, (0, common_1.Param)('activityId')),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, reschedule_activity_dto_1.RescheduleActivityDto, Object]),
+    __metadata("design:returntype", void 0)
+], ActivitiesController.prototype, "reschedule", null);
 exports.ActivitiesController = ActivitiesController = __decorate([
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard, permissions_guard_1.PermissionsGuard),
     (0, common_1.Controller)('activities'),

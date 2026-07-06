@@ -97,9 +97,10 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  ownedCompanies   Company[]             @relation("CompanyOwner")
-  activities       Activity[]
-  stageChangesMade PipelineStageHistory[]
+  ownedCompanies      Company[]              @relation("CompanyOwner")
+  activities          Activity[]
+  completedActivities Activity[]             @relation("ActivityCompletedBy")
+  stageChangesMade    PipelineStageHistory[]
 
   @@map("users")
 }
@@ -130,8 +131,8 @@ model Company {
   parentCompany   Company?  @relation("CompanyHierarchy", fields: [parentCompanyId], references: [id])
   subsidiaries    Company[] @relation("CompanyHierarchy")
 
-  website      String?
-  publicEmail  String?
+  website            String?
+  publicEmail        String?
   headOfficeProvince String?
   headOfficeCity     String?
   headOfficeAddress  String?
@@ -142,12 +143,12 @@ model Company {
   employeeCount     Int?
   annualRevenue     BigInt?
 
-  ownerId          String?
-  owner            User?          @relation("CompanyOwner", fields: [ownerId], references: [id])
-  priority         Priority       @default(MEDIUM)
-  stage            PipelineStage  @default(LEAD)
-  source           String?        @default("SAM_LIST")
-  nextActionDate   DateTime?
+  ownerId        String?
+  owner          User?         @relation("CompanyOwner", fields: [ownerId], references: [id])
+  priority       Priority      @default(MEDIUM)
+  stage          PipelineStage @default(LEAD)
+  source         String?       @default("SAM_LIST")
+  nextActionDate DateTime?
 
   researchCompletion Json?
 
@@ -169,7 +170,6 @@ model Company {
   @@index([updatedAt])
   @@index([ownerId, stage])
   @@index([stage, priority])
-
   @@map("companies")
 }
 
@@ -216,15 +216,15 @@ model Person {
   companyId String
   company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
-  fullName        String
-  title           String?
-  department      String?
-  seniorityLevel  String?
-  personaTag      String?
-  tenureInRole    String?
-  expertiseArea   String?
-  linkedinActive  Boolean?
-  bestChannel     String?
+  fullName       String
+  title          String?
+  department     String?
+  seniorityLevel String?
+  personaTag     String?
+  tenureInRole   String?
+  expertiseArea  String?
+  linkedinActive Boolean?
+  bestChannel    String?
 
   isPrimaryContact   Boolean @default(false)
   isSecondaryContact Boolean @default(false)
@@ -253,13 +253,13 @@ model Person {
 // ============================================================
 
 model PersonContact {
-  id        String   @id @default(uuid())
-  personId  String
-  person    Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  id       String @id @default(uuid())
+  personId String
+  person   Person @relation(fields: [personId], references: [id], onDelete: Cascade)
 
-  type      String   // MOBILE, WORK, HOME, INTERNAL, PERSONAL_EMAIL, WORK_EMAIL, OTHER_EMAIL
-  value     String   // شماره تلفن یا آدرس ایمیل
-  isPrimary Boolean  @default(false)
+  type      String // MOBILE, WORK, HOME, INTERNAL, PERSONAL_EMAIL, WORK_EMAIL, OTHER_EMAIL
+  value     String // شماره تلفن یا آدرس ایمیل
+  isPrimary Boolean @default(false)
   note      String?
 
   createdAt DateTime @default(now())
@@ -276,13 +276,13 @@ model PersonContact {
 // ============================================================
 
 model PersonSocial {
-  id        String   @id @default(uuid())
-  personId  String
-  person    Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  id       String @id @default(uuid())
+  personId String
+  person   Person @relation(fields: [personId], references: [id], onDelete: Cascade)
 
-  platform  String   // TELEGRAM, WHATSAPP, INSTAGRAM, LINKEDIN, TWITTER, YOUTUBE, ...
-  handle    String   // نام کاربری یا لینک پروفایل
-  isPrimary Boolean  @default(false)
+  platform  String // TELEGRAM, WHATSAPP, INSTAGRAM, LINKEDIN, TWITTER, YOUTUBE, ...
+  handle    String // نام کاربری یا لینک پروفایل
+  isPrimary Boolean @default(false)
   note      String?
 
   createdAt DateTime @default(now())
@@ -299,25 +299,30 @@ model PersonSocial {
 // ============================================================
 
 model Activity {
-  id        String   @id @default(uuid())
+  id        String  @id @default(uuid())
   companyId String
-  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
   personId  String?
-  person    Person?  @relation(fields: [personId], references: [id])
+  person    Person? @relation(fields: [personId], references: [id])
   userId    String
-  user      User     @relation(fields: [userId], references: [id])
+  user      User    @relation(fields: [userId], references: [id])
 
   type           ActivityType
   notes          String?
   outcome        String?
-  occurredAt     DateTime @default(now())
+  occurredAt     DateTime     @default(now())
   nextActionDate DateTime?
+  completedAt    DateTime?
+  completedById  String?
+  completedBy    User?        @relation("ActivityCompletedBy", fields: [completedById], references: [id])
+  completionNote String?
 
   createdAt DateTime @default(now())
 
   @@index([companyId])
   @@index([userId])
   @@index([nextActionDate])
+  @@index([completedAt])
   @@index([type])
   @@index([occurredAt])
   @@index([userId, nextActionDate])
@@ -330,14 +335,14 @@ model Activity {
 // ============================================================
 
 model PipelineStageHistory {
-  id        String        @id @default(uuid())
-  companyId String
-  company   Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  fromStage PipelineStage?
-  toStage   PipelineStage
+  id          String         @id @default(uuid())
+  companyId   String
+  company     Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  fromStage   PipelineStage?
+  toStage     PipelineStage
   changedById String?
-  changedBy   User?       @relation(fields: [changedById], references: [id])
-  changedAt DateTime      @default(now())
+  changedBy   User?          @relation(fields: [changedById], references: [id])
+  changedAt   DateTime       @default(now())
 
   @@index([companyId])
   @@index([changedAt])
@@ -358,21 +363,21 @@ model CallCard {
   primaryContactId   String?
   secondaryContactId String?
 
-  entryAngle    String?
-  painPoint     String?
-  useCase       String?
-  openingLine   String?
-  firstEmail    String?
-  linkedinMsg   String?
-  discoveryQs   Json?
-  objections    Json?
-  meetingAsk    String?
-  callGoal      String?
+  entryAngle  String?
+  painPoint   String?
+  useCase     String?
+  openingLine String?
+  firstEmail  String?
+  linkedinMsg String?
+  discoveryQs Json?
+  objections  Json?
+  meetingAsk  String?
+  callGoal    String?
 
   followUpNoResponseAt String?
   followUpInterestAt   String?
 
-  qualificationCriteria   String?
+  qualificationCriteria    String?
   disqualificationCriteria String?
 
   createdAt DateTime @default(now())
@@ -388,8 +393,8 @@ model CallCard {
 // ============================================================
 
 model PersonaLibrary {
-  id              String @id @default(uuid())
-  titlePattern    String
+  id               String  @id @default(uuid())
+  titlePattern     String
   defaultPainPoint String?
   defaultUseCase   String?
   notes            String?
@@ -432,25 +437,25 @@ model PainPoint {
 }
 
 model UseCase {
-  id          String   @id @default(uuid())
+  id          String            @id @default(uuid())
   title       String
   description String?
   category    String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  industries IndustryUseCase[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  industries  IndustryUseCase[]
 
   @@map("use_cases")
 }
 
 model IndustryPainPoint {
-  id           String   @id @default(uuid())
-  industryId   String
-  industry     Industry @relation(fields: [industryId], references: [id], onDelete: Cascade)
-  painPointId  String
-  painPoint    PainPoint @relation(fields: [painPointId], references: [id], onDelete: Cascade)
-  priority     Int?     @default(0)
-  createdAt    DateTime @default(now())
+  id          String    @id @default(uuid())
+  industryId  String
+  industry    Industry  @relation(fields: [industryId], references: [id], onDelete: Cascade)
+  painPointId String
+  painPoint   PainPoint @relation(fields: [painPointId], references: [id], onDelete: Cascade)
+  priority    Int?      @default(0)
+  createdAt   DateTime  @default(now())
 
   @@unique([industryId, painPointId])
   @@index([industryId])
@@ -459,13 +464,13 @@ model IndustryPainPoint {
 }
 
 model IndustryUseCase {
-  id          String   @id @default(uuid())
-  industryId  String
-  industry    Industry @relation(fields: [industryId], references: [id], onDelete: Cascade)
-  useCaseId   String
-  useCase     UseCase  @relation(fields: [useCaseId], references: [id], onDelete: Cascade)
-  priority    Int?     @default(0)
-  createdAt   DateTime @default(now())
+  id         String   @id @default(uuid())
+  industryId String
+  industry   Industry @relation(fields: [industryId], references: [id], onDelete: Cascade)
+  useCaseId  String
+  useCase    UseCase  @relation(fields: [useCaseId], references: [id], onDelete: Cascade)
+  priority   Int?     @default(0)
+  createdAt  DateTime @default(now())
 
   @@unique([industryId, useCaseId])
   @@index([industryId])
@@ -490,12 +495,12 @@ model Permission {
 }
 
 model RolePermission {
-  id           String   @id @default(uuid())
+  id           String     @id @default(uuid())
   role         UserRole
   permissionId String
   permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
 
   @@unique([role, permissionId])
   @@map("role_permissions")

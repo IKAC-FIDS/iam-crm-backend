@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
@@ -7,6 +7,9 @@ import { CurrentUser, CurrentUserPayload } from '../common/decorators/current-us
 import { ActivitiesService } from './activities.service';
 import { CreateActivityDto } from './dto/create-activity.dto';
 import { FindActivitiesDto } from './dto/find-activities.dto';
+import { UpdateActivityDto } from './dto/update-activity.dto';
+import { CompleteActivityDto } from './dto/complete-activity.dto';
+import { RescheduleActivityDto } from './dto/reschedule-activity.dto';
 import { PaginationDto } from '../common/dto/pagination.dto'; // ← اضافه شد
 
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
@@ -39,5 +42,23 @@ export class ActivitiesController {
     @CurrentUser() user: CurrentUserPayload,
   ) {
     return this.activitiesService.create(dto, user);
+  }
+
+  @Patch(':activityId')
+  @Permissions('activity:update')
+  update(@Param('activityId') activityId: string, @Body() dto: UpdateActivityDto, @CurrentUser() user: CurrentUserPayload) {
+    return this.activitiesService.updateActivity(activityId, dto, user);
+  }
+
+  @Patch(':activityId/complete')
+  @Permissions('follow-up:complete')
+  complete(@Param('activityId') activityId: string, @Body() dto: CompleteActivityDto, @CurrentUser() user: CurrentUserPayload) {
+    return this.activitiesService.completeActivity(activityId, dto, user);
+  }
+
+  @Patch(':activityId/reschedule')
+  @Permissions('follow-up:reschedule')
+  reschedule(@Param('activityId') activityId: string, @Body() dto: RescheduleActivityDto, @CurrentUser() user: CurrentUserPayload) {
+    return this.activitiesService.rescheduleActivity(activityId, dto, user);
   }
 }

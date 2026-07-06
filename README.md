@@ -237,3 +237,15 @@ Body: form-data → Key: file (Type: File)
 ---
 
 **ساخته‌شده با ❤️ برای تیم فروش IAM**
+
+---
+
+## Change log
+
+### fix 000001 - Activity lifecycle backend
+
+- Added activity editing through `PATCH /api/activities/:activityId` with company-scope access checks and protection for `STAGE_CHANGE` records.
+- Added follow-up completion and rescheduling endpoints.
+- Added completion metadata (`completedAt`, `completedById`, and `completionNote`) with a Prisma migration.
+- Excluded completed follow-ups from the due list; future reschedules naturally leave the due list.
+- Added DTO validation, safe empty-string normalization, and the `activity:update`, `follow-up:complete`, and `follow-up:reschedule` permissions for ADMIN, MANAGER, and REP.

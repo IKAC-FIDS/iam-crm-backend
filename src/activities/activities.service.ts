@@ -1,6 +1,9 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateActivityDto } from './dto/create-activity.dto';
+import { UpdateActivityDto } from './dto/update-activity.dto';
+import { CompleteActivityDto } from './dto/complete-activity.dto';
+import { RescheduleActivityDto } from './dto/reschedule-activity.dto';
 import { CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { PaginationDto, PaginatedResponse } from '../common/dto/pagination.dto';
 import { UserRole } from '@prisma/client';
@@ -56,6 +59,23 @@ export class ActivitiesService {
 
     // بررسی دسترسی به شرکت مربوطه
     await this.validateCompanyAccess(person.companyId, user);
+    return person;
+  }
+
+  private async findActivityForMutation(activityId: string, user: CurrentUserPayload) {
+    const activity = await this.prisma.activity.findUnique({
+      where: { id: activityId },
+      include: {
+        company: true,
+        person: true,
+        user: { select: { id: true, fullName: true } },
+        completedBy: { select: { id: true, fullName: true } },
+      },
+    });
+
+    if (!activity) throw new NotFoundException('Activity not found');
+    await this.validateCompanyAccess(activity.companyId, user);
+    return activity;
   }
 
   // ============================================================
@@ -126,6 +146,77 @@ export class ActivitiesService {
     });
   }
 
+  async updateActivity(activityId: string, dto: UpdateActivityDto, user: CurrentUserPayload) {
+    const activity = await this.findActivityForMutation(activityId, user);
+
+    if (activity.type === 'STAGE_CHANGE') {
+      throw new BadRequestException('STAGE_CHANGE activities cannot be edited manually');
+    }
+    if (dto.type === 'STAGE_CHANGE') {
+      throw new BadRequestException('Activity type cannot be changed to STAGE_CHANGE manually');
+    }
+    if (dto.personId) {
+      const person = await this.validatePersonAccess(dto.personId, user);
+      if (person.companyId !== activity.companyId) {
+        throw new BadRequestException('Person must belong to the activity company');
+      }
+    }
+
+    return this.prisma.activity.update({
+      where: { id: activityId },
+      data: {
+        ...(dto.type !== undefined && { type: dto.type }),
+        ...(dto.personId !== undefined && { personId: dto.personId }),
+        ...(dto.occurredAt != null && { occurredAt: new Date(dto.occurredAt) }),
+        ...(dto.notes !== undefined && { notes: dto.notes }),
+        ...(dto.outcome !== undefined && { outcome: dto.outcome }),
+        ...(dto.nextActionDate !== undefined && {
+          nextActionDate: dto.nextActionDate === null ? null : new Date(dto.nextActionDate),
+        }),
+      },
+      include: { company: true, person: true, user: { select: { id: true, fullName: true } }, completedBy: { select: { id: true, fullName: true } } },
+    });
+  }
+
+  async completeActivity(activityId: string, dto: CompleteActivityDto, user: CurrentUserPayload) {
+    const activity = await this.findActivityForMutation(activityId, user);
+    if (!activity.nextActionDate) {
+      throw new BadRequestException('Only activities with a follow-up date can be completed');
+    }
+    if (activity.completedAt) return activity;
+
+    return this.prisma.activity.update({
+      where: { id: activityId },
+      data: {
+        completedAt: new Date(),
+        completedById: user.userId,
+        completionNote: dto.completionNote,
+        ...(dto.outcome !== undefined && { outcome: dto.outcome }),
+      },
+      include: { company: true, person: true, user: { select: { id: true, fullName: true } }, completedBy: { select: { id: true, fullName: true } } },
+    });
+  }
+
+  async rescheduleActivity(activityId: string, dto: RescheduleActivityDto, user: CurrentUserPayload) {
+    const activity = await this.findActivityForMutation(activityId, user);
+    if (activity.completedAt) {
+      throw new BadRequestException('Completed follow-ups cannot be rescheduled');
+    }
+
+    const nextActionDate = new Date(dto.nextActionDate);
+    if (nextActionDate <= new Date()) {
+      throw new BadRequestException('nextActionDate must be in the future');
+    }
+    const note = dto.note?.trim();
+    const notes = note ? [activity.notes, `[Rescheduled] ${note}`].filter(Boolean).join('\n') : activity.notes;
+
+    return this.prisma.activity.update({
+      where: { id: activityId },
+      data: { nextActionDate, notes },
+      include: { company: true, person: true, user: { select: { id: true, fullName: true } }, completedBy: { select: { id: true, fullName: true } } },
+    });
+  }
+
   // ============================================================
   // ۳. دریافت فعالیت‌های سررسید شده (فقط برای کاربر جاری)
   // ============================================================
@@ -145,6 +236,7 @@ export class ActivitiesService {
     const where = {
       userId: user.userId,
       nextActionDate: { lte: new Date() },
+      completedAt: null,
     };
 
     const [data, total] = await Promise.all([
