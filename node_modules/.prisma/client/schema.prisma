@@ -98,6 +98,7 @@ model User {
   updatedAt    DateTime @updatedAt
 
   ownedCompanies      Company[]              @relation("CompanyOwner")
+  archivedCompanies   Company[]              @relation("CompanyArchivedBy")
   activities          Activity[]
   completedActivities Activity[]             @relation("ActivityCompletedBy")
   stageChangesMade    PipelineStageHistory[]
@@ -150,6 +151,11 @@ model Company {
   source         String?       @default("SAM_LIST")
   nextActionDate DateTime?
 
+  archivedAt    DateTime?
+  archivedById  String?
+  archivedBy    User?     @relation("CompanyArchivedBy", fields: [archivedById], references: [id])
+  archiveReason String?
+
   researchCompletion Json?
 
   createdAt DateTime @default(now())
@@ -168,6 +174,7 @@ model Company {
   @@index([industry])
   @@index([createdAt])
   @@index([updatedAt])
+  @@index([archivedAt])
   @@index([ownerId, stage])
   @@index([stage, priority])
   @@map("companies")

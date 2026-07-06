@@ -22,6 +22,7 @@ import { ChangeStageDto } from './dto/change-stage.dto';
 import { ChangeOwnerDto, BulkChangeOwnerDto } from './dto/change-owner.dto';
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { FindCompaniesDto } from './dto/find-companies.dto';
+import { ArchiveCompanyDto } from './dto/archive-company.dto';
 
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 @Controller('companies')
@@ -39,6 +40,8 @@ export class CompaniesController {
      withoutOwner: query.withoutOwner === 'true',
      search: query.search,
      ownerId: query.ownerId,
+     includeArchived: query.includeArchived === 'true',
+     archivedOnly: query.archivedOnly === 'true',
    });
  }
 
@@ -71,6 +74,24 @@ export class CompaniesController {
     @CurrentUser() user: CurrentUserPayload,
   ) {
     return this.companiesService.changeStage(id, dto, user);
+  }
+
+  @Patch(':id/archive')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @Permissions('company:archive')
+  archive(
+    @Param('id') id: string,
+    @Body() dto: ArchiveCompanyDto,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.companiesService.archive(id, dto, user);
+  }
+
+  @Patch(':id/restore')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @Permissions('company:restore')
+  restore(@Param('id') id: string, @CurrentUser() user: CurrentUserPayload) {
+    return this.companiesService.restore(id, user);
   }
 
   @Roles(UserRole.ADMIN, UserRole.MANAGER)

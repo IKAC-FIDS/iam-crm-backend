@@ -24,4 +24,12 @@ export class FindCompaniesDto extends PaginationDto {
   @IsOptional()
   @IsUUID()
   ownerId?: string;
+
+  @IsOptional()
+  @IsBooleanString()
+  includeArchived?: string;
+
+  @IsOptional()
+  @IsBooleanString()
+  archivedOnly?: string;
 }

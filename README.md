@@ -289,3 +289,10 @@ Body: form-data → Key: file (Type: File)
 - Standardized permission administration endpoints on `permission:view` and `permission:manage`.
 - The supported bulk revoke contract remains `POST /api/admin/permissions/bulk-revoke`; clients should send `{ role, actions }` in the request body.
 - Seeded roadmap permissions for advanced reports, people directory access, user management, and permission management.
+
+### fix 000008 - Company archive and restore backend
+
+- Added company archive metadata with the archiving user and an optional reason; related CRM records are never deleted.
+- Added `PATCH /api/companies/:companyId/archive` and `PATCH /api/companies/:companyId/restore` for ADMIN and team-scoped MANAGER users.
+- Company lists hide archived records by default and support `includeArchived=true` or `archivedOnly=true`.
+- Added and assigned `company:archive` and `company:restore` permissions.

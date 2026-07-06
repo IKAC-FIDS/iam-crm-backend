@@ -41,4 +41,14 @@ __decorate([
     (0, class_validator_1.IsUUID)(),
     __metadata("design:type", String)
 ], FindCompaniesDto.prototype, "ownerId", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsBooleanString)(),
+    __metadata("design:type", String)
+], FindCompaniesDto.prototype, "includeArchived", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsBooleanString)(),
+    __metadata("design:type", String)
+], FindCompaniesDto.prototype, "archivedOnly", void 0);
 //# sourceMappingURL=find-companies.dto.js.map

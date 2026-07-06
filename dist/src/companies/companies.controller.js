@@ -27,6 +27,7 @@ const update_company_dto_1 = require("./dto/update-company.dto");
 const change_stage_dto_1 = require("./dto/change-stage.dto");
 const change_owner_dto_1 = require("./dto/change-owner.dto");
 const find_companies_dto_1 = require("./dto/find-companies.dto");
+const archive_company_dto_1 = require("./dto/archive-company.dto");
 let CompaniesController = class CompaniesController {
     constructor(companiesService) {
         this.companiesService = companiesService;
@@ -38,6 +39,8 @@ let CompaniesController = class CompaniesController {
             withoutOwner: query.withoutOwner === 'true',
             search: query.search,
             ownerId: query.ownerId,
+            includeArchived: query.includeArchived === 'true',
+            archivedOnly: query.archivedOnly === 'true',
         });
     }
     findOne(id, user) {
@@ -51,6 +54,12 @@ let CompaniesController = class CompaniesController {
     }
     changeStage(id, dto, user) {
         return this.companiesService.changeStage(id, dto, user);
+    }
+    archive(id, dto, user) {
+        return this.companiesService.archive(id, dto, user);
+    }
+    restore(id, user) {
+        return this.companiesService.restore(id, user);
     }
     bulkChangeOwner(dto, user) {
         return this.companiesService.bulkChangeOwner(dto, user);
@@ -102,6 +111,27 @@ __decorate([
     __metadata("design:paramtypes", [String, change_stage_dto_1.ChangeStageDto, Object]),
     __metadata("design:returntype", void 0)
 ], CompaniesController.prototype, "changeStage", null);
+__decorate([
+    (0, common_1.Patch)(':id/archive'),
+    (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN, client_1.UserRole.MANAGER),
+    (0, permissions_decorator_1.Permissions)('company:archive'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, archive_company_dto_1.ArchiveCompanyDto, Object]),
+    __metadata("design:returntype", void 0)
+], CompaniesController.prototype, "archive", null);
+__decorate([
+    (0, common_1.Patch)(':id/restore'),
+    (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN, client_1.UserRole.MANAGER),
+    (0, permissions_decorator_1.Permissions)('company:restore'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", void 0)
+], CompaniesController.prototype, "restore", null);
 __decorate([
     (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN, client_1.UserRole.MANAGER),
     (0, permissions_decorator_1.Permissions)('company:bulk-change-owner'),

@@ -13,6 +13,7 @@ import { ChangeOwnerDto, BulkChangeOwnerDto } from './dto/change-owner.dto';
 import { CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { PaginationDto, PaginatedResponse } from '../common/dto/pagination.dto';
 import { PipelineConfigService } from '../admin/pipeline/pipeline-config.service';
+import { ArchiveCompanyDto } from './dto/archive-company.dto';
 
 @Injectable()
 export class CompaniesService {
@@ -30,6 +31,8 @@ export class CompaniesService {
       withoutOwner?: boolean;
       search?: string;
       ownerId?: string;
+      includeArchived?: boolean;
+      archivedOnly?: boolean;
     },
   ): Promise<PaginatedResponse<any>> {
     const page = pagination.page ?? 1;
@@ -93,6 +96,12 @@ export class CompaniesService {
         { industry: { contains: search } },
         { headOfficeCity: { contains: search } },
       ];
+    }
+
+    if (filters?.archivedOnly) {
+      where.archivedAt = { not: null };
+    } else if (!filters?.includeArchived) {
+      where.archivedAt = null;
     }
 
     const [data, total] = await Promise.all([
@@ -277,6 +286,36 @@ export class CompaniesService {
     });
   }
 
+  async archive(id: string, dto: ArchiveCompanyDto, user: CurrentUserPayload) {
+    const company = await this.prisma.company.findUnique({
+      where: { id },
+      include: { owner: { select: { team: true } } },
+    });
+    if (!company) throw new NotFoundException('شرکت پیدا نشد');
+    this.assertArchiveAccess(company, user);
+    if (company.archivedAt) throw new BadRequestException('شرکت قبلاً بایگانی شده است');
+
+    return this.prisma.company.update({
+      where: { id },
+      data: { archivedAt: new Date(), archivedById: user.userId, archiveReason: dto.reason },
+    });
+  }
+
+  async restore(id: string, user: CurrentUserPayload) {
+    const company = await this.prisma.company.findUnique({
+      where: { id },
+      include: { owner: { select: { team: true } } },
+    });
+    if (!company) throw new NotFoundException('شرکت پیدا نشد');
+    this.assertArchiveAccess(company, user);
+    if (!company.archivedAt) throw new BadRequestException('شرکت بایگانی نشده است');
+
+    return this.prisma.company.update({
+      where: { id },
+      data: { archivedAt: null, archivedById: null, archiveReason: null },
+    });
+  }
+
   // ============================================================
   // ۷. تغییر مالکیت گروهی شرکت‌ها
   // ============================================================
@@ -352,6 +391,12 @@ export class CompaniesService {
     }
 
     // MANAGER و ADMIN دسترسی کامل دارند
+  }
+
+  private assertArchiveAccess(company: { owner?: { team: string | null } | null }, user: CurrentUserPayload) {
+    if (user.role === UserRole.ADMIN) return;
+    if (user.role === UserRole.MANAGER && user.team && company.owner?.team === user.team) return;
+    throw new ForbiddenException('شما اجازه بایگانی یا بازیابی این شرکت را ندارید');
   }
 
   // ============================================================

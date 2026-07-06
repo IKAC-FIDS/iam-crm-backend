@@ -61,6 +61,12 @@ let CompaniesService = class CompaniesService {
                 { headOfficeCity: { contains: search } },
             ];
         }
+        if (filters?.archivedOnly) {
+            where.archivedAt = { not: null };
+        }
+        else if (!filters?.includeArchived) {
+            where.archivedAt = null;
+        }
         const [data, total] = await Promise.all([
             this.prisma.company.findMany({
                 where,
@@ -192,6 +198,36 @@ let CompaniesService = class CompaniesService {
             data: { ownerId: dto.newOwnerId },
         });
     }
+    async archive(id, dto, user) {
+        const company = await this.prisma.company.findUnique({
+            where: { id },
+            include: { owner: { select: { team: true } } },
+        });
+        if (!company)
+            throw new common_1.NotFoundException('شرکت پیدا نشد');
+        this.assertArchiveAccess(company, user);
+        if (company.archivedAt)
+            throw new common_1.BadRequestException('شرکت قبلاً بایگانی شده است');
+        return this.prisma.company.update({
+            where: { id },
+            data: { archivedAt: new Date(), archivedById: user.userId, archiveReason: dto.reason },
+        });
+    }
+    async restore(id, user) {
+        const company = await this.prisma.company.findUnique({
+            where: { id },
+            include: { owner: { select: { team: true } } },
+        });
+        if (!company)
+            throw new common_1.NotFoundException('شرکت پیدا نشد');
+        this.assertArchiveAccess(company, user);
+        if (!company.archivedAt)
+            throw new common_1.BadRequestException('شرکت بایگانی نشده است');
+        return this.prisma.company.update({
+            where: { id },
+            data: { archivedAt: null, archivedById: null, archiveReason: null },
+        });
+    }
     async bulkChangeOwner(dto, user) {
         if (user.role === client_1.UserRole.BOARDS) {
             throw new common_1.ForbiddenException('شما اجازه تغییر مالکیت گروهی شرکت‌ها را ندارید');
@@ -238,6 +274,13 @@ let CompaniesService = class CompaniesService {
         if (user.role === client_1.UserRole.REP && company.ownerId !== user.userId) {
             throw new common_1.ForbiddenException('شما به این شرکت دسترسی ندارید');
         }
+    }
+    assertArchiveAccess(company, user) {
+        if (user.role === client_1.UserRole.ADMIN)
+            return;
+        if (user.role === client_1.UserRole.MANAGER && user.team && company.owner?.team === user.team)
+            return;
+        throw new common_1.ForbiddenException('شما اجازه بایگانی یا بازیابی این شرکت را ندارید');
     }
     async assertChangeOwnerAccess(company, user) {
         if (user.role === client_1.UserRole.BOARDS) {
