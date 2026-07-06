@@ -265,3 +265,11 @@ Body: form-data → Key: file (Type: File)
 - Added Prisma catalog models, indexes, uniqueness constraints, and a database migration.
 - Added and assigned lead-source and lookup view/manage permissions; Persona Library now enforces its existing permissions.
 - Catalog dropdown endpoints return active records by default and support `?active=false` for inactive records.
+
+### fix 000004 - Pipeline stage config and transition rules backend
+
+- Added editable display configuration for every existing `PipelineStage` enum value, including order, color, active visibility, and terminal status.
+- Added generic and role-specific transition rules with role rules taking precedence over generic rules.
+- Added admin stage-config and transition-rule CRUD endpoints with dedicated permissions.
+- Seeded Persian stage labels, terminal stages, ordering, and the default allowed sales flow.
+- Company stage changes now reject inactive targets and transitions that are not explicitly allowed.

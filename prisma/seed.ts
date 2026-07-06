@@ -1,4 +1,4 @@
-import { PrismaClient, UserRole } from '@prisma/client';
+import { PipelineStage, PrismaClient, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
@@ -146,6 +146,65 @@ async function main() {
   // ============================================================
   // ۵. دسترسی‌های اولیه (Policy)
   // ============================================================
+  const stageConfigs = [
+    [PipelineStage.LEAD, 'سرنخ'],
+    [PipelineStage.CONTACTED, 'تماس گرفته شده'],
+    [PipelineStage.INTERESTED, 'علاقه‌مند'],
+    [PipelineStage.QUALIFIED, 'واجد شرایط'],
+    [PipelineStage.NEEDS_ASSESSMENT, 'نیازسنجی'],
+    [PipelineStage.PENDING_PRE_INVOICE_APPROVAL, 'در انتظار تأیید پیش‌فاکتور'],
+    [PipelineStage.POC_PILOT_SCHEDULED, 'پایلوت زمان‌بندی شده'],
+    [PipelineStage.POC_PILOT_IN_PROGRESS, 'پایلوت در حال اجرا'],
+    [PipelineStage.PENDING_POC_PILOT_APPROVAL, 'در انتظار تأیید پایلوت'],
+    [PipelineStage.PENDING_PAYMENT_INVOICE_APPROVAL, 'در انتظار تأیید فاکتور پرداخت'],
+    [PipelineStage.INSTALLATION_SCHEDULED, 'نصب زمان‌بندی شده'],
+    [PipelineStage.INSTALLATION_IN_PROGRESS, 'نصب در حال اجرا'],
+    [PipelineStage.PENDING_CUSTOMER_ACCEPTANCE, 'در انتظار پذیرش مشتری'],
+    [PipelineStage.DONE, 'انجام شده'],
+    [PipelineStage.ON_HOLD, 'متوقف شده'],
+    [PipelineStage.LOST, 'از دست رفته'],
+    [PipelineStage.NO_RESPONSE, 'بدون پاسخ'],
+  ] as const;
+
+  for (const [sortOrder, [stage, label]] of stageConfigs.entries()) {
+    await prisma.pipelineStageConfig.upsert({
+      where: { stage },
+      update: {},
+      create: {
+        stage,
+        label,
+        sortOrder,
+        isActive: true,
+        isTerminal: stage === PipelineStage.DONE || stage === PipelineStage.LOST || stage === PipelineStage.NO_RESPONSE,
+      },
+    });
+  }
+
+  const defaultTransitions: Array<[PipelineStage, PipelineStage]> = [
+    [PipelineStage.LEAD, PipelineStage.CONTACTED],
+    [PipelineStage.CONTACTED, PipelineStage.INTERESTED],
+    [PipelineStage.CONTACTED, PipelineStage.NO_RESPONSE],
+    [PipelineStage.INTERESTED, PipelineStage.QUALIFIED],
+    [PipelineStage.QUALIFIED, PipelineStage.NEEDS_ASSESSMENT],
+    [PipelineStage.NEEDS_ASSESSMENT, PipelineStage.PENDING_PRE_INVOICE_APPROVAL],
+    [PipelineStage.PENDING_PRE_INVOICE_APPROVAL, PipelineStage.POC_PILOT_SCHEDULED],
+    [PipelineStage.POC_PILOT_SCHEDULED, PipelineStage.POC_PILOT_IN_PROGRESS],
+    [PipelineStage.POC_PILOT_IN_PROGRESS, PipelineStage.PENDING_POC_PILOT_APPROVAL],
+    [PipelineStage.PENDING_POC_PILOT_APPROVAL, PipelineStage.PENDING_PAYMENT_INVOICE_APPROVAL],
+    [PipelineStage.PENDING_PAYMENT_INVOICE_APPROVAL, PipelineStage.INSTALLATION_SCHEDULED],
+    [PipelineStage.INSTALLATION_SCHEDULED, PipelineStage.INSTALLATION_IN_PROGRESS],
+    [PipelineStage.INSTALLATION_IN_PROGRESS, PipelineStage.PENDING_CUSTOMER_ACCEPTANCE],
+    [PipelineStage.PENDING_CUSTOMER_ACCEPTANCE, PipelineStage.DONE],
+    [PipelineStage.ON_HOLD, PipelineStage.CONTACTED],
+  ];
+
+  for (const [fromStage, toStage] of defaultTransitions) {
+    const existing = await prisma.pipelineStageTransition.findFirst({ where: { fromStage, toStage, role: null } });
+    if (!existing) {
+      await prisma.pipelineStageTransition.create({ data: { fromStage, toStage, role: null, isAllowed: true } });
+    }
+  }
+
   const permissions = [
     // ... (همان دسترسی‌های قبلی)
     { action: 'user:create', description: 'ایجاد کاربر جدید' },
@@ -173,6 +232,10 @@ async function main() {
     { action: 'library:lead-source:manage', description: 'Manage lead sources' },
     { action: 'lookup:view', description: 'View lookup options' },
     { action: 'lookup:manage', description: 'Manage lookup options' },
+    { action: 'pipeline:config:view', description: 'View pipeline stage configuration' },
+    { action: 'pipeline:config:manage', description: 'Manage pipeline stage configuration' },
+    { action: 'pipeline:transition:view', description: 'View pipeline transition rules' },
+    { action: 'pipeline:transition:manage', description: 'Manage pipeline transition rules' },
     // دسترسی‌های قدیمی صنعت (برای سازگاری - می‌توان حذف کرد)
     // { action: 'library:industry:manage', description: 'مدیریت کتابخانه صنعت' },
     // { action: 'library:industry:view', description: 'مشاهده کتابخانه صنعت' },

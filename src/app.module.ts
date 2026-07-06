@@ -24,6 +24,7 @@ import { PainPointsModule } from './pain-points/pain-points.module';
 import { UseCasesModule } from './use-cases/use-cases.module';
 import { LeadSourcesModule } from './lead-sources/lead-sources.module';
 import { LookupsModule } from './lookups/lookups.module';
+import { PipelineConfigModule } from './admin/pipeline/pipeline-config.module';
 
 @Module({
   imports: [
@@ -64,6 +65,7 @@ import { LookupsModule } from './lookups/lookups.module';
     UseCasesModule,
     LeadSourcesModule,
     LookupsModule,
+    PipelineConfigModule,
   ],
   providers: [
     {

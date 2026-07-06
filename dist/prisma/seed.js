@@ -149,6 +149,61 @@ async function main() {
             console.log(`✅ صنعت ایجاد شد: ${ind.name}`);
         }
     }
+    const stageConfigs = [
+        [client_1.PipelineStage.LEAD, 'سرنخ'],
+        [client_1.PipelineStage.CONTACTED, 'تماس گرفته شده'],
+        [client_1.PipelineStage.INTERESTED, 'علاقه‌مند'],
+        [client_1.PipelineStage.QUALIFIED, 'واجد شرایط'],
+        [client_1.PipelineStage.NEEDS_ASSESSMENT, 'نیازسنجی'],
+        [client_1.PipelineStage.PENDING_PRE_INVOICE_APPROVAL, 'در انتظار تأیید پیش‌فاکتور'],
+        [client_1.PipelineStage.POC_PILOT_SCHEDULED, 'پایلوت زمان‌بندی شده'],
+        [client_1.PipelineStage.POC_PILOT_IN_PROGRESS, 'پایلوت در حال اجرا'],
+        [client_1.PipelineStage.PENDING_POC_PILOT_APPROVAL, 'در انتظار تأیید پایلوت'],
+        [client_1.PipelineStage.PENDING_PAYMENT_INVOICE_APPROVAL, 'در انتظار تأیید فاکتور پرداخت'],
+        [client_1.PipelineStage.INSTALLATION_SCHEDULED, 'نصب زمان‌بندی شده'],
+        [client_1.PipelineStage.INSTALLATION_IN_PROGRESS, 'نصب در حال اجرا'],
+        [client_1.PipelineStage.PENDING_CUSTOMER_ACCEPTANCE, 'در انتظار پذیرش مشتری'],
+        [client_1.PipelineStage.DONE, 'انجام شده'],
+        [client_1.PipelineStage.ON_HOLD, 'متوقف شده'],
+        [client_1.PipelineStage.LOST, 'از دست رفته'],
+        [client_1.PipelineStage.NO_RESPONSE, 'بدون پاسخ'],
+    ];
+    for (const [sortOrder, [stage, label]] of stageConfigs.entries()) {
+        await prisma.pipelineStageConfig.upsert({
+            where: { stage },
+            update: {},
+            create: {
+                stage,
+                label,
+                sortOrder,
+                isActive: true,
+                isTerminal: stage === client_1.PipelineStage.DONE || stage === client_1.PipelineStage.LOST || stage === client_1.PipelineStage.NO_RESPONSE,
+            },
+        });
+    }
+    const defaultTransitions = [
+        [client_1.PipelineStage.LEAD, client_1.PipelineStage.CONTACTED],
+        [client_1.PipelineStage.CONTACTED, client_1.PipelineStage.INTERESTED],
+        [client_1.PipelineStage.CONTACTED, client_1.PipelineStage.NO_RESPONSE],
+        [client_1.PipelineStage.INTERESTED, client_1.PipelineStage.QUALIFIED],
+        [client_1.PipelineStage.QUALIFIED, client_1.PipelineStage.NEEDS_ASSESSMENT],
+        [client_1.PipelineStage.NEEDS_ASSESSMENT, client_1.PipelineStage.PENDING_PRE_INVOICE_APPROVAL],
+        [client_1.PipelineStage.PENDING_PRE_INVOICE_APPROVAL, client_1.PipelineStage.POC_PILOT_SCHEDULED],
+        [client_1.PipelineStage.POC_PILOT_SCHEDULED, client_1.PipelineStage.POC_PILOT_IN_PROGRESS],
+        [client_1.PipelineStage.POC_PILOT_IN_PROGRESS, client_1.PipelineStage.PENDING_POC_PILOT_APPROVAL],
+        [client_1.PipelineStage.PENDING_POC_PILOT_APPROVAL, client_1.PipelineStage.PENDING_PAYMENT_INVOICE_APPROVAL],
+        [client_1.PipelineStage.PENDING_PAYMENT_INVOICE_APPROVAL, client_1.PipelineStage.INSTALLATION_SCHEDULED],
+        [client_1.PipelineStage.INSTALLATION_SCHEDULED, client_1.PipelineStage.INSTALLATION_IN_PROGRESS],
+        [client_1.PipelineStage.INSTALLATION_IN_PROGRESS, client_1.PipelineStage.PENDING_CUSTOMER_ACCEPTANCE],
+        [client_1.PipelineStage.PENDING_CUSTOMER_ACCEPTANCE, client_1.PipelineStage.DONE],
+        [client_1.PipelineStage.ON_HOLD, client_1.PipelineStage.CONTACTED],
+    ];
+    for (const [fromStage, toStage] of defaultTransitions) {
+        const existing = await prisma.pipelineStageTransition.findFirst({ where: { fromStage, toStage, role: null } });
+        if (!existing) {
+            await prisma.pipelineStageTransition.create({ data: { fromStage, toStage, role: null, isAllowed: true } });
+        }
+    }
     const permissions = [
         { action: 'user:create', description: 'ایجاد کاربر جدید' },
         { action: 'user:view', description: 'مشاهده لیست کاربران' },
@@ -174,6 +229,10 @@ async function main() {
         { action: 'library:lead-source:manage', description: 'Manage lead sources' },
         { action: 'lookup:view', description: 'View lookup options' },
         { action: 'lookup:manage', description: 'Manage lookup options' },
+        { action: 'pipeline:config:view', description: 'View pipeline stage configuration' },
+        { action: 'pipeline:config:manage', description: 'Manage pipeline stage configuration' },
+        { action: 'pipeline:transition:view', description: 'View pipeline transition rules' },
+        { action: 'pipeline:transition:manage', description: 'Manage pipeline transition rules' },
         { action: 'report:view', description: 'مشاهده گزارش‌ها' },
         { action: 'call-card:view', description: 'مشاهده Call Card' },
         { action: 'call-card:manage', description: 'مدیریت Call Card' },

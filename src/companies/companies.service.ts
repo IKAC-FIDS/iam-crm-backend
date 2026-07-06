@@ -12,10 +12,11 @@ import { ChangeStageDto } from './dto/change-stage.dto';
 import { ChangeOwnerDto, BulkChangeOwnerDto } from './dto/change-owner.dto';
 import { CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { PaginationDto, PaginatedResponse } from '../common/dto/pagination.dto';
+import { PipelineConfigService } from '../admin/pipeline/pipeline-config.service';
 
 @Injectable()
 export class CompaniesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private pipelineConfig: PipelineConfigService) {}
 
   // ============================================================
   // ۱. دریافت لیست شرکت‌ها (با فیلترهای پیشرفته + صفحه‌بندی)
@@ -209,6 +210,8 @@ export class CompaniesService {
     if (!company) throw new NotFoundException('شرکت پیدا نشد');
 
     this.assertAccess(company, user);
+
+    await this.pipelineConfig.assertTransitionAllowed(company.stage, dto.stage, user.role as UserRole);
 
     const [updated] = await this.prisma.$transaction([
       this.prisma.company.update({

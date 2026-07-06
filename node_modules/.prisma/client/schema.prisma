@@ -351,6 +351,36 @@ model PipelineStageHistory {
   @@map("pipeline_stage_history")
 }
 
+model PipelineStageConfig {
+  id          String        @id @default(uuid())
+  stage       PipelineStage @unique
+  label       String
+  description String?
+  sortOrder   Int
+  color       String?
+  isActive    Boolean       @default(true)
+  isTerminal  Boolean       @default(false)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([isActive, sortOrder])
+  @@map("pipeline_stage_configs")
+}
+
+model PipelineStageTransition {
+  id        String         @id @default(uuid())
+  fromStage PipelineStage?
+  toStage   PipelineStage
+  role      UserRole?
+  isAllowed Boolean        @default(true)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@unique([fromStage, toStage, role])
+  @@index([fromStage, toStage])
+  @@map("pipeline_stage_transitions")
+}
+
 // ============================================================
 // Call Card
 // ============================================================

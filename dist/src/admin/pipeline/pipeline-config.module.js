@@ -6,20 +6,18 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.CompaniesModule = void 0;
+exports.PipelineConfigModule = void 0;
 const common_1 = require("@nestjs/common");
-const companies_service_1 = require("./companies.service");
-const companies_controller_1 = require("./companies.controller");
-const pipeline_config_module_1 = require("../admin/pipeline/pipeline-config.module");
-let CompaniesModule = class CompaniesModule {
+const pipeline_config_controller_1 = require("./pipeline-config.controller");
+const pipeline_config_service_1 = require("./pipeline-config.service");
+let PipelineConfigModule = class PipelineConfigModule {
 };
-exports.CompaniesModule = CompaniesModule;
-exports.CompaniesModule = CompaniesModule = __decorate([
+exports.PipelineConfigModule = PipelineConfigModule;
+exports.PipelineConfigModule = PipelineConfigModule = __decorate([
     (0, common_1.Module)({
-        imports: [pipeline_config_module_1.PipelineConfigModule],
-        providers: [companies_service_1.CompaniesService],
-        controllers: [companies_controller_1.CompaniesController],
-        exports: [companies_service_1.CompaniesService],
+        controllers: [pipeline_config_controller_1.PipelineConfigController],
+        providers: [pipeline_config_service_1.PipelineConfigService],
+        exports: [pipeline_config_service_1.PipelineConfigService],
     })
-], CompaniesModule);
-//# sourceMappingURL=companies.module.js.map
+], PipelineConfigModule);
+//# sourceMappingURL=pipeline-config.module.js.map

@@ -13,9 +13,11 @@ exports.CompaniesService = void 0;
 const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
 const prisma_service_1 = require("../prisma/prisma.service");
+const pipeline_config_service_1 = require("../admin/pipeline/pipeline-config.service");
 let CompaniesService = class CompaniesService {
-    constructor(prisma) {
+    constructor(prisma, pipelineConfig) {
         this.prisma = prisma;
+        this.pipelineConfig = pipelineConfig;
     }
     async findAll(user, pagination, filters) {
         const page = pagination.page ?? 1;
@@ -143,6 +145,7 @@ let CompaniesService = class CompaniesService {
         if (!company)
             throw new common_1.NotFoundException('شرکت پیدا نشد');
         this.assertAccess(company, user);
+        await this.pipelineConfig.assertTransitionAllowed(company.stage, dto.stage, user.role);
         const [updated] = await this.prisma.$transaction([
             this.prisma.company.update({
                 where: { id },
@@ -258,6 +261,6 @@ let CompaniesService = class CompaniesService {
 exports.CompaniesService = CompaniesService;
 exports.CompaniesService = CompaniesService = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [prisma_service_1.PrismaService])
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService, pipeline_config_service_1.PipelineConfigService])
 ], CompaniesService);
 //# sourceMappingURL=companies.service.js.map

@@ -33,6 +33,7 @@ const pain_points_module_1 = require("./pain-points/pain-points.module");
 const use_cases_module_1 = require("./use-cases/use-cases.module");
 const lead_sources_module_1 = require("./lead-sources/lead-sources.module");
 const lookups_module_1 = require("./lookups/lookups.module");
+const pipeline_config_module_1 = require("./admin/pipeline/pipeline-config.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -76,6 +77,7 @@ exports.AppModule = AppModule = __decorate([
             use_cases_module_1.UseCasesModule,
             lead_sources_module_1.LeadSourcesModule,
             lookups_module_1.LookupsModule,
+            pipeline_config_module_1.PipelineConfigModule,
         ],
         providers: [
             {
