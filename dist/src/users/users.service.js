@@ -48,6 +48,7 @@ const bcrypt = __importStar(require("bcryptjs"));
 const prisma_service_1 = require("../prisma/prisma.service");
 const client_1 = require("@prisma/client");
 const permissions_guard_1 = require("../common/guards/permissions.guard");
+const audit_log_service_1 = require("../audit-log/audit-log.service");
 const safeUserSelect = {
     id: true,
     fullName: true,
@@ -59,10 +60,11 @@ const safeUserSelect = {
     updatedAt: true,
 };
 let UsersService = class UsersService {
-    constructor(prisma) {
+    constructor(prisma, audit) {
         this.prisma = prisma;
+        this.audit = audit;
     }
-    async create(dto) {
+    async create(dto, actorId) {
         const passwordHash = await bcrypt.hash(dto.password, 10);
         const user = await this.prisma.user.create({
             data: {
@@ -74,6 +76,7 @@ let UsersService = class UsersService {
             },
         });
         const { passwordHash: _omit, ...safeUser } = user;
+        await this.audit.record({ actorId, entityType: 'user', entityId: user.id, action: 'user.created', after: safeUser });
         return safeUser;
     }
     async findAll(query) {
@@ -134,12 +137,12 @@ let UsersService = class UsersService {
         }
         return user;
     }
-    async deactivate(id) {
+    async deactivate(id, actorId) {
         const user = await this.prisma.user.findUnique({ where: { id } });
         if (!user) {
             throw new common_1.NotFoundException('کاربر پیدا نشد');
         }
-        return this.prisma.user.update({
+        const updated = await this.prisma.user.update({
             where: { id },
             data: { isActive: false },
             select: {
@@ -151,8 +154,10 @@ let UsersService = class UsersService {
                 isActive: true,
             },
         });
+        await this.audit.record({ actorId, entityType: 'user', entityId: id, action: 'user.deactivated', before: user, after: updated });
+        return updated;
     }
-    async activate(id) {
+    async activate(id, actorId) {
         const user = await this.prisma.user.findUnique({ where: { id } });
         if (!user) {
             throw new common_1.NotFoundException('کاربر پیدا نشد');
@@ -160,7 +165,7 @@ let UsersService = class UsersService {
         if (user.isActive) {
             throw new common_1.BadRequestException('کاربر قبلاً فعال است');
         }
-        return this.prisma.user.update({
+        const updated = await this.prisma.user.update({
             where: { id },
             data: { isActive: true },
             select: {
@@ -172,8 +177,10 @@ let UsersService = class UsersService {
                 isActive: true,
             },
         });
+        await this.audit.record({ actorId, entityType: 'user', entityId: id, action: 'user.activated', before: user, after: updated });
+        return updated;
     }
-    async updateUserRole(id, dto) {
+    async updateUserRole(id, dto, actorId) {
         const user = await this.prisma.user.findUnique({
             where: { id },
             include: { ownedCompanies: { select: { id: true } } },
@@ -201,12 +208,13 @@ let UsersService = class UsersService {
         });
         permissions_guard_1.PermissionsGuard.clearCache(dto.role);
         permissions_guard_1.PermissionsGuard.clearCache(user.role);
+        await this.audit.record({ actorId, entityType: 'user', entityId: id, action: 'user.role_changed', before: user, after: updatedUser });
         return updatedUser;
     }
 };
 exports.UsersService = UsersService;
 exports.UsersService = UsersService = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [prisma_service_1.PrismaService])
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService, audit_log_service_1.AuditLogService])
 ], UsersService);
 //# sourceMappingURL=users.service.js.map

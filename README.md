@@ -296,3 +296,10 @@ Body: form-data → Key: file (Type: File)
 - Added `PATCH /api/companies/:companyId/archive` and `PATCH /api/companies/:companyId/restore` for ADMIN and team-scoped MANAGER users.
 - Company lists hide archived records by default and support `includeArchived=true` or `archivedOnly=true`.
 - Added and assigned `company:archive` and `company:restore` permissions.
+
+### fix 000009 - Audit log backend
+
+- Added persistent audit logs with actor, entity, action, before/after snapshots, metadata, and indexed timestamps.
+- Added centralized recursive sanitization for password, hash, token, secret, and authorization fields.
+- Recorded key user, permission, company, activity, follow-up, and pipeline-transition changes.
+- Added the paginated and filterable `GET /api/admin/audit-logs` endpoint protected by `audit-log:view`.

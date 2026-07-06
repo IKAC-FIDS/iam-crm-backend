@@ -4,10 +4,11 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { CreateTransitionDto } from './dto/create-transition.dto';
 import { UpdateStageConfigDto } from './dto/update-stage-config.dto';
 import { UpdateTransitionDto } from './dto/update-transition.dto';
+import { AuditLogService } from '../../audit-log/audit-log.service';
 
 @Injectable()
 export class PipelineConfigService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private audit: AuditLogService) {}
 
   getStages() {
     return this.prisma.pipelineStageConfig.findMany({ orderBy: [{ sortOrder: 'asc' }, { stage: 'asc' }] });
@@ -25,22 +26,24 @@ export class PipelineConfigService {
     });
   }
 
-  async createTransition(dto: CreateTransitionDto) {
+  async createTransition(dto: CreateTransitionDto, actorId?: string) {
     this.validateDifferentStages(dto.fromStage, dto.toStage);
     await this.assertUnique(dto.fromStage ?? null, dto.toStage, dto.role ?? null);
-    return this.prisma.pipelineStageTransition.create({
+    const created = await this.prisma.pipelineStageTransition.create({
       data: { fromStage: dto.fromStage ?? null, toStage: dto.toStage, role: dto.role ?? null, isAllowed: dto.isAllowed },
     });
+    await this.audit.record({ actorId, entityType: 'pipeline_transition', entityId: created.id, action: 'pipeline.transition_rule_created', after: created });
+    return created;
   }
 
-  async updateTransition(id: string, dto: UpdateTransitionDto) {
+  async updateTransition(id: string, dto: UpdateTransitionDto, actorId?: string) {
     const current = await this.findTransition(id);
     const fromStage = dto.fromStage === undefined ? current.fromStage : dto.fromStage;
     const toStage = dto.toStage ?? current.toStage;
     const role = dto.role === undefined ? current.role : dto.role;
     this.validateDifferentStages(fromStage, toStage);
     await this.assertUnique(fromStage, toStage, role, id);
-    return this.prisma.pipelineStageTransition.update({
+    const updated = await this.prisma.pipelineStageTransition.update({
       where: { id },
       data: {
         ...(dto.fromStage !== undefined && { fromStage: dto.fromStage }),
@@ -49,11 +52,15 @@ export class PipelineConfigService {
         ...(dto.isAllowed !== undefined && { isAllowed: dto.isAllowed }),
       },
     });
+    await this.audit.record({ actorId, entityType: 'pipeline_transition', entityId: id, action: 'pipeline.transition_rule_updated', before: current, after: updated });
+    return updated;
   }
 
-  async deleteTransition(id: string) {
-    await this.findTransition(id);
-    return this.prisma.pipelineStageTransition.delete({ where: { id } });
+  async deleteTransition(id: string, actorId?: string) {
+    const current = await this.findTransition(id);
+    const deleted = await this.prisma.pipelineStageTransition.delete({ where: { id } });
+    await this.audit.record({ actorId, entityType: 'pipeline_transition', entityId: id, action: 'pipeline.transition_rule_deleted', before: current });
+    return deleted;
   }
 
   async assertTransitionAllowed(fromStage: PipelineStage, toStage: PipelineStage, role: UserRole) {

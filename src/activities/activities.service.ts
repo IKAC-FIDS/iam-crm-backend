@@ -7,10 +7,11 @@ import { RescheduleActivityDto } from './dto/reschedule-activity.dto';
 import { CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { PaginationDto, PaginatedResponse } from '../common/dto/pagination.dto';
 import { UserRole } from '@prisma/client';
+import { AuditLogService } from '../audit-log/audit-log.service';
 
 @Injectable()
 export class ActivitiesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private audit: AuditLogService) {}
 
   // ============================================================
   // متد کمکی: بررسی دسترسی به شرکت
@@ -132,7 +133,7 @@ export class ActivitiesService {
       await this.validatePersonAccess(dto.personId, user);
     }
 
-    return this.prisma.activity.create({
+    const activity = await this.prisma.activity.create({
       data: {
         companyId: dto.companyId,
         personId: dto.personId,
@@ -144,6 +145,8 @@ export class ActivitiesService {
         nextActionDate: dto.nextActionDate ? new Date(dto.nextActionDate) : undefined,
       },
     });
+    await this.audit.record({ actorId: user.userId, entityType: 'activity', entityId: activity.id, action: 'activity.created', after: activity });
+    return activity;
   }
 
   async updateActivity(activityId: string, dto: UpdateActivityDto, user: CurrentUserPayload) {
@@ -162,7 +165,7 @@ export class ActivitiesService {
       }
     }
 
-    return this.prisma.activity.update({
+    const updated = await this.prisma.activity.update({
       where: { id: activityId },
       data: {
         ...(dto.type !== undefined && { type: dto.type }),
@@ -176,6 +179,8 @@ export class ActivitiesService {
       },
       include: { company: true, person: true, user: { select: { id: true, fullName: true } }, completedBy: { select: { id: true, fullName: true } } },
     });
+    await this.audit.record({ actorId: user.userId, entityType: 'activity', entityId: activityId, action: 'activity.updated', before: activity, after: updated });
+    return updated;
   }
 
   async completeActivity(activityId: string, dto: CompleteActivityDto, user: CurrentUserPayload) {
@@ -185,7 +190,7 @@ export class ActivitiesService {
     }
     if (activity.completedAt) return activity;
 
-    return this.prisma.activity.update({
+    const completed = await this.prisma.activity.update({
       where: { id: activityId },
       data: {
         completedAt: new Date(),
@@ -195,6 +200,8 @@ export class ActivitiesService {
       },
       include: { company: true, person: true, user: { select: { id: true, fullName: true } }, completedBy: { select: { id: true, fullName: true } } },
     });
+    await this.audit.record({ actorId: user.userId, entityType: 'activity', entityId: activityId, action: 'follow-up.completed', before: activity, after: completed });
+    return completed;
   }
 
   async rescheduleActivity(activityId: string, dto: RescheduleActivityDto, user: CurrentUserPayload) {
@@ -210,11 +217,13 @@ export class ActivitiesService {
     const note = dto.note?.trim();
     const notes = note ? [activity.notes, `[Rescheduled] ${note}`].filter(Boolean).join('\n') : activity.notes;
 
-    return this.prisma.activity.update({
+    const rescheduled = await this.prisma.activity.update({
       where: { id: activityId },
       data: { nextActionDate, notes },
       include: { company: true, person: true, user: { select: { id: true, fullName: true } }, completedBy: { select: { id: true, fullName: true } } },
     });
+    await this.audit.record({ actorId: user.userId, entityType: 'activity', entityId: activityId, action: 'follow-up.rescheduled', before: activity, after: rescheduled });
+    return rescheduled;
   }
 
   // ============================================================

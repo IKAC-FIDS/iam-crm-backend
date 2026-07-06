@@ -16,6 +16,7 @@ import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { AdminPermissionsService } from './admin-permissions.service';
+import { CurrentUser, CurrentUserPayload } from '../common/decorators/current-user.decorator';
 
 @Controller('admin/permissions')
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
@@ -57,6 +58,7 @@ export class AdminPermissionsController {
   @Permissions('permission:manage')
   assignPermissionToRole(
     @Body() body: { role: UserRole; action: string },
+    @CurrentUser() actor: CurrentUserPayload,
   ) {
     if (!Object.values(UserRole).includes(body.role)) {
       throw new BadRequestException('نقش نامعتبر است');
@@ -64,6 +66,7 @@ export class AdminPermissionsController {
     return this.adminPermissionsService.assignPermissionToRole(
       body.role,
       body.action,
+      actor.userId,
     );
   }
 
@@ -74,6 +77,7 @@ export class AdminPermissionsController {
   @Permissions('permission:manage')
   revokePermissionFromRole(
     @Body() body: { role: UserRole; action: string },
+    @CurrentUser() actor: CurrentUserPayload,
   ) {
     if (!Object.values(UserRole).includes(body.role)) {
       throw new BadRequestException('نقش نامعتبر است');
@@ -81,6 +85,7 @@ export class AdminPermissionsController {
     return this.adminPermissionsService.revokePermissionFromRole(
       body.role,
       body.action,
+      actor.userId,
     );
   }
 
@@ -117,6 +122,7 @@ export class AdminPermissionsController {
   @Permissions('permission:manage')
   async bulkAssignPermissions(
     @Body() body: { role: UserRole; actions: string[] },
+    @CurrentUser() actor: CurrentUserPayload,
   ) {
     if (!Object.values(UserRole).includes(body.role)) {
       throw new BadRequestException('نقش نامعتبر است');
@@ -127,6 +133,7 @@ export class AdminPermissionsController {
     return this.adminPermissionsService.bulkAssignPermissionsToRole(
       body.role,
       body.actions,
+      actor.userId,
     );
   }
 
@@ -137,6 +144,7 @@ export class AdminPermissionsController {
   @Permissions('permission:manage')
   async bulkRevokePermissions(
     @Body() body: { role: UserRole; actions: string[] },
+    @CurrentUser() actor: CurrentUserPayload,
   ) {
     if (!Object.values(UserRole).includes(body.role)) {
       throw new BadRequestException('نقش نامعتبر است');
@@ -147,6 +155,7 @@ export class AdminPermissionsController {
     return this.adminPermissionsService.bulkRevokePermissionsFromRole(
       body.role,
       body.actions,
+      actor.userId,
     );
   }
 

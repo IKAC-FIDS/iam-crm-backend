@@ -13,9 +13,11 @@ exports.ActivitiesService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../prisma/prisma.service");
 const client_1 = require("@prisma/client");
+const audit_log_service_1 = require("../audit-log/audit-log.service");
 let ActivitiesService = class ActivitiesService {
-    constructor(prisma) {
+    constructor(prisma, audit) {
         this.prisma = prisma;
+        this.audit = audit;
     }
     async validateCompanyAccess(companyId, user) {
         const company = await this.prisma.company.findUnique({
@@ -103,7 +105,7 @@ let ActivitiesService = class ActivitiesService {
         if (dto.personId) {
             await this.validatePersonAccess(dto.personId, user);
         }
-        return this.prisma.activity.create({
+        const activity = await this.prisma.activity.create({
             data: {
                 companyId: dto.companyId,
                 personId: dto.personId,
@@ -115,6 +117,8 @@ let ActivitiesService = class ActivitiesService {
                 nextActionDate: dto.nextActionDate ? new Date(dto.nextActionDate) : undefined,
             },
         });
+        await this.audit.record({ actorId: user.userId, entityType: 'activity', entityId: activity.id, action: 'activity.created', after: activity });
+        return activity;
     }
     async updateActivity(activityId, dto, user) {
         const activity = await this.findActivityForMutation(activityId, user);
@@ -130,7 +134,7 @@ let ActivitiesService = class ActivitiesService {
                 throw new common_1.BadRequestException('Person must belong to the activity company');
             }
         }
-        return this.prisma.activity.update({
+        const updated = await this.prisma.activity.update({
             where: { id: activityId },
             data: {
                 ...(dto.type !== undefined && { type: dto.type }),
@@ -144,6 +148,8 @@ let ActivitiesService = class ActivitiesService {
             },
             include: { company: true, person: true, user: { select: { id: true, fullName: true } }, completedBy: { select: { id: true, fullName: true } } },
         });
+        await this.audit.record({ actorId: user.userId, entityType: 'activity', entityId: activityId, action: 'activity.updated', before: activity, after: updated });
+        return updated;
     }
     async completeActivity(activityId, dto, user) {
         const activity = await this.findActivityForMutation(activityId, user);
@@ -152,7 +158,7 @@ let ActivitiesService = class ActivitiesService {
         }
         if (activity.completedAt)
             return activity;
-        return this.prisma.activity.update({
+        const completed = await this.prisma.activity.update({
             where: { id: activityId },
             data: {
                 completedAt: new Date(),
@@ -162,6 +168,8 @@ let ActivitiesService = class ActivitiesService {
             },
             include: { company: true, person: true, user: { select: { id: true, fullName: true } }, completedBy: { select: { id: true, fullName: true } } },
         });
+        await this.audit.record({ actorId: user.userId, entityType: 'activity', entityId: activityId, action: 'follow-up.completed', before: activity, after: completed });
+        return completed;
     }
     async rescheduleActivity(activityId, dto, user) {
         const activity = await this.findActivityForMutation(activityId, user);
@@ -174,11 +182,13 @@ let ActivitiesService = class ActivitiesService {
         }
         const note = dto.note?.trim();
         const notes = note ? [activity.notes, `[Rescheduled] ${note}`].filter(Boolean).join('\n') : activity.notes;
-        return this.prisma.activity.update({
+        const rescheduled = await this.prisma.activity.update({
             where: { id: activityId },
             data: { nextActionDate, notes },
             include: { company: true, person: true, user: { select: { id: true, fullName: true } }, completedBy: { select: { id: true, fullName: true } } },
         });
+        await this.audit.record({ actorId: user.userId, entityType: 'activity', entityId: activityId, action: 'follow-up.rescheduled', before: activity, after: rescheduled });
+        return rescheduled;
     }
     async findDueFollowUps(user, pagination) {
         if (user.role === client_1.UserRole.BOARDS) {
@@ -219,6 +229,6 @@ let ActivitiesService = class ActivitiesService {
 exports.ActivitiesService = ActivitiesService;
 exports.ActivitiesService = ActivitiesService = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [prisma_service_1.PrismaService])
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService, audit_log_service_1.AuditLogService])
 ], ActivitiesService);
 //# sourceMappingURL=activities.service.js.map

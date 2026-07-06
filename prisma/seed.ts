@@ -212,6 +212,7 @@ async function main() {
     { action: 'user:manage', description: 'Manage users' },
     { action: 'permission:view', description: 'View permission matrix' },
     { action: 'permission:manage', description: 'Manage role permissions' },
+    { action: 'audit-log:view', description: 'View audit logs' },
     { action: 'user:deactivate', description: 'غیرفعال کردن کاربر' },
     { action: 'user:activate', description: 'فعال‌سازی مجدد کاربر' },
     { action: 'company:view', description: 'مشاهده شرکت‌ها' },

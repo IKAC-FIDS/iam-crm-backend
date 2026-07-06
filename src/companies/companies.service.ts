@@ -14,10 +14,11 @@ import { CurrentUserPayload } from '../common/decorators/current-user.decorator'
 import { PaginationDto, PaginatedResponse } from '../common/dto/pagination.dto';
 import { PipelineConfigService } from '../admin/pipeline/pipeline-config.service';
 import { ArchiveCompanyDto } from './dto/archive-company.dto';
+import { AuditLogService } from '../audit-log/audit-log.service';
 
 @Injectable()
 export class CompaniesService {
-  constructor(private prisma: PrismaService, private pipelineConfig: PipelineConfigService) {}
+  constructor(private prisma: PrismaService, private pipelineConfig: PipelineConfigService, private audit: AuditLogService) {}
 
   // ============================================================
   // ۱. دریافت لیست شرکت‌ها (با فیلترهای پیشرفته + صفحه‌بندی)
@@ -176,12 +177,14 @@ export class CompaniesService {
       throw new ForbiddenException('شما اجازه ایجاد شرکت را ندارید');
     }
 
-    return this.prisma.company.create({
+    const company = await this.prisma.company.create({
       data: {
         ...dto,
         ownerId: dto.ownerId ?? user.userId,
       },
     });
+    await this.audit.record({ actorId: user.userId, entityType: 'company', entityId: company.id, action: 'company.created', after: company });
+    return company;
   }
 
   // ============================================================
@@ -199,10 +202,12 @@ export class CompaniesService {
 
     this.assertAccess(company, user);
 
-    return this.prisma.company.update({
+    const updated = await this.prisma.company.update({
       where: { id },
       data: dto,
     });
+    await this.audit.record({ actorId: user.userId, entityType: 'company', entityId: id, action: 'company.updated', before: company, after: updated });
+    return updated;
   }
 
   // ============================================================
@@ -236,6 +241,8 @@ export class CompaniesService {
         },
       }),
     ]);
+
+    await this.audit.record({ actorId: user.userId, entityType: 'company', entityId: id, action: 'company.stage_changed', before: { stage: company.stage }, after: { stage: updated.stage } });
 
     return updated;
   }
@@ -280,10 +287,12 @@ export class CompaniesService {
       }
     }
 
-    return this.prisma.company.update({
+    const updated = await this.prisma.company.update({
       where: { id },
       data: { ownerId: dto.newOwnerId },
     });
+    await this.audit.record({ actorId: user.userId, entityType: 'company', entityId: id, action: 'company.owner_changed', before: { ownerId: company.ownerId }, after: { ownerId: updated.ownerId } });
+    return updated;
   }
 
   async archive(id: string, dto: ArchiveCompanyDto, user: CurrentUserPayload) {
@@ -295,10 +304,12 @@ export class CompaniesService {
     this.assertArchiveAccess(company, user);
     if (company.archivedAt) throw new BadRequestException('شرکت قبلاً بایگانی شده است');
 
-    return this.prisma.company.update({
+    const archived = await this.prisma.company.update({
       where: { id },
       data: { archivedAt: new Date(), archivedById: user.userId, archiveReason: dto.reason },
     });
+    await this.audit.record({ actorId: user.userId, entityType: 'company', entityId: id, action: 'company.archived', before: company, after: archived });
+    return archived;
   }
 
   async restore(id: string, user: CurrentUserPayload) {
@@ -310,10 +321,12 @@ export class CompaniesService {
     this.assertArchiveAccess(company, user);
     if (!company.archivedAt) throw new BadRequestException('شرکت بایگانی نشده است');
 
-    return this.prisma.company.update({
+    const restored = await this.prisma.company.update({
       where: { id },
       data: { archivedAt: null, archivedById: null, archiveReason: null },
     });
+    await this.audit.record({ actorId: user.userId, entityType: 'company', entityId: id, action: 'company.restored', before: company, after: restored });
+    return restored;
   }
 
   // ============================================================
@@ -367,6 +380,16 @@ export class CompaniesService {
       where: { id: { in: dto.companyIds } },
       data: { ownerId: dto.newOwnerId },
     });
+
+    await Promise.all(companies.map((company) => this.audit.record({
+      actorId: user.userId,
+      entityType: 'company',
+      entityId: company.id,
+      action: 'company.owner_changed',
+      before: { ownerId: company.ownerId },
+      after: { ownerId: dto.newOwnerId },
+      metadata: { bulk: true },
+    })));
 
     return {
       message: `${result.count} شرکت با موفقیت به کاربر ${newOwner.fullName} اختصاص یافت`,

@@ -21,6 +21,7 @@ const permissions_guard_1 = require("../common/guards/permissions.guard");
 const roles_decorator_1 = require("../common/decorators/roles.decorator");
 const permissions_decorator_1 = require("../common/decorators/permissions.decorator");
 const admin_permissions_service_1 = require("./admin-permissions.service");
+const current_user_decorator_1 = require("../common/decorators/current-user.decorator");
 let AdminPermissionsController = class AdminPermissionsController {
     constructor(adminPermissionsService) {
         this.adminPermissionsService = adminPermissionsService;
@@ -37,17 +38,17 @@ let AdminPermissionsController = class AdminPermissionsController {
         }
         return this.adminPermissionsService.getRolePermissions(role);
     }
-    assignPermissionToRole(body) {
+    assignPermissionToRole(body, actor) {
         if (!Object.values(client_1.UserRole).includes(body.role)) {
             throw new common_1.BadRequestException('نقش نامعتبر است');
         }
-        return this.adminPermissionsService.assignPermissionToRole(body.role, body.action);
+        return this.adminPermissionsService.assignPermissionToRole(body.role, body.action, actor.userId);
     }
-    revokePermissionFromRole(body) {
+    revokePermissionFromRole(body, actor) {
         if (!Object.values(client_1.UserRole).includes(body.role)) {
             throw new common_1.BadRequestException('نقش نامعتبر است');
         }
-        return this.adminPermissionsService.revokePermissionFromRole(body.role, body.action);
+        return this.adminPermissionsService.revokePermissionFromRole(body.role, body.action, actor.userId);
     }
     createPermission(body) {
         if (!body.action || body.action.trim() === '') {
@@ -58,23 +59,23 @@ let AdminPermissionsController = class AdminPermissionsController {
     deletePermission(action) {
         return this.adminPermissionsService.deletePermission(action);
     }
-    async bulkAssignPermissions(body) {
+    async bulkAssignPermissions(body, actor) {
         if (!Object.values(client_1.UserRole).includes(body.role)) {
             throw new common_1.BadRequestException('نقش نامعتبر است');
         }
         if (!body.actions || body.actions.length === 0) {
             throw new common_1.BadRequestException('حداقل یک دسترسی باید انتخاب شود');
         }
-        return this.adminPermissionsService.bulkAssignPermissionsToRole(body.role, body.actions);
+        return this.adminPermissionsService.bulkAssignPermissionsToRole(body.role, body.actions, actor.userId);
     }
-    async bulkRevokePermissions(body) {
+    async bulkRevokePermissions(body, actor) {
         if (!Object.values(client_1.UserRole).includes(body.role)) {
             throw new common_1.BadRequestException('نقش نامعتبر است');
         }
         if (!body.actions || body.actions.length === 0) {
             throw new common_1.BadRequestException('حداقل یک دسترسی باید انتخاب شود');
         }
-        return this.adminPermissionsService.bulkRevokePermissionsFromRole(body.role, body.actions);
+        return this.adminPermissionsService.bulkRevokePermissionsFromRole(body.role, body.actions, actor.userId);
     }
     async getRolePermissionsWithDetails(role) {
         if (!Object.values(client_1.UserRole).includes(role)) {
@@ -110,16 +111,18 @@ __decorate([
     (0, common_1.Post)('assign'),
     (0, permissions_decorator_1.Permissions)('permission:manage'),
     __param(0, (0, common_1.Body)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object]),
+    __metadata("design:paramtypes", [Object, Object]),
     __metadata("design:returntype", void 0)
 ], AdminPermissionsController.prototype, "assignPermissionToRole", null);
 __decorate([
     (0, common_1.Delete)('revoke'),
     (0, permissions_decorator_1.Permissions)('permission:manage'),
     __param(0, (0, common_1.Body)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object]),
+    __metadata("design:paramtypes", [Object, Object]),
     __metadata("design:returntype", void 0)
 ], AdminPermissionsController.prototype, "revokePermissionFromRole", null);
 __decorate([
@@ -142,16 +145,18 @@ __decorate([
     (0, common_1.Post)('bulk-assign'),
     (0, permissions_decorator_1.Permissions)('permission:manage'),
     __param(0, (0, common_1.Body)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object]),
+    __metadata("design:paramtypes", [Object, Object]),
     __metadata("design:returntype", Promise)
 ], AdminPermissionsController.prototype, "bulkAssignPermissions", null);
 __decorate([
     (0, common_1.Post)('bulk-revoke'),
     (0, permissions_decorator_1.Permissions)('permission:manage'),
     __param(0, (0, common_1.Body)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object]),
+    __metadata("design:paramtypes", [Object, Object]),
     __metadata("design:returntype", Promise)
 ], AdminPermissionsController.prototype, "bulkRevokePermissions", null);
 __decorate([

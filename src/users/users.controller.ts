@@ -22,8 +22,8 @@ export class UsersController {
   @Post()
   @Roles(UserRole.ADMIN)
   @Permissions('user:manage')
-  create(@Body() dto: CreateUserDto) {
-    return this.usersService.create(dto);
+  create(@Body() dto: CreateUserDto, @CurrentUser() actor: CurrentUserPayload) {
+    return this.usersService.create(dto, actor.userId);
   }
 
   // ============================================================
@@ -59,8 +59,8 @@ export class UsersController {
   @Patch(':id/deactivate')
   @Roles(UserRole.ADMIN)
   @Permissions('user:manage')
-  deactivate(@Param('id') id: string) {
-    return this.usersService.deactivate(id);
+  deactivate(@Param('id') id: string, @CurrentUser() actor: CurrentUserPayload) {
+    return this.usersService.deactivate(id, actor.userId);
   }
 
   // ============================================================
@@ -69,8 +69,8 @@ export class UsersController {
   @Patch(':id/activate')
   @Roles(UserRole.ADMIN)
   @Permissions('user:manage')
-  activate(@Param('id') id: string) {
-    return this.usersService.activate(id);
+  activate(@Param('id') id: string, @CurrentUser() actor: CurrentUserPayload) {
+    return this.usersService.activate(id, actor.userId);
   }
 
   // ============================================================
@@ -82,7 +82,8 @@ export class UsersController {
   updateUserRole(
     @Param('id') id: string,
     @Body() dto: UpdateUserRoleDto,
+    @CurrentUser() actor: CurrentUserPayload,
   ) {
-    return this.usersService.updateUserRole(id, dto);
+    return this.usersService.updateUserRole(id, dto, actor.userId);
   }
 }

@@ -29,8 +29,8 @@ let UsersController = class UsersController {
     constructor(usersService) {
         this.usersService = usersService;
     }
-    create(dto) {
-        return this.usersService.create(dto);
+    create(dto, actor) {
+        return this.usersService.create(dto, actor.userId);
     }
     findAll(query) {
         return this.usersService.findAll(query);
@@ -41,14 +41,14 @@ let UsersController = class UsersController {
     findOne(id) {
         return this.usersService.findOne(id);
     }
-    deactivate(id) {
-        return this.usersService.deactivate(id);
+    deactivate(id, actor) {
+        return this.usersService.deactivate(id, actor.userId);
     }
-    activate(id) {
-        return this.usersService.activate(id);
+    activate(id, actor) {
+        return this.usersService.activate(id, actor.userId);
     }
-    updateUserRole(id, dto) {
-        return this.usersService.updateUserRole(id, dto);
+    updateUserRole(id, dto, actor) {
+        return this.usersService.updateUserRole(id, dto, actor.userId);
     }
 };
 exports.UsersController = UsersController;
@@ -57,8 +57,9 @@ __decorate([
     (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN),
     (0, permissions_decorator_1.Permissions)('user:manage'),
     __param(0, (0, common_1.Body)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [create_user_dto_1.CreateUserDto]),
+    __metadata("design:paramtypes", [create_user_dto_1.CreateUserDto, Object]),
     __metadata("design:returntype", void 0)
 ], UsersController.prototype, "create", null);
 __decorate([
@@ -93,8 +94,9 @@ __decorate([
     (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN),
     (0, permissions_decorator_1.Permissions)('user:manage'),
     __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
+    __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", void 0)
 ], UsersController.prototype, "deactivate", null);
 __decorate([
@@ -102,8 +104,9 @@ __decorate([
     (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN),
     (0, permissions_decorator_1.Permissions)('user:manage'),
     __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
+    __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", void 0)
 ], UsersController.prototype, "activate", null);
 __decorate([
@@ -112,8 +115,9 @@ __decorate([
     (0, permissions_decorator_1.Permissions)('user:manage'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, update_user_role_dto_1.UpdateUserRoleDto]),
+    __metadata("design:paramtypes", [String, update_user_role_dto_1.UpdateUserRoleDto, Object]),
     __metadata("design:returntype", void 0)
 ], UsersController.prototype, "updateUserRole", null);
 exports.UsersController = UsersController = __decorate([

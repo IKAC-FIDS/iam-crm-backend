@@ -474,6 +474,24 @@ model LookupOption {
   @@map("lookup_options")
 }
 
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorId    String?
+  entityType String
+  entityId   String?
+  action     String
+  before     Json?
+  after      Json?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([actorId])
+  @@index([entityType, entityId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
 // ============================================================
 // ✅ جدید: مدیریت صنایع، نقاط درد و کاربردها (ماژولار)
 // ============================================================

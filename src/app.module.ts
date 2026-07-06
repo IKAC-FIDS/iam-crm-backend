@@ -25,6 +25,7 @@ import { UseCasesModule } from './use-cases/use-cases.module';
 import { LeadSourcesModule } from './lead-sources/lead-sources.module';
 import { LookupsModule } from './lookups/lookups.module';
 import { PipelineConfigModule } from './admin/pipeline/pipeline-config.module';
+import { AuditLogModule } from './audit-log/audit-log.module';
 
 @Module({
   imports: [
@@ -66,6 +67,7 @@ import { PipelineConfigModule } from './admin/pipeline/pipeline-config.module';
     LeadSourcesModule,
     LookupsModule,
     PipelineConfigModule,
+    AuditLogModule,
   ],
   providers: [
     {

@@ -2,10 +2,11 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../prisma/prisma.service';
 import { UserRole } from '@prisma/client';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
+import { AuditLogService } from '../audit-log/audit-log.service';
 
 @Injectable()
 export class AdminPermissionsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private audit: AuditLogService) {}
 
   // ============================================================
   // ۱. دریافت لیست تمام دسترسی‌ها
@@ -59,7 +60,7 @@ export class AdminPermissionsService {
   // ============================================================
   // ۳. اختصاص یک دسترسی به نقش
   // ============================================================
-  async assignPermissionToRole(role: UserRole, action: string) {
+  async assignPermissionToRole(role: UserRole, action: string, actorId?: string) {
     const permission = await this.prisma.permission.findUnique({
       where: { action },
     });
@@ -89,6 +90,7 @@ export class AdminPermissionsService {
     });
 
     PermissionsGuard.clearCache(role);
+    await this.audit.record({ actorId, entityType: 'permission', entityId: permission.id, action: 'permission.assigned', after: { role, action } });
 
     return {
       message: `دسترسی ${action} با موفقیت به نقش ${role} اختصاص یافت`,
@@ -99,7 +101,7 @@ export class AdminPermissionsService {
   // ============================================================
   // ۴. حذف یک دسترسی از نقش
   // ============================================================
-  async revokePermissionFromRole(role: UserRole, action: string) {
+  async revokePermissionFromRole(role: UserRole, action: string, actorId?: string) {
     const permission = await this.prisma.permission.findUnique({
       where: { action },
     });
@@ -125,6 +127,7 @@ export class AdminPermissionsService {
     });
 
     PermissionsGuard.clearCache(role);
+    await this.audit.record({ actorId, entityType: 'permission', entityId: permission.id, action: 'permission.revoked', before: { role, action } });
 
     return {
       message: `دسترسی ${action} با موفقیت از نقش ${role} حذف شد`,
@@ -180,7 +183,7 @@ export class AdminPermissionsService {
   // ============================================================
   // ✅ ۷. Bulk Assign Permissions به یک نقش
   // ============================================================
-  async bulkAssignPermissionsToRole(role: UserRole, actions: string[]) {
+  async bulkAssignPermissionsToRole(role: UserRole, actions: string[], actorId?: string) {
     if (!actions || actions.length === 0) {
       throw new BadRequestException('حداقل یک دسترسی باید انتخاب شود');
     }
@@ -219,6 +222,7 @@ export class AdminPermissionsService {
     );
 
     PermissionsGuard.clearCache(role);
+    await this.audit.record({ actorId, entityType: 'permission', action: 'permission.bulk_assigned', metadata: { role, actions: newPermissions.map((item) => item.action) } });
 
     return {
       message: `${result.length} دسترسی با موفقیت به نقش ${role} اختصاص یافت`,
@@ -233,7 +237,7 @@ export class AdminPermissionsService {
   // ============================================================
   // ✅ ۸. Bulk Revoke Permissions از یک نقش
   // ============================================================
-  async bulkRevokePermissionsFromRole(role: UserRole, actions: string[]) {
+  async bulkRevokePermissionsFromRole(role: UserRole, actions: string[], actorId?: string) {
     if (!actions || actions.length === 0) {
       throw new BadRequestException('حداقل یک دسترسی باید انتخاب شود');
     }
@@ -268,6 +272,7 @@ export class AdminPermissionsService {
     });
 
     PermissionsGuard.clearCache(role);
+    await this.audit.record({ actorId, entityType: 'permission', action: 'permission.bulk_revoked', metadata: { role, actions: rolePermissions.map((rp) => permissions.find((p) => p.id === rp.permissionId)?.action).filter(Boolean) } });
 
     return {
       message: `${deleted.count} دسترسی با موفقیت از نقش ${role} حذف شد`,

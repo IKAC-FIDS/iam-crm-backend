@@ -14,9 +14,11 @@ const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../prisma/prisma.service");
 const client_1 = require("@prisma/client");
 const permissions_guard_1 = require("../common/guards/permissions.guard");
+const audit_log_service_1 = require("../audit-log/audit-log.service");
 let AdminPermissionsService = class AdminPermissionsService {
-    constructor(prisma) {
+    constructor(prisma, audit) {
         this.prisma = prisma;
+        this.audit = audit;
     }
     async getAllPermissions() {
         return this.prisma.permission.findMany({
@@ -57,7 +59,7 @@ let AdminPermissionsService = class AdminPermissionsService {
             description: rp.permission.description,
         }));
     }
-    async assignPermissionToRole(role, action) {
+    async assignPermissionToRole(role, action, actorId) {
         const permission = await this.prisma.permission.findUnique({
             where: { action },
         });
@@ -83,12 +85,13 @@ let AdminPermissionsService = class AdminPermissionsService {
             include: { permission: true },
         });
         permissions_guard_1.PermissionsGuard.clearCache(role);
+        await this.audit.record({ actorId, entityType: 'permission', entityId: permission.id, action: 'permission.assigned', after: { role, action } });
         return {
             message: `دسترسی ${action} با موفقیت به نقش ${role} اختصاص یافت`,
             data: result,
         };
     }
-    async revokePermissionFromRole(role, action) {
+    async revokePermissionFromRole(role, action, actorId) {
         const permission = await this.prisma.permission.findUnique({
             where: { action },
         });
@@ -110,6 +113,7 @@ let AdminPermissionsService = class AdminPermissionsService {
             where: { id: rolePermission.id },
         });
         permissions_guard_1.PermissionsGuard.clearCache(role);
+        await this.audit.record({ actorId, entityType: 'permission', entityId: permission.id, action: 'permission.revoked', before: { role, action } });
         return {
             message: `دسترسی ${action} با موفقیت از نقش ${role} حذف شد`,
         };
@@ -144,7 +148,7 @@ let AdminPermissionsService = class AdminPermissionsService {
             message: `دسترسی ${action} با موفقیت حذف شد`,
         };
     }
-    async bulkAssignPermissionsToRole(role, actions) {
+    async bulkAssignPermissionsToRole(role, actions, actorId) {
         if (!actions || actions.length === 0) {
             throw new common_1.BadRequestException('حداقل یک دسترسی باید انتخاب شود');
         }
@@ -172,6 +176,7 @@ let AdminPermissionsService = class AdminPermissionsService {
             },
         })));
         permissions_guard_1.PermissionsGuard.clearCache(role);
+        await this.audit.record({ actorId, entityType: 'permission', action: 'permission.bulk_assigned', metadata: { role, actions: newPermissions.map((item) => item.action) } });
         return {
             message: `${result.length} دسترسی با موفقیت به نقش ${role} اختصاص یافت`,
             assigned: result.map(rp => ({
@@ -181,7 +186,7 @@ let AdminPermissionsService = class AdminPermissionsService {
             skipped: permissions.length - result.length,
         };
     }
-    async bulkRevokePermissionsFromRole(role, actions) {
+    async bulkRevokePermissionsFromRole(role, actions, actorId) {
         if (!actions || actions.length === 0) {
             throw new common_1.BadRequestException('حداقل یک دسترسی باید انتخاب شود');
         }
@@ -209,6 +214,7 @@ let AdminPermissionsService = class AdminPermissionsService {
             },
         });
         permissions_guard_1.PermissionsGuard.clearCache(role);
+        await this.audit.record({ actorId, entityType: 'permission', action: 'permission.bulk_revoked', metadata: { role, actions: rolePermissions.map((rp) => permissions.find((p) => p.id === rp.permissionId)?.action).filter(Boolean) } });
         return {
             message: `${deleted.count} دسترسی با موفقیت از نقش ${role} حذف شد`,
             removed: rolePermissions.map(rp => ({
@@ -241,6 +247,6 @@ let AdminPermissionsService = class AdminPermissionsService {
 exports.AdminPermissionsService = AdminPermissionsService;
 exports.AdminPermissionsService = AdminPermissionsService = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [prisma_service_1.PrismaService])
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService, audit_log_service_1.AuditLogService])
 ], AdminPermissionsService);
 //# sourceMappingURL=admin-permissions.service.js.map

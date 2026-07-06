@@ -7,6 +7,7 @@ import { UpdateUserRoleDto } from './dto/update-user-role.dto';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { FindUsersDto } from './dto/find-users.dto';
 import { CurrentUserPayload } from '../common/decorators/current-user.decorator';
+import { AuditLogService } from '../audit-log/audit-log.service';
 
 const safeUserSelect = {
   id: true,
@@ -21,12 +22,12 @@ const safeUserSelect = {
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private audit: AuditLogService) {}
 
   // ============================================================
   // ۱. ایجاد کاربر جدید
   // ============================================================
-  async create(dto: CreateUserDto) {
+  async create(dto: CreateUserDto, actorId?: string) {
     const passwordHash = await bcrypt.hash(dto.password, 10);
     const user = await this.prisma.user.create({
       data: {
@@ -38,6 +39,7 @@ export class UsersService {
       },
     });
     const { passwordHash: _omit, ...safeUser } = user;
+    await this.audit.record({ actorId, entityType: 'user', entityId: user.id, action: 'user.created', after: safeUser });
     return safeUser;
   }
 
@@ -112,12 +114,12 @@ export class UsersService {
   // ============================================================
   // ۴. غیرفعال کردن کاربر
   // ============================================================
-  async deactivate(id: string) {
+  async deactivate(id: string, actorId?: string) {
     const user = await this.prisma.user.findUnique({ where: { id } });
     if (!user) {
       throw new NotFoundException('کاربر پیدا نشد');
     }
-    return this.prisma.user.update({
+    const updated = await this.prisma.user.update({
       where: { id },
       data: { isActive: false },
       select: {
@@ -129,12 +131,14 @@ export class UsersService {
         isActive: true,
       },
     });
+    await this.audit.record({ actorId, entityType: 'user', entityId: id, action: 'user.deactivated', before: user, after: updated });
+    return updated;
   }
 
 // ============================================================
 // ✅ ۵. فعال‌سازی مجدد کاربر
 // ============================================================
-async activate(id: string) {
+async activate(id: string, actorId?: string) {
   const user = await this.prisma.user.findUnique({ where: { id } });
   if (!user) {
     throw new NotFoundException('کاربر پیدا نشد');
@@ -144,7 +148,7 @@ async activate(id: string) {
     throw new BadRequestException('کاربر قبلاً فعال است');
   }
 
-  return this.prisma.user.update({
+  const updated = await this.prisma.user.update({
     where: { id },
     data: { isActive: true },
     select: {
@@ -156,12 +160,14 @@ async activate(id: string) {
       isActive: true,
     },
   });
+  await this.audit.record({ actorId, entityType: 'user', entityId: id, action: 'user.activated', before: user, after: updated });
+  return updated;
 }
 
   // ============================================================
   // ✅ ۶. تغییر نقش یک کاربر
   // ============================================================
-  async updateUserRole(id: string, dto: UpdateUserRoleDto) {
+  async updateUserRole(id: string, dto: UpdateUserRoleDto, actorId?: string) {
     const user = await this.prisma.user.findUnique({
       where: { id },
       include: { ownedCompanies: { select: { id: true } } },
@@ -195,6 +201,8 @@ async activate(id: string) {
     // پاک کردن کش دسترسی‌ها (چون نقش تغییر کرده)
     PermissionsGuard.clearCache(dto.role);
     PermissionsGuard.clearCache(user.role);
+
+    await this.audit.record({ actorId, entityType: 'user', entityId: id, action: 'user.role_changed', before: user, after: updatedUser });
 
     return updatedUser;
   }

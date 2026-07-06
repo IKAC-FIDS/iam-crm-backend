@@ -24,6 +24,7 @@ const create_transition_dto_1 = require("./dto/create-transition.dto");
 const update_stage_config_dto_1 = require("./dto/update-stage-config.dto");
 const update_transition_dto_1 = require("./dto/update-transition.dto");
 const pipeline_config_service_1 = require("./pipeline-config.service");
+const current_user_decorator_1 = require("../../common/decorators/current-user.decorator");
 let PipelineConfigController = class PipelineConfigController {
     constructor(service) {
         this.service = service;
@@ -33,9 +34,9 @@ let PipelineConfigController = class PipelineConfigController {
         return this.service.updateStage(stage, dto);
     }
     getTransitions() { return this.service.getTransitions(); }
-    createTransition(dto) { return this.service.createTransition(dto); }
-    updateTransition(id, dto) { return this.service.updateTransition(id, dto); }
-    deleteTransition(id) { return this.service.deleteTransition(id); }
+    createTransition(dto, actor) { return this.service.createTransition(dto, actor.userId); }
+    updateTransition(id, dto, actor) { return this.service.updateTransition(id, dto, actor.userId); }
+    deleteTransition(id, actor) { return this.service.deleteTransition(id, actor.userId); }
 };
 exports.PipelineConfigController = PipelineConfigController;
 __decorate([
@@ -67,8 +68,9 @@ __decorate([
     (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN),
     (0, permissions_decorator_1.Permissions)('pipeline:transition:manage'),
     __param(0, (0, common_1.Body)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [create_transition_dto_1.CreateTransitionDto]),
+    __metadata("design:paramtypes", [create_transition_dto_1.CreateTransitionDto, Object]),
     __metadata("design:returntype", void 0)
 ], PipelineConfigController.prototype, "createTransition", null);
 __decorate([
@@ -77,8 +79,9 @@ __decorate([
     (0, permissions_decorator_1.Permissions)('pipeline:transition:manage'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, update_transition_dto_1.UpdateTransitionDto]),
+    __metadata("design:paramtypes", [String, update_transition_dto_1.UpdateTransitionDto, Object]),
     __metadata("design:returntype", void 0)
 ], PipelineConfigController.prototype, "updateTransition", null);
 __decorate([
@@ -86,8 +89,9 @@ __decorate([
     (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN),
     (0, permissions_decorator_1.Permissions)('pipeline:transition:manage'),
     __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
+    __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", void 0)
 ], PipelineConfigController.prototype, "deleteTransition", null);
 exports.PipelineConfigController = PipelineConfigController = __decorate([

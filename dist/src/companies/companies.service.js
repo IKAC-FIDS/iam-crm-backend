@@ -14,10 +14,12 @@ const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
 const prisma_service_1 = require("../prisma/prisma.service");
 const pipeline_config_service_1 = require("../admin/pipeline/pipeline-config.service");
+const audit_log_service_1 = require("../audit-log/audit-log.service");
 let CompaniesService = class CompaniesService {
-    constructor(prisma, pipelineConfig) {
+    constructor(prisma, pipelineConfig, audit) {
         this.prisma = prisma;
         this.pipelineConfig = pipelineConfig;
+        this.audit = audit;
     }
     async findAll(user, pagination, filters) {
         const page = pagination.page ?? 1;
@@ -123,12 +125,14 @@ let CompaniesService = class CompaniesService {
         if (user.role === client_1.UserRole.BOARDS) {
             throw new common_1.ForbiddenException('شما اجازه ایجاد شرکت را ندارید');
         }
-        return this.prisma.company.create({
+        const company = await this.prisma.company.create({
             data: {
                 ...dto,
                 ownerId: dto.ownerId ?? user.userId,
             },
         });
+        await this.audit.record({ actorId: user.userId, entityType: 'company', entityId: company.id, action: 'company.created', after: company });
+        return company;
     }
     async update(id, dto, user) {
         if (user.role === client_1.UserRole.BOARDS) {
@@ -138,10 +142,12 @@ let CompaniesService = class CompaniesService {
         if (!company)
             throw new common_1.NotFoundException('شرکت پیدا نشد');
         this.assertAccess(company, user);
-        return this.prisma.company.update({
+        const updated = await this.prisma.company.update({
             where: { id },
             data: dto,
         });
+        await this.audit.record({ actorId: user.userId, entityType: 'company', entityId: id, action: 'company.updated', before: company, after: updated });
+        return updated;
     }
     async changeStage(id, dto, user) {
         if (user.role === client_1.UserRole.BOARDS) {
@@ -166,6 +172,7 @@ let CompaniesService = class CompaniesService {
                 },
             }),
         ]);
+        await this.audit.record({ actorId: user.userId, entityType: 'company', entityId: id, action: 'company.stage_changed', before: { stage: company.stage }, after: { stage: updated.stage } });
         return updated;
     }
     async changeOwner(id, dto, user) {
@@ -193,10 +200,12 @@ let CompaniesService = class CompaniesService {
                 throw new common_1.BadRequestException('مدیر فروش باید در همان تیم شرکت باشد');
             }
         }
-        return this.prisma.company.update({
+        const updated = await this.prisma.company.update({
             where: { id },
             data: { ownerId: dto.newOwnerId },
         });
+        await this.audit.record({ actorId: user.userId, entityType: 'company', entityId: id, action: 'company.owner_changed', before: { ownerId: company.ownerId }, after: { ownerId: updated.ownerId } });
+        return updated;
     }
     async archive(id, dto, user) {
         const company = await this.prisma.company.findUnique({
@@ -208,10 +217,12 @@ let CompaniesService = class CompaniesService {
         this.assertArchiveAccess(company, user);
         if (company.archivedAt)
             throw new common_1.BadRequestException('شرکت قبلاً بایگانی شده است');
-        return this.prisma.company.update({
+        const archived = await this.prisma.company.update({
             where: { id },
             data: { archivedAt: new Date(), archivedById: user.userId, archiveReason: dto.reason },
         });
+        await this.audit.record({ actorId: user.userId, entityType: 'company', entityId: id, action: 'company.archived', before: company, after: archived });
+        return archived;
     }
     async restore(id, user) {
         const company = await this.prisma.company.findUnique({
@@ -223,10 +234,12 @@ let CompaniesService = class CompaniesService {
         this.assertArchiveAccess(company, user);
         if (!company.archivedAt)
             throw new common_1.BadRequestException('شرکت بایگانی نشده است');
-        return this.prisma.company.update({
+        const restored = await this.prisma.company.update({
             where: { id },
             data: { archivedAt: null, archivedById: null, archiveReason: null },
         });
+        await this.audit.record({ actorId: user.userId, entityType: 'company', entityId: id, action: 'company.restored', before: company, after: restored });
+        return restored;
     }
     async bulkChangeOwner(dto, user) {
         if (user.role === client_1.UserRole.BOARDS) {
@@ -262,6 +275,15 @@ let CompaniesService = class CompaniesService {
             where: { id: { in: dto.companyIds } },
             data: { ownerId: dto.newOwnerId },
         });
+        await Promise.all(companies.map((company) => this.audit.record({
+            actorId: user.userId,
+            entityType: 'company',
+            entityId: company.id,
+            action: 'company.owner_changed',
+            before: { ownerId: company.ownerId },
+            after: { ownerId: dto.newOwnerId },
+            metadata: { bulk: true },
+        })));
         return {
             message: `${result.count} شرکت با موفقیت به کاربر ${newOwner.fullName} اختصاص یافت`,
             updatedCount: result.count,
@@ -304,6 +326,6 @@ let CompaniesService = class CompaniesService {
 exports.CompaniesService = CompaniesService;
 exports.CompaniesService = CompaniesService = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [prisma_service_1.PrismaService, pipeline_config_service_1.PipelineConfigService])
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService, pipeline_config_service_1.PipelineConfigService, audit_log_service_1.AuditLogService])
 ], CompaniesService);
 //# sourceMappingURL=companies.service.js.map

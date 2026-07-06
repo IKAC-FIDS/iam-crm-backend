@@ -9,6 +9,7 @@ import { CreateTransitionDto } from './dto/create-transition.dto';
 import { UpdateStageConfigDto } from './dto/update-stage-config.dto';
 import { UpdateTransitionDto } from './dto/update-transition.dto';
 import { PipelineConfigService } from './pipeline-config.service';
+import { CurrentUser, CurrentUserPayload } from '../../common/decorators/current-user.decorator';
 
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 @Controller('admin/pipeline')
@@ -33,15 +34,15 @@ export class PipelineConfigController {
   @Post('transitions')
   @Roles(UserRole.ADMIN)
   @Permissions('pipeline:transition:manage')
-  createTransition(@Body() dto: CreateTransitionDto) { return this.service.createTransition(dto); }
+  createTransition(@Body() dto: CreateTransitionDto, @CurrentUser() actor: CurrentUserPayload) { return this.service.createTransition(dto, actor.userId); }
 
   @Patch('transitions/:id')
   @Roles(UserRole.ADMIN)
   @Permissions('pipeline:transition:manage')
-  updateTransition(@Param('id') id: string, @Body() dto: UpdateTransitionDto) { return this.service.updateTransition(id, dto); }
+  updateTransition(@Param('id') id: string, @Body() dto: UpdateTransitionDto, @CurrentUser() actor: CurrentUserPayload) { return this.service.updateTransition(id, dto, actor.userId); }
 
   @Delete('transitions/:id')
   @Roles(UserRole.ADMIN)
   @Permissions('pipeline:transition:manage')
-  deleteTransition(@Param('id') id: string) { return this.service.deleteTransition(id); }
+  deleteTransition(@Param('id') id: string, @CurrentUser() actor: CurrentUserPayload) { return this.service.deleteTransition(id, actor.userId); }
 }
