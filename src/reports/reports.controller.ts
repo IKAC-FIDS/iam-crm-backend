@@ -1,72 +1,53 @@
-import { Controller, Get, UseGuards, Query, ValidationPipe } from '@nestjs/common';
-import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../common/guards/roles.guard';
-import { PermissionsGuard } from '../common/guards/permissions.guard'; // ← اضافه شد
-import { Roles } from '../common/decorators/roles.decorator';
-import { Permissions } from '../common/decorators/permissions.decorator'; // ← اضافه شد
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
+import { CurrentUser, CurrentUserPayload } from '../common/decorators/current-user.decorator';
+import { Permissions } from '../common/decorators/permissions.decorator';
+import { Roles } from '../common/decorators/roles.decorator';
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { PermissionsGuard } from '../common/guards/permissions.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { ReportFiltersDto } from './dto/report-filters.dto';
 import { ReportsService } from './reports.service';
-import { IsDateString, IsOptional } from 'class-validator';
-
-class ActivityReportQueryDto {
-  @IsDateString()
-  @IsOptional()
-  startDate?: string;
-
-  @IsDateString()
-  @IsOptional()
-  endDate?: string;
-}
 
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
-@Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.BOARDS) // ← نقش‌های مجاز
+@Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.REP, UserRole.BOARDS)
+@Permissions('report:view')
 @Controller('reports')
 export class ReportsController {
   constructor(private reportsService: ReportsService) {}
 
-  // ============================================================
-  // ۱. نرخ تبدیل بین مراحل
-  // ============================================================
   @Get('conversion-rates')
-  @Permissions('report:view') // ← دسترسی مورد نیاز
-  getConversionRates() {
-    return this.reportsService.getConversionRates();
+  getConversionRates(@Query() filters: ReportFiltersDto, @CurrentUser() user: CurrentUserPayload) {
+    return this.reportsService.getConversionRates(filters, user);
   }
 
-  // ============================================================
-  // ۲. میانگین زمان ماندگاری در هر مرحله
-  // ============================================================
   @Get('stage-durations')
-  @Permissions('report:view')
-  getAverageStageDuration() {
-    return this.reportsService.getAverageStageDuration();
+  getAverageStageDuration(@Query() filters: ReportFiltersDto, @CurrentUser() user: CurrentUserPayload) {
+    return this.reportsService.getAverageStageDuration(filters, user);
   }
 
-  // ============================================================
-  // ۳. گزارش جامع پایپ‌لاین
-  // ============================================================
   @Get('pipeline-summary')
-  @Permissions('report:view')
-  getPipelineSummary() {
-    return this.reportsService.getPipelineSummary();
+  getPipelineSummary(@Query() filters: ReportFiltersDto, @CurrentUser() user: CurrentUserPayload) {
+    return this.reportsService.getPipelineSummary(filters, user);
   }
 
-  // ============================================================
-  // ۴. گزارش فعالیت‌ها در بازه زمانی
-  // ============================================================
-  @Get('activities')
-  @Permissions('report:view')
-  getActivityReport(
-    @Query(new ValidationPipe({ transform: true })) 
-    query: ActivityReportQueryDto,
-  ) {
-    const startDate = query.startDate 
-      ? new Date(query.startDate) 
-      : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // ۳۰ روز پیش
-    const endDate = query.endDate 
-      ? new Date(query.endDate) 
-      : new Date();
+  @Get('activities/by-user')
+  getActivitiesByUser(@Query() filters: ReportFiltersDto, @CurrentUser() user: CurrentUserPayload) {
+    return this.reportsService.getActivitiesByUser(filters, user);
+  }
 
-    return this.reportsService.getActivityReport(startDate, endDate);
+  @Get('activities')
+  getActivityReport(@Query() filters: ReportFiltersDto, @CurrentUser() user: CurrentUserPayload) {
+    return this.reportsService.getActivityReport(filters, user);
+  }
+
+  @Get('pipeline/by-owner')
+  getPipelineByOwner(@Query() filters: ReportFiltersDto, @CurrentUser() user: CurrentUserPayload) {
+    return this.reportsService.getPipelineByOwner(filters, user);
+  }
+
+  @Get('filter-options')
+  getFilterOptions(@CurrentUser() user: CurrentUserPayload) {
+    return this.reportsService.getFilterOptions(user);
   }
 }

@@ -249,3 +249,11 @@ Body: form-data → Key: file (Type: File)
 - Added completion metadata (`completedAt`, `completedById`, and `completionNote`) with a Prisma migration.
 - Excluded completed follow-ups from the due list; future reschedules naturally leave the due list.
 - Added DTO validation, safe empty-string normalization, and the `activity:update`, `follow-up:complete`, and `follow-up:reschedule` permissions for ADMIN, MANAGER, and REP.
+
+### fix 000002 - Advanced report filters backend
+
+- Added a shared validated report-filter DTO with comma-separated UUID and enum lists.
+- Added owner, team, stage, priority, industry, source, company, user, date-range, and activity-type filters to the relevant reports.
+- Added `GET /api/reports/activities/by-user`, `GET /api/reports/pipeline/by-owner`, and `GET /api/reports/filter-options`.
+- Applied data visibility consistently: ADMIN and BOARDS can report across all data, MANAGER is limited to the manager's team, and REP is limited to the rep's own scope when granted `report:view`.
+- Preserved existing unfiltered report response shapes and the activity report's default 30-day range.

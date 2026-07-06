@@ -14,82 +14,101 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ReportsController = void 0;
 const common_1 = require("@nestjs/common");
-const jwt_auth_guard_1 = require("../common/guards/jwt-auth.guard");
-const roles_guard_1 = require("../common/guards/roles.guard");
-const permissions_guard_1 = require("../common/guards/permissions.guard");
-const roles_decorator_1 = require("../common/decorators/roles.decorator");
-const permissions_decorator_1 = require("../common/decorators/permissions.decorator");
 const client_1 = require("@prisma/client");
+const current_user_decorator_1 = require("../common/decorators/current-user.decorator");
+const permissions_decorator_1 = require("../common/decorators/permissions.decorator");
+const roles_decorator_1 = require("../common/decorators/roles.decorator");
+const jwt_auth_guard_1 = require("../common/guards/jwt-auth.guard");
+const permissions_guard_1 = require("../common/guards/permissions.guard");
+const roles_guard_1 = require("../common/guards/roles.guard");
+const report_filters_dto_1 = require("./dto/report-filters.dto");
 const reports_service_1 = require("./reports.service");
-const class_validator_1 = require("class-validator");
-class ActivityReportQueryDto {
-}
-__decorate([
-    (0, class_validator_1.IsDateString)(),
-    (0, class_validator_1.IsOptional)(),
-    __metadata("design:type", String)
-], ActivityReportQueryDto.prototype, "startDate", void 0);
-__decorate([
-    (0, class_validator_1.IsDateString)(),
-    (0, class_validator_1.IsOptional)(),
-    __metadata("design:type", String)
-], ActivityReportQueryDto.prototype, "endDate", void 0);
 let ReportsController = class ReportsController {
     constructor(reportsService) {
         this.reportsService = reportsService;
     }
-    getConversionRates() {
-        return this.reportsService.getConversionRates();
+    getConversionRates(filters, user) {
+        return this.reportsService.getConversionRates(filters, user);
     }
-    getAverageStageDuration() {
-        return this.reportsService.getAverageStageDuration();
+    getAverageStageDuration(filters, user) {
+        return this.reportsService.getAverageStageDuration(filters, user);
     }
-    getPipelineSummary() {
-        return this.reportsService.getPipelineSummary();
+    getPipelineSummary(filters, user) {
+        return this.reportsService.getPipelineSummary(filters, user);
     }
-    getActivityReport(query) {
-        const startDate = query.startDate
-            ? new Date(query.startDate)
-            : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-        const endDate = query.endDate
-            ? new Date(query.endDate)
-            : new Date();
-        return this.reportsService.getActivityReport(startDate, endDate);
+    getActivitiesByUser(filters, user) {
+        return this.reportsService.getActivitiesByUser(filters, user);
+    }
+    getActivityReport(filters, user) {
+        return this.reportsService.getActivityReport(filters, user);
+    }
+    getPipelineByOwner(filters, user) {
+        return this.reportsService.getPipelineByOwner(filters, user);
+    }
+    getFilterOptions(user) {
+        return this.reportsService.getFilterOptions(user);
     }
 };
 exports.ReportsController = ReportsController;
 __decorate([
     (0, common_1.Get)('conversion-rates'),
-    (0, permissions_decorator_1.Permissions)('report:view'),
+    __param(0, (0, common_1.Query)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
+    __metadata("design:paramtypes", [report_filters_dto_1.ReportFiltersDto, Object]),
     __metadata("design:returntype", void 0)
 ], ReportsController.prototype, "getConversionRates", null);
 __decorate([
     (0, common_1.Get)('stage-durations'),
-    (0, permissions_decorator_1.Permissions)('report:view'),
+    __param(0, (0, common_1.Query)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
+    __metadata("design:paramtypes", [report_filters_dto_1.ReportFiltersDto, Object]),
     __metadata("design:returntype", void 0)
 ], ReportsController.prototype, "getAverageStageDuration", null);
 __decorate([
     (0, common_1.Get)('pipeline-summary'),
-    (0, permissions_decorator_1.Permissions)('report:view'),
+    __param(0, (0, common_1.Query)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
+    __metadata("design:paramtypes", [report_filters_dto_1.ReportFiltersDto, Object]),
     __metadata("design:returntype", void 0)
 ], ReportsController.prototype, "getPipelineSummary", null);
 __decorate([
-    (0, common_1.Get)('activities'),
-    (0, permissions_decorator_1.Permissions)('report:view'),
-    __param(0, (0, common_1.Query)(new common_1.ValidationPipe({ transform: true }))),
+    (0, common_1.Get)('activities/by-user'),
+    __param(0, (0, common_1.Query)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [ActivityReportQueryDto]),
+    __metadata("design:paramtypes", [report_filters_dto_1.ReportFiltersDto, Object]),
+    __metadata("design:returntype", void 0)
+], ReportsController.prototype, "getActivitiesByUser", null);
+__decorate([
+    (0, common_1.Get)('activities'),
+    __param(0, (0, common_1.Query)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [report_filters_dto_1.ReportFiltersDto, Object]),
     __metadata("design:returntype", void 0)
 ], ReportsController.prototype, "getActivityReport", null);
+__decorate([
+    (0, common_1.Get)('pipeline/by-owner'),
+    __param(0, (0, common_1.Query)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [report_filters_dto_1.ReportFiltersDto, Object]),
+    __metadata("design:returntype", void 0)
+], ReportsController.prototype, "getPipelineByOwner", null);
+__decorate([
+    (0, common_1.Get)('filter-options'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], ReportsController.prototype, "getFilterOptions", null);
 exports.ReportsController = ReportsController = __decorate([
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard, permissions_guard_1.PermissionsGuard),
-    (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN, client_1.UserRole.MANAGER, client_1.UserRole.BOARDS),
+    (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN, client_1.UserRole.MANAGER, client_1.UserRole.REP, client_1.UserRole.BOARDS),
+    (0, permissions_decorator_1.Permissions)('report:view'),
     (0, common_1.Controller)('reports'),
     __metadata("design:paramtypes", [reports_service_1.ReportsService])
 ], ReportsController);
