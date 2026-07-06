@@ -590,6 +590,6 @@ Body: form-data → Key: file (Type: File)
 
 ---
 
-**Built with ❤️ for the IAM sales team**
+**Built with ❤️ for sales team**
 
 ---
