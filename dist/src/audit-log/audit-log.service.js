@@ -58,6 +58,9 @@ let AuditLogService = class AuditLogService {
         if (Array.isArray(value))
             return value.map((item) => this.sanitize(item));
         if (value && typeof value === 'object') {
+            const jsonValue = value;
+            if (typeof jsonValue.toJSON === 'function')
+                return this.sanitize(jsonValue.toJSON());
             return Object.fromEntries(Object.entries(value).filter(([key]) => !/(password|hash|token|secret|authorization)/i.test(key)).map(([key, item]) => [key, this.sanitize(item)]));
         }
         return value;

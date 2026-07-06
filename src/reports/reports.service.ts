@@ -44,6 +44,23 @@ export class ReportsService {
     return and.length ? { AND: and } : {};
   }
 
+  private opportunityWhere(filters: ReportFiltersDto, user: CurrentUserPayload): Prisma.OpportunityWhereInput {
+    const and: Prisma.OpportunityWhereInput[] = [{ archivedAt: null }, { company: { archivedAt: null } }];
+    if (filters.ownerIds?.length) and.push({ ownerId: { in: filters.ownerIds } });
+    if (filters.teams?.length) and.push({ owner: { team: { in: filters.teams } } });
+    if (filters.stages?.length) and.push({ stage: { in: filters.stages } });
+    if (filters.priorities?.length) and.push({ priority: { in: filters.priorities } });
+    if (filters.industries?.length) and.push({ company: { industry: { in: filters.industries } } });
+    if (filters.sources?.length) and.push({ source: { in: filters.sources } });
+    if (filters.companyIds?.length) and.push({ companyId: { in: filters.companyIds } });
+    if (user.role === UserRole.MANAGER) {
+      and.push(user.team ? { company: { owner: { team: user.team } } } : { id: { in: [] } });
+    } else if (user.role === UserRole.REP) {
+      and.push({ OR: [{ ownerId: user.userId }, { company: { ownerId: user.userId } }] });
+    }
+    return { AND: and };
+  }
+
   private dateRange(filters: ReportFiltersDto, defaultToLast30Days = false) {
     const startDate = filters.startDate
       ? new Date(filters.startDate)
@@ -79,13 +96,13 @@ export class ReportsService {
 
   async getConversionRates(filters: ReportFiltersDto, user: CurrentUserPayload) {
     const stages = Object.values(PipelineStage);
-    const stageCounts = await this.prisma.pipelineStageHistory.groupBy({
+    const stageCounts = await this.prisma.opportunityStageHistory.groupBy({
       by: ['toStage'],
-      where: { company: this.companyWhere(filters, user) },
-      _count: { companyId: true },
+      where: { opportunity: this.opportunityWhere(filters, user) },
+      _count: { opportunityId: true },
       orderBy: { toStage: 'asc' },
     });
-    const countsMap = new Map(stageCounts.map((item) => [item.toStage, item._count.companyId]));
+    const countsMap = new Map(stageCounts.map((item) => [item.toStage, item._count.opportunityId]));
     const results: StageConversion[] = [];
     for (let i = 0; i < stages.length - 1; i++) {
       const fromStage = stages[i];
@@ -113,21 +130,21 @@ export class ReportsService {
   }
 
   async getAverageStageDuration(filters: ReportFiltersDto, user: CurrentUserPayload): Promise<DurationResult[]> {
-    const companyFilters = { ...filters, stages: undefined };
-    const histories = await this.prisma.pipelineStageHistory.findMany({
-      where: { company: this.companyWhere(companyFilters, user) },
-      select: { companyId: true, fromStage: true, changedAt: true },
-      orderBy: [{ companyId: 'asc' }, { changedAt: 'asc' }],
+    const opportunityFilters = { ...filters, stages: undefined };
+    const histories = await this.prisma.opportunityStageHistory.findMany({
+      where: { opportunity: this.opportunityWhere(opportunityFilters, user) },
+      select: { opportunityId: true, fromStage: true, changedAt: true },
+      orderBy: [{ opportunityId: 'asc' }, { changedAt: 'asc' }],
     });
     const durations = new Map<string, number[]>();
     const previous = new Map<string, Date>();
     for (const item of histories) {
-      const previousDate = previous.get(item.companyId);
+      const previousDate = previous.get(item.opportunityId);
       if (previousDate && item.fromStage && (!filters.stages?.length || filters.stages.includes(item.fromStage))) {
         const days = (item.changedAt.getTime() - previousDate.getTime()) / 86_400_000;
         durations.set(item.fromStage, [...(durations.get(item.fromStage) || []), days]);
       }
-      previous.set(item.companyId, item.changedAt);
+      previous.set(item.opportunityId, item.changedAt);
     }
     return [...durations.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([stage, values]) => ({
       stage,
@@ -139,8 +156,8 @@ export class ReportsService {
   }
 
   async getPipelineSummary(filters: ReportFiltersDto, user: CurrentUserPayload) {
-    const where = this.companyWhere(filters, user);
-    const stageCounts = await this.prisma.company.groupBy({
+    const where = this.opportunityWhere(filters, user);
+    const stageCounts = await this.prisma.opportunity.groupBy({
       by: ['stage'], where, _count: { id: true }, orderBy: { stage: 'asc' },
     });
     const totalCompanies = stageCounts.reduce((sum, item) => sum + item._count.id, 0);
@@ -211,8 +228,8 @@ export class ReportsService {
   }
 
   async getPipelineByOwner(filters: ReportFiltersDto, user: CurrentUserPayload) {
-    const companies = await this.prisma.company.findMany({
-      where: { AND: [this.companyWhere(filters, user), { ownerId: { not: null } }] },
+    const companies = await this.prisma.opportunity.findMany({
+      where: { AND: [this.opportunityWhere(filters, user), { ownerId: { not: null } }] },
       select: { ownerId: true, stage: true, owner: { select: { fullName: true, team: true } } },
     });
     const owners = new Map<string, typeof companies>();
@@ -244,7 +261,7 @@ export class ReportsService {
 
   async getFilterOptions(user: CurrentUserPayload) {
     const companyWhere = this.companyWhere({}, user);
-    const [users, companies] = await Promise.all([
+    const [users, companies, opportunities] = await Promise.all([
       this.prisma.user.findMany({
         where: this.reportUserWhere({}, user),
         select: { id: true, fullName: true, role: true, team: true },
@@ -254,13 +271,17 @@ export class ReportsService {
         where: companyWhere,
         select: { industry: true, source: true },
       }),
+      this.prisma.opportunity.findMany({
+        where: this.opportunityWhere({}, user),
+        select: { source: true },
+      }),
     ]);
     const unique = (values: Array<string | null>) => [...new Set(values.filter((value): value is string => Boolean(value)))].sort();
     return {
       users,
       teams: unique(users.map((item) => item.team)),
       industries: unique(companies.map((item) => item.industry)),
-      sources: unique(companies.map((item) => item.source)),
+      sources: unique([...companies.map((item) => item.source), ...opportunities.map((item) => item.source)]),
       stages: Object.values(PipelineStage),
       priorities: Object.values(Priority),
       activityTypes: Object.values(ActivityType),

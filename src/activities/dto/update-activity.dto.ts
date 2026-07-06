@@ -34,4 +34,9 @@ export class UpdateActivityDto {
   @IsOptional()
   @IsDateString()
   nextActionDate?: string | null;
+
+  @Transform(emptyStringToNull)
+  @IsOptional()
+  @IsUUID()
+  opportunityId?: string | null;
 }

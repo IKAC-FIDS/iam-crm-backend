@@ -1,4 +1,4 @@
-import { IsDateString, IsEnum, IsOptional, IsString } from 'class-validator';
+import { IsDateString, IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
 import { ActivityType } from '@prisma/client';
 
 export class CreateActivityDto {
@@ -27,4 +27,8 @@ export class CreateActivityDto {
   @IsOptional()
   @IsDateString()
   nextActionDate?: string;
+
+  @IsOptional()
+  @IsUUID()
+  opportunityId?: string;
 }

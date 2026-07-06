@@ -35,6 +35,7 @@ const lead_sources_module_1 = require("./lead-sources/lead-sources.module");
 const lookups_module_1 = require("./lookups/lookups.module");
 const pipeline_config_module_1 = require("./admin/pipeline/pipeline-config.module");
 const audit_log_module_1 = require("./audit-log/audit-log.module");
+const opportunities_module_1 = require("./opportunities/opportunities.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -80,6 +81,7 @@ exports.AppModule = AppModule = __decorate([
             lookups_module_1.LookupsModule,
             pipeline_config_module_1.PipelineConfigModule,
             audit_log_module_1.AuditLogModule,
+            opportunities_module_1.OpportunitiesModule,
         ],
         providers: [
             {

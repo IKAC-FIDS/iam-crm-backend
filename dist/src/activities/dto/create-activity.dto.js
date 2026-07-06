@@ -48,4 +48,9 @@ __decorate([
     (0, class_validator_1.IsDateString)(),
     __metadata("design:type", String)
 ], CreateActivityDto.prototype, "nextActionDate", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsUUID)(),
+    __metadata("design:type", String)
+], CreateActivityDto.prototype, "opportunityId", void 0);
 //# sourceMappingURL=create-activity.dto.js.map

@@ -132,6 +132,7 @@ export class ActivitiesService {
     if (dto.personId) {
       await this.validatePersonAccess(dto.personId, user);
     }
+    if (dto.opportunityId) await this.validateOpportunityCompany(dto.opportunityId, dto.companyId);
 
     const activity = await this.prisma.activity.create({
       data: {
@@ -143,6 +144,7 @@ export class ActivitiesService {
         outcome: dto.outcome,
         occurredAt: dto.occurredAt ? new Date(dto.occurredAt) : undefined,
         nextActionDate: dto.nextActionDate ? new Date(dto.nextActionDate) : undefined,
+        opportunityId: dto.opportunityId,
       },
     });
     await this.audit.record({ actorId: user.userId, entityType: 'activity', entityId: activity.id, action: 'activity.created', after: activity });
@@ -164,6 +166,7 @@ export class ActivitiesService {
         throw new BadRequestException('Person must belong to the activity company');
       }
     }
+    if (dto.opportunityId) await this.validateOpportunityCompany(dto.opportunityId, activity.companyId);
 
     const updated = await this.prisma.activity.update({
       where: { id: activityId },
@@ -176,6 +179,7 @@ export class ActivitiesService {
         ...(dto.nextActionDate !== undefined && {
           nextActionDate: dto.nextActionDate === null ? null : new Date(dto.nextActionDate),
         }),
+        ...(dto.opportunityId !== undefined && { opportunityId: dto.opportunityId }),
       },
       include: { company: true, person: true, user: { select: { id: true, fullName: true } }, completedBy: { select: { id: true, fullName: true } } },
     });
@@ -271,5 +275,11 @@ export class ActivitiesService {
         hasPrevious: page > 1,
       },
     };
+  }
+
+  private async validateOpportunityCompany(opportunityId: string, companyId: string) {
+    const opportunity = await this.prisma.opportunity.findUnique({ where: { id: opportunityId }, select: { companyId: true } });
+    if (!opportunity) throw new NotFoundException('Opportunity not found');
+    if (opportunity.companyId !== companyId) throw new BadRequestException('Opportunity must belong to the activity company');
   }
 }

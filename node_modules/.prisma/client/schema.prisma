@@ -97,11 +97,14 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  ownedCompanies      Company[]              @relation("CompanyOwner")
-  archivedCompanies   Company[]              @relation("CompanyArchivedBy")
-  activities          Activity[]
-  completedActivities Activity[]             @relation("ActivityCompletedBy")
-  stageChangesMade    PipelineStageHistory[]
+  ownedCompanies          Company[]                 @relation("CompanyOwner")
+  archivedCompanies       Company[]                 @relation("CompanyArchivedBy")
+  ownedOpportunities      Opportunity[]             @relation("OpportunityOwner")
+  archivedOpportunities   Opportunity[]             @relation("OpportunityArchivedBy")
+  opportunityStageChanges OpportunityStageHistory[]
+  activities              Activity[]
+  completedActivities     Activity[]                @relation("ActivityCompletedBy")
+  stageChangesMade        PipelineStageHistory[]
 
   @@map("users")
 }
@@ -146,6 +149,7 @@ model Company {
 
   ownerId        String?
   owner          User?         @relation("CompanyOwner", fields: [ownerId], references: [id])
+  // Deprecated pipeline compatibility fields. New sales flows belong to Opportunity.
   priority       Priority      @default(MEDIUM)
   stage          PipelineStage @default(LEAD)
   source         String?       @default("SAM_LIST")
@@ -167,6 +171,7 @@ model Company {
   activities     Activity[]
   callCard       CallCard?
   stageHistory   PipelineStageHistory[]
+  opportunities  Opportunity[]
 
   @@index([ownerId])
   @@index([stage])
@@ -323,6 +328,8 @@ model Activity {
   completedById  String?
   completedBy    User?        @relation("ActivityCompletedBy", fields: [completedById], references: [id])
   completionNote String?
+  opportunityId  String?
+  opportunity    Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
 
@@ -334,7 +341,71 @@ model Activity {
   @@index([occurredAt])
   @@index([userId, nextActionDate])
   @@index([companyId, occurredAt])
+  @@index([opportunityId])
   @@map("activities")
+}
+
+model Opportunity {
+  id        String  @id @default(uuid())
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  ownerId String?
+  owner   User?   @relation("OpportunityOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+
+  title       String
+  description String?
+
+  stage    PipelineStage @default(LEAD)
+  priority Priority      @default(MEDIUM)
+
+  estimatedValue    Decimal?  @db.Decimal(18, 2)
+  expectedCloseDate DateTime?
+
+  source     String?
+  lostReason String?
+  wonAt      DateTime?
+  lostAt     DateTime?
+
+  archivedAt    DateTime?
+  archivedById  String?
+  archivedBy    User?     @relation("OpportunityArchivedBy", fields: [archivedById], references: [id], onDelete: SetNull)
+  archiveReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  stageHistories OpportunityStageHistory[]
+  activities     Activity[]
+
+  @@index([companyId])
+  @@index([ownerId])
+  @@index([stage])
+  @@index([priority])
+  @@index([archivedAt])
+  @@index([ownerId, stage])
+  @@map("opportunities")
+}
+
+model OpportunityStageHistory {
+  id            String      @id @default(uuid())
+  opportunityId String
+  opportunity   Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+
+  fromStage PipelineStage?
+  toStage   PipelineStage
+
+  changedById String?
+  changedBy   User?   @relation(fields: [changedById], references: [id], onDelete: SetNull)
+
+  note      String?
+  changedAt DateTime @default(now())
+
+  @@index([opportunityId])
+  @@index([toStage])
+  @@index([changedAt])
+  @@index([opportunityId, changedAt])
+  @@map("opportunity_stage_histories")
 }
 
 // ============================================================

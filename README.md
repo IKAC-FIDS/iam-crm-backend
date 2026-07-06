@@ -595,6 +595,16 @@ Body: form-data → Key: file (Type: File)
 - Applied role visibility using `people:directory:view`: ADMIN sees all active-company people, MANAGER sees the manager's team, REP sees owned-company people, and BOARDS remains unauthorized by default.
 - Included safe company owner, contact, and social details with derived primary email and phone summaries.
 
+### fix 000012 - Introduce Opportunity as the pipeline-moving entity
+
+- Company remains the account/master organization; Opportunity is now the sales process that moves through the pipeline, and each company can own multiple opportunities.
+- Added Opportunity CRUD, stage, owner, archive/restore, global listing, and company-scoped listing/creation APIs.
+- Added opportunity stage history and optional Activity-to-Opportunity linkage.
+- Phase-1 migrations create a primary opportunity for every existing company, copy owner/stage/priority/source, and preserve legacy company stage history.
+- Pipeline summary, conversion, duration, and owner reports now count opportunities. Legacy response property names such as `totalCompanies` remain temporarily for frontend compatibility but represent opportunity counts.
+- Existing Company pipeline fields and `PATCH /api/companies/:companyId/stage` remain operational but are deprecated for new integrations; they do not automatically mutate opportunities.
+- Added scoped Opportunity permissions and audit events for create, update, stage, owner, archive, and restore operations.
+
 ---
 
 **Built with ❤️ for sales team**
