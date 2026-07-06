@@ -31,6 +31,8 @@ const person_socials_module_1 = require("./person-socials/person-socials.module"
 const industries_module_1 = require("./industries/industries.module");
 const pain_points_module_1 = require("./pain-points/pain-points.module");
 const use_cases_module_1 = require("./use-cases/use-cases.module");
+const lead_sources_module_1 = require("./lead-sources/lead-sources.module");
+const lookups_module_1 = require("./lookups/lookups.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -72,6 +74,8 @@ exports.AppModule = AppModule = __decorate([
             industries_module_1.IndustriesModule,
             pain_points_module_1.PainPointsModule,
             use_cases_module_1.UseCasesModule,
+            lead_sources_module_1.LeadSourcesModule,
+            lookups_module_1.LookupsModule,
         ],
         providers: [
             {

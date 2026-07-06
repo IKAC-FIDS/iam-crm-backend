@@ -169,6 +169,10 @@ async function main() {
     { action: 'library:pain-point:manage', description: 'مدیریت نقاط درد' },
     { action: 'library:use-case:view', description: 'مشاهده کاربردها' },
     { action: 'library:use-case:manage', description: 'مدیریت کاربردها' },
+    { action: 'library:lead-source:view', description: 'View lead sources' },
+    { action: 'library:lead-source:manage', description: 'Manage lead sources' },
+    { action: 'lookup:view', description: 'View lookup options' },
+    { action: 'lookup:manage', description: 'Manage lookup options' },
     // دسترسی‌های قدیمی صنعت (برای سازگاری - می‌توان حذف کرد)
     // { action: 'library:industry:manage', description: 'مدیریت کتابخانه صنعت' },
     // { action: 'library:industry:view', description: 'مشاهده کتابخانه صنعت' },
@@ -226,6 +230,8 @@ async function main() {
         'library:industry:view',
         'library:pain-point:view',
         'library:use-case:view',
+        'library:lead-source:view',
+        'lookup:view',
         'branch:manage',
         'social-channel:manage',
       ],
@@ -252,6 +258,8 @@ async function main() {
         'library:industry:view',
         'library:pain-point:view',
         'library:use-case:view',
+        'library:lead-source:view',
+        'lookup:view',
       ],
     },
     {
@@ -262,6 +270,8 @@ async function main() {
         'library:industry:view',
         'library:pain-point:view',
         'library:use-case:view',
+        'library:lead-source:view',
+        'lookup:view',
         // سایر دسترسی‌ها را ندارد
       ],
     },

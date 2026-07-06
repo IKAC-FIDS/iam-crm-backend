@@ -257,3 +257,11 @@ Body: form-data → Key: file (Type: File)
 - Added `GET /api/reports/activities/by-user`, `GET /api/reports/pipeline/by-owner`, and `GET /api/reports/filter-options`.
 - Applied data visibility consistently: ADMIN and BOARDS can report across all data, MANAGER is limited to the manager's team, and REP is limited to the rep's own scope when granted `report:view`.
 - Preserved existing unfiltered report response shapes and the activity report's default 30-day range.
+
+### fix 000003 - Admin libraries and data catalogs backend
+
+- Added admin-managed Lead Source CRUD with active/inactive filtering and soft deletion.
+- Added grouped lookup CRUD for teams, departments, seniority levels, persona tags, contact types, person social platforms, and company sources.
+- Added Prisma catalog models, indexes, uniqueness constraints, and a database migration.
+- Added and assigned lead-source and lookup view/manage permissions; Persona Library now enforces its existing permissions.
+- Catalog dropdown endpoints return active records by default and support `?active=false` for inactive records.

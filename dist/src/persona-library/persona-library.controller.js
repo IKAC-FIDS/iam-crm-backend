@@ -18,6 +18,8 @@ const client_1 = require("@prisma/client");
 const jwt_auth_guard_1 = require("../common/guards/jwt-auth.guard");
 const roles_guard_1 = require("../common/guards/roles.guard");
 const roles_decorator_1 = require("../common/decorators/roles.decorator");
+const permissions_decorator_1 = require("../common/decorators/permissions.decorator");
+const permissions_guard_1 = require("../common/guards/permissions.guard");
 const persona_library_service_1 = require("./persona-library.service");
 const upsert_persona_dto_1 = require("./dto/upsert-persona.dto");
 let PersonaLibraryController = class PersonaLibraryController {
@@ -40,13 +42,14 @@ let PersonaLibraryController = class PersonaLibraryController {
 exports.PersonaLibraryController = PersonaLibraryController;
 __decorate([
     (0, common_1.Get)(),
+    (0, permissions_decorator_1.Permissions)('library:persona:view'),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", void 0)
 ], PersonaLibraryController.prototype, "findAll", null);
 __decorate([
-    (0, common_1.UseGuards)(roles_guard_1.RolesGuard),
     (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN),
+    (0, permissions_decorator_1.Permissions)('library:persona:manage'),
     (0, common_1.Post)(),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
@@ -54,8 +57,8 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], PersonaLibraryController.prototype, "create", null);
 __decorate([
-    (0, common_1.UseGuards)(roles_guard_1.RolesGuard),
     (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN),
+    (0, permissions_decorator_1.Permissions)('library:persona:manage'),
     (0, common_1.Patch)(':id'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
@@ -64,8 +67,8 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], PersonaLibraryController.prototype, "update", null);
 __decorate([
-    (0, common_1.UseGuards)(roles_guard_1.RolesGuard),
     (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN),
+    (0, permissions_decorator_1.Permissions)('library:persona:manage'),
     (0, common_1.Delete)(':id'),
     __param(0, (0, common_1.Param)('id')),
     __metadata("design:type", Function),
@@ -73,7 +76,7 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], PersonaLibraryController.prototype, "remove", null);
 exports.PersonaLibraryController = PersonaLibraryController = __decorate([
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard, permissions_guard_1.PermissionsGuard),
     (0, common_1.Controller)('persona-library'),
     __metadata("design:paramtypes", [persona_library_service_1.PersonaLibraryService])
 ], PersonaLibraryController);

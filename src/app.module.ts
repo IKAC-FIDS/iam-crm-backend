@@ -22,6 +22,8 @@ import { PersonSocialsModule } from './person-socials/person-socials.module';
 import { IndustriesModule } from './industries/industries.module';
 import { PainPointsModule } from './pain-points/pain-points.module';
 import { UseCasesModule } from './use-cases/use-cases.module';
+import { LeadSourcesModule } from './lead-sources/lead-sources.module';
+import { LookupsModule } from './lookups/lookups.module';
 
 @Module({
   imports: [
@@ -60,6 +62,8 @@ import { UseCasesModule } from './use-cases/use-cases.module';
     IndustriesModule,
     PainPointsModule,
     UseCasesModule,
+    LeadSourcesModule,
+    LookupsModule,
   ],
   providers: [
     {
