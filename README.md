@@ -1,70 +1,71 @@
 # 🚀 IAM CRM Backend
 
-**بک‌اند سیستم مدیریت فرآیند فروش IAM** – ابزاری جامع برای تیم‌های فروش B2B: از وارد کردن لیست SAM (Service Addressable Market) و تحقیق شرکت/شخص، تا مدیریت پایپ‌لاین فروش (Kanban)، ثبت تماس‌های هوشمند (Call Card) و گزارش‌گیری تحلیلی.
+**Backend for the IAM Sales Process Management System** – a comprehensive tool for B2B sales teams: from importing SAM (Service Addressable Market) lists and company/person research, to sales pipeline management (Kanban), smart call logging (Call Card), and analytical reporting.
 
-سیستم با **NestJS**، **PostgreSQL** و **Prisma** ساخته شده و برای اجرا روی سرورهای داخلی (On-Premise) با **Docker** بهینه شده است.
-
----
-
-## 🎯 هدف هر سرویس (Business Goals)
-
-| سرویس | هدف و کاربرد اصلی |
-|-------|-------------------|
-| **Auth** | احراز هویت کاربران و صدور توکن JWT. نقطه‌ی ورود امن به سیستم. |
-| **Users** | مدیریت کاربران (فروشنده، مدیر فروش، ادمین، کاربر گزارش‌گیر). فقط ادمین می‌تواند کاربر ایجاد/غیرفعال کند. |
-| **Companies** | **هسته‌ی سیستم**: مدیریت شرکت‌ها (لیدها)، تغییر مرحله در پایپ‌لاین فروش با ثبت تاریخچه، تغییر مالکیت (اختصاص به فروشنده). |
-| **People** | مدیریت مخاطبین هر شرکت (افراد کلیدی، سمت‌ها، اطلاعات تماس). امکان ثبت چند شماره/ایمیل و شبکه‌های اجتماعی. |
-| **Activities** | ثبت تمام تعاملات با شرکت/مخاطب (تماس، ایمیل، پیام لینکدین، جلسه، یادداشت). مدیریت یادآوری‌های سررسید (Follow-up). |
-| **Call Cards** | **کارت تماس استراتژیک**: یک سند زنده برای هر شرکت که شامل زاویه‌ی ورود، نقاط درد، کاربرد محصول، سوالات اکتشافی، اعتراضات و پاسخ‌ها است. به فروشنده در آماده‌سازی و اجرای تماس‌های حرفه‌ای کمک می‌کند. |
-| **Persona Library** | کتابخانه‌ی سمت‌های سازمانی (مثل CIO، CISO، مدیر IT). به فروشنده می‌گوید هر سمت معمولاً چه چالش‌هایی دارد و چه راه‌حلی برای او جذاب است. مدیریت آن فقط با ادمین است. |
-| **Industry Playbook** (جدید: Industries + PainPoints + UseCases) | **کتابخانه‌ی صنایع**: هر صنعت (بانک، خودروسازی، بیمه، ...) نقاط درد و کاربردهای خاص خود را دارد. این سرویس به فروشنده کمک می‌کند بر اساس نوع شرکت، پیشنهادات مناسبی برای تماس آماده کند. |
-| **Import SAM List** | وارد کردن گروهی لیست شرکت‌ها از فایل Excel. ادمین می‌تواند صدها شرکت را یکجا ایجاد کند و سپس آنها را بین فروشنده‌ها توزیع کند. |
-| **Company Branches** | مدیریت شعب یک شرکت (دفاتر مرکزی، شعبات شهرستان‌ها، آدرس و تلفن). |
-| **Company Social Channels** | مدیریت کانال‌های اجتماعی شرکت (لینکدین، اینستاگرام، تلگرام، وبسایت). |
-| **Reports** | **داشبورد تحلیلی**: نرخ تبدیل بین مراحل پایپ‌لاین، میانگین زمان ماندگاری در هر مرحله، خلاصه وضعیت پایپ‌لاین و گزارش فعالیت‌ها در بازه‌های زمانی مختلف. |
-| **Admin Permissions (Policy)** | **سیستم مدیریت دسترسی پویا**: ادمین می‌تواند بدون تغییر کد، دسترسی‌های هر نقش (ADMIN, MANAGER, REP, BOARDS) را به‌صورت دقیق مدیریت کند. |
+The system is built with **NestJS**, **PostgreSQL**, and **Prisma**, and is optimized for deployment on internal/on-premise servers using **Docker**.
 
 ---
 
-## ✨ قابلیت‌های کلیدی
+## 🎯 Service Goals (Business Goals)
 
-- **مدیریت کامل پایپ‌لاین فروش**: ۱۷ مرحله از LEAD تا DONE با تاریخچه‌ی تغییرات
-- **Call Card هوشمند**: پیشنهاد خودکار Pain Point و Use Case بر اساس سمت مخاطب و صنعت شرکت
-- **مدیریت مخاطبین پیشرفته**: ثبت چند شماره تماس، چند ایمیل و چند شبکه‌ی اجتماعی برای هر فرد
-- **گزارش‌گیری تحلیلی**: نرخ تبدیل، میانگین زمان مراحل، خلاصه پایپ‌لاین
-- **Import گروهی از Excel**: ورود صدها شرکت در یک بار آپلود
-- **سیستم دسترسی‌های پویا (Policy)**: مدیریت نقش‌ها و دسترسی‌ها در پنل ادمین بدون نیاز به تغییر کد
-- **امنیت بالا**: JWT، Rate Limiting، اعتبارسنجی محیط، ایندکس‌های دیتابیس
+| Service | Main Goal and Use Case |
+|---------|-------------------------|
+| **Auth** | User authentication and JWT token issuance. The secure entry point to the system. |
+| **Users** | User management (sales rep, sales manager, admin, reporting user). Only admins can create or deactivate users. |
+| **Companies** | **Core of the system**: company/lead management, sales pipeline stage changes with history tracking, and ownership changes/assignment to sales reps. |
+| **People** | Management of each company's contacts, including key people, titles, and contact information. Supports multiple phone numbers, emails, and social networks. |
+| **Activities** | Recording all interactions with a company/contact, including calls, emails, LinkedIn messages, meetings, and notes. Also manages due follow-up reminders. |
+| **Call Cards** | **Strategic call card**: a living document for each company that includes the entry angle, pain points, product use cases, discovery questions, objections, and responses. It helps sales reps prepare for and run professional calls. |
+| **Persona Library** | A library of organizational roles/personas such as CIO, CISO, and IT Manager. It tells the sales rep what challenges each role usually has and what solution is attractive to that role. Only admins can manage it. |
+| **Industry Playbook** (new: Industries + PainPoints + UseCases) | **Industry library**: each industry, such as banking, automotive, insurance, and others, has its own pain points and use cases. This service helps the sales rep prepare relevant suggestions for calls based on the company's industry. |
+| **Import SAM List** | Bulk import of company lists from Excel files. Admins can create hundreds of companies at once and then distribute them among sales reps. |
+| **Company Branches** | Management of a company's branches, including headquarters, regional offices, addresses, and phone numbers. |
+| **Company Social Channels** | Management of company social channels such as LinkedIn, Instagram, Telegram, and website. |
+| **Reports** | **Analytical dashboard**: conversion rates between pipeline stages, average time spent in each stage, pipeline status summary, and activity reports across different date ranges. |
+| **Admin Permissions (Policy)** | **Dynamic access-control system**: admins can manage the permissions of each role (ADMIN, MANAGER, REP, BOARDS) precisely without changing code. |
 
 ---
 
-## 🚀 اجرای سریع با Docker (پیشنهادی برای سرور داخلی)
+## ✨ Key Features
+
+- **Full sales pipeline management**: 17 stages from LEAD to DONE, with stage-change history
+- **Smart Call Card**: automatic Pain Point and Use Case suggestions based on contact persona and company industry
+- **Advanced contact management**: multiple phone numbers, emails, and social networks per person
+- **Analytical reporting**: conversion rates, average stage duration, pipeline summary
+- **Bulk import from Excel**: import hundreds of companies in a single upload
+- **Dynamic permission system (Policy)**: manage roles and permissions from the admin panel without code changes
+- **High security**: JWT, rate limiting, environment validation, and database indexes
+
+---
+
+## 🚀 Quick Start with Docker (Recommended for Internal Servers)
 
 ```bash
 docker compose up -d --build
 ```
 
-این دستور:
-1. یک دیتابیس PostgreSQL بالا می‌آورد
-2. اپلیکیشن را build می‌کند
-3. مایگریشن‌های دیتابیس را اجرا می‌کند
-4. API را روی پورت 3000 بالا می‌آورد
+This command:
 
-بعد از بالا آمدن، برای پر کردن کتابخانه‌ها و ساخت کاربر ادمین اولیه:
+1. Starts a PostgreSQL database
+2. Builds the application
+3. Runs database migrations
+4. Starts the API on port 3000
+
+After the services are up, run the following command to populate libraries and create the initial admin user:
 
 ```bash
 docker compose exec api npm run seed
 ```
 
-کاربر ادمین پیش‌فرض: `admin@yourcompany.com` / `ChangeMe123!` — حتماً بلافاصله بعد از اولین ورود عوض کنید.
+Default admin user: `admin@yourcompany.com` / `ChangeMe123!` — make sure to change it immediately after the first login.
 
 ---
 
-## 💻 اجرای محلی برای توسعه
+## 💻 Local Development Setup
 
 ```bash
 cp .env.example .env
-# مقادیر DATABASE_URL و JWT_SECRET را در .env تنظیم کنید
+# Configure DATABASE_URL and JWT_SECRET in .env
 
 npm install
 npx prisma migrate dev --name init
@@ -72,107 +73,107 @@ npm run seed
 npm run start:dev
 ```
 
-API روی `http://localhost:3000/api` در دسترس است.
+The API will be available at `http://localhost:3000/api`.
 
 ---
 
-## 📂 ساختار پروژه (ماژول‌های اصلی)
+## 📂 Project Structure (Main Modules)
 
 ```
 prisma/
-├── schema.prisma          مدل کامل دیتابیس (شامل مدل‌های جدید Industry, PainPoint, UseCase)
-├── seed.ts                داده‌های اولیه (ادمین، Persona، Industry، PainPoint، UseCase، دسترسی‌ها)
-└── migrations/            فایل‌های Migration
+├── schema.prisma          Complete database model, including the new Industry, PainPoint, and UseCase models
+├── seed.ts                Initial data: admin, Persona, Industry, PainPoint, UseCase, and permissions
+└── migrations/            Migration files
 
 src/
-├── auth/                  احراز هویت JWT (ورود، صدور توکن)
-├── users/                 مدیریت کاربران (فقط ادمین)
-├── companies/             مدیریت شرکت‌ها، پایپ‌لاین، تاریخچه، تغییر مالکیت
-├── people/                مدیریت مخاطبین (با قابلیت چند شماره/ایمیل/شبکه اجتماعی)
-├── activities/            ثبت فعالیت‌ها و یادآوری‌های سررسید
-├── call-cards/            Call Card (کارت تماس استراتژیک) + پیشنهاد خودکار
-├── persona-library/       کتابخانه سمت‌ها (CIO, CISO, ...)
-├── industries/            **جدید**: مدیریت صنایع (با ارتباط Many-to-Many)
-├── pain-points/           **جدید**: مدیریت نقاط درد (قابل استفاده مجدد)
-├── use-cases/             **جدید**: مدیریت کاربردها (قابل استفاده مجدد)
-├── import/                Import گروهی از Excel (SAM List)
-├── company-branches/      مدیریت شعب شرکت‌ها
-├── company-social-channels/ مدیریت کانال‌های اجتماعی شرکت‌ها
-├── reports/               گزارش‌گیری (نرخ تبدیل، میانگین زمان، خلاصه پایپ‌لاین)
-├── admin/                 مدیریت دسترسی‌های پویا (Policy) – فقط ادمین
-├── common/                گاردها، دکوراتورها، DTOهای مشترک، اعتبارسنجی‌ها
-└── app.module.ts          ماژول اصلی
+├── auth/                  JWT authentication: login and token issuance
+├── users/                 User management, admin-only
+├── companies/             Company management, pipeline, history, and ownership changes
+├── people/                Contact management with multiple phones/emails/social networks
+├── activities/            Activity logging and due follow-up reminders
+├── call-cards/            Call Card: strategic call card + automatic suggestions
+├── persona-library/       Persona library: CIO, CISO, and others
+├── industries/            New: industry management with many-to-many relations
+├── pain-points/           New: reusable pain point management
+├── use-cases/             New: reusable use case management
+├── import/                Bulk import from Excel: SAM List
+├── company-branches/      Company branch management
+├── company-social-channels/ Company social channel management
+├── reports/               Reporting: conversion rate, average stage duration, pipeline summary
+├── admin/                 Dynamic permission management: Policy, admin-only
+├── common/                Guards, decorators, shared DTOs, and validations
+└── app.module.ts          Main module
 ```
 
 ---
 
-## 🛡️ سیستم دسترسی‌ها (Policy)
+## 🛡️ Permission System (Policy)
 
-سیستم دسترسی‌ها به‌صورت **پویا** طراحی شده و قابل مدیریت در پنل ادمین است.
+The permission system is designed to be **dynamic** and manageable from the admin panel.
 
-### نقش‌های تعریف‌شده
+### Defined Roles
 
-| نقش | توضیح |
-|-----|-------|
-| **ADMIN** | دسترسی کامل به همه بخش‌ها (مدیریت کاربران، کتابخانه‌ها، دسترسی‌ها، تنظیمات) |
-| **MANAGER** | مدیریت شرکت‌های تیم خود، مشاهده گزارش‌ها، مدیریت Call Card و فعالیت‌ها |
-| **REP** | مدیریت شرکت‌های خود، ثبت فعالیت‌ها و Call Card، مشاهده مخاطبین |
-| **BOARDS** | فقط مشاهده گزارش‌ها و داشبورد (بدون دسترسی به مدیریت شرکت‌ها و کاربران) |
+| Role | Description |
+|------|-------------|
+| **ADMIN** | Full access to all sections, including user management, libraries, permissions, and settings |
+| **MANAGER** | Manages companies belonging to their own team, views reports, and manages Call Cards and activities |
+| **REP** | Manages their own companies, records activities and Call Cards, and views contacts |
+| **BOARDS** | Read-only access to reports and dashboards, without access to company or user management |
 
-### لیست دسترسی‌های اصلی
+### Main Permission List
 
-| دسترسی | توضیح |
-|--------|-------|
-| `user:create`, `user:view`, `user:deactivate`, `user:activate` | مدیریت کاربران |
-| `company:view`, `create`, `update`, `delete`, `change-stage`, `change-owner`, `bulk-change-owner` | مدیریت شرکت‌ها |
-| `person:view`, `create`, `update`, `delete` | مدیریت مخاطبین |
-| `activity:view`, `create` | مدیریت فعالیت‌ها |
-| `call-card:view`, `manage` | مدیریت Call Card |
-| `report:view` | مشاهده گزارش‌ها |
-| `import:sam` | آپلود لیست SAM |
-| `library:persona:view`, `manage` | کتابخانه Persona |
-| `library:industry:view`, `manage` | کتابخانه صنعت (مدل جدید) |
-| `library:pain-point:view`, `manage` | مدیریت نقاط درد |
-| `library:use-case:view`, `manage` | مدیریت کاربردها |
-| `branch:manage` | مدیریت شعب |
-| `social-channel:manage` | مدیریت کانال‌های اجتماعی |
-
----
-
-## 🌐 مسیرهای API (خلاصه)
-
-| Method | Path | توضیح |
-|--------|------|-------|
-| `POST` | `/api/auth/login` | ورود و دریافت JWT |
-| `GET/POST` | `/api/users` | لیست/ایجاد کاربر (فقط ADMIN) |
-| `GET/PATCH` | `/api/users/:id` | مشاهده/غیرفعال‌سازی کاربر |
-| `GET/POST` | `/api/companies` | لیست/ساخت شرکت (با صفحه‌بندی) |
-| `GET/PATCH` | `/api/companies/:id` | مشاهده/ویرایش شرکت |
-| `PATCH` | `/api/companies/:id/stage` | تغییر مرحله پایپ‌لاین |
-| `PATCH` | `/api/companies/:id/owner` | تغییر مالکیت شرکت |
-| `PATCH` | `/api/companies/bulk/owner` | تغییر مالکیت گروهی |
-| `GET/POST` | `/api/people?companyId=` | لیست/ساخت مخاطبین (با صفحه‌بندی) |
-| `GET/PATCH/DELETE` | `/api/people/:id` | مشاهده/ویرایش/حذف مخاطب |
-| `GET/POST` | `/api/activities?companyId=` | لیست/ساخت فعالیت‌ها (با صفحه‌بندی) |
-| `GET` | `/api/activities/follow-ups/due` | یادآوری‌های سررسید کاربر جاری |
-| `GET/PUT` | `/api/companies/:companyId/call-card` | مشاهده/ایجاد Call Card |
-| `GET` | `/api/companies/:companyId/call-card/suggest` | پیشنهاد خودکار Pain Point/Use Case |
-| `GET/POST` | `/api/persona-library` | لیست/ساخت Persona (نوشتن فقط ADMIN) |
-| `GET/POST` | `/api/industries` | لیست/ساخت صنایع (مدیریت فقط ADMIN) |
-| `GET/POST` | `/api/pain-points` | لیست/ساخت نقاط درد (مدیریت فقط ADMIN) |
-| `GET/POST` | `/api/use-cases` | لیست/ساخت کاربردها (مدیریت فقط ADMIN) |
-| `POST` | `/api/import/sam` | آپلود Excel و Import گروهی (فقط ADMIN) |
-| `GET` | `/api/reports/conversion-rates` | نرخ تبدیل بین مراحل |
-| `GET` | `/api/reports/stage-durations` | میانگین زمان ماندگاری در هر مرحله |
-| `GET` | `/api/reports/pipeline-summary` | خلاصه وضعیت پایپ‌لاین |
-| `GET` | `/api/reports/activities` | گزارش فعالیت‌ها در بازه زمانی |
-| `GET/POST` | `/api/admin/permissions` | مدیریت دسترسی‌ها (فقط ADMIN) |
+| Permission | Description |
+|------------|-------------|
+| `user:create`, `user:view`, `user:deactivate`, `user:activate` | User management |
+| `company:view`, `create`, `update`, `delete`, `change-stage`, `change-owner`, `bulk-change-owner` | Company management |
+| `person:view`, `create`, `update`, `delete` | Contact management |
+| `activity:view`, `create` | Activity management |
+| `call-card:view`, `manage` | Call Card management |
+| `report:view` | View reports |
+| `import:sam` | Upload SAM list |
+| `library:persona:view`, `manage` | Persona Library |
+| `library:industry:view`, `manage` | Industry library: new model |
+| `library:pain-point:view`, `manage` | Pain point management |
+| `library:use-case:view`, `manage` | Use case management |
+| `branch:manage` | Branch management |
+| `social-channel:manage` | Social channel management |
 
 ---
 
-## 🧪 Import SAM List (ورود گروهی از Excel)
+## 🌐 API Routes (Summary)
 
-### آپلود فایل
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/auth/login` | Login and receive JWT |
+| `GET/POST` | `/api/users` | List/create users, ADMIN only |
+| `GET/PATCH` | `/api/users/:id` | View/deactivate user |
+| `GET/POST` | `/api/companies` | List/create companies, with pagination |
+| `GET/PATCH` | `/api/companies/:id` | View/edit company |
+| `PATCH` | `/api/companies/:id/stage` | Change pipeline stage |
+| `PATCH` | `/api/companies/:id/owner` | Change company ownership |
+| `PATCH` | `/api/companies/bulk/owner` | Bulk ownership change |
+| `GET/POST` | `/api/people?companyId=` | List/create contacts, with pagination |
+| `GET/PATCH/DELETE` | `/api/people/:id` | View/edit/delete contact |
+| `GET/POST` | `/api/activities?companyId=` | List/create activities, with pagination |
+| `GET` | `/api/activities/follow-ups/due` | Due follow-up reminders for the current user |
+| `GET/PUT` | `/api/companies/:companyId/call-card` | View/create Call Card |
+| `GET` | `/api/companies/:companyId/call-card/suggest` | Automatic Pain Point/Use Case suggestions |
+| `GET/POST` | `/api/persona-library` | List/create Persona records; write access is ADMIN only |
+| `GET/POST` | `/api/industries` | List/create industries; management is ADMIN only |
+| `GET/POST` | `/api/pain-points` | List/create pain points; management is ADMIN only |
+| `GET/POST` | `/api/use-cases` | List/create use cases; management is ADMIN only |
+| `POST` | `/api/import/sam` | Upload Excel and perform bulk import, ADMIN only |
+| `GET` | `/api/reports/conversion-rates` | Conversion rates between stages |
+| `GET` | `/api/reports/stage-durations` | Average time spent in each stage |
+| `GET` | `/api/reports/pipeline-summary` | Pipeline status summary |
+| `GET` | `/api/reports/activities` | Activity report over a date range |
+| `GET/POST` | `/api/admin/permissions` | Permission management, ADMIN only |
+
+---
+
+## 🧪 Import SAM List (Bulk Import from Excel)
+
+### File Upload
 
 ```http
 POST /api/import/sam
@@ -181,10 +182,10 @@ Content-Type: multipart/form-data
 Body: form-data → Key: file (Type: File)
 ```
 
-### ستون‌های قابل‌شناسایی در فایل Excel
+### Recognized Columns in the Excel File
 
-| نام ستون فارسی | نام ستون انگلیسی |
-|----------------|------------------|
+| Persian Column Name | English Column Name |
+|---------------------|---------------------|
 | نام شرکت | legalName |
 | نام تجاری | brandName |
 | صنعت | industry |
@@ -199,44 +200,44 @@ Body: form-data → Key: file (Type: File)
 
 ---
 
-## 🔐 امنیت و بهینه‌سازی
+## 🔐 Security and Optimization
 
-- **JWT** با طول عمر ۸ ساعت و `JWT_SECRET` حداقل ۳۲ کاراکتر
-- **Rate Limiting**: ۱۰۰ درخواست در ۶۰ ثانیه (برای لاگین: ۵ درخواست)
-- **اعتبارسنجی محیط** در زمان استارت (با Joi)
-- **ایندکس‌های دیتابیس** روی فیلدهای پرکاربرد برای بهبود عملکرد
-- **سیستم کش** برای دسترسی‌های هر نقش (TTL: ۱۰ دقیقه)
-
----
-
-## 📦 وابستگی‌های اصلی
-
-| کتابخانه | کاربرد |
-|----------|--------|
-| NestJS 10 | فریم‌ورک اصلی |
-| Prisma 5 | ORM و مدیریت دیتابیس |
-| PostgreSQL 16 | دیتابیس اصلی |
-| JWT + Passport | احراز هویت |
-| class-validator | اعتبارسنجی داده‌ها |
-| multer + xlsx | آپلود و پردازش Excel |
-| @nestjs/throttler | Rate Limiting |
-| joi | اعتبارسنجی محیط |
-| node-cache | کش دسترسی‌ها |
+- **JWT** with an 8-hour lifetime and a `JWT_SECRET` of at least 32 characters
+- **Rate Limiting**: 100 requests per 60 seconds; login is limited to 5 requests
+- **Environment validation** at startup with Joi
+- **Database indexes** on frequently used fields for better performance
+- **Permission cache** for each role with a 10-minute TTL
 
 ---
 
-## 🔜 چیزهایی که هنوز ساخته نشده (فاز بعدی)
+## 📦 Main Dependencies
 
-- [ ] فرانت‌اند (React) برای فرم‌های Research، Kanban و داشبورد
-- [ ] داشبورد تخصصی با نمودارهای پیشرفته
-- [ ] سیستم اعلان (Email/Push) برای یادآوری‌های سررسید
-- [ ] خروجی گرفتن از داده‌ها به صورت Excel/PDF
-- [ ] تست‌های واحد و یکپارچه‌سازی (Unit / Integration / E2E Tests)
-- [ ] مستندات Swagger (OpenAPI) برای تست و توسعه‌ی فرانت‌اند
+| Library | Purpose |
+|---------|---------|
+| NestJS 10 | Main framework |
+| Prisma 5 | ORM and database management |
+| PostgreSQL 16 | Main database |
+| JWT + Passport | Authentication |
+| class-validator | Data validation |
+| multer + xlsx | Excel upload and processing |
+| @nestjs/throttler | Rate limiting |
+| joi | Environment validation |
+| node-cache | Permission cache |
 
 ---
 
-**ساخته‌شده با ❤️ برای تیم فروش IAM**
+## 🔜 Not Built Yet (Next Phase)
+
+- [ ] Frontend (React) for Research forms, Kanban, and dashboard
+- [ ] Specialized dashboard with advanced charts
+- [ ] Notification system (Email/Push) for due follow-up reminders
+- [ ] Data export to Excel/PDF
+- [ ] Unit, integration, and E2E tests
+- [ ] Swagger (OpenAPI) documentation for frontend testing and development
+
+---
+
+**Built with ❤️ for the IAM sales team**
 
 ---
 
