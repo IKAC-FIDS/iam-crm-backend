@@ -303,3 +303,7 @@ Body: form-data → Key: file (Type: File)
 - Added centralized recursive sanitization for password, hash, token, secret, and authorization fields.
 - Recorded key user, permission, company, activity, follow-up, and pipeline-transition changes.
 - Added the paginated and filterable `GET /api/admin/audit-logs` endpoint protected by `audit-log:view`.
+
+### fix 000010 - Navigation return-state support
+
+**Not applicable — frontend only.** No backend API, schema, or service changes are required.
