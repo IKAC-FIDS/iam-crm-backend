@@ -605,6 +605,16 @@ Body: form-data → Key: file (Type: File)
 - Existing Company pipeline fields and `PATCH /api/companies/:companyId/stage` remain operational but are deprecated for new integrations; they do not automatically mutate opportunities.
 - Added scoped Opportunity permissions and audit events for create, update, stage, owner, archive, and restore operations.
 
+### fix 000013 - Make pipeline stages fully dynamic
+
+- Replaced enum-based Opportunity stages with database stage IDs while retaining `LegacyPipelineStage` only for deprecated Company compatibility fields.
+- Admins can create, inspect, edit, reorder, and safely deactivate stages; stage codes are normalized and immutable.
+- Dynamic stages define label, color, order, active/default state, terminal behavior, and `WON`, `LOST`, `ON_HOLD`, or `NONE` semantics.
+- Transition rules now reference stage IDs and return expanded stage code/label data.
+- Deactivating an in-use stage requires an active replacement and moves active opportunities with stage-history records; archived opportunities remain untouched.
+- Opportunity stage changes, terminal timestamps, reports, and filter options now use database-driven stages and ordering.
+- Existing broad `pipeline:config:*` and `pipeline:transition:*` permissions remain the enforced contract.
+
 ---
 
 **Built with ❤️ for sales team**

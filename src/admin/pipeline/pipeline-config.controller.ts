@@ -1,15 +1,17 @@
-import { Body, Controller, Delete, Get, Param, ParseEnumPipe, Patch, Post, UseGuards } from '@nestjs/common';
-import { PipelineStage, UserRole } from '@prisma/client';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { UserRole } from '@prisma/client';
+import { CurrentUser, CurrentUserPayload } from '../../common/decorators/current-user.decorator';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { CreateStageDto } from './dto/create-stage.dto';
 import { CreateTransitionDto } from './dto/create-transition.dto';
+import { ReorderStagesDto } from './dto/reorder-stages.dto';
 import { UpdateStageConfigDto } from './dto/update-stage-config.dto';
 import { UpdateTransitionDto } from './dto/update-transition.dto';
 import { PipelineConfigService } from './pipeline-config.service';
-import { CurrentUser, CurrentUserPayload } from '../../common/decorators/current-user.decorator';
 
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 @Controller('admin/pipeline')
@@ -20,12 +22,29 @@ export class PipelineConfigController {
   @Permissions('pipeline:config:view')
   getStages() { return this.service.getStages(); }
 
-  @Patch('stages/:stage')
+  @Post('stages')
   @Roles(UserRole.ADMIN)
   @Permissions('pipeline:config:manage')
-  updateStage(@Param('stage', new ParseEnumPipe(PipelineStage)) stage: PipelineStage, @Body() dto: UpdateStageConfigDto) {
-    return this.service.updateStage(stage, dto);
-  }
+  createStage(@Body() dto: CreateStageDto, @CurrentUser() actor: CurrentUserPayload) { return this.service.createStage(dto, actor.userId); }
+
+  @Patch('stages/reorder')
+  @Roles(UserRole.ADMIN)
+  @Permissions('pipeline:config:manage')
+  reorderStages(@Body() dto: ReorderStagesDto, @CurrentUser() actor: CurrentUserPayload) { return this.service.reorderStages(dto, actor.userId); }
+
+  @Get('stages/:id')
+  @Permissions('pipeline:config:view')
+  getStage(@Param('id') id: string) { return this.service.getStage(id); }
+
+  @Patch('stages/:id')
+  @Roles(UserRole.ADMIN)
+  @Permissions('pipeline:config:manage')
+  updateStage(@Param('id') id: string, @Body() dto: UpdateStageConfigDto, @CurrentUser() actor: CurrentUserPayload) { return this.service.updateStage(id, dto, actor.userId); }
+
+  @Delete('stages/:id')
+  @Roles(UserRole.ADMIN)
+  @Permissions('pipeline:config:manage')
+  deleteStage(@Param('id') id: string, @Query('replacementStageId') replacementStageId: string | undefined, @CurrentUser() actor: CurrentUserPayload) { return this.service.deactivateStage(id, replacementStageId, actor.userId); }
 
   @Get('transitions')
   @Permissions('pipeline:transition:view')

@@ -17,13 +17,15 @@ class CreateTransitionDto {
 exports.CreateTransitionDto = CreateTransitionDto;
 __decorate([
     (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsEnum)(client_1.PipelineStage),
+    (0, class_validator_1.IsUUID)(),
     __metadata("design:type", Object)
-], CreateTransitionDto.prototype, "fromStage", void 0);
+], CreateTransitionDto.prototype, "fromStageId", void 0);
 __decorate([
-    (0, class_validator_1.IsEnum)(client_1.PipelineStage),
+    (0, class_validator_1.IsDefined)(),
+    (0, class_validator_1.ValidateIf)((_, value) => value !== null),
+    (0, class_validator_1.IsUUID)(),
     __metadata("design:type", String)
-], CreateTransitionDto.prototype, "toStage", void 0);
+], CreateTransitionDto.prototype, "toStageId", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsEnum)(client_1.UserRole),

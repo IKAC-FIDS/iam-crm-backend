@@ -66,7 +66,7 @@ __decorate([
     (0, class_transformer_1.Transform)(csv),
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsArray)(),
-    (0, class_validator_1.IsEnum)(client_1.PipelineStage, { each: true }),
+    (0, class_validator_1.IsString)({ each: true }),
     __metadata("design:type", Array)
 ], ReportFiltersDto.prototype, "stages", void 0);
 __decorate([

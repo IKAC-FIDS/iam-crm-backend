@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { ActivityType, PipelineStage, Priority } from '@prisma/client';
+import { ActivityType, Priority } from '@prisma/client';
 import { IsArray, IsDateString, IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
 
 const csv = ({ value }: { value: unknown }): string[] | undefined => {
@@ -46,8 +46,8 @@ export class ReportFiltersDto {
   @Transform(csv)
   @IsOptional()
   @IsArray()
-  @IsEnum(PipelineStage, { each: true })
-  stages?: PipelineStage[];
+  @IsString({ each: true })
+  stages?: string[];
 
   @Transform(csv)
   @IsOptional()

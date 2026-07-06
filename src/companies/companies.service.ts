@@ -4,7 +4,7 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
-import { PipelineStage, Priority, Prisma, UserRole } from '@prisma/client';
+import { LegacyPipelineStage, Priority, Prisma, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
@@ -27,7 +27,7 @@ export class CompaniesService {
     user: CurrentUserPayload,
     pagination: PaginationDto,
     filters?: {
-      stage?: PipelineStage;
+      stage?: LegacyPipelineStage;
       priority?: Priority;
       withoutOwner?: boolean;
       search?: string;
@@ -225,7 +225,7 @@ export class CompaniesService {
 
     this.assertAccess(company, user);
 
-    await this.pipelineConfig.assertTransitionAllowed(company.stage, dto.stage, user.role as UserRole);
+    await this.pipelineConfig.assertTransitionAllowedByCode(company.stage, dto.stage, user.role as UserRole);
 
     const [updated] = await this.prisma.$transaction([
       this.prisma.company.update({

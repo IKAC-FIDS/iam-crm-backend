@@ -1,9 +1,8 @@
-import { PipelineStage } from '@prisma/client';
-import { IsEnum, IsOptional, IsString } from 'class-validator';
+import { IsOptional, IsString, IsUUID } from 'class-validator';
 
 export class ChangeOpportunityStageDto {
-  @IsEnum(PipelineStage)
-  stage!: PipelineStage;
+  @IsOptional() @IsUUID() stageId?: string;
+  @IsOptional() @IsString() stage?: string;
 
   @IsOptional()
   @IsString()

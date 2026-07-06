@@ -150,58 +150,61 @@ async function main() {
         }
     }
     const stageConfigs = [
-        [client_1.PipelineStage.LEAD, 'سرنخ'],
-        [client_1.PipelineStage.CONTACTED, 'تماس گرفته شده'],
-        [client_1.PipelineStage.INTERESTED, 'علاقه‌مند'],
-        [client_1.PipelineStage.QUALIFIED, 'واجد شرایط'],
-        [client_1.PipelineStage.NEEDS_ASSESSMENT, 'نیازسنجی'],
-        [client_1.PipelineStage.PENDING_PRE_INVOICE_APPROVAL, 'در انتظار تأیید پیش‌فاکتور'],
-        [client_1.PipelineStage.POC_PILOT_SCHEDULED, 'پایلوت زمان‌بندی شده'],
-        [client_1.PipelineStage.POC_PILOT_IN_PROGRESS, 'پایلوت در حال اجرا'],
-        [client_1.PipelineStage.PENDING_POC_PILOT_APPROVAL, 'در انتظار تأیید پایلوت'],
-        [client_1.PipelineStage.PENDING_PAYMENT_INVOICE_APPROVAL, 'در انتظار تأیید فاکتور پرداخت'],
-        [client_1.PipelineStage.INSTALLATION_SCHEDULED, 'نصب زمان‌بندی شده'],
-        [client_1.PipelineStage.INSTALLATION_IN_PROGRESS, 'نصب در حال اجرا'],
-        [client_1.PipelineStage.PENDING_CUSTOMER_ACCEPTANCE, 'در انتظار پذیرش مشتری'],
-        [client_1.PipelineStage.DONE, 'انجام شده'],
-        [client_1.PipelineStage.ON_HOLD, 'متوقف شده'],
-        [client_1.PipelineStage.LOST, 'از دست رفته'],
-        [client_1.PipelineStage.NO_RESPONSE, 'بدون پاسخ'],
+        ['LEAD', 'سرنخ', false, 'NONE', '#607D8B'],
+        ['CONTACTED', 'تماس گرفته شده', false, 'NONE', '#2196F3'],
+        ['INTERESTED', 'علاقه‌مند', false, 'NONE', '#00BCD4'],
+        ['QUALIFIED', 'واجد شرایط', false, 'NONE', '#3F51B5'],
+        ['NEEDS_ASSESSMENT', 'نیازسنجی', false, 'NONE', '#673AB7'],
+        ['PENDING_PRE_INVOICE_APPROVAL', 'در انتظار تأیید پیش‌فاکتور', false, 'NONE', '#9C27B0'],
+        ['POC_PILOT_SCHEDULED', 'پایلوت زمان‌بندی شده', false, 'NONE', '#FF9800'],
+        ['POC_PILOT_IN_PROGRESS', 'پایلوت در حال اجرا', false, 'NONE', '#FF5722'],
+        ['PENDING_POC_PILOT_APPROVAL', 'در انتظار تأیید پایلوت', false, 'NONE', '#795548'],
+        ['PENDING_PAYMENT_INVOICE_APPROVAL', 'در انتظار تأیید فاکتور پرداخت', false, 'NONE', '#CDDC39'],
+        ['INSTALLATION_SCHEDULED', 'نصب زمان‌بندی شده', false, 'NONE', '#8BC34A'],
+        ['INSTALLATION_IN_PROGRESS', 'نصب در حال اجرا', false, 'NONE', '#4CAF50'],
+        ['PENDING_CUSTOMER_ACCEPTANCE', 'در انتظار پذیرش مشتری', false, 'NONE', '#009688'],
+        ['DONE', 'انجام شده', true, 'WON', '#2E7D32'],
+        ['ON_HOLD', 'متوقف شده', true, 'ON_HOLD', '#F9A825'],
+        ['LOST', 'از دست رفته', true, 'LOST', '#C62828'],
+        ['NO_RESPONSE', 'بدون پاسخ', true, 'LOST', '#757575'],
     ];
-    for (const [sortOrder, [stage, label]] of stageConfigs.entries()) {
-        await prisma.pipelineStageConfig.upsert({
-            where: { stage },
+    for (const [sortOrder, [code, label, isTerminal, terminalType, color]] of stageConfigs.entries()) {
+        await prisma.pipelineStage.upsert({
+            where: { code },
             update: {},
             create: {
-                stage,
+                code,
                 label,
                 sortOrder,
+                color,
                 isActive: true,
-                isTerminal: stage === client_1.PipelineStage.DONE || stage === client_1.PipelineStage.LOST || stage === client_1.PipelineStage.NO_RESPONSE,
+                isTerminal,
+                terminalType,
+                isDefault: code === 'LEAD',
             },
         });
     }
     const defaultTransitions = [
-        [client_1.PipelineStage.LEAD, client_1.PipelineStage.CONTACTED],
-        [client_1.PipelineStage.CONTACTED, client_1.PipelineStage.INTERESTED],
-        [client_1.PipelineStage.CONTACTED, client_1.PipelineStage.NO_RESPONSE],
-        [client_1.PipelineStage.INTERESTED, client_1.PipelineStage.QUALIFIED],
-        [client_1.PipelineStage.QUALIFIED, client_1.PipelineStage.NEEDS_ASSESSMENT],
-        [client_1.PipelineStage.NEEDS_ASSESSMENT, client_1.PipelineStage.PENDING_PRE_INVOICE_APPROVAL],
-        [client_1.PipelineStage.PENDING_PRE_INVOICE_APPROVAL, client_1.PipelineStage.POC_PILOT_SCHEDULED],
-        [client_1.PipelineStage.POC_PILOT_SCHEDULED, client_1.PipelineStage.POC_PILOT_IN_PROGRESS],
-        [client_1.PipelineStage.POC_PILOT_IN_PROGRESS, client_1.PipelineStage.PENDING_POC_PILOT_APPROVAL],
-        [client_1.PipelineStage.PENDING_POC_PILOT_APPROVAL, client_1.PipelineStage.PENDING_PAYMENT_INVOICE_APPROVAL],
-        [client_1.PipelineStage.PENDING_PAYMENT_INVOICE_APPROVAL, client_1.PipelineStage.INSTALLATION_SCHEDULED],
-        [client_1.PipelineStage.INSTALLATION_SCHEDULED, client_1.PipelineStage.INSTALLATION_IN_PROGRESS],
-        [client_1.PipelineStage.INSTALLATION_IN_PROGRESS, client_1.PipelineStage.PENDING_CUSTOMER_ACCEPTANCE],
-        [client_1.PipelineStage.PENDING_CUSTOMER_ACCEPTANCE, client_1.PipelineStage.DONE],
-        [client_1.PipelineStage.ON_HOLD, client_1.PipelineStage.CONTACTED],
+        ['LEAD', 'CONTACTED'], ['CONTACTED', 'INTERESTED'], ['CONTACTED', 'NO_RESPONSE'],
+        ['INTERESTED', 'QUALIFIED'], ['QUALIFIED', 'NEEDS_ASSESSMENT'],
+        ['NEEDS_ASSESSMENT', 'PENDING_PRE_INVOICE_APPROVAL'],
+        ['PENDING_PRE_INVOICE_APPROVAL', 'POC_PILOT_SCHEDULED'],
+        ['POC_PILOT_SCHEDULED', 'POC_PILOT_IN_PROGRESS'],
+        ['POC_PILOT_IN_PROGRESS', 'PENDING_POC_PILOT_APPROVAL'],
+        ['PENDING_POC_PILOT_APPROVAL', 'PENDING_PAYMENT_INVOICE_APPROVAL'],
+        ['PENDING_PAYMENT_INVOICE_APPROVAL', 'INSTALLATION_SCHEDULED'],
+        ['INSTALLATION_SCHEDULED', 'INSTALLATION_IN_PROGRESS'],
+        ['INSTALLATION_IN_PROGRESS', 'PENDING_CUSTOMER_ACCEPTANCE'],
+        ['PENDING_CUSTOMER_ACCEPTANCE', 'DONE'], ['ON_HOLD', 'CONTACTED'],
     ];
-    for (const [fromStage, toStage] of defaultTransitions) {
-        const existing = await prisma.pipelineStageTransition.findFirst({ where: { fromStage, toStage, role: null } });
+    for (const [fromCode, toCode] of defaultTransitions) {
+        const [fromStage, toStage] = await Promise.all([
+            prisma.pipelineStage.findUniqueOrThrow({ where: { code: fromCode } }),
+            prisma.pipelineStage.findUniqueOrThrow({ where: { code: toCode } }),
+        ]);
+        const existing = await prisma.pipelineStageTransition.findFirst({ where: { fromStageId: fromStage.id, toStageId: toStage.id, role: null } });
         if (!existing) {
-            await prisma.pipelineStageTransition.create({ data: { fromStage, toStage, role: null, isAllowed: true } });
+            await prisma.pipelineStageTransition.create({ data: { fromStageId: fromStage.id, toStageId: toStage.id, role: null, isAllowed: true } });
         }
     }
     const permissions = [

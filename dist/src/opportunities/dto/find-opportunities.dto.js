@@ -38,9 +38,14 @@ __decorate([
 ], FindOpportunitiesDto.prototype, "team", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsEnum)(client_1.PipelineStage),
+    (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], FindOpportunitiesDto.prototype, "stage", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsUUID)(),
+    __metadata("design:type", String)
+], FindOpportunitiesDto.prototype, "stageId", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsEnum)(client_1.Priority),

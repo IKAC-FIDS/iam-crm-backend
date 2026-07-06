@@ -9,14 +9,26 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ChangeStageDto = void 0;
+exports.ReorderStagesDto = void 0;
+const class_transformer_1 = require("class-transformer");
 const class_validator_1 = require("class-validator");
-const client_1 = require("@prisma/client");
-class ChangeStageDto {
+class ReorderStageItemDto {
 }
-exports.ChangeStageDto = ChangeStageDto;
 __decorate([
-    (0, class_validator_1.IsEnum)(client_1.LegacyPipelineStage),
+    (0, class_validator_1.IsUUID)(),
     __metadata("design:type", String)
-], ChangeStageDto.prototype, "stage", void 0);
-//# sourceMappingURL=change-stage.dto.js.map
+], ReorderStageItemDto.prototype, "id", void 0);
+__decorate([
+    (0, class_validator_1.IsInt)(),
+    __metadata("design:type", Number)
+], ReorderStageItemDto.prototype, "sortOrder", void 0);
+class ReorderStagesDto {
+}
+exports.ReorderStagesDto = ReorderStagesDto;
+__decorate([
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.ValidateNested)({ each: true }),
+    (0, class_transformer_1.Type)(() => ReorderStageItemDto),
+    __metadata("design:type", Array)
+], ReorderStagesDto.prototype, "items", void 0);
+//# sourceMappingURL=reorder-stages.dto.js.map

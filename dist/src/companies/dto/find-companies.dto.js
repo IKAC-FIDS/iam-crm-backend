@@ -18,7 +18,7 @@ class FindCompaniesDto extends pagination_dto_1.PaginationDto {
 exports.FindCompaniesDto = FindCompaniesDto;
 __decorate([
     (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsEnum)(client_1.PipelineStage),
+    (0, class_validator_1.IsEnum)(client_1.LegacyPipelineStage),
     __metadata("design:type", String)
 ], FindCompaniesDto.prototype, "stage", void 0);
 __decorate([

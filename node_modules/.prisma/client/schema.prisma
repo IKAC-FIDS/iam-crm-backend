@@ -23,7 +23,7 @@ enum UserRole {
   BOARDS
 }
 
-enum PipelineStage {
+enum LegacyPipelineStage {
   LEAD
   CONTACTED
   INTERESTED
@@ -41,6 +41,8 @@ enum PipelineStage {
   ON_HOLD
   LOST
   NO_RESPONSE
+
+  @@map("PipelineStage")
 }
 
 enum Priority {
@@ -148,11 +150,11 @@ model Company {
   annualRevenue     BigInt?
 
   ownerId        String?
-  owner          User?         @relation("CompanyOwner", fields: [ownerId], references: [id])
+  owner          User?               @relation("CompanyOwner", fields: [ownerId], references: [id])
   // Deprecated pipeline compatibility fields. New sales flows belong to Opportunity.
-  priority       Priority      @default(MEDIUM)
-  stage          PipelineStage @default(LEAD)
-  source         String?       @default("SAM_LIST")
+  priority       Priority            @default(MEDIUM)
+  stage          LegacyPipelineStage @default(LEAD)
+  source         String?             @default("SAM_LIST")
   nextActionDate DateTime?
 
   archivedAt    DateTime?
@@ -356,7 +358,8 @@ model Opportunity {
   title       String
   description String?
 
-  stage    PipelineStage @default(LEAD)
+  stageId  String
+  stage    PipelineStage @relation(fields: [stageId], references: [id])
   priority Priority      @default(MEDIUM)
 
   estimatedValue    Decimal?  @db.Decimal(18, 2)
@@ -380,10 +383,10 @@ model Opportunity {
 
   @@index([companyId])
   @@index([ownerId])
-  @@index([stage])
+  @@index([stageId])
   @@index([priority])
   @@index([archivedAt])
-  @@index([ownerId, stage])
+  @@index([ownerId, stageId])
   @@map("opportunities")
 }
 
@@ -392,8 +395,10 @@ model OpportunityStageHistory {
   opportunityId String
   opportunity   Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
 
-  fromStage PipelineStage?
-  toStage   PipelineStage
+  fromStageId String?
+  fromStage   PipelineStage? @relation("OpportunityHistoryFromStage", fields: [fromStageId], references: [id])
+  toStageId   String
+  toStage     PipelineStage  @relation("OpportunityHistoryToStage", fields: [toStageId], references: [id])
 
   changedById String?
   changedBy   User?   @relation(fields: [changedById], references: [id], onDelete: SetNull)
@@ -402,7 +407,8 @@ model OpportunityStageHistory {
   changedAt DateTime @default(now())
 
   @@index([opportunityId])
-  @@index([toStage])
+  @@index([fromStageId])
+  @@index([toStageId])
   @@index([changedAt])
   @@index([opportunityId, changedAt])
   @@map("opportunity_stage_histories")
@@ -413,14 +419,14 @@ model OpportunityStageHistory {
 // ============================================================
 
 model PipelineStageHistory {
-  id          String         @id @default(uuid())
+  id          String               @id @default(uuid())
   companyId   String
-  company     Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  fromStage   PipelineStage?
-  toStage     PipelineStage
+  company     Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  fromStage   LegacyPipelineStage?
+  toStage     LegacyPipelineStage
   changedById String?
-  changedBy   User?          @relation(fields: [changedById], references: [id])
-  changedAt   DateTime       @default(now())
+  changedBy   User?                @relation(fields: [changedById], references: [id])
+  changedAt   DateTime             @default(now())
 
   @@index([companyId])
   @@index([changedAt])
@@ -429,33 +435,46 @@ model PipelineStageHistory {
   @@map("pipeline_stage_history")
 }
 
-model PipelineStageConfig {
-  id          String        @id @default(uuid())
-  stage       PipelineStage @unique
-  label       String
-  description String?
-  sortOrder   Int
-  color       String?
-  isActive    Boolean       @default(true)
-  isTerminal  Boolean       @default(false)
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+model PipelineStage {
+  id           String   @id @default(uuid())
+  code         String   @unique
+  label        String
+  description  String?
+  sortOrder    Int      @default(0)
+  color        String?
+  isActive     Boolean  @default(true)
+  isTerminal   Boolean  @default(false)
+  terminalType String?
+  isDefault    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
+  opportunities            Opportunity[]
+  opportunityHistoriesFrom OpportunityStageHistory[] @relation("OpportunityHistoryFromStage")
+  opportunityHistoriesTo   OpportunityStageHistory[] @relation("OpportunityHistoryToStage")
+  transitionsFrom          PipelineStageTransition[] @relation("TransitionFromStage")
+  transitionsTo            PipelineStageTransition[] @relation("TransitionToStage")
+
+  @@index([sortOrder])
   @@index([isActive, sortOrder])
-  @@map("pipeline_stage_configs")
+  @@map("pipeline_stages")
 }
 
 model PipelineStageTransition {
-  id        String         @id @default(uuid())
-  fromStage PipelineStage?
-  toStage   PipelineStage
-  role      UserRole?
-  isAllowed Boolean        @default(true)
-  createdAt DateTime       @default(now())
-  updatedAt DateTime       @updatedAt
+  id          String         @id @default(uuid())
+  fromStageId String?
+  fromStage   PipelineStage? @relation("TransitionFromStage", fields: [fromStageId], references: [id])
+  toStageId   String
+  toStage     PipelineStage  @relation("TransitionToStage", fields: [toStageId], references: [id])
+  role        UserRole?
+  isAllowed   Boolean        @default(true)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
 
-  @@unique([fromStage, toStage, role])
-  @@index([fromStage, toStage])
+  @@unique([fromStageId, toStageId, role])
+  @@index([fromStageId])
+  @@index([toStageId])
+  @@index([role])
   @@map("pipeline_stage_transitions")
 }
 

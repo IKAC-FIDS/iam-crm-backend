@@ -23,8 +23,6 @@ let ReportsService = class ReportsService {
             and.push({ ownerId: { in: filters.ownerIds } });
         if (filters.teams?.length)
             and.push({ owner: { team: { in: filters.teams } } });
-        if (filters.stages?.length)
-            and.push({ stage: { in: filters.stages } });
         if (filters.priorities?.length)
             and.push({ priority: { in: filters.priorities } });
         if (filters.industries?.length)
@@ -50,7 +48,10 @@ let ReportsService = class ReportsService {
         if (filters.teams?.length)
             and.push({ owner: { team: { in: filters.teams } } });
         if (filters.stages?.length)
-            and.push({ stage: { in: filters.stages } });
+            and.push({ OR: [
+                    { stageId: { in: filters.stages } },
+                    { stage: { code: { in: filters.stages.map((item) => item.toUpperCase()) } } },
+                ] });
         if (filters.priorities?.length)
             and.push({ priority: { in: filters.priorities } });
         if (filters.industries?.length)
@@ -100,30 +101,30 @@ let ReportsService = class ReportsService {
         return { AND: and };
     }
     async getConversionRates(filters, user) {
-        const stages = Object.values(client_1.PipelineStage);
+        const stages = await this.prisma.pipelineStage.findMany({ orderBy: [{ sortOrder: 'asc' }, { code: 'asc' }] });
         const stageCounts = await this.prisma.opportunityStageHistory.groupBy({
-            by: ['toStage'],
+            by: ['toStageId'],
             where: { opportunity: this.opportunityWhere(filters, user) },
             _count: { opportunityId: true },
-            orderBy: { toStage: 'asc' },
+            orderBy: { toStageId: 'asc' },
         });
-        const countsMap = new Map(stageCounts.map((item) => [item.toStage, item._count.opportunityId]));
+        const countsMap = new Map(stageCounts.map((item) => [item.toStageId, item._count.opportunityId]));
         const results = [];
         for (let i = 0; i < stages.length - 1; i++) {
-            const fromStage = stages[i];
-            const toStage = stages[i + 1];
-            const fromCount = countsMap.get(fromStage) || 0;
-            const toCount = countsMap.get(toStage) || 0;
+            const from = stages[i];
+            const to = stages[i + 1];
+            const fromCount = countsMap.get(from.id) || 0;
+            const toCount = countsMap.get(to.id) || 0;
             results.push({
-                fromStage,
-                toStage,
+                fromStage: from.code,
+                toStage: to.code,
                 fromCount,
                 toCount,
                 conversionRate: `${fromCount ? Math.round((toCount / fromCount) * 100) : 0}%`,
             });
         }
-        const leadCount = countsMap.get(client_1.PipelineStage.LEAD) || 0;
-        const doneCount = countsMap.get(client_1.PipelineStage.DONE) || 0;
+        const leadCount = stages.filter((item) => item.isDefault).reduce((sum, item) => sum + (countsMap.get(item.id) || 0), 0);
+        const doneCount = stages.filter((item) => item.terminalType === 'WON').reduce((sum, item) => sum + (countsMap.get(item.id) || 0), 0);
         return {
             stages: results,
             summary: {
@@ -137,16 +138,17 @@ let ReportsService = class ReportsService {
         const opportunityFilters = { ...filters, stages: undefined };
         const histories = await this.prisma.opportunityStageHistory.findMany({
             where: { opportunity: this.opportunityWhere(opportunityFilters, user) },
-            select: { opportunityId: true, fromStage: true, changedAt: true },
+            select: { opportunityId: true, fromStageId: true, fromStage: { select: { code: true } }, changedAt: true },
             orderBy: [{ opportunityId: 'asc' }, { changedAt: 'asc' }],
         });
         const durations = new Map();
         const previous = new Map();
         for (const item of histories) {
             const previousDate = previous.get(item.opportunityId);
-            if (previousDate && item.fromStage && (!filters.stages?.length || filters.stages.includes(item.fromStage))) {
+            const stageFilterMatches = !filters.stages?.length || filters.stages.includes(item.fromStageId ?? '') || (item.fromStage && filters.stages.map((value) => value.toUpperCase()).includes(item.fromStage.code));
+            if (previousDate && item.fromStage && stageFilterMatches) {
                 const days = (item.changedAt.getTime() - previousDate.getTime()) / 86_400_000;
-                durations.set(item.fromStage, [...(durations.get(item.fromStage) || []), days]);
+                durations.set(item.fromStage.code, [...(durations.get(item.fromStage.code) || []), days]);
             }
             previous.set(item.opportunityId, item.changedAt);
         }
@@ -161,17 +163,21 @@ let ReportsService = class ReportsService {
     async getPipelineSummary(filters, user) {
         const where = this.opportunityWhere(filters, user);
         const stageCounts = await this.prisma.opportunity.groupBy({
-            by: ['stage'], where, _count: { id: true }, orderBy: { stage: 'asc' },
+            by: ['stageId'], where, _count: { id: true }, orderBy: { stageId: 'asc' },
         });
         const totalCompanies = stageCounts.reduce((sum, item) => sum + item._count.id, 0);
-        const lostCount = stageCounts
-            .filter((item) => this.isLostStage(item.stage))
-            .reduce((sum, item) => sum + item._count.id, 0);
+        const stages = await this.prisma.pipelineStage.findMany({ orderBy: [{ sortOrder: 'asc' }, { code: 'asc' }] });
+        const stageMap = new Map(stages.map((stage) => [stage.id, stage]));
+        const countMap = new Map(stageCounts.map((item) => [item.stageId, item._count.id]));
+        const lostCount = stageCounts.filter((item) => stageMap.get(item.stageId)?.terminalType === 'LOST').reduce((sum, item) => sum + item._count.id, 0);
         return {
-            stages: stageCounts.map((item) => ({
-                stage: item.stage,
-                count: item._count.id,
-                percentage: totalCompanies ? Math.round((item._count.id / totalCompanies) * 100) : 0,
+            stages: stages.filter((stage) => countMap.has(stage.id)).map((stage) => ({
+                stage: stage.code,
+                stageId: stage.id,
+                label: stage.label,
+                sortOrder: stage.sortOrder,
+                count: countMap.get(stage.id) || 0,
+                percentage: totalCompanies ? Math.round(((countMap.get(stage.id) || 0) / totalCompanies) * 100) : 0,
             })),
             summary: {
                 totalCompanies,
@@ -228,10 +234,13 @@ let ReportsService = class ReportsService {
         }));
     }
     async getPipelineByOwner(filters, user) {
-        const companies = await this.prisma.opportunity.findMany({
-            where: { AND: [this.opportunityWhere(filters, user), { ownerId: { not: null } }] },
-            select: { ownerId: true, stage: true, owner: { select: { fullName: true, team: true } } },
-        });
+        const [companies, stages] = await Promise.all([
+            this.prisma.opportunity.findMany({
+                where: { AND: [this.opportunityWhere(filters, user), { ownerId: { not: null } }] },
+                select: { ownerId: true, stageId: true, stage: true, owner: { select: { fullName: true, team: true } } },
+            }),
+            this.prisma.pipelineStage.findMany({ orderBy: [{ sortOrder: 'asc' }, { code: 'asc' }] }),
+        ]);
         const owners = new Map();
         for (const company of companies) {
             if (!company.ownerId)
@@ -239,8 +248,8 @@ let ReportsService = class ReportsService {
             owners.set(company.ownerId, [...(owners.get(company.ownerId) || []), company]);
         }
         return [...owners.entries()].map(([ownerId, items]) => {
-            const doneCompanies = items.filter((item) => item.stage === client_1.PipelineStage.DONE).length;
-            const lostCompanies = items.filter((item) => this.isLostStage(item.stage)).length;
+            const doneCompanies = items.filter((item) => item.stage.terminalType === 'WON').length;
+            const lostCompanies = items.filter((item) => item.stage.terminalType === 'LOST').length;
             const totalCompanies = items.length;
             return {
                 ownerId,
@@ -252,9 +261,12 @@ let ReportsService = class ReportsService {
                 lostCompanies,
                 conversionRate: totalCompanies ? Math.round((doneCompanies / totalCompanies) * 100) : 0,
                 lostRate: totalCompanies ? Math.round((lostCompanies / totalCompanies) * 100) : 0,
-                stages: Object.values(client_1.PipelineStage).map((stage) => ({
-                    stage,
-                    count: items.filter((item) => item.stage === stage).length,
+                stages: stages.map((stage) => ({
+                    stage: stage.code,
+                    stageId: stage.id,
+                    label: stage.label,
+                    sortOrder: stage.sortOrder,
+                    count: items.filter((item) => item.stageId === stage.id).length,
                 })),
             };
         }).sort((a, b) => a.fullName.localeCompare(b.fullName));
@@ -282,7 +294,7 @@ let ReportsService = class ReportsService {
             teams: unique(users.map((item) => item.team)),
             industries: unique(companies.map((item) => item.industry)),
             sources: unique([...companies.map((item) => item.source), ...opportunities.map((item) => item.source)]),
-            stages: Object.values(client_1.PipelineStage),
+            stages: await this.prisma.pipelineStage.findMany({ where: { isActive: true }, select: { id: true, code: true, label: true, sortOrder: true, color: true, isTerminal: true, terminalType: true, isDefault: true }, orderBy: [{ sortOrder: 'asc' }, { code: 'asc' }] }),
             priorities: Object.values(client_1.Priority),
             activityTypes: Object.values(client_1.ActivityType),
         };
@@ -305,9 +317,6 @@ let ReportsService = class ReportsService {
     }
     round(value) {
         return Math.round(value * 100) / 100;
-    }
-    isLostStage(stage) {
-        return stage === client_1.PipelineStage.LOST || stage === client_1.PipelineStage.NO_RESPONSE;
     }
 };
 exports.ReportsService = ReportsService;

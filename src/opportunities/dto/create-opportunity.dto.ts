@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { PipelineStage, Priority } from '@prisma/client';
+import { Priority } from '@prisma/client';
 import { IsDateString, IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, Min } from 'class-validator';
 
 export class CreateOpportunityDto {
@@ -18,9 +18,8 @@ export class CreateOpportunityDto {
   @IsUUID()
   ownerId?: string;
 
-  @IsOptional()
-  @IsEnum(PipelineStage)
-  stage?: PipelineStage;
+  @IsOptional() @IsUUID() stageId?: string;
+  @IsOptional() @IsString() stage?: string;
 
   @IsOptional()
   @IsEnum(Priority)

@@ -157,7 +157,7 @@ let CompaniesService = class CompaniesService {
         if (!company)
             throw new common_1.NotFoundException('شرکت پیدا نشد');
         this.assertAccess(company, user);
-        await this.pipelineConfig.assertTransitionAllowed(company.stage, dto.stage, user.role);
+        await this.pipelineConfig.assertTransitionAllowedByCode(company.stage, dto.stage, user.role);
         const [updated] = await this.prisma.$transaction([
             this.prisma.company.update({
                 where: { id },

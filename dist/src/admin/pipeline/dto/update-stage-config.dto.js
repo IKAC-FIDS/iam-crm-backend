@@ -9,8 +9,9 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.UpdateStageConfigDto = void 0;
+exports.UpdateStageConfigDto = exports.TERMINAL_TYPES = void 0;
 const class_validator_1 = require("class-validator");
+exports.TERMINAL_TYPES = ['WON', 'LOST', 'ON_HOLD', 'NONE'];
 class UpdateStageConfigDto {
 }
 exports.UpdateStageConfigDto = UpdateStageConfigDto;
@@ -23,7 +24,7 @@ __decorate([
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
+    __metadata("design:type", Object)
 ], UpdateStageConfigDto.prototype, "description", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
@@ -33,7 +34,7 @@ __decorate([
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsHexColor)(),
-    __metadata("design:type", String)
+    __metadata("design:type", Object)
 ], UpdateStageConfigDto.prototype, "color", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
@@ -45,4 +46,14 @@ __decorate([
     (0, class_validator_1.IsBoolean)(),
     __metadata("design:type", Boolean)
 ], UpdateStageConfigDto.prototype, "isTerminal", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsIn)(exports.TERMINAL_TYPES),
+    __metadata("design:type", Object)
+], UpdateStageConfigDto.prototype, "terminalType", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsBoolean)(),
+    __metadata("design:type", Boolean)
+], UpdateStageConfigDto.prototype, "isDefault", void 0);
 //# sourceMappingURL=update-stage-config.dto.js.map

@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { ActivityType, PipelineStage, Prisma, UserRole } from '@prisma/client';
+import { ActivityType, Prisma, UserRole } from '@prisma/client';
 import { PipelineConfigService } from '../admin/pipeline/pipeline-config.service';
 import { AuditLogService } from '../audit-log/audit-log.service';
 import { CurrentUserPayload } from '../common/decorators/current-user.decorator';
@@ -14,6 +14,7 @@ import { UpdateOpportunityDto } from './dto/update-opportunity.dto';
 const opportunityInclude = {
   company: { select: { id: true, legalName: true, brandName: true, industry: true } },
   owner: { select: { id: true, fullName: true, email: true, team: true } },
+  stage: { select: { id: true, code: true, label: true, sortOrder: true, color: true, isTerminal: true, terminalType: true } },
 } satisfies Prisma.OpportunityInclude;
 
 @Injectable()
@@ -47,7 +48,7 @@ export class OpportunitiesService {
       where: { AND: [{ id }, this.scopeWhere(user)] },
       include: {
         ...opportunityInclude,
-        stageHistories: { orderBy: { changedAt: 'desc' } },
+        stageHistories: { include: { fromStage: { select: { id: true, code: true, label: true } }, toStage: { select: { id: true, code: true, label: true } } }, orderBy: { changedAt: 'desc' } },
         activities: { orderBy: { occurredAt: 'desc' }, take: 20 },
       },
     });
@@ -57,8 +58,7 @@ export class OpportunitiesService {
 
   async create(dto: CreateOpportunityDto, user: CurrentUserPayload) {
     const company = await this.getCompanyInScope(dto.companyId, user);
-    const stage = dto.stage ?? await this.getDefaultStage();
-    await this.assertActiveStage(stage);
+    const stage = await this.resolveStage(dto.stageId, dto.stage);
     const ownerId = dto.ownerId ?? company.ownerId;
     if (dto.ownerId) await this.validateOwner(dto.ownerId, user);
 
@@ -68,14 +68,14 @@ export class OpportunitiesService {
         ownerId,
         title: dto.title.trim(),
         description: dto.description,
-        stage,
+        stageId: stage.id,
         priority: dto.priority,
         estimatedValue: dto.estimatedValue,
         expectedCloseDate: dto.expectedCloseDate ? new Date(dto.expectedCloseDate) : undefined,
         source: dto.source,
-        wonAt: stage === PipelineStage.DONE ? new Date() : undefined,
-        lostAt: this.isLost(stage) ? new Date() : undefined,
-        stageHistories: { create: { fromStage: null, toStage: stage, changedById: user.userId } },
+        wonAt: stage.terminalType === 'WON' ? new Date() : undefined,
+        lostAt: stage.terminalType === 'LOST' ? new Date() : undefined,
+        stageHistories: { create: { fromStageId: null, toStageId: stage.id, changedById: user.userId } },
       },
       include: opportunityInclude,
     });
@@ -100,21 +100,23 @@ export class OpportunitiesService {
 
   async changeStage(id: string, dto: ChangeOpportunityStageDto, user: CurrentUserPayload) {
     const current = await this.getForMutation(id, user);
-    await this.assertActiveStage(dto.stage);
-    await this.pipelineConfig.assertTransitionAllowed(current.stage, dto.stage, user.role as UserRole);
+    if (current.archivedAt) throw new BadRequestException('Archived opportunities cannot change stage');
+    if (!dto.stageId && !dto.stage) throw new BadRequestException('stageId or stage code is required');
+    const target = await this.resolveStage(dto.stageId, dto.stage);
+    await this.pipelineConfig.assertTransitionAllowed(current.stageId, target.id, user.role as UserRole);
     const now = new Date();
     const [updated] = await this.prisma.$transaction([
       this.prisma.opportunity.update({
         where: { id },
         data: {
-          stage: dto.stage,
-          wonAt: dto.stage === PipelineStage.DONE ? now : null,
-          lostAt: this.isLost(dto.stage) ? now : null,
+          stageId: target.id,
+          wonAt: target.terminalType === 'WON' ? now : null,
+          lostAt: target.terminalType === 'LOST' ? now : null,
         },
         include: opportunityInclude,
       }),
       this.prisma.opportunityStageHistory.create({
-        data: { opportunityId: id, fromStage: current.stage, toStage: dto.stage, changedById: user.userId, note: dto.note },
+        data: { opportunityId: id, fromStageId: current.stageId, toStageId: target.id, changedById: user.userId, note: dto.note },
       }),
       this.prisma.activity.create({
         data: {
@@ -123,11 +125,11 @@ export class OpportunitiesService {
           userId: user.userId,
           type: ActivityType.STAGE_CHANGE,
           notes: dto.note,
-          outcome: `${current.stage} -> ${dto.stage}`,
+          outcome: `${current.stage.code} -> ${target.code}`,
         },
       }),
     ]);
-    await this.audit.record({ actorId: user.userId, entityType: 'opportunity', entityId: id, action: 'opportunity.stage_changed', before: { stage: current.stage }, after: { stage: dto.stage }, metadata: { note: dto.note } });
+    await this.audit.record({ actorId: user.userId, entityType: 'opportunity', entityId: id, action: 'opportunity.stage_changed', before: { stageId: current.stageId, code: current.stage.code }, after: { stageId: target.id, code: target.code }, metadata: { note: dto.note } });
     return updated;
   }
 
@@ -160,7 +162,8 @@ export class OpportunitiesService {
     if (query.companyId) and.push({ companyId: query.companyId });
     if (query.ownerId) and.push({ ownerId: query.ownerId });
     if (query.team?.trim()) and.push({ owner: { team: query.team.trim() } });
-    if (query.stage) and.push({ stage: query.stage });
+    if (query.stage) and.push({ stage: { code: query.stage.trim().toUpperCase() } });
+    if (query.stageId) and.push({ stageId: query.stageId });
     if (query.priority) and.push({ priority: query.priority });
     if (query.source?.trim()) and.push({ source: query.source.trim() });
     if (query.archivedOnly === 'true') and.push({ archivedAt: { not: null } });
@@ -209,17 +212,15 @@ export class OpportunitiesService {
   }
 
   private async getDefaultStage() {
-    const config = await this.prisma.pipelineStageConfig.findFirst({ where: { isActive: true }, orderBy: { sortOrder: 'asc' } });
+    const config = await this.prisma.pipelineStage.findFirst({ where: { isActive: true, isDefault: true }, orderBy: { sortOrder: 'asc' } });
     if (!config) throw new BadRequestException('No active initial pipeline stage is configured');
-    return config.stage;
+    return config;
   }
 
-  private async assertActiveStage(stage: PipelineStage) {
-    const config = await this.prisma.pipelineStageConfig.findUnique({ where: { stage } });
-    if (!config?.isActive) throw new BadRequestException('Selected pipeline stage is not active');
-  }
-
-  private isLost(stage: PipelineStage) {
-    return stage === PipelineStage.LOST || stage === PipelineStage.NO_RESPONSE;
+  private async resolveStage(stageId?: string, code?: string) {
+    if (!stageId && !code) return this.getDefaultStage();
+    const stage = await this.prisma.pipelineStage.findFirst({ where: stageId ? { id: stageId } : { code: code!.trim().toUpperCase() } });
+    if (!stage?.isActive) throw new BadRequestException('Selected pipeline stage is not active');
+    return stage;
   }
 }

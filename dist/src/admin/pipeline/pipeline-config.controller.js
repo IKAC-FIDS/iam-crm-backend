@@ -15,24 +15,28 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.PipelineConfigController = void 0;
 const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
+const current_user_decorator_1 = require("../../common/decorators/current-user.decorator");
 const permissions_decorator_1 = require("../../common/decorators/permissions.decorator");
 const roles_decorator_1 = require("../../common/decorators/roles.decorator");
 const jwt_auth_guard_1 = require("../../common/guards/jwt-auth.guard");
 const permissions_guard_1 = require("../../common/guards/permissions.guard");
 const roles_guard_1 = require("../../common/guards/roles.guard");
+const create_stage_dto_1 = require("./dto/create-stage.dto");
 const create_transition_dto_1 = require("./dto/create-transition.dto");
+const reorder_stages_dto_1 = require("./dto/reorder-stages.dto");
 const update_stage_config_dto_1 = require("./dto/update-stage-config.dto");
 const update_transition_dto_1 = require("./dto/update-transition.dto");
 const pipeline_config_service_1 = require("./pipeline-config.service");
-const current_user_decorator_1 = require("../../common/decorators/current-user.decorator");
 let PipelineConfigController = class PipelineConfigController {
     constructor(service) {
         this.service = service;
     }
     getStages() { return this.service.getStages(); }
-    updateStage(stage, dto) {
-        return this.service.updateStage(stage, dto);
-    }
+    createStage(dto, actor) { return this.service.createStage(dto, actor.userId); }
+    reorderStages(dto, actor) { return this.service.reorderStages(dto, actor.userId); }
+    getStage(id) { return this.service.getStage(id); }
+    updateStage(id, dto, actor) { return this.service.updateStage(id, dto, actor.userId); }
+    deleteStage(id, replacementStageId, actor) { return this.service.deactivateStage(id, replacementStageId, actor.userId); }
     getTransitions() { return this.service.getTransitions(); }
     createTransition(dto, actor) { return this.service.createTransition(dto, actor.userId); }
     updateTransition(id, dto, actor) { return this.service.updateTransition(id, dto, actor.userId); }
@@ -47,15 +51,55 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], PipelineConfigController.prototype, "getStages", null);
 __decorate([
-    (0, common_1.Patch)('stages/:stage'),
+    (0, common_1.Post)('stages'),
     (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN),
     (0, permissions_decorator_1.Permissions)('pipeline:config:manage'),
-    __param(0, (0, common_1.Param)('stage', new common_1.ParseEnumPipe(client_1.PipelineStage))),
-    __param(1, (0, common_1.Body)()),
+    __param(0, (0, common_1.Body)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, update_stage_config_dto_1.UpdateStageConfigDto]),
+    __metadata("design:paramtypes", [create_stage_dto_1.CreateStageDto, Object]),
+    __metadata("design:returntype", void 0)
+], PipelineConfigController.prototype, "createStage", null);
+__decorate([
+    (0, common_1.Patch)('stages/reorder'),
+    (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN),
+    (0, permissions_decorator_1.Permissions)('pipeline:config:manage'),
+    __param(0, (0, common_1.Body)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [reorder_stages_dto_1.ReorderStagesDto, Object]),
+    __metadata("design:returntype", void 0)
+], PipelineConfigController.prototype, "reorderStages", null);
+__decorate([
+    (0, common_1.Get)('stages/:id'),
+    (0, permissions_decorator_1.Permissions)('pipeline:config:view'),
+    __param(0, (0, common_1.Param)('id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", void 0)
+], PipelineConfigController.prototype, "getStage", null);
+__decorate([
+    (0, common_1.Patch)('stages/:id'),
+    (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN),
+    (0, permissions_decorator_1.Permissions)('pipeline:config:manage'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, update_stage_config_dto_1.UpdateStageConfigDto, Object]),
     __metadata("design:returntype", void 0)
 ], PipelineConfigController.prototype, "updateStage", null);
+__decorate([
+    (0, common_1.Delete)('stages/:id'),
+    (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN),
+    (0, permissions_decorator_1.Permissions)('pipeline:config:manage'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Query)('replacementStageId')),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object, Object]),
+    __metadata("design:returntype", void 0)
+], PipelineConfigController.prototype, "deleteStage", null);
 __decorate([
     (0, common_1.Get)('transitions'),
     (0, permissions_decorator_1.Permissions)('pipeline:transition:view'),

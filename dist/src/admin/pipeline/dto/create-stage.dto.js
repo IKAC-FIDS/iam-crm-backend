@@ -9,62 +9,56 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.CreateOpportunityDto = void 0;
-const class_transformer_1 = require("class-transformer");
-const client_1 = require("@prisma/client");
+exports.CreateStageDto = void 0;
 const class_validator_1 = require("class-validator");
-class CreateOpportunityDto {
+const update_stage_config_dto_1 = require("./update-stage-config.dto");
+class CreateStageDto {
 }
-exports.CreateOpportunityDto = CreateOpportunityDto;
+exports.CreateStageDto = CreateStageDto;
 __decorate([
-    (0, class_validator_1.IsUUID)(),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsNotEmpty)(),
+    (0, class_validator_1.Matches)(/^[A-Za-z][A-Za-z0-9_ ]*$/),
     __metadata("design:type", String)
-], CreateOpportunityDto.prototype, "companyId", void 0);
+], CreateStageDto.prototype, "code", void 0);
 __decorate([
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.IsNotEmpty)(),
     __metadata("design:type", String)
-], CreateOpportunityDto.prototype, "title", void 0);
+], CreateStageDto.prototype, "label", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
-], CreateOpportunityDto.prototype, "description", void 0);
+], CreateStageDto.prototype, "description", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsUUID)(),
-    __metadata("design:type", String)
-], CreateOpportunityDto.prototype, "ownerId", void 0);
-__decorate([
-    (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsUUID)(),
-    __metadata("design:type", String)
-], CreateOpportunityDto.prototype, "stageId", void 0);
-__decorate([
-    (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
-], CreateOpportunityDto.prototype, "stage", void 0);
-__decorate([
-    (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsEnum)(client_1.Priority),
-    __metadata("design:type", String)
-], CreateOpportunityDto.prototype, "priority", void 0);
-__decorate([
-    (0, class_validator_1.IsOptional)(),
-    (0, class_transformer_1.Type)(() => Number),
-    (0, class_validator_1.IsNumber)(),
-    (0, class_validator_1.Min)(0),
+    (0, class_validator_1.IsInt)(),
     __metadata("design:type", Number)
-], CreateOpportunityDto.prototype, "estimatedValue", void 0);
+], CreateStageDto.prototype, "sortOrder", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsDateString)(),
+    (0, class_validator_1.IsHexColor)(),
     __metadata("design:type", String)
-], CreateOpportunityDto.prototype, "expectedCloseDate", void 0);
+], CreateStageDto.prototype, "color", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsBoolean)(),
+    __metadata("design:type", Boolean)
+], CreateStageDto.prototype, "isActive", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsBoolean)(),
+    __metadata("design:type", Boolean)
+], CreateStageDto.prototype, "isTerminal", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsIn)(update_stage_config_dto_1.TERMINAL_TYPES),
     __metadata("design:type", String)
-], CreateOpportunityDto.prototype, "source", void 0);
-//# sourceMappingURL=create-opportunity.dto.js.map
+], CreateStageDto.prototype, "terminalType", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsBoolean)(),
+    __metadata("design:type", Boolean)
+], CreateStageDto.prototype, "isDefault", void 0);
+//# sourceMappingURL=create-stage.dto.js.map

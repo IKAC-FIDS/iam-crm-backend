@@ -1,7 +1,7 @@
 import { IsEnum } from 'class-validator';
-import { PipelineStage } from '@prisma/client';
+import { LegacyPipelineStage } from '@prisma/client';
 
 export class ChangeStageDto {
-  @IsEnum(PipelineStage)
-  stage: PipelineStage;
+  @IsEnum(LegacyPipelineStage)
+  stage: LegacyPipelineStage;
 }

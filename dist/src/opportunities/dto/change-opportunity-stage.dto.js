@@ -10,13 +10,18 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ChangeOpportunityStageDto = void 0;
-const client_1 = require("@prisma/client");
 const class_validator_1 = require("class-validator");
 class ChangeOpportunityStageDto {
 }
 exports.ChangeOpportunityStageDto = ChangeOpportunityStageDto;
 __decorate([
-    (0, class_validator_1.IsEnum)(client_1.PipelineStage),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsUUID)(),
+    __metadata("design:type", String)
+], ChangeOpportunityStageDto.prototype, "stageId", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], ChangeOpportunityStageDto.prototype, "stage", void 0);
 __decorate([
