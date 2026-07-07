@@ -260,6 +260,19 @@ The permission system is designed to be **dynamic** and manageable from the admi
 | ------ | ----------------- | --------------------- |
 | `POST` | `/api/auth/login` | Login and receive JWT |
 
+### Passkeys
+
+| Method   | Path                                             | Description                                      |
+| -------- | ------------------------------------------------ | ------------------------------------------------ |
+| `GET`    | `/api/me/passkeys`                               | List current user's registered passkeys          |
+| `POST`   | `/api/me/passkeys/registration/options`          | Start authenticated passkey registration         |
+| `POST`   | `/api/me/passkeys/registration/verify`           | Verify and save a new passkey                    |
+| `DELETE` | `/api/me/passkeys/:id`                           | Delete current user's passkey                    |
+| `POST`   | `/api/auth/passkeys/authentication/options`      | Start usernameless passkey login                 |
+| `POST`   | `/api/auth/passkeys/authentication/verify`       | Verify passkey login and return JWT login shape  |
+| `GET`    | `/api/admin/users/:id/passkeys`                  | Admin list of a user's passkeys                  |
+| `DELETE` | `/api/admin/users/:id/passkeys/:passkeyId`       | Admin delete/reset of a user's passkey           |
+
 ### Users
 
 | Method  | Path                        | Description                                     |
@@ -490,6 +503,7 @@ Body: form-data → Key: file (Type: File)
 ## 🔐 Security and Optimization
 
 * **JWT authentication** with configurable token lifetime
+* **Optional WebAuthn/Passkey authentication** for discoverable usernameless login
 * **Password hashing** before storing user credentials
 * **Rate limiting** for API protection
 * **Login throttling** if enabled in the current throttler configuration
@@ -498,6 +512,16 @@ Body: form-data → Key: file (Type: File)
 * **Role/permission-based access control**
 * **Dynamic permission cache** for role permissions
 * **Audit-log sanitization** for sensitive fields such as password, token, secret, hash, and authorization data
+
+WebAuthn/passkey configuration:
+
+```env
+WEBAUTHN_RP_NAME="IAM CRM"
+WEBAUTHN_RP_ID="localhost"
+WEBAUTHN_ORIGIN="http://localhost:5173"
+```
+
+Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_RP_ID="crm.example.com"` and `WEBAUTHN_ORIGIN="https://crm.example.com"`.
 
 ---
 
@@ -514,6 +538,7 @@ Body: form-data → Key: file (Type: File)
 | @nestjs/throttler | Rate limiting                         |
 | joi               | Environment validation                |
 | node-cache        | Permission cache                      |
+| @simplewebauthn/server | WebAuthn/passkey verification     |
 
 ---
 
@@ -629,6 +654,16 @@ Body: form-data → Key: file (Type: File)
 - Added stage IDs, labels, sort ordering, and terminal-aware won/lost metrics to pipeline summary, conversion, duration, and owner reports.
 - Returned frontend-friendly report filter options with `{ value, label }` shapes for users, owners, teams, industries, lead sources, stages, priorities, and activity types.
 - No Prisma schema, migration, seed, or permission changes were required.
+
+### fix 000015 - Add optional usernameless WebAuthn passkey authentication
+
+- Added optional WebAuthn/passkey login without changing `POST /api/auth/login`.
+- Added `UserPasskey` storage with credential ID, public key bytes, counter, device metadata, backup state, transports, and last-used timestamp.
+- Added authenticated passkey management endpoints under `/api/me/passkeys`.
+- Added usernameless discoverable passkey login endpoints under `/api/auth/passkeys/authentication/*`; successful verification returns the same `{ accessToken, user }` shape as password login.
+- Added optional admin passkey list/delete endpoints under `/api/admin/users/:id/passkeys`.
+- Added WebAuthn RP config defaults and validation for `WEBAUTHN_RP_NAME`, `WEBAUTHN_RP_ID`, and `WEBAUTHN_ORIGIN`.
+- Added audit logs for passkey registration, deletion, admin deletion, login success, and login failure.
 
 ---
 

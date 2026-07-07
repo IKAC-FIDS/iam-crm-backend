@@ -27,6 +27,7 @@ import { LookupsModule } from './lookups/lookups.module';
 import { PipelineConfigModule } from './admin/pipeline/pipeline-config.module';
 import { AuditLogModule } from './audit-log/audit-log.module';
 import { OpportunitiesModule } from './opportunities/opportunities.module';
+import { PasskeysModule } from './auth/passkeys/passkeys.module';
 
 @Module({
   imports: [
@@ -70,6 +71,7 @@ import { OpportunitiesModule } from './opportunities/opportunities.module';
     PipelineConfigModule,
     AuditLogModule,
     OpportunitiesModule,
+    PasskeysModule,
   ],
   providers: [
     {

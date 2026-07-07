@@ -63,4 +63,10 @@ export const envValidationSchema = Joi.object({
       'number.base': 'THROTTLE_LIMIT باید یک عدد باشد',
       'number.min': 'THROTTLE_LIMIT باید حداقل ۱ باشد',
     }),
+
+  WEBAUTHN_RP_NAME: Joi.string().default('IAM CRM'),
+
+  WEBAUTHN_RP_ID: Joi.string().default('localhost'),
+
+  WEBAUTHN_ORIGIN: Joi.string().uri().default('http://localhost:5173'),
 });

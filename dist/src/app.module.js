@@ -36,6 +36,7 @@ const lookups_module_1 = require("./lookups/lookups.module");
 const pipeline_config_module_1 = require("./admin/pipeline/pipeline-config.module");
 const audit_log_module_1 = require("./audit-log/audit-log.module");
 const opportunities_module_1 = require("./opportunities/opportunities.module");
+const passkeys_module_1 = require("./auth/passkeys/passkeys.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -82,6 +83,7 @@ exports.AppModule = AppModule = __decorate([
             pipeline_config_module_1.PipelineConfigModule,
             audit_log_module_1.AuditLogModule,
             opportunities_module_1.OpportunitiesModule,
+            passkeys_module_1.PasskeysModule,
         ],
         providers: [
             {

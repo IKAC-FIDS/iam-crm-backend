@@ -61,6 +61,9 @@ let AuthService = class AuthService {
         if (!passwordValid) {
             throw new common_1.UnauthorizedException('ایمیل یا رمز عبور نادرست است');
         }
+        return this.buildLoginResponse(user);
+    }
+    async buildLoginResponse(user) {
         const rolePermissions = await this.prisma.rolePermission.findMany({
             where: { role: user.role },
             include: { permission: true },

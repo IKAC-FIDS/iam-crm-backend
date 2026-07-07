@@ -107,8 +107,28 @@ model User {
   activities              Activity[]
   completedActivities     Activity[]                @relation("ActivityCompletedBy")
   stageChangesMade        PipelineStageHistory[]
+  passkeys                UserPasskey[]
 
   @@map("users")
+}
+
+model UserPasskey {
+  id                   String    @id @default(uuid())
+  userId               String
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  credentialId         String    @unique
+  credentialPublicKey  Bytes
+  counter              Int       @default(0)
+  deviceName           String?
+  transports           String[]
+  backedUp             Boolean   @default(false)
+  credentialDeviceType String?
+  lastUsedAt           DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("user_passkeys")
 }
 
 // ============================================================

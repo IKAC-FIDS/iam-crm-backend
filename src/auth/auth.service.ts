@@ -1,5 +1,6 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { User } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
@@ -22,7 +23,10 @@ export class AuthService {
       throw new UnauthorizedException('ایمیل یا رمز عبور نادرست است');
     }
 
-    // دریافت دسترسی‌های کاربر
+    return this.buildLoginResponse(user);
+  }
+
+  async buildLoginResponse(user: User) {
     const rolePermissions = await this.prisma.rolePermission.findMany({
       where: { role: user.role },
       include: { permission: true },
@@ -44,7 +48,7 @@ export class AuthService {
         email: user.email,
         role: user.role,
         team: user.team,
-        permissions, // ← ارسال دسترسی‌ها به فرانت‌اند
+        permissions,
       },
     };
   }
