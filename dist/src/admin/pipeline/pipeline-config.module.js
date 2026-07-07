@@ -9,13 +9,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.PipelineConfigModule = void 0;
 const common_1 = require("@nestjs/common");
 const pipeline_config_controller_1 = require("./pipeline-config.controller");
+const pipeline_runtime_controller_1 = require("./pipeline-runtime.controller");
 const pipeline_config_service_1 = require("./pipeline-config.service");
 let PipelineConfigModule = class PipelineConfigModule {
 };
 exports.PipelineConfigModule = PipelineConfigModule;
 exports.PipelineConfigModule = PipelineConfigModule = __decorate([
     (0, common_1.Module)({
-        controllers: [pipeline_config_controller_1.PipelineConfigController],
+        controllers: [pipeline_config_controller_1.PipelineConfigController, pipeline_runtime_controller_1.PipelineRuntimeController],
         providers: [pipeline_config_service_1.PipelineConfigService],
         exports: [pipeline_config_service_1.PipelineConfigService],
     })

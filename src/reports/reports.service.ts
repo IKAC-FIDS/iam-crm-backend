@@ -5,15 +5,22 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ReportFiltersDto } from './dto/report-filters.dto';
 
 interface StageConversion {
-  fromStage: string;
+  fromStageId: string | null;
+  fromStage: string | null;
+  fromLabel: string;
+  toStageId: string;
   toStage: string;
+  toLabel: string;
   fromCount: number;
   toCount: number;
-  conversionRate: string;
+  conversionRate: number;
 }
 
 interface DurationResult {
   stage: string;
+  stageId?: string;
+  label?: string;
+  sortOrder?: number;
   sample_count: number;
   avg_duration_days: number;
   min_duration_days: number;
@@ -23,6 +30,14 @@ interface DurationResult {
 @Injectable()
 export class ReportsService {
   constructor(private prisma: PrismaService) {}
+
+  private transitionKey(fromStageId: string | null, toStageId: string) {
+    return `${fromStageId ?? 'ENTRY'}:${toStageId}`;
+  }
+
+  private percent(part: number, total: number) {
+    return total ? Math.round((part / total) * 100) : 0;
+  }
 
   private companyWhere(filters: ReportFiltersDto, user: CurrentUserPayload): Prisma.CompanyWhereInput {
     const and: Prisma.CompanyWhereInput[] = [];
@@ -97,91 +112,255 @@ export class ReportsService {
   }
 
   async getConversionRates(filters: ReportFiltersDto, user: CurrentUserPayload) {
-    const stages = await this.prisma.pipelineStage.findMany({ orderBy: [{ sortOrder: 'asc' }, { code: 'asc' }] });
-    const stageCounts = await this.prisma.opportunityStageHistory.groupBy({
-      by: ['toStageId'],
-      where: { opportunity: this.opportunityWhere(filters, user) },
-      _count: { opportunityId: true },
-      orderBy: { toStageId: 'asc' },
-    });
-    const countsMap = new Map(stageCounts.map((item) => [item.toStageId, item._count.opportunityId]));
-    const results: StageConversion[] = [];
-    for (let i = 0; i < stages.length - 1; i++) {
-      const from = stages[i];
-      const to = stages[i + 1];
-      const fromCount = countsMap.get(from.id) || 0;
-      const toCount = countsMap.get(to.id) || 0;
-      results.push({
-        fromStage: from.code,
-        toStage: to.code,
-        fromCount,
-        toCount,
-        conversionRate: `${fromCount ? Math.round((toCount / fromCount) * 100) : 0}%`,
-      });
+    const where = this.opportunityWhere(filters, user);
+
+    const [transitions, totalOpportunities, movementCounts, reachedRows, wonStages] = await Promise.all([
+      this.prisma.pipelineStageTransition.findMany({
+        where: {
+          isAllowed: true,
+          toStage: { isActive: true },
+          OR: [{ fromStageId: null }, { fromStage: { isActive: true } }],
+        },
+        include: {
+          fromStage: true,
+          toStage: true,
+        },
+      }),
+
+      this.prisma.opportunity.count({ where }),
+
+      this.prisma.opportunityStageHistory.groupBy({
+        by: ['fromStageId', 'toStageId'],
+        where: {
+          opportunity: where,
+        },
+        _count: { opportunityId: true },
+      }),
+
+      this.prisma.opportunityStageHistory.findMany({
+        where: {
+          opportunity: where,
+        },
+        select: {
+          opportunityId: true,
+          toStageId: true,
+        },
+        distinct: ['opportunityId', 'toStageId'],
+      }),
+
+      this.prisma.pipelineStage.findMany({
+        where: { terminalType: 'WON' },
+        select: { id: true },
+      }),
+    ]);
+
+    const uniqueTransitions = new Map<string, (typeof transitions)[number]>();
+
+    for (const transition of transitions) {
+      const key = this.transitionKey(transition.fromStageId, transition.toStageId);
+
+      if (!uniqueTransitions.has(key)) {
+        uniqueTransitions.set(key, transition);
+      }
     }
-    const leadCount = stages.filter((item) => item.isDefault).reduce((sum, item) => sum + (countsMap.get(item.id) || 0), 0);
-    const doneCount = stages.filter((item) => item.terminalType === 'WON').reduce((sum, item) => sum + (countsMap.get(item.id) || 0), 0);
+
+    const movementMap = new Map(
+      movementCounts.map((item) => [
+        this.transitionKey(item.fromStageId, item.toStageId),
+        item._count.opportunityId,
+      ]),
+    );
+
+    const reachedMap = new Map<string, number>();
+
+    for (const item of reachedRows) {
+      reachedMap.set(item.toStageId, (reachedMap.get(item.toStageId) ?? 0) + 1);
+    }
+
+    const rows = [...uniqueTransitions.values()]
+      .sort((a, b) => {
+        const fromSortA = a.fromStage?.sortOrder ?? -1;
+        const fromSortB = b.fromStage?.sortOrder ?? -1;
+
+        if (fromSortA !== fromSortB) return fromSortA - fromSortB;
+
+        return a.toStage.sortOrder - b.toStage.sortOrder;
+      })
+      .map((transition): StageConversion => {
+        const toCount = movementMap.get(this.transitionKey(transition.fromStageId, transition.toStageId)) ?? 0;
+
+        const fromCount = transition.fromStageId
+          ? reachedMap.get(transition.fromStageId) ?? 0
+          : totalOpportunities;
+
+        return {
+          fromStageId: transition.fromStageId,
+          fromStage: transition.fromStage?.code ?? null,
+          fromLabel: transition.fromStage?.label ?? 'ورودی اولیه',
+          toStageId: transition.toStageId,
+          toStage: transition.toStage.code,
+          toLabel: transition.toStage.label,
+          fromCount,
+          toCount,
+          conversionRate: this.percent(toCount, fromCount),
+        };
+      });
+
+    const wonStageIds = wonStages.map((stage) => stage.id);
+
+    const wonCount = wonStageIds.length
+      ? await this.prisma.opportunity.count({
+          where: {
+            AND: [where, { stageId: { in: wonStageIds } }],
+          },
+        })
+      : 0;
+
     return {
-      stages: results,
+      stages: rows,
       summary: {
-        totalCompanies: leadCount,
-        completedCompanies: doneCount,
-        overallConversionRate: leadCount ? Math.round((doneCount / leadCount) * 100) : 0,
+        totalCompanies: totalOpportunities,
+        completedCompanies: wonCount,
+        overallConversionRate: this.percent(wonCount, totalOpportunities),
+
+        totalOpportunities,
+        wonOpportunities: wonCount,
+        overallOpportunityConversionRate: this.percent(wonCount, totalOpportunities),
       },
     };
   }
 
   async getAverageStageDuration(filters: ReportFiltersDto, user: CurrentUserPayload): Promise<DurationResult[]> {
     const opportunityFilters = { ...filters, stages: undefined };
-    const histories = await this.prisma.opportunityStageHistory.findMany({
-      where: { opportunity: this.opportunityWhere(opportunityFilters, user) },
-      select: { opportunityId: true, fromStageId: true, fromStage: { select: { code: true } }, changedAt: true },
-      orderBy: [{ opportunityId: 'asc' }, { changedAt: 'asc' }],
-    });
+
+    const [histories, stages] = await Promise.all([
+      this.prisma.opportunityStageHistory.findMany({
+        where: {
+          opportunity: this.opportunityWhere(opportunityFilters, user),
+        },
+        select: {
+          opportunityId: true,
+          fromStageId: true,
+          fromStage: {
+            select: {
+              id: true,
+              code: true,
+              label: true,
+              sortOrder: true,
+            },
+          },
+          changedAt: true,
+        },
+        orderBy: [{ opportunityId: 'asc' }, { changedAt: 'asc' }],
+      }),
+
+      this.prisma.pipelineStage.findMany({
+        select: {
+          id: true,
+          code: true,
+          label: true,
+          sortOrder: true,
+        },
+      }),
+    ]);
+
+    const stageByCode = new Map(stages.map((stage) => [stage.code, stage]));
     const durations = new Map<string, number[]>();
     const previous = new Map<string, Date>();
+
     for (const item of histories) {
       const previousDate = previous.get(item.opportunityId);
-      const stageFilterMatches = !filters.stages?.length || filters.stages.includes(item.fromStageId ?? '') || (item.fromStage && filters.stages.map((value) => value.toUpperCase()).includes(item.fromStage.code));
+
+      const stageFilterMatches =
+        !filters.stages?.length ||
+        filters.stages.includes(item.fromStageId ?? '') ||
+        (item.fromStage && filters.stages.map((value) => value.toUpperCase()).includes(item.fromStage.code));
+
       if (previousDate && item.fromStage && stageFilterMatches) {
         const days = (item.changedAt.getTime() - previousDate.getTime()) / 86_400_000;
-        durations.set(item.fromStage.code, [...(durations.get(item.fromStage.code) || []), days]);
+
+        durations.set(item.fromStage.code, [
+          ...(durations.get(item.fromStage.code) || []),
+          days,
+        ]);
       }
+
       previous.set(item.opportunityId, item.changedAt);
     }
-    return [...durations.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([stage, values]) => ({
-      stage,
-      sample_count: values.length,
-      avg_duration_days: this.round(values.reduce((sum, value) => sum + value, 0) / values.length),
-      min_duration_days: this.round(Math.min(...values)),
-      max_duration_days: this.round(Math.max(...values)),
-    }));
+
+    return [...durations.entries()]
+      .map(([stage, values]) => {
+        const config = stageByCode.get(stage);
+
+        return {
+          stage,
+          stageId: config?.id,
+          label: config?.label,
+          sortOrder: config?.sortOrder,
+          sample_count: values.length,
+          avg_duration_days: this.round(values.reduce((sum, value) => sum + value, 0) / values.length),
+          min_duration_days: this.round(Math.min(...values)),
+          max_duration_days: this.round(Math.max(...values)),
+        };
+      })
+      .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
   }
 
   async getPipelineSummary(filters: ReportFiltersDto, user: CurrentUserPayload) {
     const where = this.opportunityWhere(filters, user);
-    const stageCounts = await this.prisma.opportunity.groupBy({
-      by: ['stageId'], where, _count: { id: true }, orderBy: { stageId: 'asc' },
-    });
-    const totalCompanies = stageCounts.reduce((sum, item) => sum + item._count.id, 0);
-    const stages = await this.prisma.pipelineStage.findMany({ orderBy: [{ sortOrder: 'asc' }, { code: 'asc' }] });
-    const stageMap = new Map(stages.map((stage) => [stage.id, stage]));
+
+    const [stageCounts, stages] = await Promise.all([
+      this.prisma.opportunity.groupBy({
+        by: ['stageId'],
+        where,
+        _count: { id: true },
+        orderBy: { stageId: 'asc' },
+      }),
+
+      this.prisma.pipelineStage.findMany({
+        orderBy: [{ sortOrder: 'asc' }, { code: 'asc' }],
+      }),
+    ]);
+
+    const totalOpportunities = stageCounts.reduce((sum, item) => sum + item._count.id, 0);
     const countMap = new Map(stageCounts.map((item) => [item.stageId, item._count.id]));
-    const lostCount = stageCounts.filter((item) => stageMap.get(item.stageId)?.terminalType === 'LOST').reduce((sum, item) => sum + item._count.id, 0);
+
+    const wonCount = stages
+      .filter((stage) => stage.terminalType === 'WON')
+      .reduce((sum, stage) => sum + (countMap.get(stage.id) ?? 0), 0);
+
+    const lostCount = stages
+      .filter((stage) => stage.terminalType === 'LOST')
+      .reduce((sum, stage) => sum + (countMap.get(stage.id) ?? 0), 0);
+
+    const activeCount = totalOpportunities - wonCount - lostCount;
+
     return {
-      stages: stages.filter((stage) => countMap.has(stage.id)).map((stage) => ({
-        stage: stage.code,
-        stageId: stage.id,
-        label: stage.label,
-        sortOrder: stage.sortOrder,
-        count: countMap.get(stage.id) || 0,
-        percentage: totalCompanies ? Math.round(((countMap.get(stage.id) || 0) / totalCompanies) * 100) : 0,
-      })),
+      stages: stages.map((stage) => {
+        const count = countMap.get(stage.id) ?? 0;
+
+        return {
+          stage: stage.code,
+          stageId: stage.id,
+          label: stage.label,
+          sortOrder: stage.sortOrder,
+          count,
+          percentage: this.percent(count, totalOpportunities),
+        };
+      }),
+
       summary: {
-        totalCompanies,
-        activeCompanies: totalCompanies - lostCount,
+        totalCompanies: totalOpportunities,
+        activeCompanies: activeCount,
         lostCompanies: lostCount,
-        lostRate: totalCompanies ? Math.round((lostCount / totalCompanies) * 100) : 0,
+        lostRate: this.percent(lostCount, totalOpportunities),
+
+        totalOpportunities,
+        activeOpportunities: activeCount,
+        wonOpportunities: wonCount,
+        lostOpportunities: lostCount,
+        wonRate: this.percent(wonCount, totalOpportunities),
+        lostOpportunityRate: this.percent(lostCount, totalOpportunities),
       },
     };
   }
@@ -235,69 +414,236 @@ export class ReportsService {
   }
 
   async getPipelineByOwner(filters: ReportFiltersDto, user: CurrentUserPayload) {
-    const [companies, stages] = await Promise.all([
+    const [opportunities, stages] = await Promise.all([
       this.prisma.opportunity.findMany({
-        where: { AND: [this.opportunityWhere(filters, user), { ownerId: { not: null } }] },
-        select: { ownerId: true, stageId: true, stage: true, owner: { select: { fullName: true, team: true } } },
+        where: {
+          AND: [this.opportunityWhere(filters, user), { ownerId: { not: null } }],
+        },
+        select: {
+          ownerId: true,
+          stageId: true,
+          stage: true,
+          owner: {
+            select: {
+              fullName: true,
+              team: true,
+            },
+          },
+        },
       }),
-      this.prisma.pipelineStage.findMany({ orderBy: [{ sortOrder: 'asc' }, { code: 'asc' }] }),
+
+      this.prisma.pipelineStage.findMany({
+        orderBy: [{ sortOrder: 'asc' }, { code: 'asc' }],
+      }),
     ]);
-    const owners = new Map<string, typeof companies>();
-    for (const company of companies) {
-      if (!company.ownerId) continue;
-      owners.set(company.ownerId, [...(owners.get(company.ownerId) || []), company]);
+
+    const owners = new Map<string, typeof opportunities>();
+
+    for (const opportunity of opportunities) {
+      if (!opportunity.ownerId) continue;
+
+      owners.set(opportunity.ownerId, [
+        ...(owners.get(opportunity.ownerId) || []),
+        opportunity,
+      ]);
     }
-    return [...owners.entries()].map(([ownerId, items]) => {
-      const doneCompanies = items.filter((item) => item.stage.terminalType === 'WON').length;
-      const lostCompanies = items.filter((item) => item.stage.terminalType === 'LOST').length;
-      const totalCompanies = items.length;
-      return {
-        ownerId,
-        fullName: items[0].owner?.fullName || '',
-        team: items[0].owner?.team ?? null,
-        totalCompanies,
-        activeCompanies: totalCompanies - doneCompanies - lostCompanies,
-        doneCompanies,
-        lostCompanies,
-        conversionRate: totalCompanies ? Math.round((doneCompanies / totalCompanies) * 100) : 0,
-        lostRate: totalCompanies ? Math.round((lostCompanies / totalCompanies) * 100) : 0,
-        stages: stages.map((stage) => ({
-          stage: stage.code,
-          stageId: stage.id,
-          label: stage.label,
-          sortOrder: stage.sortOrder,
-          count: items.filter((item) => item.stageId === stage.id).length,
-        })),
-      };
-    }).sort((a, b) => a.fullName.localeCompare(b.fullName));
+
+    return [...owners.entries()]
+      .map(([ownerId, items]) => {
+        const wonOpportunities = items.filter((item) => item.stage.terminalType === 'WON').length;
+        const lostOpportunities = items.filter((item) => item.stage.terminalType === 'LOST').length;
+        const totalOpportunities = items.length;
+        const activeOpportunities = totalOpportunities - wonOpportunities - lostOpportunities;
+
+        return {
+          ownerId,
+          fullName: items[0].owner?.fullName || '',
+          team: items[0].owner?.team ?? null,
+
+          totalCompanies: totalOpportunities,
+          activeCompanies: activeOpportunities,
+          doneCompanies: wonOpportunities,
+          lostCompanies: lostOpportunities,
+
+          totalOpportunities,
+          activeOpportunities,
+          wonOpportunities,
+          lostOpportunities,
+
+          conversionRate: this.percent(wonOpportunities, totalOpportunities),
+          lostRate: this.percent(lostOpportunities, totalOpportunities),
+
+          stages: stages.map((stage) => ({
+            stage: stage.code,
+            stageId: stage.id,
+            label: stage.label,
+            sortOrder: stage.sortOrder,
+            count: items.filter((item) => item.stageId === stage.id).length,
+          })),
+        };
+      })
+      .sort((a, b) => a.fullName.localeCompare(b.fullName));
   }
 
   async getFilterOptions(user: CurrentUserPayload) {
-    const companyWhere = this.companyWhere({}, user);
-    const [users, companies, opportunities] = await Promise.all([
+    const userWhere = this.reportUserWhere({}, user);
+
+    const [users, industries, leadSources, stages] = await Promise.all([
       this.prisma.user.findMany({
-        where: this.reportUserWhere({}, user),
-        select: { id: true, fullName: true, role: true, team: true },
+        where: userWhere,
+        select: {
+          id: true,
+          fullName: true,
+          role: true,
+          team: true,
+          isActive: true,
+        },
         orderBy: { fullName: 'asc' },
       }),
-      this.prisma.company.findMany({
-        where: companyWhere,
-        select: { industry: true, source: true },
+
+      this.prisma.industry.findMany({
+        select: {
+          id: true,
+          name: true,
+        },
+        orderBy: { name: 'asc' },
       }),
-      this.prisma.opportunity.findMany({
-        where: this.opportunityWhere({}, user),
-        select: { source: true },
+
+      this.prisma.leadSource.findMany({
+        where: { isActive: true },
+        select: {
+          id: true,
+          code: true,
+          name: true,
+          sortOrder: true,
+        },
+        orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+      }),
+
+      this.prisma.pipelineStage.findMany({
+        where: { isActive: true },
+        select: {
+          id: true,
+          code: true,
+          label: true,
+          sortOrder: true,
+          color: true,
+          isTerminal: true,
+          terminalType: true,
+          isDefault: true,
+        },
+        orderBy: [{ sortOrder: 'asc' }, { code: 'asc' }],
       }),
     ]);
-    const unique = (values: Array<string | null>) => [...new Set(values.filter((value): value is string => Boolean(value)))].sort();
+
+    const activeUsers = users.filter((item) => item.isActive);
+
+    const owners = activeUsers.filter(
+      (item) => item.role === UserRole.REP || item.role === UserRole.MANAGER,
+    );
+
+    const uniqueTeams = [
+      ...new Set(
+        activeUsers
+          .map((item) => item.team)
+          .filter((value): value is string => Boolean(value)),
+      ),
+    ].sort();
+
+    const priorityOptions = [
+      { value: Priority.LOW, label: 'کم' },
+      { value: Priority.MEDIUM, label: 'متوسط' },
+      { value: Priority.HIGH, label: 'زیاد' },
+      { value: Priority.STRATEGIC, label: 'استراتژیک' },
+    ];
+
+    const activityTypeOptions = [
+      { value: ActivityType.CALL, label: 'تماس' },
+      { value: ActivityType.EMAIL, label: 'ایمیل' },
+      { value: ActivityType.LINKEDIN_MESSAGE, label: 'پیام لینکدین' },
+      { value: ActivityType.LINKEDIN_ENGAGEMENT, label: 'تعامل لینکدین' },
+      { value: ActivityType.MEETING, label: 'جلسه' },
+      { value: ActivityType.NOTE, label: 'یادداشت' },
+      { value: ActivityType.STAGE_CHANGE, label: 'تغییر مرحله' },
+    ];
+
     return {
-      users,
-      teams: unique(users.map((item) => item.team)),
-      industries: unique(companies.map((item) => item.industry)),
-      sources: unique([...companies.map((item) => item.source), ...opportunities.map((item) => item.source)]),
-      stages: await this.prisma.pipelineStage.findMany({ where: { isActive: true }, select: { id: true, code: true, label: true, sortOrder: true, color: true, isTerminal: true, terminalType: true, isDefault: true }, orderBy: [{ sortOrder: 'asc' }, { code: 'asc' }] }),
-      priorities: Object.values(Priority),
-      activityTypes: Object.values(ActivityType),
+      users: activeUsers.map((item) => ({
+        value: item.id,
+        id: item.id,
+        label: item.fullName,
+        fullName: item.fullName,
+        team: item.team,
+        role: item.role,
+      })),
+
+      owners: owners.map((item) => ({
+        value: item.id,
+        id: item.id,
+        label: item.fullName,
+        fullName: item.fullName,
+        team: item.team,
+        role: item.role,
+      })),
+
+      teams: uniqueTeams.map((team) => ({
+        value: team,
+        label: team,
+      })),
+
+      industries: industries.map((item) => ({
+        value: item.name,
+        id: item.id,
+        label: item.name,
+        name: item.name,
+      })),
+
+      sources: leadSources.map((item) => ({
+        value: item.code,
+        id: item.id,
+        code: item.code,
+        label: item.name,
+        name: item.name,
+        sortOrder: item.sortOrder,
+      })),
+
+      leadSources: leadSources.map((item) => ({
+        value: item.code,
+        id: item.id,
+        code: item.code,
+        label: item.name,
+        name: item.name,
+        sortOrder: item.sortOrder,
+      })),
+
+      stages: stages.map((item) => ({
+        value: item.id,
+        id: item.id,
+        code: item.code,
+        label: item.label,
+        sortOrder: item.sortOrder,
+        color: item.color,
+        isTerminal: item.isTerminal,
+        terminalType: item.terminalType,
+        isDefault: item.isDefault,
+      })),
+
+      pipelineStages: stages.map((item) => ({
+        value: item.id,
+        id: item.id,
+        code: item.code,
+        label: item.label,
+        sortOrder: item.sortOrder,
+        color: item.color,
+        isTerminal: item.isTerminal,
+        terminalType: item.terminalType,
+        isDefault: item.isDefault,
+      })),
+
+      priorities: priorityOptions,
+      priorityOptions,
+      activityTypes: activityTypeOptions,
+      activityTypeOptions,
     };
   }
 
@@ -317,5 +663,4 @@ export class ReportsService {
   private round(value: number) {
     return Math.round(value * 100) / 100;
   }
-
 }

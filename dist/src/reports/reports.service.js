@@ -17,6 +17,12 @@ let ReportsService = class ReportsService {
     constructor(prisma) {
         this.prisma = prisma;
     }
+    transitionKey(fromStageId, toStageId) {
+        return `${fromStageId ?? 'ENTRY'}:${toStageId}`;
+    }
+    percent(part, total) {
+        return total ? Math.round((part / total) * 100) : 0;
+    }
     companyWhere(filters, user) {
         const and = [];
         if (filters.ownerIds?.length)
@@ -101,89 +107,211 @@ let ReportsService = class ReportsService {
         return { AND: and };
     }
     async getConversionRates(filters, user) {
-        const stages = await this.prisma.pipelineStage.findMany({ orderBy: [{ sortOrder: 'asc' }, { code: 'asc' }] });
-        const stageCounts = await this.prisma.opportunityStageHistory.groupBy({
-            by: ['toStageId'],
-            where: { opportunity: this.opportunityWhere(filters, user) },
-            _count: { opportunityId: true },
-            orderBy: { toStageId: 'asc' },
-        });
-        const countsMap = new Map(stageCounts.map((item) => [item.toStageId, item._count.opportunityId]));
-        const results = [];
-        for (let i = 0; i < stages.length - 1; i++) {
-            const from = stages[i];
-            const to = stages[i + 1];
-            const fromCount = countsMap.get(from.id) || 0;
-            const toCount = countsMap.get(to.id) || 0;
-            results.push({
-                fromStage: from.code,
-                toStage: to.code,
+        const where = this.opportunityWhere(filters, user);
+        const [transitions, totalOpportunities, movementCounts, reachedRows, wonStages] = await Promise.all([
+            this.prisma.pipelineStageTransition.findMany({
+                where: {
+                    isAllowed: true,
+                    toStage: { isActive: true },
+                    OR: [{ fromStageId: null }, { fromStage: { isActive: true } }],
+                },
+                include: {
+                    fromStage: true,
+                    toStage: true,
+                },
+            }),
+            this.prisma.opportunity.count({ where }),
+            this.prisma.opportunityStageHistory.groupBy({
+                by: ['fromStageId', 'toStageId'],
+                where: {
+                    opportunity: where,
+                },
+                _count: { opportunityId: true },
+            }),
+            this.prisma.opportunityStageHistory.findMany({
+                where: {
+                    opportunity: where,
+                },
+                select: {
+                    opportunityId: true,
+                    toStageId: true,
+                },
+                distinct: ['opportunityId', 'toStageId'],
+            }),
+            this.prisma.pipelineStage.findMany({
+                where: { terminalType: 'WON' },
+                select: { id: true },
+            }),
+        ]);
+        const uniqueTransitions = new Map();
+        for (const transition of transitions) {
+            const key = this.transitionKey(transition.fromStageId, transition.toStageId);
+            if (!uniqueTransitions.has(key)) {
+                uniqueTransitions.set(key, transition);
+            }
+        }
+        const movementMap = new Map(movementCounts.map((item) => [
+            this.transitionKey(item.fromStageId, item.toStageId),
+            item._count.opportunityId,
+        ]));
+        const reachedMap = new Map();
+        for (const item of reachedRows) {
+            reachedMap.set(item.toStageId, (reachedMap.get(item.toStageId) ?? 0) + 1);
+        }
+        const rows = [...uniqueTransitions.values()]
+            .sort((a, b) => {
+            const fromSortA = a.fromStage?.sortOrder ?? -1;
+            const fromSortB = b.fromStage?.sortOrder ?? -1;
+            if (fromSortA !== fromSortB)
+                return fromSortA - fromSortB;
+            return a.toStage.sortOrder - b.toStage.sortOrder;
+        })
+            .map((transition) => {
+            const toCount = movementMap.get(this.transitionKey(transition.fromStageId, transition.toStageId)) ?? 0;
+            const fromCount = transition.fromStageId
+                ? reachedMap.get(transition.fromStageId) ?? 0
+                : totalOpportunities;
+            return {
+                fromStageId: transition.fromStageId,
+                fromStage: transition.fromStage?.code ?? null,
+                fromLabel: transition.fromStage?.label ?? 'ورودی اولیه',
+                toStageId: transition.toStageId,
+                toStage: transition.toStage.code,
+                toLabel: transition.toStage.label,
                 fromCount,
                 toCount,
-                conversionRate: `${fromCount ? Math.round((toCount / fromCount) * 100) : 0}%`,
-            });
-        }
-        const leadCount = stages.filter((item) => item.isDefault).reduce((sum, item) => sum + (countsMap.get(item.id) || 0), 0);
-        const doneCount = stages.filter((item) => item.terminalType === 'WON').reduce((sum, item) => sum + (countsMap.get(item.id) || 0), 0);
+                conversionRate: this.percent(toCount, fromCount),
+            };
+        });
+        const wonStageIds = wonStages.map((stage) => stage.id);
+        const wonCount = wonStageIds.length
+            ? await this.prisma.opportunity.count({
+                where: {
+                    AND: [where, { stageId: { in: wonStageIds } }],
+                },
+            })
+            : 0;
         return {
-            stages: results,
+            stages: rows,
             summary: {
-                totalCompanies: leadCount,
-                completedCompanies: doneCount,
-                overallConversionRate: leadCount ? Math.round((doneCount / leadCount) * 100) : 0,
+                totalCompanies: totalOpportunities,
+                completedCompanies: wonCount,
+                overallConversionRate: this.percent(wonCount, totalOpportunities),
+                totalOpportunities,
+                wonOpportunities: wonCount,
+                overallOpportunityConversionRate: this.percent(wonCount, totalOpportunities),
             },
         };
     }
     async getAverageStageDuration(filters, user) {
         const opportunityFilters = { ...filters, stages: undefined };
-        const histories = await this.prisma.opportunityStageHistory.findMany({
-            where: { opportunity: this.opportunityWhere(opportunityFilters, user) },
-            select: { opportunityId: true, fromStageId: true, fromStage: { select: { code: true } }, changedAt: true },
-            orderBy: [{ opportunityId: 'asc' }, { changedAt: 'asc' }],
-        });
+        const [histories, stages] = await Promise.all([
+            this.prisma.opportunityStageHistory.findMany({
+                where: {
+                    opportunity: this.opportunityWhere(opportunityFilters, user),
+                },
+                select: {
+                    opportunityId: true,
+                    fromStageId: true,
+                    fromStage: {
+                        select: {
+                            id: true,
+                            code: true,
+                            label: true,
+                            sortOrder: true,
+                        },
+                    },
+                    changedAt: true,
+                },
+                orderBy: [{ opportunityId: 'asc' }, { changedAt: 'asc' }],
+            }),
+            this.prisma.pipelineStage.findMany({
+                select: {
+                    id: true,
+                    code: true,
+                    label: true,
+                    sortOrder: true,
+                },
+            }),
+        ]);
+        const stageByCode = new Map(stages.map((stage) => [stage.code, stage]));
         const durations = new Map();
         const previous = new Map();
         for (const item of histories) {
             const previousDate = previous.get(item.opportunityId);
-            const stageFilterMatches = !filters.stages?.length || filters.stages.includes(item.fromStageId ?? '') || (item.fromStage && filters.stages.map((value) => value.toUpperCase()).includes(item.fromStage.code));
+            const stageFilterMatches = !filters.stages?.length ||
+                filters.stages.includes(item.fromStageId ?? '') ||
+                (item.fromStage && filters.stages.map((value) => value.toUpperCase()).includes(item.fromStage.code));
             if (previousDate && item.fromStage && stageFilterMatches) {
                 const days = (item.changedAt.getTime() - previousDate.getTime()) / 86_400_000;
-                durations.set(item.fromStage.code, [...(durations.get(item.fromStage.code) || []), days]);
+                durations.set(item.fromStage.code, [
+                    ...(durations.get(item.fromStage.code) || []),
+                    days,
+                ]);
             }
             previous.set(item.opportunityId, item.changedAt);
         }
-        return [...durations.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([stage, values]) => ({
-            stage,
-            sample_count: values.length,
-            avg_duration_days: this.round(values.reduce((sum, value) => sum + value, 0) / values.length),
-            min_duration_days: this.round(Math.min(...values)),
-            max_duration_days: this.round(Math.max(...values)),
-        }));
+        return [...durations.entries()]
+            .map(([stage, values]) => {
+            const config = stageByCode.get(stage);
+            return {
+                stage,
+                stageId: config?.id,
+                label: config?.label,
+                sortOrder: config?.sortOrder,
+                sample_count: values.length,
+                avg_duration_days: this.round(values.reduce((sum, value) => sum + value, 0) / values.length),
+                min_duration_days: this.round(Math.min(...values)),
+                max_duration_days: this.round(Math.max(...values)),
+            };
+        })
+            .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
     }
     async getPipelineSummary(filters, user) {
         const where = this.opportunityWhere(filters, user);
-        const stageCounts = await this.prisma.opportunity.groupBy({
-            by: ['stageId'], where, _count: { id: true }, orderBy: { stageId: 'asc' },
-        });
-        const totalCompanies = stageCounts.reduce((sum, item) => sum + item._count.id, 0);
-        const stages = await this.prisma.pipelineStage.findMany({ orderBy: [{ sortOrder: 'asc' }, { code: 'asc' }] });
-        const stageMap = new Map(stages.map((stage) => [stage.id, stage]));
+        const [stageCounts, stages] = await Promise.all([
+            this.prisma.opportunity.groupBy({
+                by: ['stageId'],
+                where,
+                _count: { id: true },
+                orderBy: { stageId: 'asc' },
+            }),
+            this.prisma.pipelineStage.findMany({
+                orderBy: [{ sortOrder: 'asc' }, { code: 'asc' }],
+            }),
+        ]);
+        const totalOpportunities = stageCounts.reduce((sum, item) => sum + item._count.id, 0);
         const countMap = new Map(stageCounts.map((item) => [item.stageId, item._count.id]));
-        const lostCount = stageCounts.filter((item) => stageMap.get(item.stageId)?.terminalType === 'LOST').reduce((sum, item) => sum + item._count.id, 0);
+        const wonCount = stages
+            .filter((stage) => stage.terminalType === 'WON')
+            .reduce((sum, stage) => sum + (countMap.get(stage.id) ?? 0), 0);
+        const lostCount = stages
+            .filter((stage) => stage.terminalType === 'LOST')
+            .reduce((sum, stage) => sum + (countMap.get(stage.id) ?? 0), 0);
+        const activeCount = totalOpportunities - wonCount - lostCount;
         return {
-            stages: stages.filter((stage) => countMap.has(stage.id)).map((stage) => ({
-                stage: stage.code,
-                stageId: stage.id,
-                label: stage.label,
-                sortOrder: stage.sortOrder,
-                count: countMap.get(stage.id) || 0,
-                percentage: totalCompanies ? Math.round(((countMap.get(stage.id) || 0) / totalCompanies) * 100) : 0,
-            })),
+            stages: stages.map((stage) => {
+                const count = countMap.get(stage.id) ?? 0;
+                return {
+                    stage: stage.code,
+                    stageId: stage.id,
+                    label: stage.label,
+                    sortOrder: stage.sortOrder,
+                    count,
+                    percentage: this.percent(count, totalOpportunities),
+                };
+            }),
             summary: {
-                totalCompanies,
-                activeCompanies: totalCompanies - lostCount,
+                totalCompanies: totalOpportunities,
+                activeCompanies: activeCount,
                 lostCompanies: lostCount,
-                lostRate: totalCompanies ? Math.round((lostCount / totalCompanies) * 100) : 0,
+                lostRate: this.percent(lostCount, totalOpportunities),
+                totalOpportunities,
+                activeOpportunities: activeCount,
+                wonOpportunities: wonCount,
+                lostOpportunities: lostCount,
+                wonRate: this.percent(wonCount, totalOpportunities),
+                lostOpportunityRate: this.percent(lostCount, totalOpportunities),
             },
         };
     }
@@ -234,33 +362,56 @@ let ReportsService = class ReportsService {
         }));
     }
     async getPipelineByOwner(filters, user) {
-        const [companies, stages] = await Promise.all([
+        const [opportunities, stages] = await Promise.all([
             this.prisma.opportunity.findMany({
-                where: { AND: [this.opportunityWhere(filters, user), { ownerId: { not: null } }] },
-                select: { ownerId: true, stageId: true, stage: true, owner: { select: { fullName: true, team: true } } },
+                where: {
+                    AND: [this.opportunityWhere(filters, user), { ownerId: { not: null } }],
+                },
+                select: {
+                    ownerId: true,
+                    stageId: true,
+                    stage: true,
+                    owner: {
+                        select: {
+                            fullName: true,
+                            team: true,
+                        },
+                    },
+                },
             }),
-            this.prisma.pipelineStage.findMany({ orderBy: [{ sortOrder: 'asc' }, { code: 'asc' }] }),
+            this.prisma.pipelineStage.findMany({
+                orderBy: [{ sortOrder: 'asc' }, { code: 'asc' }],
+            }),
         ]);
         const owners = new Map();
-        for (const company of companies) {
-            if (!company.ownerId)
+        for (const opportunity of opportunities) {
+            if (!opportunity.ownerId)
                 continue;
-            owners.set(company.ownerId, [...(owners.get(company.ownerId) || []), company]);
+            owners.set(opportunity.ownerId, [
+                ...(owners.get(opportunity.ownerId) || []),
+                opportunity,
+            ]);
         }
-        return [...owners.entries()].map(([ownerId, items]) => {
-            const doneCompanies = items.filter((item) => item.stage.terminalType === 'WON').length;
-            const lostCompanies = items.filter((item) => item.stage.terminalType === 'LOST').length;
-            const totalCompanies = items.length;
+        return [...owners.entries()]
+            .map(([ownerId, items]) => {
+            const wonOpportunities = items.filter((item) => item.stage.terminalType === 'WON').length;
+            const lostOpportunities = items.filter((item) => item.stage.terminalType === 'LOST').length;
+            const totalOpportunities = items.length;
+            const activeOpportunities = totalOpportunities - wonOpportunities - lostOpportunities;
             return {
                 ownerId,
                 fullName: items[0].owner?.fullName || '',
                 team: items[0].owner?.team ?? null,
-                totalCompanies,
-                activeCompanies: totalCompanies - doneCompanies - lostCompanies,
-                doneCompanies,
-                lostCompanies,
-                conversionRate: totalCompanies ? Math.round((doneCompanies / totalCompanies) * 100) : 0,
-                lostRate: totalCompanies ? Math.round((lostCompanies / totalCompanies) * 100) : 0,
+                totalCompanies: totalOpportunities,
+                activeCompanies: activeOpportunities,
+                doneCompanies: wonOpportunities,
+                lostCompanies: lostOpportunities,
+                totalOpportunities,
+                activeOpportunities,
+                wonOpportunities,
+                lostOpportunities,
+                conversionRate: this.percent(wonOpportunities, totalOpportunities),
+                lostRate: this.percent(lostOpportunities, totalOpportunities),
                 stages: stages.map((stage) => ({
                     stage: stage.code,
                     stageId: stage.id,
@@ -269,34 +420,146 @@ let ReportsService = class ReportsService {
                     count: items.filter((item) => item.stageId === stage.id).length,
                 })),
             };
-        }).sort((a, b) => a.fullName.localeCompare(b.fullName));
+        })
+            .sort((a, b) => a.fullName.localeCompare(b.fullName));
     }
     async getFilterOptions(user) {
-        const companyWhere = this.companyWhere({}, user);
-        const [users, companies, opportunities] = await Promise.all([
+        const userWhere = this.reportUserWhere({}, user);
+        const [users, industries, leadSources, stages] = await Promise.all([
             this.prisma.user.findMany({
-                where: this.reportUserWhere({}, user),
-                select: { id: true, fullName: true, role: true, team: true },
+                where: userWhere,
+                select: {
+                    id: true,
+                    fullName: true,
+                    role: true,
+                    team: true,
+                    isActive: true,
+                },
                 orderBy: { fullName: 'asc' },
             }),
-            this.prisma.company.findMany({
-                where: companyWhere,
-                select: { industry: true, source: true },
+            this.prisma.industry.findMany({
+                select: {
+                    id: true,
+                    name: true,
+                },
+                orderBy: { name: 'asc' },
             }),
-            this.prisma.opportunity.findMany({
-                where: this.opportunityWhere({}, user),
-                select: { source: true },
+            this.prisma.leadSource.findMany({
+                where: { isActive: true },
+                select: {
+                    id: true,
+                    code: true,
+                    name: true,
+                    sortOrder: true,
+                },
+                orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+            }),
+            this.prisma.pipelineStage.findMany({
+                where: { isActive: true },
+                select: {
+                    id: true,
+                    code: true,
+                    label: true,
+                    sortOrder: true,
+                    color: true,
+                    isTerminal: true,
+                    terminalType: true,
+                    isDefault: true,
+                },
+                orderBy: [{ sortOrder: 'asc' }, { code: 'asc' }],
             }),
         ]);
-        const unique = (values) => [...new Set(values.filter((value) => Boolean(value)))].sort();
+        const activeUsers = users.filter((item) => item.isActive);
+        const owners = activeUsers.filter((item) => item.role === client_1.UserRole.REP || item.role === client_1.UserRole.MANAGER);
+        const uniqueTeams = [
+            ...new Set(activeUsers
+                .map((item) => item.team)
+                .filter((value) => Boolean(value))),
+        ].sort();
+        const priorityOptions = [
+            { value: client_1.Priority.LOW, label: 'کم' },
+            { value: client_1.Priority.MEDIUM, label: 'متوسط' },
+            { value: client_1.Priority.HIGH, label: 'زیاد' },
+            { value: client_1.Priority.STRATEGIC, label: 'استراتژیک' },
+        ];
+        const activityTypeOptions = [
+            { value: client_1.ActivityType.CALL, label: 'تماس' },
+            { value: client_1.ActivityType.EMAIL, label: 'ایمیل' },
+            { value: client_1.ActivityType.LINKEDIN_MESSAGE, label: 'پیام لینکدین' },
+            { value: client_1.ActivityType.LINKEDIN_ENGAGEMENT, label: 'تعامل لینکدین' },
+            { value: client_1.ActivityType.MEETING, label: 'جلسه' },
+            { value: client_1.ActivityType.NOTE, label: 'یادداشت' },
+            { value: client_1.ActivityType.STAGE_CHANGE, label: 'تغییر مرحله' },
+        ];
         return {
-            users,
-            teams: unique(users.map((item) => item.team)),
-            industries: unique(companies.map((item) => item.industry)),
-            sources: unique([...companies.map((item) => item.source), ...opportunities.map((item) => item.source)]),
-            stages: await this.prisma.pipelineStage.findMany({ where: { isActive: true }, select: { id: true, code: true, label: true, sortOrder: true, color: true, isTerminal: true, terminalType: true, isDefault: true }, orderBy: [{ sortOrder: 'asc' }, { code: 'asc' }] }),
-            priorities: Object.values(client_1.Priority),
-            activityTypes: Object.values(client_1.ActivityType),
+            users: activeUsers.map((item) => ({
+                value: item.id,
+                id: item.id,
+                label: item.fullName,
+                fullName: item.fullName,
+                team: item.team,
+                role: item.role,
+            })),
+            owners: owners.map((item) => ({
+                value: item.id,
+                id: item.id,
+                label: item.fullName,
+                fullName: item.fullName,
+                team: item.team,
+                role: item.role,
+            })),
+            teams: uniqueTeams.map((team) => ({
+                value: team,
+                label: team,
+            })),
+            industries: industries.map((item) => ({
+                value: item.name,
+                id: item.id,
+                label: item.name,
+                name: item.name,
+            })),
+            sources: leadSources.map((item) => ({
+                value: item.code,
+                id: item.id,
+                code: item.code,
+                label: item.name,
+                name: item.name,
+                sortOrder: item.sortOrder,
+            })),
+            leadSources: leadSources.map((item) => ({
+                value: item.code,
+                id: item.id,
+                code: item.code,
+                label: item.name,
+                name: item.name,
+                sortOrder: item.sortOrder,
+            })),
+            stages: stages.map((item) => ({
+                value: item.id,
+                id: item.id,
+                code: item.code,
+                label: item.label,
+                sortOrder: item.sortOrder,
+                color: item.color,
+                isTerminal: item.isTerminal,
+                terminalType: item.terminalType,
+                isDefault: item.isDefault,
+            })),
+            pipelineStages: stages.map((item) => ({
+                value: item.id,
+                id: item.id,
+                code: item.code,
+                label: item.label,
+                sortOrder: item.sortOrder,
+                color: item.color,
+                isTerminal: item.isTerminal,
+                terminalType: item.terminalType,
+                isDefault: item.isDefault,
+            })),
+            priorities: priorityOptions,
+            priorityOptions,
+            activityTypes: activityTypeOptions,
+            activityTypeOptions,
         };
     }
     reportUserWhere(filters, user) {

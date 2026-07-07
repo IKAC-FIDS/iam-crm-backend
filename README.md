@@ -383,6 +383,13 @@ Reports may support filters such as:
 startDate=&endDate=&userIds=&ownerIds=&companyIds=&teams=&stages=&priorities=&industries=&sources=&activityTypes=
 ```
 
+### Pipeline Runtime
+
+| Method | Path                        | Description                                      |
+| ------ | --------------------------- | ------------------------------------------------ |
+| `GET`  | `/api/pipeline/stages`      | List active pipeline stages for opportunity UI   |
+| `GET`  | `/api/pipeline/transitions` | List configured stage transitions for runtime UI |
+
 ### Admin Permissions
 
 | Method   | Path                                              | Description                           |
@@ -614,6 +621,14 @@ Body: form-data → Key: file (Type: File)
 - Deactivating an in-use stage requires an active replacement and moves active opportunities with stage-history records; archived opportunities remain untouched.
 - Opportunity stage changes, terminal timestamps, reports, and filter options now use database-driven stages and ordering.
 - Existing broad `pipeline:config:*` and `pipeline:transition:*` permissions remain the enforced contract.
+
+### fix 000014 - Opportunity frontend contract helpers
+
+- Added runtime pipeline metadata endpoints: `GET /api/pipeline/stages` for active stages and `GET /api/pipeline/transitions` for configured transitions.
+- Extended pipeline report responses with opportunity-native summary fields while keeping legacy company-named fields for frontend compatibility.
+- Added stage IDs, labels, sort ordering, and terminal-aware won/lost metrics to pipeline summary, conversion, duration, and owner reports.
+- Returned frontend-friendly report filter options with `{ value, label }` shapes for users, owners, teams, industries, lead sources, stages, priorities, and activity types.
+- No Prisma schema, migration, seed, or permission changes were required.
 
 ---
 
