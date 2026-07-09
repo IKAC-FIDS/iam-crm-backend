@@ -45,6 +45,21 @@ export const envValidationSchema = Joi.object({
       'any.only': 'NODE_ENV باید یکی از مقادیر development, production, test باشد',
     }),
 
+  // ---------- CORS ----------
+  CORS_ORIGINS: Joi.string()
+    .default('http://localhost:5173')
+    .messages({
+      'string.base': 'CORS_ORIGINS باید یک رشته شامل originهای مجاز باشد',
+    }),
+
+  CORS_CREDENTIALS: Joi.boolean()
+    .truthy('true')
+    .falsy('false')
+    .default(false)
+    .messages({
+      'boolean.base': 'CORS_CREDENTIALS باید true یا false باشد',
+    }),
+
   // ---------- Rate Limiting (اختیاری) ----------
   THROTTLE_TTL: Joi.number()
     .default(60000)

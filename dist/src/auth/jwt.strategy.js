@@ -11,30 +11,30 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.JwtStrategy = void 0;
 const common_1 = require("@nestjs/common");
+const config_1 = require("@nestjs/config");
 const passport_1 = require("@nestjs/passport");
 const passport_jwt_1 = require("passport-jwt");
-const config_1 = require("@nestjs/config");
 let JwtStrategy = class JwtStrategy extends (0, passport_1.PassportStrategy)(passport_jwt_1.Strategy) {
     constructor(configService) {
         const secret = configService.get('JWT_SECRET');
-        console.log('JWT_SECRET in strategy:', secret);
+        if (!secret) {
+            throw new Error('JWT_SECRET is not configured');
+        }
         super({
             jwtFromRequest: passport_jwt_1.ExtractJwt.fromAuthHeaderAsBearerToken(),
             ignoreExpiration: false,
             secretOrKey: secret,
         });
-        this.configService = configService;
     }
     async validate(payload) {
-        console.log('✅ Validate called with payload:', payload);
-        if (!payload) {
+        if (!payload?.sub || !payload.email || !payload.role) {
             throw new common_1.UnauthorizedException('Invalid token payload');
         }
         return {
             userId: payload.sub,
             email: payload.email,
             role: payload.role,
-            team: payload.team || null
+            team: payload.team ?? null,
         };
     }
 };

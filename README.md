@@ -675,6 +675,16 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 - No Prisma schema, migration, seed, or API route changes were required.
 - Build/lint were not run in this environment because GitHub write access was unavailable and no local working tree was created.
 
+### fix 000017 - Add production-safe CORS configuration
+
+- Replaced unrestricted `app.enableCors()` with an environment-driven CORS configuration.
+- Added `CORS_ORIGINS` support for comma-separated allowed frontend origins.
+- Added `CORS_CREDENTIALS` support with a safe default of `false`.
+- Added Joi validation defaults for the new CORS environment variables.
+- Updated `.env.example` and `docker-compose.yml` with local development CORS defaults.
+- No Prisma schema, migration, seed, or API route changes were required.
+- Build/lint were not run in this environment because GitHub write access was unavailable and no local working tree was created.
+
 ---
 
 **Built with ❤️ for sales team**
