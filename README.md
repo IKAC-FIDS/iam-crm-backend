@@ -685,6 +685,16 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 - No Prisma schema, migration, seed, or API route changes were required.
 - Build/lint were not run in this environment because GitHub write access was unavailable and no local working tree was created.
 
+### fix 000018 - Add HTTP security headers with Helmet
+
+- Added Helmet middleware to apply standard HTTP security headers for the backend API.
+- Disabled Helmet Content Security Policy for now because the backend serves JSON APIs rather than browser-rendered pages.
+- Disabled Cross-Origin-Embedder-Policy to avoid unnecessary frontend integration issues for API, WebAuthn, and browser-based flows.
+- Preserved the production-safe CORS configuration from fix 000017.
+- Added the `helmet` dependency.
+- No Prisma schema, migration, seed, or API route changes were required.
+- Build/lint were not run in this environment because GitHub write access was unavailable and no local working tree was created.
+
 ---
 
 **Built with ❤️ for sales team**
