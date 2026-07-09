@@ -714,7 +714,19 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 - Added `BACKEND_PUBLIC_URL` environment configuration for OIDC redirect URI generation.
 - Added `openid-client` dependency.
 - No Prisma schema migration was required in this fix.
-- `npm run build` passed.
+
+### fix 000023 - Add SAML service-provider login
+
+- Added SAML service-provider login endpoint: `GET /api/auth/saml/:providerId/login`.
+- Added SAML Assertion Consumer Service endpoint: `POST /api/auth/saml/:providerId/acs`.
+- Added SAML service-provider metadata endpoint: `GET /api/auth/saml/:providerId/metadata`.
+- Added SAML response validation using the configured IdP X.509 certificate.
+- Added SAML user resolution through `ExternalIdentity`.
+- Added optional auto-provisioning of internal CRM users based on provider configuration.
+- Reused the existing one-time SSO ticket exchange flow.
+- Reused `AuthService.buildLoginResponse` indirectly through `POST /api/auth/sso/exchange`.
+- No Prisma schema migration was required because SAML provider fields already existed in the SSO foundation schema.
+- Added `@node-saml/node-saml` dependency.
 
 ---
 

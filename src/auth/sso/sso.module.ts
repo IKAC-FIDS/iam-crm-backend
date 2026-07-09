@@ -8,6 +8,8 @@ import { SsoPublicController } from './sso-public.controller';
 import { SsoProviderService } from './sso-provider.service';
 import { SsoSecretService } from './sso-secret.service';
 import { SsoTicketService } from './sso-ticket.service';
+import { SamlController } from './saml.controller';
+import { SamlService } from './saml.service';
 
 @Module({
   imports: [AuthModule],
@@ -15,6 +17,7 @@ import { SsoTicketService } from './sso-ticket.service';
     SsoPublicController,
     SsoAdminController,
     OidcController,
+    SamlController,
     SsoExchangeController,
   ],
   providers: [
@@ -22,12 +25,14 @@ import { SsoTicketService } from './sso-ticket.service';
     SsoSecretService,
     SsoTicketService,
     OidcService,
+    SamlService,
   ],
   exports: [
     SsoProviderService,
     SsoSecretService,
     SsoTicketService,
     OidcService,
+    SamlService,
   ],
 })
 export class SsoModule {}

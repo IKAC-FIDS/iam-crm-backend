@@ -17,6 +17,8 @@ const sso_public_controller_1 = require("./sso-public.controller");
 const sso_provider_service_1 = require("./sso-provider.service");
 const sso_secret_service_1 = require("./sso-secret.service");
 const sso_ticket_service_1 = require("./sso-ticket.service");
+const saml_controller_1 = require("./saml.controller");
+const saml_service_1 = require("./saml.service");
 let SsoModule = class SsoModule {
 };
 exports.SsoModule = SsoModule;
@@ -27,6 +29,7 @@ exports.SsoModule = SsoModule = __decorate([
             sso_public_controller_1.SsoPublicController,
             sso_admin_controller_1.SsoAdminController,
             oidc_controller_1.OidcController,
+            saml_controller_1.SamlController,
             sso_exchange_controller_1.SsoExchangeController,
         ],
         providers: [
@@ -34,12 +37,14 @@ exports.SsoModule = SsoModule = __decorate([
             sso_secret_service_1.SsoSecretService,
             sso_ticket_service_1.SsoTicketService,
             oidc_service_1.OidcService,
+            saml_service_1.SamlService,
         ],
         exports: [
             sso_provider_service_1.SsoProviderService,
             sso_secret_service_1.SsoSecretService,
             sso_ticket_service_1.SsoTicketService,
             oidc_service_1.OidcService,
+            saml_service_1.SamlService,
         ],
     })
 ], SsoModule);

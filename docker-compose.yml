@@ -16,13 +16,11 @@ services:
     restart: unless-stopped
     depends_on:
       - db
+    env_file:
+      - .env.docker
     environment:
       DATABASE_URL: "postgresql://iam_crm:changeme@db:5432/iam_crm?schema=public"
-      JWT_SECRET: "change-this-to-a-long-random-string"
-      JWT_EXPIRES_IN: "8h"
       PORT: 3000
-      CORS_ORIGINS: "http://localhost:5173"
-      CORS_CREDENTIALS: "false"
     ports:
       - "3000:3000"
     command: sh -c "npx prisma migrate deploy && node dist/src/main.js"

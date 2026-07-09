@@ -59,15 +59,30 @@ export class SsoSecretService {
     }
   }
 
-  private getKey(): Buffer {
-    const secret = this.config.get<string>('SSO_SECRET_ENCRYPTION_KEY');
+//   private getKey(): Buffer {
+//     const secret = this.config.get<string>('SSO_SECRET_ENCRYPTION_KEY');
+//
+//     if (!secret || secret.length < 32) {
+//       throw new InternalServerErrorException(
+//         'SSO secret encryption key is not configured',
+//       );
+//     }
+//
+//     return createHash('sha256').update(secret).digest();
+//   }
 
-    if (!secret || secret.length < 32) {
-      throw new InternalServerErrorException(
-        'SSO secret encryption key is not configured',
-      );
-    }
+private getKey(): Buffer {
+  const secret = this.config.get<string>('SSO_SECRET_ENCRYPTION_KEY');
 
-    return createHash('sha256').update(secret).digest();
+  console.log('SSO_SECRET_ENCRYPTION_KEY exists:', !!secret);
+  console.log('SSO_SECRET length:', secret?.length);
+
+  if (!secret || secret.length < 32) {
+    throw new InternalServerErrorException(
+      'SSO secret encryption key is not configured',
+    );
   }
+
+  return createHash('sha256').update(secret).digest();
+}
 }

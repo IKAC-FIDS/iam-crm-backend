@@ -56,6 +56,8 @@ let SsoSecretService = class SsoSecretService {
     }
     getKey() {
         const secret = this.config.get('SSO_SECRET_ENCRYPTION_KEY');
+        console.log('SSO_SECRET_ENCRYPTION_KEY exists:', !!secret);
+        console.log('SSO_SECRET length:', secret?.length);
         if (!secret || secret.length < 32) {
             throw new common_1.InternalServerErrorException('SSO secret encryption key is not configured');
         }
