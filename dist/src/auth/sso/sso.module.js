@@ -8,7 +8,11 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SsoModule = void 0;
 const common_1 = require("@nestjs/common");
+const auth_module_1 = require("../auth.module");
+const oidc_controller_1 = require("./oidc.controller");
+const oidc_service_1 = require("./oidc.service");
 const sso_admin_controller_1 = require("./sso-admin.controller");
+const sso_exchange_controller_1 = require("./sso-exchange.controller");
 const sso_public_controller_1 = require("./sso-public.controller");
 const sso_provider_service_1 = require("./sso-provider.service");
 const sso_secret_service_1 = require("./sso-secret.service");
@@ -18,9 +22,25 @@ let SsoModule = class SsoModule {
 exports.SsoModule = SsoModule;
 exports.SsoModule = SsoModule = __decorate([
     (0, common_1.Module)({
-        controllers: [sso_public_controller_1.SsoPublicController, sso_admin_controller_1.SsoAdminController],
-        providers: [sso_provider_service_1.SsoProviderService, sso_secret_service_1.SsoSecretService, sso_ticket_service_1.SsoTicketService],
-        exports: [sso_provider_service_1.SsoProviderService, sso_secret_service_1.SsoSecretService, sso_ticket_service_1.SsoTicketService],
+        imports: [auth_module_1.AuthModule],
+        controllers: [
+            sso_public_controller_1.SsoPublicController,
+            sso_admin_controller_1.SsoAdminController,
+            oidc_controller_1.OidcController,
+            sso_exchange_controller_1.SsoExchangeController,
+        ],
+        providers: [
+            sso_provider_service_1.SsoProviderService,
+            sso_secret_service_1.SsoSecretService,
+            sso_ticket_service_1.SsoTicketService,
+            oidc_service_1.OidcService,
+        ],
+        exports: [
+            sso_provider_service_1.SsoProviderService,
+            sso_secret_service_1.SsoSecretService,
+            sso_ticket_service_1.SsoTicketService,
+            oidc_service_1.OidcService,
+        ],
     })
 ], SsoModule);
 //# sourceMappingURL=sso.module.js.map

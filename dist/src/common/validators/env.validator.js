@@ -107,6 +107,12 @@ exports.envValidationSchema = Joi.object({
         .messages({
         'string.uri': 'FRONTEND_SSO_CALLBACK_URL باید یک URL معتبر باشد',
     }),
+    BACKEND_PUBLIC_URL: Joi.string()
+        .uri()
+        .default('http://localhost:3000')
+        .messages({
+        'string.uri': 'BACKEND_PUBLIC_URL باید یک URL معتبر باشد',
+    }),
     THROTTLE_TTL: Joi.number()
         .default(60000)
         .integer()

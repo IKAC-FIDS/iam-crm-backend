@@ -700,6 +700,22 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 - Added `sso-provider:view` and `sso-provider:manage` permissions for ADMIN.
 - Full OIDC login, SAML login, admin SSO APIs, and public provider endpoints are not implemented yet in this phase.
 - Prisma migration is required: `add_sso_relying_party_foundation`.
+
+### fix 000022 - Add OIDC relying-party login
+
+- Added OIDC login redirect endpoint: `GET /api/auth/oidc/:providerId/login`.
+- Added OIDC callback endpoint: `GET /api/auth/oidc/:providerId/callback`.
+- Added one-time SSO ticket exchange endpoint: `POST /api/auth/sso/exchange`.
+- Added OIDC state and nonce validation.
+- Added OIDC user resolution through `ExternalIdentity`.
+- Added optional auto-provisioning of internal CRM users based on provider configuration.
+- Added allowed-domain enforcement for auto-provisioned users.
+- Reused `AuthService.buildLoginResponse` for issuing the internal CRM JWT.
+- Added `BACKEND_PUBLIC_URL` environment configuration for OIDC redirect URI generation.
+- Added `openid-client` dependency.
+- No Prisma schema migration was required in this fix.
+- `npm run build` passed.
+
 ---
 
 **Built with ❤️ for sales team**
