@@ -665,6 +665,16 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 - Added WebAuthn RP config defaults and validation for `WEBAUTHN_RP_NAME`, `WEBAUTHN_RP_ID`, and `WEBAUTHN_ORIGIN`.
 - Added audit logs for passkey registration, deletion, admin deletion, login success, and login failure.
 
+### fix 000016 - Harden JWT strategy and production security logs
+
+- Removed unsafe runtime logging of `JWT_SECRET` from the JWT strategy.
+- Removed JWT payload console logging from token validation to avoid exposing user/session data in production logs.
+- Added a typed JWT payload shape for strategy validation.
+- Added explicit startup protection if `JWT_SECRET` is missing.
+- Preserved the existing JWT payload contract: `sub`, `email`, `role`, and optional `team`.
+- No Prisma schema, migration, seed, or API route changes were required.
+- Build/lint were not run in this environment because GitHub write access was unavailable and no local working tree was created.
+
 ---
 
 **Built with ❤️ for sales team**
