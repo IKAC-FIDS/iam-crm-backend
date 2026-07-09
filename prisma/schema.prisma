@@ -23,6 +23,11 @@ enum UserRole {
   BOARDS
 }
 
+enum SsoProviderType {
+  OIDC
+  SAML
+}
+
 enum LegacyPipelineStage {
   LEAD
   CONTACTED
@@ -108,6 +113,8 @@ model User {
   completedActivities     Activity[]                @relation("ActivityCompletedBy")
   stageChangesMade        PipelineStageHistory[]
   passkeys                UserPasskey[]
+  externalIdentities      ExternalIdentity[]
+  ssoLoginTickets         SsoLoginTicket[]
 
   @@map("users")
 }
@@ -129,6 +136,92 @@ model UserPasskey {
 
   @@index([userId])
   @@map("user_passkeys")
+}
+
+model SsoProvider {
+  id       String          @id @default(uuid())
+  name     String
+  type     SsoProviderType
+  isActive Boolean         @default(true)
+
+  autoProvision Boolean  @default(false)
+  defaultRole   UserRole?
+  allowedDomains String[] @default([])
+
+  // OIDC configuration
+  issuer           String?
+  clientId         String?
+  clientSecretEnc  String?
+  authorizationUrl String?
+  tokenUrl         String?
+  userInfoUrl      String?
+  jwksUrl          String?
+  scopes           String[] @default(["openid", "profile", "email"])
+
+  // SAML configuration
+  entityId             String?
+  ssoUrl               String?
+  x509Certificate      String?
+  signRequests         Boolean @default(false)
+  wantAssertionsSigned Boolean @default(true)
+  wantResponseSigned   Boolean @default(false)
+
+  // Attribute mapping
+  emailAttribute  String?
+  nameAttribute   String?
+  groupsAttribute String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  externalIdentities ExternalIdentity[]
+  loginTickets       SsoLoginTicket[]
+
+  @@index([type])
+  @@index([isActive])
+  @@map("sso_providers")
+}
+
+model ExternalIdentity {
+  id         String @id @default(uuid())
+  userId     String
+  providerId String
+
+  subject String
+  email   String?
+
+  user     User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider SsoProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([providerId, subject])
+  @@index([userId])
+  @@index([email])
+  @@map("external_identities")
+}
+
+model SsoLoginTicket {
+  id         String @id @default(uuid())
+  ticketHash String @unique
+
+  userId     String
+  providerId String?
+
+  expiresAt  DateTime
+  consumedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  user     User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider SsoProvider? @relation(fields: [providerId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([providerId])
+  @@index([expiresAt])
+  @@index([consumedAt])
+  @@map("sso_login_tickets")
 }
 
 // ============================================================

@@ -672,8 +672,6 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 - Added a typed JWT payload shape for strategy validation.
 - Added explicit startup protection if `JWT_SECRET` is missing.
 - Preserved the existing JWT payload contract: `sub`, `email`, `role`, and optional `team`.
-- No Prisma schema, migration, seed, or API route changes were required.
-- Build/lint were not run in this environment because GitHub write access was unavailable and no local working tree was created.
 
 ### fix 000017 - Add production-safe CORS configuration
 
@@ -682,8 +680,6 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 - Added `CORS_CREDENTIALS` support with a safe default of `false`.
 - Added Joi validation defaults for the new CORS environment variables.
 - Updated `.env.example` and `docker-compose.yml` with local development CORS defaults.
-- No Prisma schema, migration, seed, or API route changes were required.
-- Build/lint were not run in this environment because GitHub write access was unavailable and no local working tree was created.
 
 ### fix 000018 - Add HTTP security headers with Helmet
 
@@ -692,9 +688,18 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 - Disabled Cross-Origin-Embedder-Policy to avoid unnecessary frontend integration issues for API, WebAuthn, and browser-based flows.
 - Preserved the production-safe CORS configuration from fix 000017.
 - Added the `helmet` dependency.
-- No Prisma schema, migration, seed, or API route changes were required.
-- Build/lint were not run in this environment because GitHub write access was unavailable and no local working tree was created.
 
+### fix 000021 - Add SSO relying-party foundation
+
+- Added the initial Prisma foundation for SSO relying-party support.
+- Added `SsoProviderType` with `OIDC` and `SAML` provider types.
+- Added `SsoProvider` for external IdP configuration.
+- Added `ExternalIdentity` for mapping external IdP subjects to internal CRM users.
+- Added `SsoLoginTicket` for future one-time SSO callback ticket exchange.
+- Added SSO environment variables for secret encryption, ticket TTL, and frontend callback URL.
+- Added `sso-provider:view` and `sso-provider:manage` permissions for ADMIN.
+- Full OIDC login, SAML login, admin SSO APIs, and public provider endpoints are not implemented yet in this phase.
+- Prisma migration is required: `add_sso_relying_party_foundation`.
 ---
 
 **Built with ❤️ for sales team**

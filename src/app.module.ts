@@ -28,6 +28,7 @@ import { PipelineConfigModule } from './admin/pipeline/pipeline-config.module';
 import { AuditLogModule } from './audit-log/audit-log.module';
 import { OpportunitiesModule } from './opportunities/opportunities.module';
 import { PasskeysModule } from './auth/passkeys/passkeys.module';
+import { SsoModule } from './auth/sso/sso.module';
 
 @Module({
   imports: [
@@ -50,6 +51,7 @@ import { PasskeysModule } from './auth/passkeys/passkeys.module';
     }),
     PrismaModule,
     AuthModule,
+    SsoModule,
     UsersModule,
     CompaniesModule,
     PeopleModule,

@@ -37,6 +37,7 @@ const pipeline_config_module_1 = require("./admin/pipeline/pipeline-config.modul
 const audit_log_module_1 = require("./audit-log/audit-log.module");
 const opportunities_module_1 = require("./opportunities/opportunities.module");
 const passkeys_module_1 = require("./auth/passkeys/passkeys.module");
+const sso_module_1 = require("./auth/sso/sso.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -62,6 +63,7 @@ exports.AppModule = AppModule = __decorate([
             }),
             prisma_module_1.PrismaModule,
             auth_module_1.AuthModule,
+            sso_module_1.SsoModule,
             users_module_1.UsersModule,
             companies_module_1.CompaniesModule,
             people_module_1.PeopleModule,

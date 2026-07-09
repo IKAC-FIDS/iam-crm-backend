@@ -648,6 +648,8 @@ async function main() {
         { action: 'pipeline:config:manage', description: 'مدیریت مراحل پایپ‌لاین' },
         { action: 'pipeline:transition:view', description: 'مشاهده قوانین انتقال پایپ‌لاین' },
         { action: 'pipeline:transition:manage', description: 'مدیریت قوانین انتقال پایپ‌لاین' },
+        { action: 'sso-provider:view', description: 'مشاهده تنظیمات SSO Providerها', },
+        { action: 'sso-provider:manage', description: 'مدیریت تنظیمات SSO Providerها', },
     ];
     for (const permission of permissions) {
         await upsertPermission(permission);

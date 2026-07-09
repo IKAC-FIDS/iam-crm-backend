@@ -85,6 +85,28 @@ exports.envValidationSchema = Joi.object({
         .messages({
         'boolean.base': 'CORS_CREDENTIALS باید true یا false باشد',
     }),
+    SSO_SECRET_ENCRYPTION_KEY: Joi.string()
+        .min(32)
+        .optional()
+        .messages({
+        'string.base': 'SSO_SECRET_ENCRYPTION_KEY باید رشته باشد',
+        'string.min': 'SSO_SECRET_ENCRYPTION_KEY باید حداقل ۳۲ کاراکتر باشد',
+    }),
+    SSO_TICKET_TTL: Joi.number()
+        .default(120)
+        .integer()
+        .min(30)
+        .messages({
+        'number.base': 'SSO_TICKET_TTL باید یک عدد باشد',
+        'number.integer': 'SSO_TICKET_TTL باید عدد صحیح باشد',
+        'number.min': 'SSO_TICKET_TTL باید حداقل ۳۰ ثانیه باشد',
+    }),
+    FRONTEND_SSO_CALLBACK_URL: Joi.string()
+        .uri()
+        .default('http://localhost:5173/auth/sso/callback')
+        .messages({
+        'string.uri': 'FRONTEND_SSO_CALLBACK_URL باید یک URL معتبر باشد',
+    }),
     THROTTLE_TTL: Joi.number()
         .default(60000)
         .integer()
