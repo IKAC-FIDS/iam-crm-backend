@@ -75,7 +75,7 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], MyPasskeysController.prototype, "delete", null);
 exports.MyPasskeysController = MyPasskeysController = __decorate([
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, permissions_guard_1.PermissionsGuard),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     (0, common_1.Controller)('me/passkeys'),
     __metadata("design:paramtypes", [passkeys_service_1.PasskeysService])
 ], MyPasskeysController);

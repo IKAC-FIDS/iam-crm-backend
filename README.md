@@ -818,6 +818,28 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
   - `src/auth/passkeys/passkeys.controller.ts`
   - `prisma/seed.ts`
 
+### fix 000026 - Deprecate company pipeline mutation and enforce opportunity pipeline
+
+- Deprecated legacy company-stage mutation endpoint:
+  - `PATCH /api/companies/:id/stage`
+- Kept the deprecated endpoint available only to return `410 Gone` with migration guidance.
+- Removed company-stage mutation from `CompaniesService`.
+- Removed legacy `ChangeStageDto` for company-stage mutation.
+- Enforced opportunity pipeline as the only supported sales pipeline mutation path:
+  - `PATCH /api/opportunities/:id/stage`
+  - required permission: `opportunity:change-stage`
+- Kept legacy company pipeline fields as read-only compatibility fields:
+  - `Company.stage`
+  - `Company.priority`
+  - `Company.source`
+- Marked `company:change-stage` permission as deprecated in seed data.
+- No Prisma schema migration was required.
+- Important changed/new files:
+  - `src/companies/companies.controller.ts`
+  - `src/companies/companies.service.ts`
+  - `src/companies/dto/change-stage.dto.ts`
+  - `prisma/seed.ts`
+
 ---
 
 **Built with ❤️ for sales team**

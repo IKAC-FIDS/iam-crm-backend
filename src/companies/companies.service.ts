@@ -8,17 +8,18 @@ import { LegacyPipelineStage, Priority, Prisma, UserRole } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
-import { ChangeStageDto } from './dto/change-stage.dto';
 import { ChangeOwnerDto, BulkChangeOwnerDto } from './dto/change-owner.dto';
 import { CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { PaginationDto, PaginatedResponse } from '../common/dto/pagination.dto';
-import { PipelineConfigService } from '../admin/pipeline/pipeline-config.service';
 import { ArchiveCompanyDto } from './dto/archive-company.dto';
 import { AuditLogService } from '../audit-log/audit-log.service';
 
 @Injectable()
 export class CompaniesService {
-  constructor(private prisma: PrismaService, private pipelineConfig: PipelineConfigService, private audit: AuditLogService) {}
+  constructor(
+    private prisma: PrismaService,
+    private audit: AuditLogService,
+  ) {}
 
   // ============================================================
   // ۱. دریافت لیست شرکت‌ها (با فیلترهای پیشرفته + صفحه‌بندی)
@@ -213,39 +214,7 @@ export class CompaniesService {
   // ============================================================
   // ۵. تغییر مرحله پایپ‌لاین
   // ============================================================
-  async changeStage(id: string, dto: ChangeStageDto, user: CurrentUserPayload) {
-    // جلوگیری از تغییر مرحله توسط BOARDS
-    if (user.role === UserRole.BOARDS) {
-      throw new ForbiddenException('شما اجازه تغییر مرحله شرکت را ندارید');
-    }
 
-    const company = await this.prisma.company.findUnique({ where: { id } });
-
-    if (!company) throw new NotFoundException('شرکت پیدا نشد');
-
-    this.assertAccess(company, user);
-
-    await this.pipelineConfig.assertTransitionAllowedByCode(company.stage, dto.stage, user.role as UserRole);
-
-    const [updated] = await this.prisma.$transaction([
-      this.prisma.company.update({
-        where: { id },
-        data: { stage: dto.stage },
-      }),
-      this.prisma.pipelineStageHistory.create({
-        data: {
-          companyId: id,
-          fromStage: company.stage,
-          toStage: dto.stage,
-          changedById: user.userId,
-        },
-      }),
-    ]);
-
-    await this.audit.record({ actorId: user.userId, entityType: 'company', entityId: id, action: 'company.stage_changed', before: { stage: company.stage }, after: { stage: updated.stage } });
-
-    return updated;
-  }
 
   // ============================================================
   // ۶. تغییر مالکیت یک شرکت

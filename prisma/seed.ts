@@ -685,7 +685,7 @@ async function main() {
     { action: 'company:change-owner', description: 'تغییر مالک شرکت' },
     { action: 'company:assign-owner', description: 'مشاهده مالکان قابل تخصیص شرکت' },
     { action: 'company:bulk-change-owner', description: 'تغییر گروهی مالک شرکت‌ها' },
-    { action: 'company:change-stage', description: 'تغییر مرحله legacy شرکت' },
+    { action: 'company:change-stage', description: 'Deprecated: تغییر مرحله legacy شرکت - از opportunity:change-stage استفاده شود' },
 
     { action: 'opportunity:view', description: 'مشاهده فرصت‌ها' },
     { action: 'opportunity:create', description: 'ایجاد فرصت' },

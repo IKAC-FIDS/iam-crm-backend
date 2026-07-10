@@ -13,12 +13,10 @@ exports.CompaniesService = void 0;
 const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
 const prisma_service_1 = require("../prisma/prisma.service");
-const pipeline_config_service_1 = require("../admin/pipeline/pipeline-config.service");
 const audit_log_service_1 = require("../audit-log/audit-log.service");
 let CompaniesService = class CompaniesService {
-    constructor(prisma, pipelineConfig, audit) {
+    constructor(prisma, audit) {
         this.prisma = prisma;
-        this.pipelineConfig = pipelineConfig;
         this.audit = audit;
     }
     async findAll(user, pagination, filters) {
@@ -147,32 +145,6 @@ let CompaniesService = class CompaniesService {
             data: dto,
         });
         await this.audit.record({ actorId: user.userId, entityType: 'company', entityId: id, action: 'company.updated', before: company, after: updated });
-        return updated;
-    }
-    async changeStage(id, dto, user) {
-        if (user.role === client_1.UserRole.BOARDS) {
-            throw new common_1.ForbiddenException('شما اجازه تغییر مرحله شرکت را ندارید');
-        }
-        const company = await this.prisma.company.findUnique({ where: { id } });
-        if (!company)
-            throw new common_1.NotFoundException('شرکت پیدا نشد');
-        this.assertAccess(company, user);
-        await this.pipelineConfig.assertTransitionAllowedByCode(company.stage, dto.stage, user.role);
-        const [updated] = await this.prisma.$transaction([
-            this.prisma.company.update({
-                where: { id },
-                data: { stage: dto.stage },
-            }),
-            this.prisma.pipelineStageHistory.create({
-                data: {
-                    companyId: id,
-                    fromStage: company.stage,
-                    toStage: dto.stage,
-                    changedById: user.userId,
-                },
-            }),
-        ]);
-        await this.audit.record({ actorId: user.userId, entityType: 'company', entityId: id, action: 'company.stage_changed', before: { stage: company.stage }, after: { stage: updated.stage } });
         return updated;
     }
     async changeOwner(id, dto, user) {
@@ -326,6 +298,7 @@ let CompaniesService = class CompaniesService {
 exports.CompaniesService = CompaniesService;
 exports.CompaniesService = CompaniesService = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [prisma_service_1.PrismaService, pipeline_config_service_1.PipelineConfigService, audit_log_service_1.AuditLogService])
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService,
+        audit_log_service_1.AuditLogService])
 ], CompaniesService);
 //# sourceMappingURL=companies.service.js.map

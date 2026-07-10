@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  GoneException,
   Param,
   Patch,
   Post,
@@ -15,7 +16,6 @@ import { CurrentUser, CurrentUserPayload } from '../common/decorators/current-us
 import { CompaniesService } from './companies.service';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
-import { ChangeStageDto } from './dto/change-stage.dto';
 import { ChangeOwnerDto, BulkChangeOwnerDto } from './dto/change-owner.dto';
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { FindCompaniesDto } from './dto/find-companies.dto';
@@ -69,13 +69,15 @@ export class CompaniesController {
   }
 
   @Patch(':id/stage')
-  @Permissions('company:change-stage')
-  changeStage(
-    @Param('id') id: string,
-    @Body() dto: ChangeStageDto,
-    @CurrentUser() user: CurrentUserPayload,
-  ) {
-    return this.companiesService.changeStage(id, dto, user);
+  @Permissions('company:view')
+  changeStageDeprecated(@Param('id') id: string) {
+    throw new GoneException({
+      message:
+        'Company pipeline mutation is deprecated. Use opportunity pipeline instead.',
+      deprecatedEndpoint: `/api/companies/${id}/stage`,
+      replacementEndpoint: '/api/opportunities/:id/stage',
+      replacementPermission: 'opportunity:change-stage',
+    });
   }
 
   @Patch(':id/archive')
