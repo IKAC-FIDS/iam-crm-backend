@@ -430,8 +430,13 @@ model PersonContact {
   personId String
   person   Person @relation(fields: [personId], references: [id], onDelete: Cascade)
 
-  type      String // MOBILE, WORK, HOME, INTERNAL, PERSONAL_EMAIL, WORK_EMAIL, OTHER_EMAIL
-  value     String // شماره تلفن یا آدرس ایمیل
+  typeOptionId String?
+  typeOption   LookupOption? @relation("PersonContactTypeOption", fields: [typeOptionId], references: [id], onDelete: SetNull)
+
+  // Deprecated compatibility snapshot. New writes should resolve from LookupOption(group = contact_types).
+  type String
+
+  value     String
   isPrimary Boolean @default(false)
   note      String?
 
@@ -441,6 +446,7 @@ model PersonContact {
   @@unique([personId, type, value])
   @@index([personId])
   @@index([type])
+  @@index([typeOptionId])
   @@map("person_contacts")
 }
 
@@ -453,8 +459,13 @@ model PersonSocial {
   personId String
   person   Person @relation(fields: [personId], references: [id], onDelete: Cascade)
 
-  platform  String // TELEGRAM, WHATSAPP, INSTAGRAM, LINKEDIN, TWITTER, YOUTUBE, ...
-  handle    String // نام کاربری یا لینک پروفایل
+  platformOptionId String?
+  platformOption   LookupOption? @relation("PersonSocialPlatformOption", fields: [platformOptionId], references: [id], onDelete: SetNull)
+
+  // Deprecated compatibility snapshot. New writes should resolve from LookupOption(group = social_types).
+  platform String
+
+  handle    String
   isPrimary Boolean @default(false)
   note      String?
 
@@ -464,6 +475,7 @@ model PersonSocial {
   @@unique([personId, platform, handle])
   @@index([personId])
   @@index([platform])
+  @@index([platformOptionId])
   @@map("person_socials")
 }
 
@@ -718,6 +730,9 @@ model LookupOption {
   sortOrder   Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  personContactTypes    PersonContact[] @relation("PersonContactTypeOption")
+  personSocialPlatforms PersonSocial[]  @relation("PersonSocialPlatformOption")
 
   @@unique([group, code])
   @@index([group])

@@ -81,8 +81,24 @@ let PeopleService = class PeopleService {
                     id: true, companyId: true, fullName: true, title: true, department: true, personaTag: true,
                     email: true, phone: true, isPrimaryContact: true, createdAt: true, updatedAt: true,
                     company: { select: { id: true, legalName: true, brandName: true, owner: { select: { id: true, fullName: true, email: true, team: true } } } },
-                    contacts: { select: { id: true, type: true, value: true, isPrimary: true }, orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }] },
-                    socials: { select: { id: true, platform: true, handle: true } },
+                    contacts: {
+                        select: {
+                            id: true,
+                            type: true,
+                            typeOption: true,
+                            value: true,
+                            isPrimary: true,
+                        },
+                        orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+                    },
+                    socials: {
+                        select: {
+                            id: true,
+                            platform: true,
+                            platformOption: true,
+                            handle: true,
+                        },
+                    },
                 },
                 orderBy: [{ fullName: 'asc' }, { createdAt: 'desc' }],
                 skip: (page - 1) * limit,
@@ -147,29 +163,55 @@ let PeopleService = class PeopleService {
     async create(dto, user) {
         await this.validateCompanyAccess(dto.companyId, user);
         const { contacts, socials, ...personData } = dto;
+        const normalizedContacts = await Promise.all((contacts ?? []).map(async (contact) => {
+            const normalizedType = await this.resolveContactTypeReference(contact.typeOptionId, contact.type, true);
+            const value = contact.value.trim();
+            if (!value) {
+                throw new common_1.BadRequestException('مقدار تماس الزامی است');
+            }
+            return {
+                typeOptionId: normalizedType.typeOptionId,
+                type: normalizedType.typeCode,
+                value,
+                isPrimary: contact.isPrimary ?? false,
+                note: contact.note?.trim() || undefined,
+            };
+        }));
+        const normalizedSocials = await Promise.all((socials ?? []).map(async (social) => {
+            const normalizedPlatform = await this.resolveSocialPlatformReference(social.platformOptionId, social.platform, true);
+            const handle = social.handle.trim();
+            if (!handle) {
+                throw new common_1.BadRequestException('شناسه یا لینک شبکه اجتماعی الزامی است');
+            }
+            return {
+                platformOptionId: normalizedPlatform.platformOptionId,
+                platform: normalizedPlatform.platformCode,
+                handle,
+                isPrimary: social.isPrimary ?? false,
+                note: social.note?.trim() || undefined,
+            };
+        }));
         return this.prisma.person.create({
             data: {
                 ...personData,
                 contacts: {
-                    create: contacts?.map(c => ({
-                        type: c.type,
-                        value: c.value,
-                        isPrimary: c.isPrimary || false,
-                        note: c.note,
-                    })) || [],
+                    create: normalizedContacts,
                 },
                 socials: {
-                    create: socials?.map(s => ({
-                        platform: s.platform,
-                        handle: s.handle,
-                        isPrimary: s.isPrimary || false,
-                        note: s.note,
-                    })) || [],
+                    create: normalizedSocials,
                 },
             },
             include: {
-                contacts: true,
-                socials: true,
+                contacts: {
+                    include: {
+                        typeOption: true,
+                    },
+                },
+                socials: {
+                    include: {
+                        platformOption: true,
+                    },
+                },
             },
         });
     }
@@ -221,6 +263,116 @@ let PeopleService = class PeopleService {
         if (user.role === client_1.UserRole.BOARDS) {
             throw new common_1.ForbiddenException('شما دسترسی به مخاطبین را ندارید');
         }
+    }
+    async resolveContactTypeReference(typeOptionId, type, required = false) {
+        if (typeOptionId) {
+            const option = await this.prisma.lookupOption.findFirst({
+                where: {
+                    id: typeOptionId,
+                    group: 'contact_types',
+                    isActive: true,
+                },
+            });
+            if (!option) {
+                throw new common_1.BadRequestException('نوع تماس انتخاب‌شده معتبر یا فعال نیست');
+            }
+            return {
+                typeOptionId: option.id,
+                typeCode: option.code,
+            };
+        }
+        const normalizedType = type?.trim();
+        if (normalizedType) {
+            const option = await this.prisma.lookupOption.findFirst({
+                where: {
+                    group: 'contact_types',
+                    isActive: true,
+                    OR: [
+                        {
+                            code: {
+                                equals: normalizedType,
+                                mode: 'insensitive',
+                            },
+                        },
+                        {
+                            label: {
+                                equals: normalizedType,
+                                mode: 'insensitive',
+                            },
+                        },
+                    ],
+                },
+            });
+            if (!option) {
+                throw new common_1.BadRequestException('نوع تماس باید از گزینه‌های پایه contact_types انتخاب شود. مقدار متنی آزاد مجاز نیست');
+            }
+            return {
+                typeOptionId: option.id,
+                typeCode: option.code,
+            };
+        }
+        if (required) {
+            throw new common_1.BadRequestException('typeOptionId یا type الزامی است');
+        }
+        return {
+            typeOptionId: null,
+            typeCode: '',
+        };
+    }
+    async resolveSocialPlatformReference(platformOptionId, platform, required = false) {
+        if (platformOptionId) {
+            const option = await this.prisma.lookupOption.findFirst({
+                where: {
+                    id: platformOptionId,
+                    group: 'social_types',
+                    isActive: true,
+                },
+            });
+            if (!option) {
+                throw new common_1.BadRequestException('پلتفرم انتخاب‌شده معتبر یا فعال نیست');
+            }
+            return {
+                platformOptionId: option.id,
+                platformCode: option.code,
+            };
+        }
+        const normalizedPlatform = platform?.trim();
+        if (normalizedPlatform) {
+            const option = await this.prisma.lookupOption.findFirst({
+                where: {
+                    group: 'social_types',
+                    isActive: true,
+                    OR: [
+                        {
+                            code: {
+                                equals: normalizedPlatform,
+                                mode: 'insensitive',
+                            },
+                        },
+                        {
+                            label: {
+                                equals: normalizedPlatform,
+                                mode: 'insensitive',
+                            },
+                        },
+                    ],
+                },
+            });
+            if (!option) {
+                throw new common_1.BadRequestException('پلتفرم باید از گزینه‌های پایه social_types انتخاب شود. مقدار متنی آزاد مجاز نیست');
+            }
+            return {
+                platformOptionId: option.id,
+                platformCode: option.code,
+            };
+        }
+        if (required) {
+            throw new common_1.BadRequestException('platformOptionId یا platform الزامی است');
+        }
+        return {
+            platformOptionId: null,
+            platformCode: '',
+        };
     }
 };
 exports.PeopleService = PeopleService;

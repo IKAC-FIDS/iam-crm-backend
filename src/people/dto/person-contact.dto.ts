@@ -1,8 +1,23 @@
-import { IsString, IsOptional, IsBoolean, IsUUID } from 'class-validator';
+import {
+  IsBoolean,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from 'class-validator';
 
 export class CreatePersonContactDto {
+  @IsOptional()
+  @IsUUID()
+  typeOptionId?: string;
+
+  /**
+   * Deprecated compatibility input.
+   * Prefer typeOptionId.
+   * If sent, it must match LookupOption.code or LookupOption.label in group = contact_types.
+   */
+  @IsOptional()
   @IsString()
-  type!: string; // MOBILE, WORK, PERSONAL_EMAIL, ...
+  type?: string;
 
   @IsString()
   value!: string;
@@ -17,6 +32,14 @@ export class CreatePersonContactDto {
 }
 
 export class UpdatePersonContactDto {
+  @IsOptional()
+  @IsUUID()
+  typeOptionId?: string;
+
+  /**
+   * Deprecated compatibility input.
+   * Prefer typeOptionId.
+   */
   @IsOptional()
   @IsString()
   type?: string;

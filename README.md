@@ -867,6 +867,34 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
   - `src/companies/companies.controller.ts`
   - `src/companies/companies.service.ts`
 
+### fix 000028 - Complete person contact/social normalization
+
+- Added normalized lookup references for person contacts and socials:
+  - `PersonContact.typeOptionId` -> `LookupOption(group = contact_types)`
+  - `PersonSocial.platformOptionId` -> `LookupOption(group = social_types)`
+- Kept legacy string snapshots for backward compatibility:
+  - `PersonContact.type`
+  - `PersonSocial.platform`
+- Updated contact/social DTOs to accept normalized lookup IDs:
+  - `typeOptionId`
+  - `platformOptionId`
+- Kept legacy `type` and `platform` inputs as compatibility fields when they match active lookup options.
+- Rejected free-text contact types and social platforms that do not exist in lookup options.
+- Updated contact/social create and update flows to resolve lookup references and store canonical codes.
+- Updated person detail and directory responses to include lookup reference metadata:
+  - `typeOption`
+  - `platformOption`
+- Added migration backfill from existing string values to lookup references.
+- No role or permission changes were required.
+- Important changed/new files:
+  - `prisma/schema.prisma`
+  - `src/people/dto/person-contact.dto.ts`
+  - `src/people/dto/person-social.dto.ts`
+  - `src/person-contacts/person-contacts.service.ts`
+  - `src/person-socials/person-socials.service.ts`
+  - `src/people/people.service.ts`
+
+
 ---
 
 **Built with ❤️ for sales team**

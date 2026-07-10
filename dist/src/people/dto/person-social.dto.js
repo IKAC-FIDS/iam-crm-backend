@@ -15,6 +15,12 @@ class CreatePersonSocialDto {
 }
 exports.CreatePersonSocialDto = CreatePersonSocialDto;
 __decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsUUID)(),
+    __metadata("design:type", String)
+], CreatePersonSocialDto.prototype, "platformOptionId", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], CreatePersonSocialDto.prototype, "platform", void 0);
@@ -35,6 +41,11 @@ __decorate([
 class UpdatePersonSocialDto {
 }
 exports.UpdatePersonSocialDto = UpdatePersonSocialDto;
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsUUID)(),
+    __metadata("design:type", String)
+], UpdatePersonSocialDto.prototype, "platformOptionId", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),

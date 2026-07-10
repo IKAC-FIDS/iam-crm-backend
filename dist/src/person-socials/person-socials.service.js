@@ -11,8 +11,8 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.PersonSocialsService = void 0;
 const common_1 = require("@nestjs/common");
-const prisma_service_1 = require("../prisma/prisma.service");
 const client_1 = require("@prisma/client");
+const prisma_service_1 = require("../prisma/prisma.service");
 let PersonSocialsService = class PersonSocialsService {
     constructor(prisma) {
         this.prisma = prisma;
@@ -20,7 +20,14 @@ let PersonSocialsService = class PersonSocialsService {
     async validatePersonAccess(personId, user) {
         const person = await this.prisma.person.findUnique({
             where: { id: personId },
-            include: { company: { select: { ownerId: true, owner: { select: { team: true } } } } },
+            include: {
+                company: {
+                    select: {
+                        ownerId: true,
+                        owner: { select: { team: true } },
+                    },
+                },
+            },
         });
         if (!person)
             throw new common_1.NotFoundException('مخاطب پیدا نشد');
@@ -42,6 +49,12 @@ let PersonSocialsService = class PersonSocialsService {
     }
     async create(personId, dto, user) {
         await this.validatePersonAccess(personId, user);
+        const normalizedPlatform = await this.resolveSocialPlatformReference(dto.platformOptionId, dto.platform, true);
+        const handle = dto.handle.trim();
+        if (!handle) {
+            throw new common_1.BadRequestException('شناسه یا لینک شبکه اجتماعی الزامی است');
+        }
+        await this.assertNoDuplicateSocial(personId, normalizedPlatform.platformOptionId, normalizedPlatform.platformCode, handle);
         if (dto.isPrimary) {
             await this.prisma.personSocial.updateMany({
                 where: { personId, isPrimary: true },
@@ -51,10 +64,14 @@ let PersonSocialsService = class PersonSocialsService {
         return this.prisma.personSocial.create({
             data: {
                 personId,
-                platform: dto.platform,
-                handle: dto.handle,
-                isPrimary: dto.isPrimary || false,
-                note: dto.note,
+                platformOptionId: normalizedPlatform.platformOptionId,
+                platform: normalizedPlatform.platformCode,
+                handle,
+                isPrimary: dto.isPrimary ?? false,
+                note: dto.note?.trim() || undefined,
+            },
+            include: {
+                platformOption: true,
             },
         });
     }
@@ -62,13 +79,23 @@ let PersonSocialsService = class PersonSocialsService {
         await this.validatePersonAccess(personId, user);
         return this.prisma.personSocial.findMany({
             where: { personId },
-            orderBy: { platform: 'asc' },
+            include: {
+                platformOption: true,
+            },
+            orderBy: [
+                { isPrimary: 'desc' },
+                { platform: 'asc' },
+                { createdAt: 'asc' },
+            ],
         });
     }
     async findOne(id, user) {
         const social = await this.prisma.personSocial.findUnique({
             where: { id },
-            include: { person: true },
+            include: {
+                person: true,
+                platformOption: true,
+            },
         });
         if (!social)
             throw new common_1.NotFoundException('شبکه اجتماعی پیدا نشد');
@@ -78,20 +105,59 @@ let PersonSocialsService = class PersonSocialsService {
     async update(id, dto, user) {
         const social = await this.prisma.personSocial.findUnique({
             where: { id },
-            include: { person: true },
+            include: {
+                person: true,
+                platformOption: true,
+            },
         });
         if (!social)
             throw new common_1.NotFoundException('شبکه اجتماعی پیدا نشد');
         await this.validatePersonAccess(social.personId, user);
+        const updateData = {};
+        let nextPlatformOptionId = social.platformOptionId;
+        let nextPlatformCode = social.platform;
+        let nextHandle = social.handle;
+        if (dto.platformOptionId !== undefined || dto.platform !== undefined) {
+            const normalizedPlatform = await this.resolveSocialPlatformReference(dto.platformOptionId, dto.platform, true);
+            nextPlatformOptionId = normalizedPlatform.platformOptionId;
+            nextPlatformCode = normalizedPlatform.platformCode;
+            updateData.platformOptionId = normalizedPlatform.platformOptionId;
+            updateData.platform = normalizedPlatform.platformCode;
+        }
+        if (dto.handle !== undefined) {
+            nextHandle = dto.handle.trim();
+            if (!nextHandle) {
+                throw new common_1.BadRequestException('شناسه یا لینک شبکه اجتماعی الزامی است');
+            }
+            updateData.handle = nextHandle;
+        }
+        if (dto.isPrimary !== undefined) {
+            updateData.isPrimary = dto.isPrimary;
+        }
+        if (dto.note !== undefined) {
+            updateData.note = dto.note?.trim() || null;
+        }
+        if (dto.platformOptionId !== undefined ||
+            dto.platform !== undefined ||
+            dto.handle !== undefined) {
+            await this.assertNoDuplicateSocial(social.personId, nextPlatformOptionId, nextPlatformCode, nextHandle, id);
+        }
         if (dto.isPrimary) {
             await this.prisma.personSocial.updateMany({
-                where: { personId: social.personId, isPrimary: true },
+                where: {
+                    personId: social.personId,
+                    isPrimary: true,
+                    NOT: { id },
+                },
                 data: { isPrimary: false },
             });
         }
         return this.prisma.personSocial.update({
             where: { id },
-            data: dto,
+            data: updateData,
+            include: {
+                platformOption: true,
+            },
         });
     }
     async remove(id, user) {
@@ -105,6 +171,77 @@ let PersonSocialsService = class PersonSocialsService {
         return this.prisma.personSocial.delete({
             where: { id },
         });
+    }
+    async resolveSocialPlatformReference(platformOptionId, platform, required = false) {
+        if (platformOptionId) {
+            const option = await this.prisma.lookupOption.findFirst({
+                where: {
+                    id: platformOptionId,
+                    group: 'social_types',
+                    isActive: true,
+                },
+            });
+            if (!option) {
+                throw new common_1.BadRequestException('پلتفرم انتخاب‌شده معتبر یا فعال نیست');
+            }
+            return {
+                platformOptionId: option.id,
+                platformCode: option.code,
+            };
+        }
+        const normalizedPlatform = platform?.trim();
+        if (normalizedPlatform) {
+            const option = await this.prisma.lookupOption.findFirst({
+                where: {
+                    group: 'social_types',
+                    isActive: true,
+                    OR: [
+                        {
+                            code: {
+                                equals: normalizedPlatform,
+                                mode: 'insensitive',
+                            },
+                        },
+                        {
+                            label: {
+                                equals: normalizedPlatform,
+                                mode: 'insensitive',
+                            },
+                        },
+                    ],
+                },
+            });
+            if (!option) {
+                throw new common_1.BadRequestException('پلتفرم باید از گزینه‌های پایه social_types انتخاب شود. مقدار متنی آزاد مجاز نیست');
+            }
+            return {
+                platformOptionId: option.id,
+                platformCode: option.code,
+            };
+        }
+        if (required) {
+            throw new common_1.BadRequestException('platformOptionId یا platform الزامی است');
+        }
+        return {
+            platformOptionId: null,
+            platformCode: '',
+        };
+    }
+    async assertNoDuplicateSocial(personId, platformOptionId, platformCode, handle, excludeId) {
+        const duplicate = await this.prisma.personSocial.findFirst({
+            where: {
+                personId,
+                handle,
+                OR: [
+                    ...(platformOptionId ? [{ platformOptionId }] : []),
+                    { platform: platformCode },
+                ],
+                ...(excludeId ? { NOT: { id: excludeId } } : {}),
+            },
+        });
+        if (duplicate) {
+            throw new common_1.BadRequestException('این شبکه اجتماعی برای این مخاطب قبلاً ثبت شده است');
+        }
     }
 };
 exports.PersonSocialsService = PersonSocialsService;

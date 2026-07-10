@@ -15,6 +15,12 @@ class CreatePersonContactDto {
 }
 exports.CreatePersonContactDto = CreatePersonContactDto;
 __decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsUUID)(),
+    __metadata("design:type", String)
+], CreatePersonContactDto.prototype, "typeOptionId", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], CreatePersonContactDto.prototype, "type", void 0);
@@ -35,6 +41,11 @@ __decorate([
 class UpdatePersonContactDto {
 }
 exports.UpdatePersonContactDto = UpdatePersonContactDto;
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsUUID)(),
+    __metadata("design:type", String)
+], UpdatePersonContactDto.prototype, "typeOptionId", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
