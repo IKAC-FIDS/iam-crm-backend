@@ -32,6 +32,7 @@ import { SsoModule } from './auth/sso/sso.module';
 import { HealthModule } from './health/health.module';
 import { ProductCatalogModule } from './product-catalog/product-catalog.module';
 import { AttachmentsModule } from './attachments/attachments.module';
+import { TasksModule } from './tasks/tasks.module';
 
 @Module({
   imports: [
@@ -80,6 +81,7 @@ import { AttachmentsModule } from './attachments/attachments.module';
     PasskeysModule,
     ProductCatalogModule,
     AttachmentsModule,
+    TasksModule,
   ],
   providers: [
     {

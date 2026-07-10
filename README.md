@@ -1249,6 +1249,96 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
   - `docker-compose.yml`
   - `.gitignore`
 
+### fix 000036 - Add dedicated task management
+
+- Added dedicated task management separate from activity follow-ups.
+- Added `TaskStatus` enum:
+  - `TODO`
+  - `IN_PROGRESS`
+  - `DONE`
+  - `CANCELLED`
+- Added `Task` model with:
+  - title
+  - description
+  - status
+  - priority
+  - due date
+  - reminder date
+  - assignment
+  - creator
+  - completion metadata
+  - cancellation metadata
+- Added task links to CRM entities:
+  - company
+  - person
+  - opportunity
+  - commercial document
+  - payment
+- Added task relations to:
+  - `User`
+  - `Company`
+  - `Person`
+  - `Opportunity`
+  - `OpportunityCommercialDocument`
+  - `OpportunityPayment`
+- Added task APIs:
+  - `GET /api/tasks`
+  - `POST /api/tasks`
+  - `GET /api/tasks/:id`
+  - `PATCH /api/tasks/:id`
+  - `PATCH /api/tasks/:id/status`
+  - `PATCH /api/tasks/:id/assign`
+  - `PATCH /api/tasks/:id/complete`
+  - `PATCH /api/tasks/:id/reschedule`
+  - `DELETE /api/tasks/:id`
+- Added task filters:
+  - status
+  - priority
+  - assigned user
+  - creator
+  - company
+  - person
+  - opportunity
+  - commercial document
+  - payment
+  - due date range
+  - search
+- Added scoped task visibility by role:
+  - ADMIN can access all tasks.
+  - MANAGER can access team-related tasks.
+  - REP can access assigned, created, and owned-entity tasks.
+  - BOARDS can view tasks only.
+- Added task audit logs for:
+  - create
+  - update
+  - status change
+  - assign
+  - complete
+  - reschedule
+  - delete
+- Added task permissions:
+  - `task:view`
+  - `task:create`
+  - `task:update`
+  - `task:assign`
+  - `task:complete`
+  - `task:delete`
+- Updated opportunity detail response to include task count and task list.
+- Important changed/new files:
+  - `prisma/schema.prisma`
+  - `prisma/seed.ts`
+  - `src/tasks/dto/create-task.dto.ts`
+  - `src/tasks/dto/update-task.dto.ts`
+  - `src/tasks/dto/find-tasks.dto.ts`
+  - `src/tasks/dto/change-task-status.dto.ts`
+  - `src/tasks/dto/assign-task.dto.ts`
+  - `src/tasks/dto/complete-task.dto.ts`
+  - `src/tasks/dto/reschedule-task.dto.ts`
+  - `src/tasks/tasks.controller.ts`
+  - `src/tasks/tasks.service.ts`
+  - `src/tasks/tasks.module.ts`
+  - `src/opportunities/opportunities.service.ts`
+
 ---
 
 **Built with ❤️ for sales team**

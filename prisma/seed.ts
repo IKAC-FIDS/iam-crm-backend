@@ -756,6 +756,13 @@ async function main() {
 
     { action: 'attachment:view', description: 'مشاهده فایل‌های پیوست' },
     { action: 'attachment:manage', description: 'مدیریت فایل‌های پیوست' },
+
+    { action: 'task:view', description: 'مشاهده کارها' },
+    { action: 'task:create', description: 'ایجاد کار' },
+    { action: 'task:update', description: 'ویرایش و زمان‌بندی مجدد کار' },
+    { action: 'task:assign', description: 'ارجاع کار به کاربر دیگر' },
+    { action: 'task:complete', description: 'تکمیل کار' },
+    { action: 'task:delete', description: 'حذف کار' },
   ];
 
   for (const permission of permissions) {
@@ -830,6 +837,13 @@ async function main() {
 
     'attachment:view',
     'attachment:manage',
+
+    'task:view',
+    'task:create',
+    'task:update',
+    'task:assign',
+    'task:complete',
+    'task:delete',
   ];
 
   const repActions = [
@@ -879,6 +893,11 @@ async function main() {
 
     'attachment:view',
     'attachment:manage',
+
+    'task:view',
+    'task:create',
+    'task:update',
+    'task:complete',
   ];
 
   const boardsActions = [
@@ -896,6 +915,8 @@ async function main() {
     'payment:view',
 
     'attachment:view',
+
+    'task:view',
   ];
 
   await syncRolePermissions(UserRole.ADMIN, allActions);

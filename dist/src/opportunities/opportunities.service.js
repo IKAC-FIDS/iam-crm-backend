@@ -48,6 +48,7 @@ const opportunityInclude = {
             lineItems: true,
             commercialDocuments: true,
             payments: true,
+            tasks: true,
         },
     },
     commercialDocuments: {
@@ -182,6 +183,68 @@ let OpportunitiesService = class OpportunitiesService {
                     orderBy: [
                         { sortOrder: 'asc' },
                         { createdAt: 'asc' },
+                    ],
+                },
+                commercialDocuments: {
+                    orderBy: [
+                        { createdAt: 'desc' },
+                    ],
+                    include: {
+                        payments: {
+                            select: {
+                                id: true,
+                                status: true,
+                                amount: true,
+                                currency: true,
+                                dueDate: true,
+                                paidAt: true,
+                                method: true,
+                                referenceNumber: true,
+                            },
+                            orderBy: {
+                                createdAt: 'desc',
+                            },
+                        },
+                    },
+                },
+                payments: {
+                    orderBy: [
+                        { createdAt: 'desc' },
+                    ],
+                    include: {
+                        commercialDocument: {
+                            select: {
+                                id: true,
+                                type: true,
+                                status: true,
+                                number: true,
+                                title: true,
+                            },
+                        },
+                    },
+                },
+                tasks: {
+                    include: {
+                        assignedTo: {
+                            select: {
+                                id: true,
+                                fullName: true,
+                                email: true,
+                                role: true,
+                                team: true,
+                            },
+                        },
+                        createdBy: {
+                            select: {
+                                id: true,
+                                fullName: true,
+                                email: true,
+                            },
+                        },
+                    },
+                    orderBy: [
+                        { dueAt: 'asc' },
+                        { createdAt: 'desc' },
                     ],
                 },
             },

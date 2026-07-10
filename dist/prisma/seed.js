@@ -663,6 +663,12 @@ async function main() {
         { action: 'payment:manage', description: 'مدیریت پرداخت‌های فرصت فروش' },
         { action: 'attachment:view', description: 'مشاهده فایل‌های پیوست' },
         { action: 'attachment:manage', description: 'مدیریت فایل‌های پیوست' },
+        { action: 'task:view', description: 'مشاهده کارها' },
+        { action: 'task:create', description: 'ایجاد کار' },
+        { action: 'task:update', description: 'ویرایش و زمان‌بندی مجدد کار' },
+        { action: 'task:assign', description: 'ارجاع کار به کاربر دیگر' },
+        { action: 'task:complete', description: 'تکمیل کار' },
+        { action: 'task:delete', description: 'حذف کار' },
     ];
     for (const permission of permissions) {
         await upsertPermission(permission);
@@ -720,6 +726,12 @@ async function main() {
         'payment:manage',
         'attachment:view',
         'attachment:manage',
+        'task:view',
+        'task:create',
+        'task:update',
+        'task:assign',
+        'task:complete',
+        'task:delete',
     ];
     const repActions = [
         'company:view',
@@ -759,6 +771,10 @@ async function main() {
         'payment:manage',
         'attachment:view',
         'attachment:manage',
+        'task:view',
+        'task:create',
+        'task:update',
+        'task:complete',
     ];
     const boardsActions = [
         'report:view',
@@ -772,6 +788,7 @@ async function main() {
         'commercial-document:view',
         'payment:view',
         'attachment:view',
+        'task:view',
     ];
     await syncRolePermissions(client_1.UserRole.ADMIN, allActions);
     await syncRolePermissions(client_1.UserRole.MANAGER, managerActions);

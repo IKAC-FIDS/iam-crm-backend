@@ -18,37 +18,38 @@ import { UpdateOpportunityDto } from './dto/update-opportunity.dto';
 
 const opportunityInclude = {
   company: {
-    select: {
-      id: true,
-      legalName: true,
-      brandName: true,
-      industry: true,
+      select: {
+        id: true,
+        legalName: true,
+        brandName: true,
+        industry: true,
+      },
     },
-  },
-  owner: {
-    select: {
-      id: true,
-      fullName: true,
-      email: true,
-      team: true,
+    owner: {
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+        team: true,
+      },
     },
-  },
-  stage: {
-    select: {
-      id: true,
-      code: true,
-      label: true,
-      sortOrder: true,
-      color: true,
-      isTerminal: true,
-      terminalType: true,
+    stage: {
+      select: {
+        id: true,
+        code: true,
+        label: true,
+        sortOrder: true,
+        color: true,
+        isTerminal: true,
+        terminalType: true,
+      },
     },
-  },
-  _count: {
+    _count: {
       select: {
         lineItems: true,
         commercialDocuments: true,
         payments: true,
+        tasks: true,
       },
     },
 commercialDocuments: {
@@ -199,6 +200,71 @@ export class OpportunitiesService {
           orderBy: [
             { sortOrder: 'asc' },
             { createdAt: 'asc' },
+          ],
+        },
+
+        commercialDocuments: {
+          orderBy: [
+            { createdAt: 'desc' },
+          ],
+          include: {
+            payments: {
+              select: {
+                id: true,
+                status: true,
+                amount: true,
+                currency: true,
+                dueDate: true,
+                paidAt: true,
+                method: true,
+                referenceNumber: true,
+              },
+              orderBy: {
+                createdAt: 'desc',
+              },
+            },
+          },
+        },
+
+        payments: {
+          orderBy: [
+            { createdAt: 'desc' },
+          ],
+          include: {
+            commercialDocument: {
+              select: {
+                id: true,
+                type: true,
+                status: true,
+                number: true,
+                title: true,
+              },
+            },
+          },
+        },
+
+        tasks: {
+          include: {
+            assignedTo: {
+              select: {
+                id: true,
+                fullName: true,
+                email: true,
+                role: true,
+                team: true,
+              },
+            },
+            createdBy: {
+              select: {
+                id: true,
+                fullName: true,
+                email: true,
+              },
+            },
+          },
+          orderBy: [
+            { dueAt: 'asc' },
+            { createdAt: 'desc' },
           ],
         },
       },
