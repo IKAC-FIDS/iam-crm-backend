@@ -929,6 +929,39 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
   - `src/audit-log/audit-log.service.ts`
   - `src/audit-log/dto/find-audit-logs.dto.ts`
 
+### fix 000030 - Standardize API response and error contract
+
+- Added a global API response interceptor.
+- Standardized successful API responses to:
+  - `success`
+  - `data`
+  - `meta`
+  - `requestId`
+  - `timestamp`
+- Preserved existing paginated service responses by lifting existing `meta` to the top-level response.
+- Added a global API exception filter.
+- Standardized error responses to:
+  - `success: false`
+  - `error.code`
+  - `error.message`
+  - `error.details`
+  - `requestId`
+  - `timestamp`
+  - `path`
+  - `method`
+  - `statusCode`
+- Normalized validation errors under `VALIDATION_ERROR`.
+- Normalized selected Prisma errors:
+  - `P2002` -> `UNIQUE_CONSTRAINT_FAILED`
+  - `P2003` -> `FOREIGN_KEY_CONSTRAINT_FAILED`
+  - `P2025` -> `RECORD_NOT_FOUND`
+- Added `x-request-id` to CORS allowed and exposed headers.
+- Important changed/new files:
+  - `src/common/http/api-response.types.ts`
+  - `src/common/interceptors/api-response.interceptor.ts`
+  - `src/common/filters/api-exception.filter.ts`
+  - `src/main.ts`
+
 ---
 
 **Built with ❤️ for sales team**

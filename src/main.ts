@@ -4,6 +4,8 @@ import { NestFactory } from '@nestjs/core';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { ApiExceptionFilter } from './common/filters/api-exception.filter';
+import { ApiResponseInterceptor } from './common/interceptors/api-response.interceptor';
 
 function parseCorsOrigins(value?: string): string[] {
   return (value ?? '')
@@ -40,7 +42,14 @@ async function bootstrap() {
     },
     credentials: config.get<boolean>('CORS_CREDENTIALS', true),
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'x-request-id',
+    ],
+    exposedHeaders: [
+      'x-request-id',
+    ],
   });
 
   app.useGlobalPipes(
@@ -50,6 +59,9 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
     }),
   );
+
+  app.useGlobalInterceptors(new ApiResponseInterceptor());
+  app.useGlobalFilters(new ApiExceptionFilter());
 
   app.setGlobalPrefix('api');
 

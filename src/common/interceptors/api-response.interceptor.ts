@@ -1,0 +1,79 @@
+import {
+  CallHandler,
+  ExecutionContext,
+  Injectable,
+  NestInterceptor,
+} from '@nestjs/common';
+import type { Response } from 'express';
+import { map, Observable } from 'rxjs';
+import {
+  ApiSuccessResponse,
+  PaginatedPayload,
+} from '../http/api-response.types';
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isAlreadyStandardResponse(value: unknown): value is { success: boolean } {
+  return isObject(value) && typeof value.success === 'boolean';
+}
+
+function isPaginatedPayload(value: unknown): value is PaginatedPayload {
+  return (
+    isObject(value) &&
+    Object.prototype.hasOwnProperty.call(value, 'data') &&
+    Object.prototype.hasOwnProperty.call(value, 'meta')
+  );
+}
+
+function getResponseRequestId(response: Response): string | null {
+  const header = response.getHeader('x-request-id');
+
+  if (Array.isArray(header)) {
+    return String(header[0] ?? '').trim() || null;
+  }
+
+  if (header !== undefined) {
+    return String(header).trim() || null;
+  }
+
+  return null;
+}
+
+@Injectable()
+export class ApiResponseInterceptor implements NestInterceptor {
+  intercept(
+    context: ExecutionContext,
+    next: CallHandler,
+  ): Observable<ApiSuccessResponse> {
+    const response = context.switchToHttp().getResponse<Response>();
+
+    return next.handle().pipe(
+      map((payload: unknown) => {
+        if (isAlreadyStandardResponse(payload)) {
+          return payload;
+        }
+
+        const base = {
+          success: true as const,
+          requestId: getResponseRequestId(response),
+          timestamp: new Date().toISOString(),
+        };
+
+        if (isPaginatedPayload(payload)) {
+          return {
+            ...base,
+            data: payload.data,
+            meta: payload.meta,
+          };
+        }
+
+        return {
+          ...base,
+          data: payload ?? null,
+        };
+      }),
+    );
+  }
+}
