@@ -894,6 +894,40 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
   - `src/person-socials/person-socials.service.ts`
   - `src/people/people.service.ts`
 
+### fix 000029 - Enrich audit logs with request context
+
+- Added request-context fields to audit logs:
+  - `requestId`
+  - `ipAddress`
+  - `userAgent`
+  - `requestMethod`
+  - `requestPath`
+- Added request context middleware using AsyncLocalStorage.
+- Added automatic request ID resolution from `x-request-id`.
+- Generated a request ID when the client does not provide one.
+- Returned `x-request-id` on the response for traceability.
+- Updated `AuditLogService.record()` to automatically enrich records with request context.
+- Kept explicit override support for request-context fields when records are created outside an HTTP request.
+- Extended audit-log filtering:
+  - `requestId`
+  - `ipAddress`
+  - `requestMethod`
+  - `requestPath`
+- Expanded audit sanitization to remove sensitive fields such as:
+  - password
+  - hash
+  - token
+  - secret
+  - authorization
+  - cookie
+  - credential
+- Important changed/new files:
+  - `prisma/schema.prisma`
+  - `src/audit-log/audit-request-context.service.ts`
+  - `src/audit-log/audit-request-context.middleware.ts`
+  - `src/audit-log/audit-log.module.ts`
+  - `src/audit-log/audit-log.service.ts`
+  - `src/audit-log/dto/find-audit-logs.dto.ts`
 
 ---
 

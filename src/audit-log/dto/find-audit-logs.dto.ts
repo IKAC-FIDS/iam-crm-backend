@@ -1,4 +1,9 @@
-import { IsDateString, IsOptional, IsString, IsUUID } from 'class-validator';
+import {
+  IsDateString,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from 'class-validator';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 
 export class FindAuditLogsDto extends PaginationDto {
@@ -17,6 +22,22 @@ export class FindAuditLogsDto extends PaginationDto {
   @IsOptional()
   @IsString()
   action?: string;
+
+  @IsOptional()
+  @IsString()
+  requestId?: string;
+
+  @IsOptional()
+  @IsString()
+  ipAddress?: string;
+
+  @IsOptional()
+  @IsString()
+  requestMethod?: string;
+
+  @IsOptional()
+  @IsString()
+  requestPath?: string;
 
   @IsOptional()
   @IsDateString()

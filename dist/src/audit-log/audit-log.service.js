@@ -12,20 +12,34 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuditLogService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../prisma/prisma.service");
+const audit_request_context_service_1 = require("./audit-request-context.service");
 let AuditLogService = class AuditLogService {
-    constructor(prisma) {
+    constructor(prisma, requestContext) {
         this.prisma = prisma;
+        this.requestContext = requestContext;
     }
     record(input) {
+        const context = this.requestContext.getContext();
         return this.prisma.auditLog.create({
             data: {
-                actorId: input.actorId,
+                actorId: input.actorId ?? null,
                 entityType: input.entityType,
-                entityId: input.entityId,
+                entityId: input.entityId ?? null,
                 action: input.action,
-                ...(input.before !== undefined && { before: this.sanitize(input.before) }),
-                ...(input.after !== undefined && { after: this.sanitize(input.after) }),
-                ...(input.metadata !== undefined && { metadata: this.sanitize(input.metadata) }),
+                requestId: input.requestId ?? context?.requestId ?? null,
+                ipAddress: input.ipAddress ?? context?.ipAddress ?? null,
+                userAgent: input.userAgent ?? context?.userAgent ?? null,
+                requestMethod: input.requestMethod ?? context?.requestMethod ?? null,
+                requestPath: input.requestPath ?? context?.requestPath ?? null,
+                ...(input.before !== undefined && {
+                    before: this.sanitize(input.before),
+                }),
+                ...(input.after !== undefined && {
+                    after: this.sanitize(input.after),
+                }),
+                ...(input.metadata !== undefined && {
+                    metadata: this.sanitize(input.metadata),
+                }),
             },
         });
     }
@@ -34,34 +48,77 @@ let AuditLogService = class AuditLogService {
         const limit = query.limit ?? 20;
         const startDate = query.startDate ? new Date(query.startDate) : undefined;
         const endDate = query.endDate ? new Date(query.endDate) : undefined;
-        if (startDate && endDate && startDate > endDate)
+        if (startDate && endDate && startDate > endDate) {
             throw new common_1.BadRequestException('startDate must be before or equal to endDate');
+        }
         const where = {
             ...(query.actorId && { actorId: query.actorId }),
             ...(query.entityType && { entityType: query.entityType }),
             ...(query.entityId && { entityId: query.entityId }),
             ...(query.action && { action: query.action }),
-            ...((startDate || endDate) && { createdAt: { gte: startDate, lte: endDate } }),
+            ...(query.requestId && { requestId: query.requestId }),
+            ...(query.ipAddress && {
+                ipAddress: {
+                    contains: query.ipAddress,
+                    mode: 'insensitive',
+                },
+            }),
+            ...(query.requestMethod && {
+                requestMethod: query.requestMethod.toUpperCase(),
+            }),
+            ...(query.requestPath && {
+                requestPath: {
+                    contains: query.requestPath,
+                    mode: 'insensitive',
+                },
+            }),
+            ...((startDate || endDate) && {
+                createdAt: {
+                    gte: startDate,
+                    lte: endDate,
+                },
+            }),
         };
         const [data, total] = await Promise.all([
-            this.prisma.auditLog.findMany({ where, orderBy: { createdAt: 'desc' }, skip: (page - 1) * limit, take: limit }),
+            this.prisma.auditLog.findMany({
+                where,
+                orderBy: { createdAt: 'desc' },
+                skip: (page - 1) * limit,
+                take: limit,
+            }),
             this.prisma.auditLog.count({ where }),
         ]);
         const totalPages = Math.ceil(total / limit);
-        return { data, meta: { total, page, limit, totalPages, hasNext: page < totalPages, hasPrevious: page > 1 } };
+        return {
+            data,
+            meta: {
+                total,
+                page,
+                limit,
+                totalPages,
+                hasNext: page < totalPages,
+                hasPrevious: page > 1,
+            },
+        };
     }
     sanitize(value) {
-        if (value instanceof Date)
+        if (value instanceof Date) {
             return value.toISOString();
-        if (typeof value === 'bigint')
+        }
+        if (typeof value === 'bigint') {
             return value.toString();
-        if (Array.isArray(value))
+        }
+        if (Array.isArray(value)) {
             return value.map((item) => this.sanitize(item));
+        }
         if (value && typeof value === 'object') {
             const jsonValue = value;
-            if (typeof jsonValue.toJSON === 'function')
+            if (typeof jsonValue.toJSON === 'function') {
                 return this.sanitize(jsonValue.toJSON());
-            return Object.fromEntries(Object.entries(value).filter(([key]) => !/(password|hash|token|secret|authorization)/i.test(key)).map(([key, item]) => [key, this.sanitize(item)]));
+            }
+            return Object.fromEntries(Object.entries(value)
+                .filter(([key]) => !/(password|hash|token|secret|authorization|cookie|credential)/i.test(key))
+                .map(([key, item]) => [key, this.sanitize(item)]));
         }
         return value;
     }
@@ -69,6 +126,7 @@ let AuditLogService = class AuditLogService {
 exports.AuditLogService = AuditLogService;
 exports.AuditLogService = AuditLogService = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [prisma_service_1.PrismaService])
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService,
+        audit_request_context_service_1.AuditRequestContextService])
 ], AuditLogService);
 //# sourceMappingURL=audit-log.service.js.map

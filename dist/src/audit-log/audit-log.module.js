@@ -9,12 +9,28 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuditLogModule = void 0;
 const common_1 = require("@nestjs/common");
 const audit_log_controller_1 = require("./audit-log.controller");
+const audit_request_context_middleware_1 = require("./audit-request-context.middleware");
+const audit_request_context_service_1 = require("./audit-request-context.service");
 const audit_log_service_1 = require("./audit-log.service");
 let AuditLogModule = class AuditLogModule {
+    configure(consumer) {
+        consumer.apply(audit_request_context_middleware_1.AuditRequestContextMiddleware).forRoutes('*');
+    }
 };
 exports.AuditLogModule = AuditLogModule;
 exports.AuditLogModule = AuditLogModule = __decorate([
     (0, common_1.Global)(),
-    (0, common_1.Module)({ controllers: [audit_log_controller_1.AuditLogController], providers: [audit_log_service_1.AuditLogService], exports: [audit_log_service_1.AuditLogService] })
+    (0, common_1.Module)({
+        controllers: [audit_log_controller_1.AuditLogController],
+        providers: [
+            audit_log_service_1.AuditLogService,
+            audit_request_context_service_1.AuditRequestContextService,
+            audit_request_context_middleware_1.AuditRequestContextMiddleware,
+        ],
+        exports: [
+            audit_log_service_1.AuditLogService,
+            audit_request_context_service_1.AuditRequestContextService,
+        ],
+    })
 ], AuditLogModule);
 //# sourceMappingURL=audit-log.module.js.map
