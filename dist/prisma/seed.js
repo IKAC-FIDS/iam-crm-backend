@@ -661,6 +661,8 @@ async function main() {
         { action: 'commercial-document:manage', description: 'مدیریت اسناد تجاری فرصت فروش' },
         { action: 'payment:view', description: 'مشاهده پرداخت‌های فرصت فروش' },
         { action: 'payment:manage', description: 'مدیریت پرداخت‌های فرصت فروش' },
+        { action: 'attachment:view', description: 'مشاهده فایل‌های پیوست' },
+        { action: 'attachment:manage', description: 'مدیریت فایل‌های پیوست' },
     ];
     for (const permission of permissions) {
         await upsertPermission(permission);
@@ -716,6 +718,8 @@ async function main() {
         'commercial-document:manage',
         'payment:view',
         'payment:manage',
+        'attachment:view',
+        'attachment:manage',
     ];
     const repActions = [
         'company:view',
@@ -753,6 +757,8 @@ async function main() {
         'commercial-document:manage',
         'payment:view',
         'payment:manage',
+        'attachment:view',
+        'attachment:manage',
     ];
     const boardsActions = [
         'report:view',
@@ -765,6 +771,7 @@ async function main() {
         'lookup:view',
         'commercial-document:view',
         'payment:view',
+        'attachment:view',
     ];
     await syncRolePermissions(client_1.UserRole.ADMIN, allActions);
     await syncRolePermissions(client_1.UserRole.MANAGER, managerActions);

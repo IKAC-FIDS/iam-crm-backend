@@ -65,6 +65,13 @@ function httpStatusToCode(statusCode) {
             return statusCode >= 500 ? 'INTERNAL_SERVER_ERROR' : 'HTTP_ERROR';
     }
 }
+function isMulterError(exception) {
+    return (typeof exception === 'object' &&
+        exception !== null &&
+        'name' in exception &&
+        'code' in exception &&
+        exception.name === 'MulterError');
+}
 let ApiExceptionFilter = class ApiExceptionFilter {
     catch(exception, host) {
         const ctx = host.switchToHttp();
@@ -76,7 +83,9 @@ let ApiExceptionFilter = class ApiExceptionFilter {
             error: {
                 code: normalized.code,
                 message: normalized.message,
-                ...(normalized.details !== undefined && { details: normalized.details }),
+                ...(normalized.details !== undefined && {
+                    details: normalized.details,
+                }),
             },
             requestId: getResponseRequestId(response, request),
             timestamp: new Date().toISOString(),
@@ -87,6 +96,13 @@ let ApiExceptionFilter = class ApiExceptionFilter {
         response.status(normalized.statusCode).json(body);
     }
     normalizeException(exception) {
+        if (isMulterError(exception)) {
+            return {
+                statusCode: common_1.HttpStatus.BAD_REQUEST,
+                code: `UPLOAD_${exception.code}`,
+                message: exception.message || 'File upload error',
+            };
+        }
         if (exception instanceof common_1.HttpException) {
             const statusCode = exception.getStatus();
             const exceptionResponse = exception.getResponse();
@@ -103,7 +119,9 @@ let ApiExceptionFilter = class ApiExceptionFilter {
             return {
                 statusCode,
                 code: exceptionResponse.code ??
-                    (isValidationError ? 'VALIDATION_ERROR' : httpStatusToCode(statusCode)),
+                    (isValidationError
+                        ? 'VALIDATION_ERROR'
+                        : httpStatusToCode(statusCode)),
                 message: isValidationError
                     ? 'Validation failed'
                     : normalizeMessage(message),

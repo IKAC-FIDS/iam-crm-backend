@@ -5,8 +5,8 @@ import {
   HttpException,
   HttpStatus,
 } from '@nestjs/common';
-import type { Request, Response } from 'express';
 import { Prisma } from '@prisma/client';
+import type { Request, Response } from 'express';
 import { ApiErrorResponse } from '../http/api-response.types';
 
 type NestErrorResponse =
@@ -19,7 +19,10 @@ type NestErrorResponse =
       details?: unknown;
     };
 
-function getResponseRequestId(response: Response, request: Request): string | null {
+function getResponseRequestId(
+  response: Response,
+  request: Request,
+): string | null {
   const responseHeader = response.getHeader('x-request-id');
 
   if (Array.isArray(responseHeader)) {
@@ -67,25 +70,46 @@ function httpStatusToCode(statusCode: number): string {
   switch (statusCode) {
     case HttpStatus.BAD_REQUEST:
       return 'BAD_REQUEST';
+
     case HttpStatus.UNAUTHORIZED:
       return 'UNAUTHORIZED';
+
     case HttpStatus.FORBIDDEN:
       return 'FORBIDDEN';
+
     case HttpStatus.NOT_FOUND:
       return 'NOT_FOUND';
+
     case HttpStatus.CONFLICT:
       return 'CONFLICT';
+
     case HttpStatus.GONE:
       return 'GONE';
+
     case HttpStatus.TOO_MANY_REQUESTS:
       return 'RATE_LIMITED';
+
     case HttpStatus.UNPROCESSABLE_ENTITY:
       return 'UNPROCESSABLE_ENTITY';
+
     case HttpStatus.SERVICE_UNAVAILABLE:
       return 'SERVICE_UNAVAILABLE';
+
     default:
       return statusCode >= 500 ? 'INTERNAL_SERVER_ERROR' : 'HTTP_ERROR';
   }
+}
+
+function isMulterError(
+  exception: unknown,
+): exception is { name: string; code: string; message: string } {
+  return (
+    typeof exception === 'object' &&
+    exception !== null &&
+    'name' in exception &&
+    'code' in exception &&
+    (exception as { name?: unknown }).name === 'MulterError'
+  );
 }
 
 @Catch()
@@ -102,7 +126,9 @@ export class ApiExceptionFilter implements ExceptionFilter {
       error: {
         code: normalized.code,
         message: normalized.message,
-        ...(normalized.details !== undefined && { details: normalized.details }),
+        ...(normalized.details !== undefined && {
+          details: normalized.details,
+        }),
       },
       requestId: getResponseRequestId(response, request),
       timestamp: new Date().toISOString(),
@@ -120,6 +146,14 @@ export class ApiExceptionFilter implements ExceptionFilter {
     message: string;
     details?: unknown;
   } {
+    if (isMulterError(exception)) {
+      return {
+        statusCode: HttpStatus.BAD_REQUEST,
+        code: `UPLOAD_${exception.code}`,
+        message: exception.message || 'File upload error',
+      };
+    }
+
     if (exception instanceof HttpException) {
       const statusCode = exception.getStatus();
       const exceptionResponse = exception.getResponse() as NestErrorResponse;
@@ -142,7 +176,9 @@ export class ApiExceptionFilter implements ExceptionFilter {
         statusCode,
         code:
           exceptionResponse.code ??
-          (isValidationError ? 'VALIDATION_ERROR' : httpStatusToCode(statusCode)),
+          (isValidationError
+            ? 'VALIDATION_ERROR'
+            : httpStatusToCode(statusCode)),
         message: isValidationError
           ? 'Validation failed'
           : normalizeMessage(message),

@@ -1158,6 +1158,97 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
   - `src/opportunities/opportunities.module.ts`
   - `src/opportunities/opportunities.service.ts`
 
+### fix 000035 - Add secure file attachments with Local and MinIO-ready storage
+
+- Added secure file attachment support for CRM entities.
+- Added attachment entity types:
+  - `OPPORTUNITY`
+  - `COMMERCIAL_DOCUMENT`
+  - `PAYMENT`
+- Added storage provider enum:
+  - `LOCAL`
+  - `MINIO`
+- Added `FileAttachment` model for storing attachment metadata.
+- Attachment binary content is stored outside PostgreSQL.
+- PostgreSQL stores only attachment metadata, including:
+  - entity type
+  - entity ID
+  - storage provider
+  - bucket
+  - object key
+  - local storage path
+  - original file name
+  - stored file name
+  - MIME type
+  - file size
+  - SHA-256 hash
+  - uploader
+  - soft-delete metadata
+- Added storage abstraction for attachments.
+- Added local filesystem storage implementation.
+- Added MinIO/S3-compatible storage implementation using AWS SDK v3.
+- Added secure attachment APIs:
+  - `GET /api/attachments`
+  - `POST /api/attachments`
+  - `GET /api/attachments/:id`
+  - `GET /api/attachments/:id/download`
+  - `DELETE /api/attachments/:id`
+- Attachment upload and download are protected by:
+  - JWT authentication
+  - permission checks
+  - scoped entity access checks
+- Added scoped access validation for:
+  - opportunity attachments
+  - commercial document attachments
+  - payment attachments
+- Added upload validation:
+  - maximum file size
+  - allowed MIME types
+  - empty file rejection
+- Added standardized Multer upload error handling in the global API exception filter.
+- Added audit logs for:
+  - attachment upload
+  - attachment download
+  - attachment soft delete
+- Added attachment permissions:
+  - `attachment:view`
+  - `attachment:manage`
+- Added optional environment variables:
+  - `ATTACHMENT_STORAGE_DRIVER`
+  - `ATTACHMENT_STORAGE_ROOT`
+  - `MAX_ATTACHMENT_SIZE_BYTES`
+  - `ALLOWED_ATTACHMENT_MIME_TYPES`
+  - `S3_ENDPOINT`
+  - `S3_REGION`
+  - `S3_BUCKET`
+  - `S3_ACCESS_KEY_ID`
+  - `S3_SECRET_ACCESS_KEY`
+  - `S3_FORCE_PATH_STYLE`
+- Updated Docker Compose with:
+  - MinIO service
+  - MinIO console
+  - MinIO bucket initialization service
+  - API MinIO environment configuration
+- Updated `.gitignore` to exclude local stored attachments.
+- Important changed/new files:
+  - `package.json`
+  - `package-lock.json`
+  - `prisma/schema.prisma`
+  - `prisma/seed.ts`
+  - `src/attachments/dto/upload-attachment.dto.ts`
+  - `src/attachments/dto/find-attachments.dto.ts`
+  - `src/attachments/storage/attachment-storage.types.ts`
+  - `src/attachments/storage/local-attachment-storage.service.ts`
+  - `src/attachments/storage/minio-attachment-storage.service.ts`
+  - `src/attachments/attachments.controller.ts`
+  - `src/attachments/attachments.service.ts`
+  - `src/attachments/attachments.module.ts`
+  - `src/app.module.ts`
+  - `src/common/validators/env.validator.ts`
+  - `src/common/filters/api-exception.filter.ts`
+  - `docker-compose.yml`
+  - `.gitignore`
+
 ---
 
 **Built with ❤️ for sales team**

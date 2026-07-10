@@ -40,6 +40,7 @@ const passkeys_module_1 = require("./auth/passkeys/passkeys.module");
 const sso_module_1 = require("./auth/sso/sso.module");
 const health_module_1 = require("./health/health.module");
 const product_catalog_module_1 = require("./product-catalog/product-catalog.module");
+const attachments_module_1 = require("./attachments/attachments.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -90,6 +91,7 @@ exports.AppModule = AppModule = __decorate([
             opportunities_module_1.OpportunitiesModule,
             passkeys_module_1.PasskeysModule,
             product_catalog_module_1.ProductCatalogModule,
+            attachments_module_1.AttachmentsModule,
         ],
         providers: [
             {

@@ -137,6 +137,87 @@ export const envValidationSchema = Joi.object({
       'number.min': 'THROTTLE_LIMIT باید حداقل ۱ باشد',
     }),
 
+ ATTACHMENT_STORAGE_DRIVER: Joi.string()
+    .valid('local', 'minio')
+    .default('local')
+    .messages({
+      'any.only': 'ATTACHMENT_STORAGE_DRIVER باید یکی از مقادیر local یا minio باشد',
+      'string.base': 'ATTACHMENT_STORAGE_DRIVER باید رشته باشد',
+    }),
+
+  ATTACHMENT_STORAGE_ROOT: Joi.string()
+    .default('storage/attachments')
+    .messages({
+      'string.base': 'ATTACHMENT_STORAGE_ROOT باید رشته باشد',
+    }),
+
+  MAX_ATTACHMENT_SIZE_BYTES: Joi.number()
+    .default(26214400)
+    .integer()
+    .min(1024)
+    .messages({
+      'number.base': 'MAX_ATTACHMENT_SIZE_BYTES باید عدد باشد',
+      'number.min': 'MAX_ATTACHMENT_SIZE_BYTES باید حداقل ۱۰۲۴ بایت باشد',
+    }),
+
+  ALLOWED_ATTACHMENT_MIME_TYPES: Joi.string()
+    .default(
+      [
+        'application/pdf',
+        'image/jpeg',
+        'image/png',
+        'image/webp',
+        'text/plain',
+        'text/csv',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      ].join(','),
+    )
+    .messages({
+      'string.base': 'ALLOWED_ATTACHMENT_MIME_TYPES باید رشته باشد',
+    }),
+
+  S3_ENDPOINT: Joi.string()
+    .uri()
+    .optional()
+    .messages({
+      'string.uri': 'S3_ENDPOINT باید URL معتبر باشد',
+    }),
+
+  S3_REGION: Joi.string()
+    .default('us-east-1')
+    .messages({
+      'string.base': 'S3_REGION باید رشته باشد',
+    }),
+
+  S3_BUCKET: Joi.string()
+    .default('iam-crm-attachments')
+    .messages({
+      'string.base': 'S3_BUCKET باید رشته باشد',
+    }),
+
+  S3_ACCESS_KEY_ID: Joi.string()
+    .optional()
+    .messages({
+      'string.base': 'S3_ACCESS_KEY_ID باید رشته باشد',
+    }),
+
+  S3_SECRET_ACCESS_KEY: Joi.string()
+    .optional()
+    .messages({
+      'string.base': 'S3_SECRET_ACCESS_KEY باید رشته باشد',
+    }),
+
+  S3_FORCE_PATH_STYLE: Joi.boolean()
+    .truthy('true')
+    .falsy('false')
+    .default(true)
+    .messages({
+      'boolean.base': 'S3_FORCE_PATH_STYLE باید true یا false باشد',
+    }),
+
   WEBAUTHN_RP_NAME: Joi.string().default('IAM CRM'),
 
   WEBAUTHN_RP_ID: Joi.string().default('localhost'),
