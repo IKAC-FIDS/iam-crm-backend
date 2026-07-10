@@ -29,6 +29,7 @@ import { AuditLogModule } from './audit-log/audit-log.module';
 import { OpportunitiesModule } from './opportunities/opportunities.module';
 import { PasskeysModule } from './auth/passkeys/passkeys.module';
 import { SsoModule } from './auth/sso/sso.module';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -49,6 +50,7 @@ import { SsoModule } from './auth/sso/sso.module';
         ],
       }),
     }),
+    HealthModule,
     PrismaModule,
     AuthModule,
     SsoModule,

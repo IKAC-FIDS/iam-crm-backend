@@ -46,11 +46,29 @@ export const envValidationSchema = Joi.object({
       }),
 
   NODE_ENV: Joi.string()
-    .valid('development', 'production', 'test')
-    .default('development')
-    .messages({
-      'any.only': 'NODE_ENV باید یکی از مقادیر development, production, test باشد',
-    }),
+      .valid('development', 'production', 'test')
+      .default('development')
+      .messages({
+        'any.only': 'NODE_ENV باید یکی از مقادیر development, production, test باشد',
+      }),
+
+    APP_VERSION: Joi.string()
+      .optional()
+      .messages({
+        'string.base': 'APP_VERSION باید رشته باشد',
+      }),
+
+    APP_COMMIT_SHA: Joi.string()
+      .optional()
+      .messages({
+        'string.base': 'APP_COMMIT_SHA باید رشته باشد',
+      }),
+
+    APP_BUILD_TIME: Joi.string()
+      .optional()
+      .messages({
+        'string.base': 'APP_BUILD_TIME باید رشته باشد',
+      }),
 
   // ---------- CORS ----------
   CORS_ORIGINS: Joi.string()

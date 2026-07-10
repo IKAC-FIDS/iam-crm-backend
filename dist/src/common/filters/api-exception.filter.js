@@ -59,6 +59,8 @@ function httpStatusToCode(statusCode) {
             return 'RATE_LIMITED';
         case common_1.HttpStatus.UNPROCESSABLE_ENTITY:
             return 'UNPROCESSABLE_ENTITY';
+        case common_1.HttpStatus.SERVICE_UNAVAILABLE:
+            return 'SERVICE_UNAVAILABLE';
         default:
             return statusCode >= 500 ? 'INTERNAL_SERVER_ERROR' : 'HTTP_ERROR';
     }

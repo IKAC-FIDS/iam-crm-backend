@@ -38,6 +38,7 @@ const audit_log_module_1 = require("./audit-log/audit-log.module");
 const opportunities_module_1 = require("./opportunities/opportunities.module");
 const passkeys_module_1 = require("./auth/passkeys/passkeys.module");
 const sso_module_1 = require("./auth/sso/sso.module");
+const health_module_1 = require("./health/health.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -61,6 +62,7 @@ exports.AppModule = AppModule = __decorate([
                     ],
                 }),
             }),
+            health_module_1.HealthModule,
             prisma_module_1.PrismaModule,
             auth_module_1.AuthModule,
             sso_module_1.SsoModule,

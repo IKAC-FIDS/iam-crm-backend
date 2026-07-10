@@ -962,6 +962,43 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
   - `src/common/filters/api-exception.filter.ts`
   - `src/main.ts`
 
+### fix 000031 - Add health, readiness, and version endpoints
+
+- Added public operational endpoints:
+  - `GET /api/health`
+  - `GET /api/ready`
+  - `GET /api/version`
+- Added liveness response with:
+  - service name
+  - environment
+  - uptime
+  - start timestamp
+  - current timestamp
+- Added readiness response with dependency checks:
+  - API status
+  - database status
+  - database latency
+- Made readiness return `503 Service Unavailable` when the database check fails.
+- Added version endpoint with:
+  - package name
+  - app version
+  - environment
+  - commit SHA
+  - build time
+  - Node.js version
+- Added optional environment variables:
+  - `APP_VERSION`
+  - `APP_COMMIT_SHA`
+  - `APP_BUILD_TIME`
+- Updated standardized error code mapping for `503 Service Unavailable`.
+- Important changed/new files:
+  - `src/health/health.module.ts`
+  - `src/health/health.controller.ts`
+  - `src/health/health.service.ts`
+  - `src/app.module.ts`
+  - `src/common/validators/env.validator.ts`
+  - `src/common/filters/api-exception.filter.ts`
+
 ---
 
 **Built with ❤️ for sales team**
