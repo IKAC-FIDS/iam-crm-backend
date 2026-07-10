@@ -48,14 +48,23 @@ export class AuthService {
       throw new UnauthorizedException('ایمیل یا رمز عبور نادرست است');
     }
 
+    if (user.lockedUntil && user.lockedUntil > new Date()) {
+      throw new UnauthorizedException(
+        'حساب کاربری موقتاً قفل شده است. لطفاً بعداً دوباره تلاش کنید',
+      );
+    }
+
     const passwordValid = await bcrypt.compare(
       dto.password,
       user.passwordHash,
     );
 
     if (!passwordValid) {
+      await this.recordFailedLogin(user.id, user.failedLoginAttempts);
       throw new UnauthorizedException('ایمیل یا رمز عبور نادرست است');
     }
+
+    await this.recordSuccessfulLogin(user.id, req);
 
     return this.buildSessionLoginResponse(user, req);
   }
@@ -158,5 +167,52 @@ export class AuthService {
     void refreshSessionId;
 
     return publicResponse;
+  }
+
+  private async recordFailedLogin(
+    userId: string,
+    currentFailedAttempts: number,
+  ): Promise<void> {
+    const nextFailedAttempts = currentFailedAttempts + 1;
+    const shouldLock = nextFailedAttempts >= 5;
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        failedLoginAttempts: nextFailedAttempts,
+        lockedUntil: shouldLock
+          ? new Date(Date.now() + 15 * 60 * 1000)
+          : null,
+      },
+    });
+  }
+
+  private async recordSuccessfulLogin(
+    userId: string,
+    req?: Request,
+  ): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        failedLoginAttempts: 0,
+        lockedUntil: null,
+        lastLoginAt: new Date(),
+        lastLoginIp: this.extractIpAddress(req),
+      },
+    });
+  }
+
+  private extractIpAddress(req?: Request): string | null {
+    const forwardedFor = req?.headers['x-forwarded-for'];
+
+    if (Array.isArray(forwardedFor)) {
+      return forwardedFor[0]?.split(',')[0]?.trim() || null;
+    }
+
+    if (typeof forwardedFor === 'string') {
+      return forwardedFor.split(',')[0]?.trim() || null;
+    }
+
+    return req?.ip || req?.socket?.remoteAddress || null;
   }
 }

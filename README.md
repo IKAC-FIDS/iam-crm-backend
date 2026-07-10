@@ -718,6 +718,31 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
     - `.env.example`
     - `prisma/seed.ts`
 
+### fix 000020 - Add account security endpoints
+
+- Added account security overview endpoint: `GET /api/auth/account/security`.
+- Added authenticated password change endpoint: `POST /api/auth/account/change-password`.
+- Added logout-other-sessions endpoint: `POST /api/auth/account/logout-other-sessions`.
+- Added account security fields to `User`:
+  - `passwordChangedAt`
+  - `lastLoginAt`
+  - `lastLoginIp`
+  - `failedLoginAttempts`
+  - `lockedUntil`
+- Added failed-login tracking.
+- Added temporary account lock after repeated failed login attempts.
+- Added successful-login metadata update.
+- Added refresh-session revocation for password changes.
+- Added support for revoking all other sessions while keeping the current session.
+- Important changed/new files:
+  - `prisma/schema.prisma`
+  - `src/auth/account-security.controller.ts`
+  - `src/auth/account-security.service.ts`
+  - `src/auth/dto/change-password.dto.ts`
+  - `src/auth/auth.service.ts`
+  - `src/auth/auth.module.ts`
+  - `src/auth/refresh-token.service.ts`
+
 ### fix 000021 - Add SSO relying-party foundation
 
 - Added the initial Prisma foundation for SSO relying-party support.

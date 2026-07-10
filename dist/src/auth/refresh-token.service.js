@@ -204,6 +204,26 @@ let RefreshTokenService = class RefreshTokenService {
                 : false,
         };
     }
+    async revokeAllUserSessionsExceptToken(userId, refreshToken, reason = 'LOGOUT_OTHER_SESSIONS') {
+        const currentHash = this.hashRefreshToken(refreshToken);
+        const result = await this.prisma.refreshSession.updateMany({
+            where: {
+                userId,
+                refreshTokenHash: {
+                    not: currentHash,
+                },
+                revokedAt: null,
+                expiresAt: {
+                    gt: new Date(),
+                },
+            },
+            data: {
+                revokedAt: new Date(),
+                revokedReason: reason,
+            },
+        });
+        return result.count;
+    }
     async revokeActiveSessionsForUser(userId, reason) {
         await this.prisma.refreshSession.updateMany({
             where: {

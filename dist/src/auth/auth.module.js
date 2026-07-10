@@ -17,6 +17,8 @@ const jwt_strategy_1 = require("./jwt.strategy");
 const refresh_token_service_1 = require("./refresh-token.service");
 const sessions_controller_1 = require("./sessions.controller");
 const sessions_service_1 = require("./sessions.service");
+const account_security_controller_1 = require("./account-security.controller");
+const account_security_service_1 = require("./account-security.service");
 let AuthModule = class AuthModule {
 };
 exports.AuthModule = AuthModule;
@@ -40,10 +42,12 @@ exports.AuthModule = AuthModule = __decorate([
             jwt_strategy_1.JwtStrategy,
             refresh_token_service_1.RefreshTokenService,
             sessions_service_1.SessionsService,
+            account_security_service_1.AccountSecurityService,
         ],
         controllers: [
             auth_controller_1.AuthController,
             sessions_controller_1.SessionsController,
+            account_security_controller_1.AccountSecurityController,
         ],
         exports: [
             auth_service_1.AuthService,

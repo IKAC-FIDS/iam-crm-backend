@@ -9,6 +9,8 @@ import { JwtStrategy } from './jwt.strategy';
 import { RefreshTokenService } from './refresh-token.service';
 import { SessionsController } from './sessions.controller';
 import { SessionsService } from './sessions.service';
+import { AccountSecurityController } from './account-security.controller';
+import { AccountSecurityService } from './account-security.service';
 
 @Module({
   imports: [
@@ -29,10 +31,12 @@ import { SessionsService } from './sessions.service';
     JwtStrategy,
     RefreshTokenService,
     SessionsService,
+    AccountSecurityService,
   ],
   controllers: [
     AuthController,
     SessionsController,
+    AccountSecurityController,
   ],
   exports: [
     AuthService,

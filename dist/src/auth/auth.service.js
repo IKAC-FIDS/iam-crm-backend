@@ -63,10 +63,15 @@ let AuthService = class AuthService {
         if (!user || !user.isActive) {
             throw new common_1.UnauthorizedException('ایمیل یا رمز عبور نادرست است');
         }
+        if (user.lockedUntil && user.lockedUntil > new Date()) {
+            throw new common_1.UnauthorizedException('حساب کاربری موقتاً قفل شده است. لطفاً بعداً دوباره تلاش کنید');
+        }
         const passwordValid = await bcrypt.compare(dto.password, user.passwordHash);
         if (!passwordValid) {
+            await this.recordFailedLogin(user.id, user.failedLoginAttempts);
             throw new common_1.UnauthorizedException('ایمیل یا رمز عبور نادرست است');
         }
+        await this.recordSuccessfulLogin(user.id, req);
         return this.buildSessionLoginResponse(user, req);
     }
     async refresh(refreshToken, req) {
@@ -130,6 +135,40 @@ let AuthService = class AuthService {
         void refreshTokenExpiresAt;
         void refreshSessionId;
         return publicResponse;
+    }
+    async recordFailedLogin(userId, currentFailedAttempts) {
+        const nextFailedAttempts = currentFailedAttempts + 1;
+        const shouldLock = nextFailedAttempts >= 5;
+        await this.prisma.user.update({
+            where: { id: userId },
+            data: {
+                failedLoginAttempts: nextFailedAttempts,
+                lockedUntil: shouldLock
+                    ? new Date(Date.now() + 15 * 60 * 1000)
+                    : null,
+            },
+        });
+    }
+    async recordSuccessfulLogin(userId, req) {
+        await this.prisma.user.update({
+            where: { id: userId },
+            data: {
+                failedLoginAttempts: 0,
+                lockedUntil: null,
+                lastLoginAt: new Date(),
+                lastLoginIp: this.extractIpAddress(req),
+            },
+        });
+    }
+    extractIpAddress(req) {
+        const forwardedFor = req?.headers['x-forwarded-for'];
+        if (Array.isArray(forwardedFor)) {
+            return forwardedFor[0]?.split(',')[0]?.trim() || null;
+        }
+        if (typeof forwardedFor === 'string') {
+            return forwardedFor.split(',')[0]?.trim() || null;
+        }
+        return req?.ip || req?.socket?.remoteAddress || null;
     }
 };
 exports.AuthService = AuthService;
