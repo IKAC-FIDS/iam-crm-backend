@@ -1,16 +1,12 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
 import { CurrentUser, CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { Permissions } from '../common/decorators/permissions.decorator';
-import { Roles } from '../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
-import { RolesGuard } from '../common/guards/roles.guard';
 import { ReportFiltersDto } from './dto/report-filters.dto';
 import { ReportsService } from './reports.service';
 
-@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
-@Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.REP, UserRole.BOARDS)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 @Permissions('report:view')
 @Controller('reports')
 export class ReportsController {

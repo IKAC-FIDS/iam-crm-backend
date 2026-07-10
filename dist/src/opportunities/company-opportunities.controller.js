@@ -14,13 +14,10 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CompanyOpportunitiesController = void 0;
 const common_1 = require("@nestjs/common");
-const client_1 = require("@prisma/client");
 const current_user_decorator_1 = require("../common/decorators/current-user.decorator");
 const permissions_decorator_1 = require("../common/decorators/permissions.decorator");
-const roles_decorator_1 = require("../common/decorators/roles.decorator");
 const jwt_auth_guard_1 = require("../common/guards/jwt-auth.guard");
 const permissions_guard_1 = require("../common/guards/permissions.guard");
-const roles_guard_1 = require("../common/guards/roles.guard");
 const create_company_opportunity_dto_1 = require("./dto/create-company-opportunity.dto");
 const find_opportunities_dto_1 = require("./dto/find-opportunities.dto");
 const opportunities_service_1 = require("./opportunities.service");
@@ -38,7 +35,6 @@ let CompanyOpportunitiesController = class CompanyOpportunitiesController {
 exports.CompanyOpportunitiesController = CompanyOpportunitiesController;
 __decorate([
     (0, common_1.Get)(),
-    (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN, client_1.UserRole.MANAGER, client_1.UserRole.REP, client_1.UserRole.BOARDS),
     (0, permissions_decorator_1.Permissions)('opportunity:view'),
     __param(0, (0, common_1.Param)('companyId')),
     __param(1, (0, common_1.Query)()),
@@ -49,7 +45,6 @@ __decorate([
 ], CompanyOpportunitiesController.prototype, "findAll", null);
 __decorate([
     (0, common_1.Post)(),
-    (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN, client_1.UserRole.MANAGER, client_1.UserRole.REP),
     (0, permissions_decorator_1.Permissions)('opportunity:create'),
     __param(0, (0, common_1.Param)('companyId')),
     __param(1, (0, common_1.Body)()),
@@ -60,7 +55,7 @@ __decorate([
 ], CompanyOpportunitiesController.prototype, "create", null);
 exports.CompanyOpportunitiesController = CompanyOpportunitiesController = __decorate([
     (0, common_1.Controller)('companies/:companyId/opportunities'),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard, permissions_guard_1.PermissionsGuard),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, permissions_guard_1.PermissionsGuard),
     __metadata("design:paramtypes", [opportunities_service_1.OpportunitiesService])
 ], CompanyOpportunitiesController);
 //# sourceMappingURL=company-opportunities.controller.js.map

@@ -8,12 +8,9 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../common/guards/roles.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { Permissions } from '../common/decorators/permissions.decorator';
-import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser, CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { CompaniesService } from './companies.service';
 import { CreateCompanyDto } from './dto/create-company.dto';
@@ -24,12 +21,13 @@ import { PaginationDto } from '../common/dto/pagination.dto';
 import { FindCompaniesDto } from './dto/find-companies.dto';
 import { ArchiveCompanyDto } from './dto/archive-company.dto';
 
-@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('companies')
 export class CompaniesController {
   constructor(private companiesService: CompaniesService) {}
 
  @Get()
+ @Permissions('company:view')
  findAll(
    @CurrentUser() user: CurrentUserPayload,
    @Query() query: FindCompaniesDto,
@@ -46,11 +44,13 @@ export class CompaniesController {
  }
 
   @Get(':id')
+  @Permissions('company:view')
   findOne(@Param('id') id: string, @CurrentUser() user: CurrentUserPayload) {
     return this.companiesService.findOne(id, user);
   }
 
   @Post()
+  @Permissions('company:create')
   create(
     @Body() dto: CreateCompanyDto,
     @CurrentUser() user: CurrentUserPayload,
@@ -59,6 +59,7 @@ export class CompaniesController {
   }
 
   @Patch(':id')
+  @Permissions('company:update')
   update(
     @Param('id') id: string,
     @Body() dto: UpdateCompanyDto,
@@ -68,6 +69,7 @@ export class CompaniesController {
   }
 
   @Patch(':id/stage')
+  @Permissions('company:change-stage')
   changeStage(
     @Param('id') id: string,
     @Body() dto: ChangeStageDto,
@@ -77,7 +79,6 @@ export class CompaniesController {
   }
 
   @Patch(':id/archive')
-  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @Permissions('company:archive')
   archive(
     @Param('id') id: string,
@@ -88,13 +89,11 @@ export class CompaniesController {
   }
 
   @Patch(':id/restore')
-  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @Permissions('company:restore')
   restore(@Param('id') id: string, @CurrentUser() user: CurrentUserPayload) {
     return this.companiesService.restore(id, user);
   }
 
-  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @Permissions('company:bulk-change-owner')
   @Patch('bulk/owner')
   bulkChangeOwner(
@@ -104,7 +103,6 @@ export class CompaniesController {
     return this.companiesService.bulkChangeOwner(dto, user);
   }
 
-  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @Permissions('company:change-owner')
   @Patch(':id/owner')
   changeOwner(

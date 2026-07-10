@@ -1,26 +1,23 @@
 import {
-  Controller,
-  Get,
-  Post,
-  Delete,
-  Patch,
-  Body,
-  Param,
-  UseGuards,
   BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
 } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
-import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../common/guards/roles.guard';
-import { PermissionsGuard } from '../common/guards/permissions.guard';
-import { Roles } from '../common/decorators/roles.decorator';
-import { Permissions } from '../common/decorators/permissions.decorator';
-import { AdminPermissionsService } from './admin-permissions.service';
 import { CurrentUser, CurrentUserPayload } from '../common/decorators/current-user.decorator';
+import { Permissions } from '../common/decorators/permissions.decorator';
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { PermissionsGuard } from '../common/guards/permissions.guard';
+import { AdminPermissionsService } from './admin-permissions.service';
 
 @Controller('admin/permissions')
-@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
-@Roles(UserRole.ADMIN)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class AdminPermissionsController {
   constructor(private adminPermissionsService: AdminPermissionsService) {}
 

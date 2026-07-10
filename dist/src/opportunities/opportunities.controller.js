@@ -14,13 +14,10 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.OpportunitiesController = void 0;
 const common_1 = require("@nestjs/common");
-const client_1 = require("@prisma/client");
 const current_user_decorator_1 = require("../common/decorators/current-user.decorator");
 const permissions_decorator_1 = require("../common/decorators/permissions.decorator");
-const roles_decorator_1 = require("../common/decorators/roles.decorator");
 const jwt_auth_guard_1 = require("../common/guards/jwt-auth.guard");
 const permissions_guard_1 = require("../common/guards/permissions.guard");
-const roles_guard_1 = require("../common/guards/roles.guard");
 const archive_opportunity_dto_1 = require("./dto/archive-opportunity.dto");
 const change_opportunity_owner_dto_1 = require("./dto/change-opportunity-owner.dto");
 const change_opportunity_stage_dto_1 = require("./dto/change-opportunity-stage.dto");
@@ -44,7 +41,6 @@ let OpportunitiesController = class OpportunitiesController {
 exports.OpportunitiesController = OpportunitiesController;
 __decorate([
     (0, common_1.Get)(),
-    (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN, client_1.UserRole.MANAGER, client_1.UserRole.REP, client_1.UserRole.BOARDS),
     (0, permissions_decorator_1.Permissions)('opportunity:view'),
     __param(0, (0, common_1.Query)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
@@ -54,7 +50,6 @@ __decorate([
 ], OpportunitiesController.prototype, "findAll", null);
 __decorate([
     (0, common_1.Post)(),
-    (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN, client_1.UserRole.MANAGER, client_1.UserRole.REP),
     (0, permissions_decorator_1.Permissions)('opportunity:create'),
     __param(0, (0, common_1.Body)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
@@ -64,7 +59,6 @@ __decorate([
 ], OpportunitiesController.prototype, "create", null);
 __decorate([
     (0, common_1.Get)(':id'),
-    (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN, client_1.UserRole.MANAGER, client_1.UserRole.REP, client_1.UserRole.BOARDS),
     (0, permissions_decorator_1.Permissions)('opportunity:view'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
@@ -74,7 +68,6 @@ __decorate([
 ], OpportunitiesController.prototype, "findOne", null);
 __decorate([
     (0, common_1.Patch)(':id'),
-    (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN, client_1.UserRole.MANAGER, client_1.UserRole.REP),
     (0, permissions_decorator_1.Permissions)('opportunity:update'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
@@ -85,7 +78,6 @@ __decorate([
 ], OpportunitiesController.prototype, "update", null);
 __decorate([
     (0, common_1.Patch)(':id/stage'),
-    (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN, client_1.UserRole.MANAGER, client_1.UserRole.REP),
     (0, permissions_decorator_1.Permissions)('opportunity:change-stage'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
@@ -96,7 +88,6 @@ __decorate([
 ], OpportunitiesController.prototype, "changeStage", null);
 __decorate([
     (0, common_1.Patch)(':id/owner'),
-    (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN, client_1.UserRole.MANAGER),
     (0, permissions_decorator_1.Permissions)('opportunity:change-owner'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
@@ -107,7 +98,6 @@ __decorate([
 ], OpportunitiesController.prototype, "changeOwner", null);
 __decorate([
     (0, common_1.Patch)(':id/archive'),
-    (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN, client_1.UserRole.MANAGER),
     (0, permissions_decorator_1.Permissions)('opportunity:archive'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
@@ -118,7 +108,6 @@ __decorate([
 ], OpportunitiesController.prototype, "archive", null);
 __decorate([
     (0, common_1.Patch)(':id/restore'),
-    (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN, client_1.UserRole.MANAGER),
     (0, permissions_decorator_1.Permissions)('opportunity:restore'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
@@ -128,7 +117,7 @@ __decorate([
 ], OpportunitiesController.prototype, "restore", null);
 exports.OpportunitiesController = OpportunitiesController = __decorate([
     (0, common_1.Controller)('opportunities'),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard, permissions_guard_1.PermissionsGuard),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, permissions_guard_1.PermissionsGuard),
     __metadata("design:paramtypes", [opportunities_service_1.OpportunitiesService])
 ], OpportunitiesController);
 //# sourceMappingURL=opportunities.controller.js.map

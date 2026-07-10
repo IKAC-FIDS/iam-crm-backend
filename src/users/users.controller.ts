@@ -1,9 +1,6 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../common/guards/roles.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
-import { Roles } from '../common/decorators/roles.decorator';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -11,7 +8,7 @@ import { UpdateUserRoleDto } from './dto/update-user-role.dto';
 import { FindUsersDto } from './dto/find-users.dto';
 import { CurrentUser, CurrentUserPayload } from '../common/decorators/current-user.decorator';
 
-@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('users')
 export class UsersController {
   constructor(private usersService: UsersService) {}
@@ -20,8 +17,7 @@ export class UsersController {
   // ۱. ایجاد کاربر جدید
   // ============================================================
   @Post()
-  @Roles(UserRole.ADMIN)
-  @Permissions('user:manage')
+  @Permissions('user:create')
   create(@Body() dto: CreateUserDto, @CurrentUser() actor: CurrentUserPayload) {
     return this.usersService.create(dto, actor.userId);
   }
@@ -30,14 +26,12 @@ export class UsersController {
   // ۲. دریافت لیست کاربران
   // ============================================================
   @Get()
-  @Roles(UserRole.ADMIN)
   @Permissions('user:view')
   findAll(@Query() query: FindUsersDto) {
     return this.usersService.findAll(query);
   }
 
   @Get('owner-options')
-  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @Permissions('company:assign-owner')
   getOwnerOptions(@CurrentUser() user: CurrentUserPayload) {
     return this.usersService.getOwnerOptions(user);
@@ -47,7 +41,6 @@ export class UsersController {
   // ۳. دریافت یک کاربر
   // ============================================================
   @Get(':id')
-  @Roles(UserRole.ADMIN)
   @Permissions('user:view')
   findOne(@Param('id') id: string) {
     return this.usersService.findOne(id);
@@ -57,8 +50,7 @@ export class UsersController {
   // ۴. غیرفعال کردن کاربر
   // ============================================================
   @Patch(':id/deactivate')
-  @Roles(UserRole.ADMIN)
-  @Permissions('user:manage')
+  @Permissions('user:deactivate')
   deactivate(@Param('id') id: string, @CurrentUser() actor: CurrentUserPayload) {
     return this.usersService.deactivate(id, actor.userId);
   }
@@ -67,8 +59,7 @@ export class UsersController {
   // ✅ ۵. فعال‌سازی مجدد کاربر
   // ============================================================
   @Patch(':id/activate')
-  @Roles(UserRole.ADMIN)
-  @Permissions('user:manage')
+  @Permissions('user:activate')
   activate(@Param('id') id: string, @CurrentUser() actor: CurrentUserPayload) {
     return this.usersService.activate(id, actor.userId);
   }
@@ -77,8 +68,7 @@ export class UsersController {
   // ✅ ۶. تغییر نقش یک کاربر
   // ============================================================
   @Patch(':id/role')
-  @Roles(UserRole.ADMIN)
-  @Permissions('user:manage')
+  @Permissions('user:change-role')
   updateUserRole(
     @Param('id') id: string,
     @Body() dto: UpdateUserRoleDto,

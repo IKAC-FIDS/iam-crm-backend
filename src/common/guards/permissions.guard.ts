@@ -1,63 +1,119 @@
 import {
-  Injectable,
   CanActivate,
   ExecutionContext,
   ForbiddenException,
+  Injectable,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { PrismaService } from '../../prisma/prisma.service';
-import { PERMISSIONS_KEY } from '../decorators/permissions.decorator';
+import { UserRole } from '@prisma/client';
 import NodeCache from 'node-cache';
+import { PrismaService } from '../../prisma/prisma.service';
+import {
+  PERMISSIONS_KEY,
+  PermissionPolicyMetadata,
+} from '../decorators/permissions.decorator';
 
-const cache = new NodeCache({ stdTTL: 600 }); // ۱۰ دقیقه کش
+const cache = new NodeCache({ stdTTL: 600 });
+
+type RequestUser = {
+  userId?: string;
+  email?: string;
+  role?: string;
+  team?: string | null;
+};
 
 @Injectable()
 export class PermissionsGuard implements CanActivate {
   constructor(
-    private reflector: Reflector,
-    private prisma: PrismaService,
+    private readonly reflector: Reflector,
+    private readonly prisma: PrismaService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const requiredPermissions = this.reflector.getAllAndOverride<string[]>(
-      PERMISSIONS_KEY,
-      [context.getHandler(), context.getClass()],
-    );
+    const policy = this.reflector.getAllAndOverride<
+      PermissionPolicyMetadata | string[] | undefined
+    >(PERMISSIONS_KEY, [context.getHandler(), context.getClass()]);
 
-    if (!requiredPermissions || requiredPermissions.length === 0) {
+    const normalizedPolicy = this.normalizePolicy(policy);
+
+    if (!normalizedPolicy || normalizedPolicy.actions.length === 0) {
       return true;
     }
 
     const request = context.switchToHttp().getRequest();
-    const user = request.user;
+    const requestUser = request.user as RequestUser | undefined;
 
-    if (!user) {
+    if (!requestUser?.userId) {
       throw new ForbiddenException('کاربر احراز هویت نشده است');
     }
 
-    const userPermissions = await this.getPermissionsForRole(user.role);
-    const hasAllPermissions = requiredPermissions.every((perm) =>
-      userPermissions.has(perm),
-    );
+    const dbUser = await this.prisma.user.findUnique({
+      where: { id: requestUser.userId },
+      select: {
+        id: true,
+        role: true,
+        isActive: true,
+      },
+    });
 
-    if (!hasAllPermissions) {
+    if (!dbUser || !dbUser.isActive) {
+      throw new ForbiddenException('حساب کاربری فعال نیست');
+    }
+
+    const userPermissions = await this.getPermissionsForRole(dbUser.role);
+
+    const allowed =
+      normalizedPolicy.mode === 'any'
+        ? normalizedPolicy.actions.some((permission) =>
+            userPermissions.has(permission),
+          )
+        : normalizedPolicy.actions.every((permission) =>
+            userPermissions.has(permission),
+          );
+
+    if (!allowed) {
+      const missingPermissions = normalizedPolicy.actions.filter(
+        (permission) => !userPermissions.has(permission),
+      );
+
       throw new ForbiddenException(
-        `شما دسترسی لازم برای این عملیات را ندارید: ${requiredPermissions.join(', ')}`,
+        `شما دسترسی لازم برای این عملیات را ندارید: ${missingPermissions.join(', ')}`,
       );
     }
 
     return true;
   }
 
-  private async getPermissionsForRole(role: string): Promise<Set<string>> {
+  private normalizePolicy(
+    policy: PermissionPolicyMetadata | string[] | undefined,
+  ): PermissionPolicyMetadata | null {
+    if (!policy) {
+      return null;
+    }
+
+    if (Array.isArray(policy)) {
+      return {
+        actions: policy,
+        mode: 'all',
+      };
+    }
+
+    return {
+      actions: policy.actions ?? [],
+      mode: policy.mode ?? 'all',
+    };
+  }
+
+  private async getPermissionsForRole(role: UserRole): Promise<Set<string>> {
     const cacheKey = `permissions:${role}`;
     let permissions = cache.get<string[]>(cacheKey);
 
     if (!permissions) {
       const rolePermissions = await this.prisma.rolePermission.findMany({
-        where: { role: role as any },
+        where: { role },
         include: { permission: true },
       });
+
       permissions = rolePermissions.map((rp) => rp.permission.action);
       cache.set(cacheKey, permissions);
     }
@@ -65,12 +121,12 @@ export class PermissionsGuard implements CanActivate {
     return new Set(permissions);
   }
 
-  // ✅ متد کمکی برای پاک کردن کش (در سرویس مدیریت استفاده می‌شود)
-  static clearCache(role?: string) {
+  static clearCache(role?: UserRole | string) {
     if (role) {
       cache.del(`permissions:${role}`);
-    } else {
-      cache.flushAll();
+      return;
     }
+
+    cache.flushAll();
   }
 }

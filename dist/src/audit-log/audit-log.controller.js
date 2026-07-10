@@ -14,12 +14,9 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuditLogController = void 0;
 const common_1 = require("@nestjs/common");
-const client_1 = require("@prisma/client");
 const permissions_decorator_1 = require("../common/decorators/permissions.decorator");
-const roles_decorator_1 = require("../common/decorators/roles.decorator");
 const jwt_auth_guard_1 = require("../common/guards/jwt-auth.guard");
 const permissions_guard_1 = require("../common/guards/permissions.guard");
-const roles_guard_1 = require("../common/guards/roles.guard");
 const audit_log_service_1 = require("./audit-log.service");
 const find_audit_logs_dto_1 = require("./dto/find-audit-logs.dto");
 let AuditLogController = class AuditLogController {
@@ -38,8 +35,7 @@ __decorate([
 ], AuditLogController.prototype, "findAll", null);
 exports.AuditLogController = AuditLogController = __decorate([
     (0, common_1.Controller)('admin/audit-logs'),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard, permissions_guard_1.PermissionsGuard),
-    (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, permissions_guard_1.PermissionsGuard),
     (0, permissions_decorator_1.Permissions)('audit-log:view'),
     __metadata("design:paramtypes", [audit_log_service_1.AuditLogService])
 ], AuditLogController);

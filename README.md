@@ -782,6 +782,20 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 - No Prisma schema migration was required because SAML provider fields already existed in the SSO foundation schema.
 - Added `@node-saml/node-saml` dependency.
 
+### fix 000024 - Make permission system truly policy-driven
+
+- Removed hardcoded role dependency from permission-protected admin permission endpoints.
+- Updated `PermissionsGuard` to evaluate access from database-backed role permissions.
+- Updated permission evaluation to use the current user role from the database instead of trusting only the JWT role claim.
+- Added support for `all` and `any` permission-check modes.
+- Added `AnyPermission` decorator for endpoints where one of several permissions is sufficient.
+- Kept permission cache with explicit invalidation after permission changes.
+- No Prisma schema migration was required.
+- Important changed/new files:
+  - `src/common/decorators/permissions.decorator.ts`
+  - `src/common/guards/permissions.guard.ts`
+  - `src/admin/admin-permissions.controller.ts`
+
 ---
 
 **Built with ❤️ for sales team**

@@ -15,13 +15,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.AdminPermissionsController = void 0;
 const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
-const jwt_auth_guard_1 = require("../common/guards/jwt-auth.guard");
-const roles_guard_1 = require("../common/guards/roles.guard");
-const permissions_guard_1 = require("../common/guards/permissions.guard");
-const roles_decorator_1 = require("../common/decorators/roles.decorator");
-const permissions_decorator_1 = require("../common/decorators/permissions.decorator");
-const admin_permissions_service_1 = require("./admin-permissions.service");
 const current_user_decorator_1 = require("../common/decorators/current-user.decorator");
+const permissions_decorator_1 = require("../common/decorators/permissions.decorator");
+const jwt_auth_guard_1 = require("../common/guards/jwt-auth.guard");
+const permissions_guard_1 = require("../common/guards/permissions.guard");
+const admin_permissions_service_1 = require("./admin-permissions.service");
 let AdminPermissionsController = class AdminPermissionsController {
     constructor(adminPermissionsService) {
         this.adminPermissionsService = adminPermissionsService;
@@ -169,8 +167,7 @@ __decorate([
 ], AdminPermissionsController.prototype, "getRolePermissionsWithDetails", null);
 exports.AdminPermissionsController = AdminPermissionsController = __decorate([
     (0, common_1.Controller)('admin/permissions'),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard, permissions_guard_1.PermissionsGuard),
-    (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, permissions_guard_1.PermissionsGuard),
     __metadata("design:paramtypes", [admin_permissions_service_1.AdminPermissionsService])
 ], AdminPermissionsController);
 //# sourceMappingURL=admin-permissions.controller.js.map

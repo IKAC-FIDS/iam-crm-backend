@@ -14,12 +14,9 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.IndustriesController = void 0;
 const common_1 = require("@nestjs/common");
-const client_1 = require("@prisma/client");
 const jwt_auth_guard_1 = require("../common/guards/jwt-auth.guard");
-const roles_guard_1 = require("../common/guards/roles.guard");
 const permissions_guard_1 = require("../common/guards/permissions.guard");
 const permissions_decorator_1 = require("../common/decorators/permissions.decorator");
-const roles_decorator_1 = require("../common/decorators/roles.decorator");
 const industries_service_1 = require("./industries.service");
 const create_industry_dto_1 = require("./dto/create-industry.dto");
 const update_industry_dto_1 = require("./dto/update-industry.dto");
@@ -60,7 +57,6 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], IndustriesController.prototype, "findOne", null);
 __decorate([
-    (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN),
     (0, permissions_decorator_1.Permissions)('library:industry:manage'),
     (0, common_1.Post)(),
     __param(0, (0, common_1.Body)()),
@@ -69,7 +65,6 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], IndustriesController.prototype, "create", null);
 __decorate([
-    (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN),
     (0, permissions_decorator_1.Permissions)('library:industry:manage'),
     (0, common_1.Patch)(':id'),
     __param(0, (0, common_1.Param)('id')),
@@ -79,7 +74,6 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], IndustriesController.prototype, "update", null);
 __decorate([
-    (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN),
     (0, permissions_decorator_1.Permissions)('library:industry:manage'),
     (0, common_1.Delete)(':id'),
     __param(0, (0, common_1.Param)('id')),
@@ -88,7 +82,7 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], IndustriesController.prototype, "remove", null);
 exports.IndustriesController = IndustriesController = __decorate([
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard, permissions_guard_1.PermissionsGuard),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, permissions_guard_1.PermissionsGuard),
     (0, common_1.Controller)('industries'),
     __metadata("design:paramtypes", [industries_service_1.IndustriesService])
 ], IndustriesController);

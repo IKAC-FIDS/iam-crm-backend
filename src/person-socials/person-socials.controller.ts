@@ -9,14 +9,13 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../common/guards/roles.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { CurrentUser, CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { PersonSocialsService } from './person-socials.service';
 import { CreatePersonSocialDto, UpdatePersonSocialDto } from '../people/dto/person-social.dto';
 
-@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('people/:personId/socials')
 export class PersonSocialsController {
   constructor(private socialsService: PersonSocialsService) {}

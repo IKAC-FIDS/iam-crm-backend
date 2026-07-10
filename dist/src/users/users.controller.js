@@ -14,11 +14,8 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.UsersController = void 0;
 const common_1 = require("@nestjs/common");
-const client_1 = require("@prisma/client");
 const jwt_auth_guard_1 = require("../common/guards/jwt-auth.guard");
-const roles_guard_1 = require("../common/guards/roles.guard");
 const permissions_guard_1 = require("../common/guards/permissions.guard");
-const roles_decorator_1 = require("../common/decorators/roles.decorator");
 const permissions_decorator_1 = require("../common/decorators/permissions.decorator");
 const users_service_1 = require("./users.service");
 const create_user_dto_1 = require("./dto/create-user.dto");
@@ -54,8 +51,7 @@ let UsersController = class UsersController {
 exports.UsersController = UsersController;
 __decorate([
     (0, common_1.Post)(),
-    (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN),
-    (0, permissions_decorator_1.Permissions)('user:manage'),
+    (0, permissions_decorator_1.Permissions)('user:create'),
     __param(0, (0, common_1.Body)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
@@ -64,7 +60,6 @@ __decorate([
 ], UsersController.prototype, "create", null);
 __decorate([
     (0, common_1.Get)(),
-    (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN),
     (0, permissions_decorator_1.Permissions)('user:view'),
     __param(0, (0, common_1.Query)()),
     __metadata("design:type", Function),
@@ -73,7 +68,6 @@ __decorate([
 ], UsersController.prototype, "findAll", null);
 __decorate([
     (0, common_1.Get)('owner-options'),
-    (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN, client_1.UserRole.MANAGER),
     (0, permissions_decorator_1.Permissions)('company:assign-owner'),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
@@ -82,7 +76,6 @@ __decorate([
 ], UsersController.prototype, "getOwnerOptions", null);
 __decorate([
     (0, common_1.Get)(':id'),
-    (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN),
     (0, permissions_decorator_1.Permissions)('user:view'),
     __param(0, (0, common_1.Param)('id')),
     __metadata("design:type", Function),
@@ -91,8 +84,7 @@ __decorate([
 ], UsersController.prototype, "findOne", null);
 __decorate([
     (0, common_1.Patch)(':id/deactivate'),
-    (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN),
-    (0, permissions_decorator_1.Permissions)('user:manage'),
+    (0, permissions_decorator_1.Permissions)('user:deactivate'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
@@ -101,8 +93,7 @@ __decorate([
 ], UsersController.prototype, "deactivate", null);
 __decorate([
     (0, common_1.Patch)(':id/activate'),
-    (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN),
-    (0, permissions_decorator_1.Permissions)('user:manage'),
+    (0, permissions_decorator_1.Permissions)('user:activate'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
@@ -111,8 +102,7 @@ __decorate([
 ], UsersController.prototype, "activate", null);
 __decorate([
     (0, common_1.Patch)(':id/role'),
-    (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN),
-    (0, permissions_decorator_1.Permissions)('user:manage'),
+    (0, permissions_decorator_1.Permissions)('user:change-role'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
     __param(2, (0, current_user_decorator_1.CurrentUser)()),
@@ -121,7 +111,7 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], UsersController.prototype, "updateUserRole", null);
 exports.UsersController = UsersController = __decorate([
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard, permissions_guard_1.PermissionsGuard),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, permissions_guard_1.PermissionsGuard),
     (0, common_1.Controller)('users'),
     __metadata("design:paramtypes", [users_service_1.UsersService])
 ], UsersController);

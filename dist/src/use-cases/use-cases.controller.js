@@ -14,12 +14,9 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.UseCasesController = void 0;
 const common_1 = require("@nestjs/common");
-const client_1 = require("@prisma/client");
 const jwt_auth_guard_1 = require("../common/guards/jwt-auth.guard");
-const roles_guard_1 = require("../common/guards/roles.guard");
 const permissions_guard_1 = require("../common/guards/permissions.guard");
 const permissions_decorator_1 = require("../common/decorators/permissions.decorator");
-const roles_decorator_1 = require("../common/decorators/roles.decorator");
 const use_cases_service_1 = require("./use-cases.service");
 const create_use_case_dto_1 = require("./dto/create-use-case.dto");
 const update_use_case_dto_1 = require("./dto/update-use-case.dto");
@@ -60,7 +57,6 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], UseCasesController.prototype, "findOne", null);
 __decorate([
-    (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN),
     (0, permissions_decorator_1.Permissions)('library:use-case:manage'),
     (0, common_1.Post)(),
     __param(0, (0, common_1.Body)()),
@@ -69,7 +65,6 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], UseCasesController.prototype, "create", null);
 __decorate([
-    (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN),
     (0, permissions_decorator_1.Permissions)('library:use-case:manage'),
     (0, common_1.Patch)(':id'),
     __param(0, (0, common_1.Param)('id')),
@@ -79,7 +74,6 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], UseCasesController.prototype, "update", null);
 __decorate([
-    (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN),
     (0, permissions_decorator_1.Permissions)('library:use-case:manage'),
     (0, common_1.Delete)(':id'),
     __param(0, (0, common_1.Param)('id')),
@@ -88,7 +82,7 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], UseCasesController.prototype, "remove", null);
 exports.UseCasesController = UseCasesController = __decorate([
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard, permissions_guard_1.PermissionsGuard),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, permissions_guard_1.PermissionsGuard),
     (0, common_1.Controller)('use-cases'),
     __metadata("design:paramtypes", [use_cases_service_1.UseCasesService])
 ], UseCasesController);

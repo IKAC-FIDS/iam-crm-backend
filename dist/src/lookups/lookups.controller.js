@@ -14,13 +14,10 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.LookupsController = void 0;
 const common_1 = require("@nestjs/common");
-const client_1 = require("@prisma/client");
 const permissions_decorator_1 = require("../common/decorators/permissions.decorator");
-const roles_decorator_1 = require("../common/decorators/roles.decorator");
 const active_filter_dto_1 = require("../common/dto/active-filter.dto");
 const jwt_auth_guard_1 = require("../common/guards/jwt-auth.guard");
 const permissions_guard_1 = require("../common/guards/permissions.guard");
-const roles_guard_1 = require("../common/guards/roles.guard");
 const create_lookup_option_dto_1 = require("./dto/create-lookup-option.dto");
 const update_lookup_option_dto_1 = require("./dto/update-lookup-option.dto");
 const lookups_service_1 = require("./lookups.service");
@@ -45,7 +42,6 @@ __decorate([
 ], LookupsController.prototype, "findAll", null);
 __decorate([
     (0, common_1.Post)(':group'),
-    (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN),
     (0, permissions_decorator_1.Permissions)('lookup:manage'),
     __param(0, (0, common_1.Param)('group')),
     __param(1, (0, common_1.Body)()),
@@ -55,7 +51,6 @@ __decorate([
 ], LookupsController.prototype, "create", null);
 __decorate([
     (0, common_1.Patch)(':group/:id'),
-    (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN),
     (0, permissions_decorator_1.Permissions)('lookup:manage'),
     __param(0, (0, common_1.Param)('group')),
     __param(1, (0, common_1.Param)('id')),
@@ -66,7 +61,6 @@ __decorate([
 ], LookupsController.prototype, "update", null);
 __decorate([
     (0, common_1.Delete)(':group/:id'),
-    (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN),
     (0, permissions_decorator_1.Permissions)('lookup:manage'),
     __param(0, (0, common_1.Param)('group')),
     __param(1, (0, common_1.Param)('id')),
@@ -75,7 +69,7 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], LookupsController.prototype, "remove", null);
 exports.LookupsController = LookupsController = __decorate([
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard, permissions_guard_1.PermissionsGuard),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, permissions_guard_1.PermissionsGuard),
     (0, common_1.Controller)('lookups'),
     __metadata("design:paramtypes", [lookups_service_1.LookupsService])
 ], LookupsController);
