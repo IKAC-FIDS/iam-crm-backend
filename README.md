@@ -999,6 +999,37 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
   - `src/common/validators/env.validator.ts`
   - `src/common/filters/api-exception.filter.ts`
 
+### fix 000032 - Add lint, test, and GitHub Actions CI
+
+- Added ESLint configuration using the modern flat config format.
+- Added lint scripts:
+  - `npm run lint`
+  - `npm run lint:fix`
+- Added Jest test configuration.
+- Added a dedicated `tsconfig.spec.json` for Jest tests.
+- Added initial unit tests for `HealthService`.
+- Added CI script:
+  - `npm run ci`
+- Added GitHub Actions workflow:
+  - `.github/workflows/backend-ci.yml`
+- CI runs:
+  - dependency install
+  - Prisma Client generation
+  - lint
+  - unit tests
+  - build
+- Configured CI test environment variables for backend startup/build validation.
+- Added PostgreSQL service container for future DB-backed tests.
+- No Prisma schema migration was required.
+- Important changed/new files:
+  - `package.json`
+  - `package-lock.json`
+  - `eslint.config.mjs`
+  - `jest.config.cjs`
+  - `tsconfig.spec.json`
+  - `test/health/health.service.spec.ts`
+  - `.github/workflows/backend-ci.yml`
+
 ---
 
 **Built with ❤️ for sales team**
