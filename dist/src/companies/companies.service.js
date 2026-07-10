@@ -12,8 +12,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.CompaniesService = void 0;
 const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
-const prisma_service_1 = require("../prisma/prisma.service");
 const audit_log_service_1 = require("../audit-log/audit-log.service");
+const prisma_service_1 = require("../prisma/prisma.service");
 let CompaniesService = class CompaniesService {
     constructor(prisma, audit) {
         this.prisma = prisma;
@@ -47,6 +47,24 @@ let CompaniesService = class CompaniesService {
         if (filters?.priority) {
             where.priority = filters.priority;
         }
+        if (filters?.industryId) {
+            where.industryId = filters.industryId;
+        }
+        else if (filters?.industry?.trim()) {
+            where.industry = {
+                equals: filters.industry.trim(),
+                mode: 'insensitive',
+            };
+        }
+        if (filters?.sourceId) {
+            where.sourceId = filters.sourceId;
+        }
+        else if (filters?.source?.trim()) {
+            where.source = {
+                equals: filters.source.trim(),
+                mode: 'insensitive',
+            };
+        }
         if (filters?.ownerId) {
             if (user.role === client_1.UserRole.ADMIN || user.role === client_1.UserRole.MANAGER) {
                 where.ownerId = filters.ownerId;
@@ -55,10 +73,13 @@ let CompaniesService = class CompaniesService {
         if (filters?.search?.trim()) {
             const search = filters.search.trim();
             where.OR = [
-                { legalName: { contains: search } },
-                { brandName: { contains: search } },
-                { industry: { contains: search } },
-                { headOfficeCity: { contains: search } },
+                { legalName: { contains: search, mode: 'insensitive' } },
+                { brandName: { contains: search, mode: 'insensitive' } },
+                { industry: { contains: search, mode: 'insensitive' } },
+                { headOfficeCity: { contains: search, mode: 'insensitive' } },
+                { industryRef: { name: { contains: search, mode: 'insensitive' } } },
+                { sourceRef: { name: { contains: search, mode: 'insensitive' } } },
+                { sourceRef: { code: { contains: search, mode: 'insensitive' } } },
             ];
         }
         if (filters?.archivedOnly) {
@@ -76,6 +97,22 @@ let CompaniesService = class CompaniesService {
                             id: true,
                             fullName: true,
                             team: true,
+                        },
+                    },
+                    industryRef: {
+                        select: {
+                            id: true,
+                            name: true,
+                            description: true,
+                        },
+                    },
+                    sourceRef: {
+                        select: {
+                            id: true,
+                            code: true,
+                            name: true,
+                            description: true,
+                            isActive: true,
                         },
                     },
                 },
@@ -106,12 +143,21 @@ let CompaniesService = class CompaniesService {
             where: { id },
             include: {
                 owner: { select: { id: true, fullName: true, team: true } },
+                industryRef: true,
+                sourceRef: true,
                 people: true,
                 branches: true,
                 socialChannels: true,
                 callCard: true,
                 activities: { orderBy: { occurredAt: 'desc' }, take: 20 },
                 stageHistory: { orderBy: { changedAt: 'desc' } },
+                opportunities: {
+                    include: {
+                        stage: true,
+                        owner: { select: { id: true, fullName: true, email: true, team: true } },
+                    },
+                    orderBy: { updatedAt: 'desc' },
+                },
             },
         });
         if (!company)
@@ -123,13 +169,36 @@ let CompaniesService = class CompaniesService {
         if (user.role === client_1.UserRole.BOARDS) {
             throw new common_1.ForbiddenException('شما اجازه ایجاد شرکت را ندارید');
         }
+        const { industryId, industry, sourceId, source, ...companyData } = dto;
+        const normalizedRefs = await this.resolveCompanyReferences({
+            industryId,
+            industry,
+            sourceId,
+            source,
+            applyDefaultSource: true,
+        });
         const company = await this.prisma.company.create({
             data: {
-                ...dto,
+                ...companyData,
+                industryId: normalizedRefs.industryId,
+                industry: normalizedRefs.industryName,
+                sourceId: normalizedRefs.sourceId,
+                source: normalizedRefs.sourceCode,
                 ownerId: dto.ownerId ?? user.userId,
             },
+            include: {
+                owner: { select: { id: true, fullName: true, team: true } },
+                industryRef: true,
+                sourceRef: true,
+            },
         });
-        await this.audit.record({ actorId: user.userId, entityType: 'company', entityId: company.id, action: 'company.created', after: company });
+        await this.audit.record({
+            actorId: user.userId,
+            entityType: 'company',
+            entityId: company.id,
+            action: 'company.created',
+            after: company,
+        });
         return company;
     }
     async update(id, dto, user) {
@@ -140,11 +209,37 @@ let CompaniesService = class CompaniesService {
         if (!company)
             throw new common_1.NotFoundException('شرکت پیدا نشد');
         this.assertAccess(company, user);
+        const { industryId, industry, sourceId, source, ...companyData } = dto;
+        const updateData = {
+            ...companyData,
+        };
+        if (industryId !== undefined || industry !== undefined) {
+            const normalizedIndustry = await this.resolveIndustryReference(industryId, industry);
+            updateData.industryId = normalizedIndustry.industryId;
+            updateData.industry = normalizedIndustry.industryName;
+        }
+        if (sourceId !== undefined || source !== undefined) {
+            const normalizedSource = await this.resolveSourceReference(sourceId, source, false);
+            updateData.sourceId = normalizedSource.sourceId;
+            updateData.source = normalizedSource.sourceCode;
+        }
         const updated = await this.prisma.company.update({
             where: { id },
-            data: dto,
+            data: updateData,
+            include: {
+                owner: { select: { id: true, fullName: true, team: true } },
+                industryRef: true,
+                sourceRef: true,
+            },
         });
-        await this.audit.record({ actorId: user.userId, entityType: 'company', entityId: id, action: 'company.updated', before: company, after: updated });
+        await this.audit.record({
+            actorId: user.userId,
+            entityType: 'company',
+            entityId: id,
+            action: 'company.updated',
+            before: company,
+            after: updated,
+        });
         return updated;
     }
     async changeOwner(id, dto, user) {
@@ -176,7 +271,14 @@ let CompaniesService = class CompaniesService {
             where: { id },
             data: { ownerId: dto.newOwnerId },
         });
-        await this.audit.record({ actorId: user.userId, entityType: 'company', entityId: id, action: 'company.owner_changed', before: { ownerId: company.ownerId }, after: { ownerId: updated.ownerId } });
+        await this.audit.record({
+            actorId: user.userId,
+            entityType: 'company',
+            entityId: id,
+            action: 'company.owner_changed',
+            before: { ownerId: company.ownerId },
+            after: { ownerId: updated.ownerId },
+        });
         return updated;
     }
     async archive(id, dto, user) {
@@ -187,13 +289,25 @@ let CompaniesService = class CompaniesService {
         if (!company)
             throw new common_1.NotFoundException('شرکت پیدا نشد');
         this.assertArchiveAccess(company, user);
-        if (company.archivedAt)
+        if (company.archivedAt) {
             throw new common_1.BadRequestException('شرکت قبلاً بایگانی شده است');
+        }
         const archived = await this.prisma.company.update({
             where: { id },
-            data: { archivedAt: new Date(), archivedById: user.userId, archiveReason: dto.reason },
+            data: {
+                archivedAt: new Date(),
+                archivedById: user.userId,
+                archiveReason: dto.reason,
+            },
         });
-        await this.audit.record({ actorId: user.userId, entityType: 'company', entityId: id, action: 'company.archived', before: company, after: archived });
+        await this.audit.record({
+            actorId: user.userId,
+            entityType: 'company',
+            entityId: id,
+            action: 'company.archived',
+            before: company,
+            after: archived,
+        });
         return archived;
     }
     async restore(id, user) {
@@ -204,13 +318,25 @@ let CompaniesService = class CompaniesService {
         if (!company)
             throw new common_1.NotFoundException('شرکت پیدا نشد');
         this.assertArchiveAccess(company, user);
-        if (!company.archivedAt)
+        if (!company.archivedAt) {
             throw new common_1.BadRequestException('شرکت بایگانی نشده است');
+        }
         const restored = await this.prisma.company.update({
             where: { id },
-            data: { archivedAt: null, archivedById: null, archiveReason: null },
+            data: {
+                archivedAt: null,
+                archivedById: null,
+                archiveReason: null,
+            },
         });
-        await this.audit.record({ actorId: user.userId, entityType: 'company', entityId: id, action: 'company.restored', before: company, after: restored });
+        await this.audit.record({
+            actorId: user.userId,
+            entityType: 'company',
+            entityId: id,
+            action: 'company.restored',
+            before: company,
+            after: restored,
+        });
         return restored;
     }
     async bulkChangeOwner(dto, user) {
@@ -272,8 +398,11 @@ let CompaniesService = class CompaniesService {
     assertArchiveAccess(company, user) {
         if (user.role === client_1.UserRole.ADMIN)
             return;
-        if (user.role === client_1.UserRole.MANAGER && user.team && company.owner?.team === user.team)
+        if (user.role === client_1.UserRole.MANAGER &&
+            user.team &&
+            company.owner?.team === user.team) {
             return;
+        }
         throw new common_1.ForbiddenException('شما اجازه بایگانی یا بازیابی این شرکت را ندارید');
     }
     async assertChangeOwnerAccess(company, user) {
@@ -293,6 +422,108 @@ let CompaniesService = class CompaniesService {
             return;
         }
         throw new common_1.ForbiddenException('شما اجازه تغییر مالکیت شرکت‌ها را ندارید');
+    }
+    async resolveCompanyReferences(input) {
+        const normalizedIndustry = await this.resolveIndustryReference(input.industryId, input.industry);
+        const normalizedSource = await this.resolveSourceReference(input.sourceId, input.source, input.applyDefaultSource);
+        return {
+            ...normalizedIndustry,
+            ...normalizedSource,
+        };
+    }
+    async resolveIndustryReference(industryId, industryName) {
+        if (industryId) {
+            const industry = await this.prisma.industry.findUnique({
+                where: { id: industryId },
+            });
+            if (!industry) {
+                throw new common_1.BadRequestException('صنعت انتخاب‌شده معتبر نیست');
+            }
+            return {
+                industryId: industry.id,
+                industryName: industry.name,
+            };
+        }
+        const normalizedName = industryName?.trim();
+        if (!normalizedName) {
+            return {
+                industryId: null,
+                industryName: null,
+            };
+        }
+        const industry = await this.prisma.industry.findFirst({
+            where: {
+                name: {
+                    equals: normalizedName,
+                    mode: 'insensitive',
+                },
+            },
+        });
+        if (!industry) {
+            throw new common_1.BadRequestException('صنعت باید از کتابخانه صنایع انتخاب شود. مقدار متنی آزاد مجاز نیست');
+        }
+        return {
+            industryId: industry.id,
+            industryName: industry.name,
+        };
+    }
+    async resolveSourceReference(sourceId, source, applyDefaultSource = false) {
+        if (sourceId) {
+            const leadSource = await this.prisma.leadSource.findUnique({
+                where: { id: sourceId },
+            });
+            if (!leadSource || !leadSource.isActive) {
+                throw new common_1.BadRequestException('منبع جذب انتخاب‌شده معتبر یا فعال نیست');
+            }
+            return {
+                sourceId: leadSource.id,
+                sourceCode: leadSource.code,
+            };
+        }
+        const normalizedSource = source?.trim();
+        if (normalizedSource) {
+            const leadSource = await this.prisma.leadSource.findFirst({
+                where: {
+                    isActive: true,
+                    OR: [
+                        {
+                            code: {
+                                equals: normalizedSource,
+                                mode: 'insensitive',
+                            },
+                        },
+                        {
+                            name: {
+                                equals: normalizedSource,
+                                mode: 'insensitive',
+                            },
+                        },
+                    ],
+                },
+            });
+            if (!leadSource) {
+                throw new common_1.BadRequestException('منبع جذب باید از کتابخانه Lead Sources انتخاب شود. مقدار متنی آزاد مجاز نیست');
+            }
+            return {
+                sourceId: leadSource.id,
+                sourceCode: leadSource.code,
+            };
+        }
+        if (applyDefaultSource) {
+            const defaultLeadSource = await this.prisma.leadSource.findUnique({
+                where: { code: 'SAM_LIST' },
+            });
+            if (defaultLeadSource?.isActive) {
+                return {
+                    sourceId: defaultLeadSource.id,
+                    sourceCode: defaultLeadSource.code,
+                };
+            }
+        }
+        return {
+            sourceId: null,
+            sourceCode: null,
+        };
     }
 };
 exports.CompaniesService = CompaniesService;

@@ -32,6 +32,10 @@ let CompaniesController = class CompaniesController {
         return this.companiesService.findAll(user, query, {
             stage: query.stage,
             priority: query.priority,
+            industryId: query.industryId,
+            industry: query.industry,
+            sourceId: query.sourceId,
+            source: query.source,
             withoutOwner: query.withoutOwner === 'true',
             search: query.search,
             ownerId: query.ownerId,
@@ -135,8 +139,8 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], CompaniesController.prototype, "restore", null);
 __decorate([
-    (0, permissions_decorator_1.Permissions)('company:bulk-change-owner'),
     (0, common_1.Patch)('bulk/owner'),
+    (0, permissions_decorator_1.Permissions)('company:bulk-change-owner'),
     __param(0, (0, common_1.Body)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
@@ -144,8 +148,8 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], CompaniesController.prototype, "bulkChangeOwner", null);
 __decorate([
-    (0, permissions_decorator_1.Permissions)('company:change-owner'),
     (0, common_1.Patch)(':id/owner'),
+    (0, permissions_decorator_1.Permissions)('company:change-owner'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
     __param(2, (0, current_user_decorator_1.CurrentUser)()),

@@ -840,6 +840,33 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
   - `src/companies/dto/change-stage.dto.ts`
   - `prisma/seed.ts`
 
+### fix 000027 - Normalize company industry and source references
+
+- Added normalized company references:
+  - `Company.industryId` -> `Industry`
+  - `Company.sourceId` -> `LeadSource`
+- Kept legacy string fields as compatibility snapshots:
+  - `Company.industry`
+  - `Company.source`
+- Updated company create/update flows to resolve `industryId` and `sourceId`.
+- Added backward-compatible resolution for legacy `industry` and `source` inputs when they match existing reference data.
+- Rejected free-text industry/source values that do not exist in reference tables.
+- Updated company list/detail responses to include:
+  - `industryRef`
+  - `sourceRef`
+- Added company filters:
+  - `industryId`
+  - `sourceId`
+  - legacy `industry`
+  - legacy `source`
+- Added migration backfill from existing company string values to normalized references.
+- Important changed/new files:
+  - `prisma/schema.prisma`
+  - `src/companies/dto/create-company.dto.ts`
+  - `src/companies/dto/find-companies.dto.ts`
+  - `src/companies/companies.controller.ts`
+  - `src/companies/companies.service.ts`
+
 ---
 
 **Built with ❤️ for sales team**

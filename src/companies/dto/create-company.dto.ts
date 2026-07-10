@@ -1,4 +1,4 @@
-import { IsEnum, IsOptional, IsString } from 'class-validator';
+import { IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
 import { CompanyOwnership, Priority } from '@prisma/client';
 
 export class CreateCompanyDto {
@@ -9,6 +9,15 @@ export class CreateCompanyDto {
   @IsString()
   brandName?: string;
 
+  @IsOptional()
+  @IsUUID()
+  industryId?: string;
+
+  /**
+   * Deprecated compatibility input.
+   * Prefer industryId.
+   * If sent, it must match an existing Industry.name.
+   */
   @IsOptional()
   @IsString()
   industry?: string;
@@ -22,7 +31,7 @@ export class CreateCompanyDto {
   priority?: Priority;
 
   @IsOptional()
-  @IsString()
+  @IsUUID()
   ownerId?: string;
 
   @IsOptional()
@@ -33,6 +42,15 @@ export class CreateCompanyDto {
   @IsString()
   headOfficeCity?: string;
 
+  @IsOptional()
+  @IsUUID()
+  sourceId?: string;
+
+  /**
+   * Deprecated compatibility input.
+   * Prefer sourceId.
+   * If sent, it must match an existing LeadSource.code or LeadSource.name.
+   */
   @IsOptional()
   @IsString()
   source?: string;

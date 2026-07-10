@@ -1,6 +1,12 @@
 // src/companies/dto/find-companies.dto.ts
 
-import { IsBooleanString, IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
+import {
+  IsBooleanString,
+  IsEnum,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from 'class-validator';
 import { LegacyPipelineStage, Priority } from '@prisma/client';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 
@@ -12,6 +18,30 @@ export class FindCompaniesDto extends PaginationDto {
   @IsOptional()
   @IsEnum(Priority)
   priority?: Priority;
+
+  @IsOptional()
+  @IsUUID()
+  industryId?: string;
+
+  /**
+   * Deprecated compatibility filter.
+   * Prefer industryId.
+   */
+  @IsOptional()
+  @IsString()
+  industry?: string;
+
+  @IsOptional()
+  @IsUUID()
+  sourceId?: string;
+
+  /**
+   * Deprecated compatibility filter.
+   * Prefer sourceId.
+   */
+  @IsOptional()
+  @IsString()
+  source?: string;
 
   @IsOptional()
   @IsBooleanString()

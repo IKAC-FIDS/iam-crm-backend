@@ -12,12 +12,14 @@ import {
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { Permissions } from '../common/decorators/permissions.decorator';
-import { CurrentUser, CurrentUserPayload } from '../common/decorators/current-user.decorator';
+import {
+  CurrentUser,
+  CurrentUserPayload,
+} from '../common/decorators/current-user.decorator';
 import { CompaniesService } from './companies.service';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import { ChangeOwnerDto, BulkChangeOwnerDto } from './dto/change-owner.dto';
-import { PaginationDto } from '../common/dto/pagination.dto';
 import { FindCompaniesDto } from './dto/find-companies.dto';
 import { ArchiveCompanyDto } from './dto/archive-company.dto';
 
@@ -26,22 +28,26 @@ import { ArchiveCompanyDto } from './dto/archive-company.dto';
 export class CompaniesController {
   constructor(private companiesService: CompaniesService) {}
 
- @Get()
- @Permissions('company:view')
- findAll(
-   @CurrentUser() user: CurrentUserPayload,
-   @Query() query: FindCompaniesDto,
- ) {
-   return this.companiesService.findAll(user, query, {
-     stage: query.stage,
-     priority: query.priority,
-     withoutOwner: query.withoutOwner === 'true',
-     search: query.search,
-     ownerId: query.ownerId,
-     includeArchived: query.includeArchived === 'true',
-     archivedOnly: query.archivedOnly === 'true',
-   });
- }
+  @Get()
+  @Permissions('company:view')
+  findAll(
+    @CurrentUser() user: CurrentUserPayload,
+    @Query() query: FindCompaniesDto,
+  ) {
+    return this.companiesService.findAll(user, query, {
+      stage: query.stage,
+      priority: query.priority,
+      industryId: query.industryId,
+      industry: query.industry,
+      sourceId: query.sourceId,
+      source: query.source,
+      withoutOwner: query.withoutOwner === 'true',
+      search: query.search,
+      ownerId: query.ownerId,
+      includeArchived: query.includeArchived === 'true',
+      archivedOnly: query.archivedOnly === 'true',
+    });
+  }
 
   @Get(':id')
   @Permissions('company:view')
@@ -96,8 +102,8 @@ export class CompaniesController {
     return this.companiesService.restore(id, user);
   }
 
-  @Permissions('company:bulk-change-owner')
   @Patch('bulk/owner')
+  @Permissions('company:bulk-change-owner')
   bulkChangeOwner(
     @Body() dto: BulkChangeOwnerDto,
     @CurrentUser() user: CurrentUserPayload,
@@ -105,8 +111,8 @@ export class CompaniesController {
     return this.companiesService.bulkChangeOwner(dto, user);
   }
 
-  @Permissions('company:change-owner')
   @Patch(':id/owner')
+  @Permissions('company:change-owner')
   changeOwner(
     @Param('id') id: string,
     @Body() dto: ChangeOwnerDto,

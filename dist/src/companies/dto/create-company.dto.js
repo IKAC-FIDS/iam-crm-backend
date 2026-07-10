@@ -26,6 +26,11 @@ __decorate([
 ], CreateCompanyDto.prototype, "brandName", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsUUID)(),
+    __metadata("design:type", String)
+], CreateCompanyDto.prototype, "industryId", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], CreateCompanyDto.prototype, "industry", void 0);
@@ -41,7 +46,7 @@ __decorate([
 ], CreateCompanyDto.prototype, "priority", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsUUID)(),
     __metadata("design:type", String)
 ], CreateCompanyDto.prototype, "ownerId", void 0);
 __decorate([
@@ -54,6 +59,11 @@ __decorate([
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], CreateCompanyDto.prototype, "headOfficeCity", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsUUID)(),
+    __metadata("design:type", String)
+], CreateCompanyDto.prototype, "sourceId", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),

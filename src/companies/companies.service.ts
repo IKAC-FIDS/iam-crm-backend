@@ -1,18 +1,18 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
-  BadRequestException,
 } from '@nestjs/common';
 import { LegacyPipelineStage, Priority, Prisma, UserRole } from '@prisma/client';
+import { AuditLogService } from '../audit-log/audit-log.service';
+import { CurrentUserPayload } from '../common/decorators/current-user.decorator';
+import { PaginatedResponse, PaginationDto } from '../common/dto/pagination.dto';
 import { PrismaService } from '../prisma/prisma.service';
+import { ArchiveCompanyDto } from './dto/archive-company.dto';
+import { ChangeOwnerDto, BulkChangeOwnerDto } from './dto/change-owner.dto';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
-import { ChangeOwnerDto, BulkChangeOwnerDto } from './dto/change-owner.dto';
-import { CurrentUserPayload } from '../common/decorators/current-user.decorator';
-import { PaginationDto, PaginatedResponse } from '../common/dto/pagination.dto';
-import { ArchiveCompanyDto } from './dto/archive-company.dto';
-import { AuditLogService } from '../audit-log/audit-log.service';
 
 @Injectable()
 export class CompaniesService {
@@ -21,15 +21,16 @@ export class CompaniesService {
     private audit: AuditLogService,
   ) {}
 
-  // ============================================================
-  // ۱. دریافت لیست شرکت‌ها (با فیلترهای پیشرفته + صفحه‌بندی)
-  // ============================================================
   async findAll(
     user: CurrentUserPayload,
     pagination: PaginationDto,
     filters?: {
       stage?: LegacyPipelineStage;
       priority?: Priority;
+      industryId?: string;
+      industry?: string;
+      sourceId?: string;
+      source?: string;
       withoutOwner?: boolean;
       search?: string;
       ownerId?: string;
@@ -43,32 +44,17 @@ export class CompaniesService {
 
     let where: Prisma.CompanyWhereInput = {};
 
-    // ============================================================
-    // دسترسی بر اساس نقش
-    // ============================================================
     if (user.role === UserRole.REP) {
-      // فروشنده: فقط شرکت‌های خودش
       where.ownerId = user.userId;
     } else if (user.role === UserRole.MANAGER) {
-      // مدیر فروش: فقط شرکت‌های تیم خودش
       if (user.team) {
         where.owner = { team: user.team };
       } else {
-        // اگر MANAGER تیم ندارد، هیچ شرکتی نبیند
         where = { id: { in: [] } };
       }
     } else if (user.role === UserRole.BOARDS) {
-      // کاربر BOARDS: هیچ شرکتی را نمی‌بیند
       where = { id: { in: [] } };
     }
-    // ADMIN: همه شرکت‌ها، where خالی می‌ماند
-
-    // ============================================================
-    // فیلترهای اضافی
-    // نکته مهم:
-    // این فیلترها نباید داخل Object.keys(where).length باشند،
-    // چون برای ADMIN مقدار where در ابتدا خالی است و فیلترها اعمال نمی‌شوند.
-    // ============================================================
 
     if (filters?.withoutOwner && user.role !== UserRole.REP) {
       where.ownerId = null;
@@ -82,8 +68,25 @@ export class CompaniesService {
       where.priority = filters.priority;
     }
 
+    if (filters?.industryId) {
+      where.industryId = filters.industryId;
+    } else if (filters?.industry?.trim()) {
+      where.industry = {
+        equals: filters.industry.trim(),
+        mode: 'insensitive',
+      };
+    }
+
+    if (filters?.sourceId) {
+      where.sourceId = filters.sourceId;
+    } else if (filters?.source?.trim()) {
+      where.source = {
+        equals: filters.source.trim(),
+        mode: 'insensitive',
+      };
+    }
+
     if (filters?.ownerId) {
-      // REP نباید بتواند با ownerId از scope خودش خارج شود
       if (user.role === UserRole.ADMIN || user.role === UserRole.MANAGER) {
         where.ownerId = filters.ownerId;
       }
@@ -93,10 +96,13 @@ export class CompaniesService {
       const search = filters.search.trim();
 
       where.OR = [
-        { legalName: { contains: search } },
-        { brandName: { contains: search } },
-        { industry: { contains: search } },
-        { headOfficeCity: { contains: search } },
+        { legalName: { contains: search, mode: 'insensitive' } },
+        { brandName: { contains: search, mode: 'insensitive' } },
+        { industry: { contains: search, mode: 'insensitive' } },
+        { headOfficeCity: { contains: search, mode: 'insensitive' } },
+        { industryRef: { name: { contains: search, mode: 'insensitive' } } },
+        { sourceRef: { name: { contains: search, mode: 'insensitive' } } },
+        { sourceRef: { code: { contains: search, mode: 'insensitive' } } },
       ];
     }
 
@@ -115,6 +121,22 @@ export class CompaniesService {
               id: true,
               fullName: true,
               team: true,
+            },
+          },
+          industryRef: {
+            select: {
+              id: true,
+              name: true,
+              description: true,
+            },
+          },
+          sourceRef: {
+            select: {
+              id: true,
+              code: true,
+              name: true,
+              description: true,
+              isActive: true,
             },
           },
         },
@@ -140,11 +162,7 @@ export class CompaniesService {
     };
   }
 
-  // ============================================================
-  // ۲. دریافت یک شرکت
-  // ============================================================
   async findOne(id: string, user: CurrentUserPayload) {
-    // جلوگیری از دسترسی BOARDS به شرکت‌ها
     if (user.role === UserRole.BOARDS) {
       throw new ForbiddenException('شما دسترسی به شرکت‌ها را ندارید');
     }
@@ -153,12 +171,21 @@ export class CompaniesService {
       where: { id },
       include: {
         owner: { select: { id: true, fullName: true, team: true } },
+        industryRef: true,
+        sourceRef: true,
         people: true,
         branches: true,
         socialChannels: true,
         callCard: true,
         activities: { orderBy: { occurredAt: 'desc' }, take: 20 },
         stageHistory: { orderBy: { changedAt: 'desc' } },
+        opportunities: {
+          include: {
+            stage: true,
+            owner: { select: { id: true, fullName: true, email: true, team: true } },
+          },
+          orderBy: { updatedAt: 'desc' },
+        },
       },
     });
 
@@ -169,30 +196,49 @@ export class CompaniesService {
     return company;
   }
 
-  // ============================================================
-  // ۳. ایجاد شرکت جدید
-  // ============================================================
   async create(dto: CreateCompanyDto, user: CurrentUserPayload) {
-    // جلوگیری از ایجاد شرکت توسط BOARDS
     if (user.role === UserRole.BOARDS) {
       throw new ForbiddenException('شما اجازه ایجاد شرکت را ندارید');
     }
 
+    const { industryId, industry, sourceId, source, ...companyData } = dto;
+
+    const normalizedRefs = await this.resolveCompanyReferences({
+      industryId,
+      industry,
+      sourceId,
+      source,
+      applyDefaultSource: true,
+    });
+
     const company = await this.prisma.company.create({
       data: {
-        ...dto,
+        ...companyData,
+        industryId: normalizedRefs.industryId,
+        industry: normalizedRefs.industryName,
+        sourceId: normalizedRefs.sourceId,
+        source: normalizedRefs.sourceCode,
         ownerId: dto.ownerId ?? user.userId,
       },
+      include: {
+        owner: { select: { id: true, fullName: true, team: true } },
+        industryRef: true,
+        sourceRef: true,
+      },
     });
-    await this.audit.record({ actorId: user.userId, entityType: 'company', entityId: company.id, action: 'company.created', after: company });
+
+    await this.audit.record({
+      actorId: user.userId,
+      entityType: 'company',
+      entityId: company.id,
+      action: 'company.created',
+      after: company,
+    });
+
     return company;
   }
 
-  // ============================================================
-  // ۴. ویرایش شرکت
-  // ============================================================
   async update(id: string, dto: UpdateCompanyDto, user: CurrentUserPayload) {
-    // جلوگیری از ویرایش توسط BOARDS
     if (user.role === UserRole.BOARDS) {
       throw new ForbiddenException('شما اجازه ویرایش شرکت را ندارید');
     }
@@ -203,28 +249,60 @@ export class CompaniesService {
 
     this.assertAccess(company, user);
 
+    const { industryId, industry, sourceId, source, ...companyData } = dto;
+
+    const updateData: Prisma.CompanyUncheckedUpdateInput = {
+      ...companyData,
+    };
+
+    if (industryId !== undefined || industry !== undefined) {
+      const normalizedIndustry = await this.resolveIndustryReference(
+        industryId,
+        industry,
+      );
+
+      updateData.industryId = normalizedIndustry.industryId;
+      updateData.industry = normalizedIndustry.industryName;
+    }
+
+    if (sourceId !== undefined || source !== undefined) {
+      const normalizedSource = await this.resolveSourceReference(
+        sourceId,
+        source,
+        false,
+      );
+
+      updateData.sourceId = normalizedSource.sourceId;
+      updateData.source = normalizedSource.sourceCode;
+    }
+
     const updated = await this.prisma.company.update({
       where: { id },
-      data: dto,
+      data: updateData,
+      include: {
+        owner: { select: { id: true, fullName: true, team: true } },
+        industryRef: true,
+        sourceRef: true,
+      },
     });
-    await this.audit.record({ actorId: user.userId, entityType: 'company', entityId: id, action: 'company.updated', before: company, after: updated });
+
+    await this.audit.record({
+      actorId: user.userId,
+      entityType: 'company',
+      entityId: id,
+      action: 'company.updated',
+      before: company,
+      after: updated,
+    });
+
     return updated;
   }
 
-  // ============================================================
-  // ۵. تغییر مرحله پایپ‌لاین
-  // ============================================================
-
-
-  // ============================================================
-  // ۶. تغییر مالکیت یک شرکت
-  // ============================================================
   async changeOwner(
     id: string,
     dto: ChangeOwnerDto,
     user: CurrentUserPayload,
   ) {
-    // جلوگیری از تغییر مالکیت توسط BOARDS
     if (user.role === UserRole.BOARDS) {
       throw new ForbiddenException('شما اجازه تغییر مالکیت شرکت را ندارید');
     }
@@ -260,7 +338,16 @@ export class CompaniesService {
       where: { id },
       data: { ownerId: dto.newOwnerId },
     });
-    await this.audit.record({ actorId: user.userId, entityType: 'company', entityId: id, action: 'company.owner_changed', before: { ownerId: company.ownerId }, after: { ownerId: updated.ownerId } });
+
+    await this.audit.record({
+      actorId: user.userId,
+      entityType: 'company',
+      entityId: id,
+      action: 'company.owner_changed',
+      before: { ownerId: company.ownerId },
+      after: { ownerId: updated.ownerId },
+    });
+
     return updated;
   }
 
@@ -269,15 +356,33 @@ export class CompaniesService {
       where: { id },
       include: { owner: { select: { team: true } } },
     });
+
     if (!company) throw new NotFoundException('شرکت پیدا نشد');
+
     this.assertArchiveAccess(company, user);
-    if (company.archivedAt) throw new BadRequestException('شرکت قبلاً بایگانی شده است');
+
+    if (company.archivedAt) {
+      throw new BadRequestException('شرکت قبلاً بایگانی شده است');
+    }
 
     const archived = await this.prisma.company.update({
       where: { id },
-      data: { archivedAt: new Date(), archivedById: user.userId, archiveReason: dto.reason },
+      data: {
+        archivedAt: new Date(),
+        archivedById: user.userId,
+        archiveReason: dto.reason,
+      },
     });
-    await this.audit.record({ actorId: user.userId, entityType: 'company', entityId: id, action: 'company.archived', before: company, after: archived });
+
+    await this.audit.record({
+      actorId: user.userId,
+      entityType: 'company',
+      entityId: id,
+      action: 'company.archived',
+      before: company,
+      after: archived,
+    });
+
     return archived;
   }
 
@@ -286,26 +391,40 @@ export class CompaniesService {
       where: { id },
       include: { owner: { select: { team: true } } },
     });
+
     if (!company) throw new NotFoundException('شرکت پیدا نشد');
+
     this.assertArchiveAccess(company, user);
-    if (!company.archivedAt) throw new BadRequestException('شرکت بایگانی نشده است');
+
+    if (!company.archivedAt) {
+      throw new BadRequestException('شرکت بایگانی نشده است');
+    }
 
     const restored = await this.prisma.company.update({
       where: { id },
-      data: { archivedAt: null, archivedById: null, archiveReason: null },
+      data: {
+        archivedAt: null,
+        archivedById: null,
+        archiveReason: null,
+      },
     });
-    await this.audit.record({ actorId: user.userId, entityType: 'company', entityId: id, action: 'company.restored', before: company, after: restored });
+
+    await this.audit.record({
+      actorId: user.userId,
+      entityType: 'company',
+      entityId: id,
+      action: 'company.restored',
+      before: company,
+      after: restored,
+    });
+
     return restored;
   }
 
-  // ============================================================
-  // ۷. تغییر مالکیت گروهی شرکت‌ها
-  // ============================================================
   async bulkChangeOwner(
     dto: BulkChangeOwnerDto,
     user: CurrentUserPayload,
   ) {
-    // جلوگیری از تغییر مالکیت گروهی توسط BOARDS
     if (user.role === UserRole.BOARDS) {
       throw new ForbiddenException('شما اجازه تغییر مالکیت گروهی شرکت‌ها را ندارید');
     }
@@ -350,15 +469,19 @@ export class CompaniesService {
       data: { ownerId: dto.newOwnerId },
     });
 
-    await Promise.all(companies.map((company) => this.audit.record({
-      actorId: user.userId,
-      entityType: 'company',
-      entityId: company.id,
-      action: 'company.owner_changed',
-      before: { ownerId: company.ownerId },
-      after: { ownerId: dto.newOwnerId },
-      metadata: { bulk: true },
-    })));
+    await Promise.all(
+      companies.map((company) =>
+        this.audit.record({
+          actorId: user.userId,
+          entityType: 'company',
+          entityId: company.id,
+          action: 'company.owner_changed',
+          before: { ownerId: company.ownerId },
+          after: { ownerId: dto.newOwnerId },
+          metadata: { bulk: true },
+        }),
+      ),
+    );
 
     return {
       message: `${result.count} شرکت با موفقیت به کاربر ${newOwner.fullName} اختصاص یافت`,
@@ -366,14 +489,10 @@ export class CompaniesService {
     };
   }
 
-  // ============================================================
-  // ۸. متد کمکی: بررسی دسترسی عمومی
-  // ============================================================
   private assertAccess(
     company: { ownerId: string | null },
     user: CurrentUserPayload,
   ) {
-    // BOARDS قبلاً در متدهای جداگانه بررسی شده، اما برای اطمینان:
     if (user.role === UserRole.BOARDS) {
       throw new ForbiddenException('شما دسترسی به شرکت‌ها را ندارید');
     }
@@ -381,19 +500,25 @@ export class CompaniesService {
     if (user.role === UserRole.REP && company.ownerId !== user.userId) {
       throw new ForbiddenException('شما به این شرکت دسترسی ندارید');
     }
-
-    // MANAGER و ADMIN دسترسی کامل دارند
   }
 
-  private assertArchiveAccess(company: { owner?: { team: string | null } | null }, user: CurrentUserPayload) {
+  private assertArchiveAccess(
+    company: { owner?: { team: string | null } | null },
+    user: CurrentUserPayload,
+  ) {
     if (user.role === UserRole.ADMIN) return;
-    if (user.role === UserRole.MANAGER && user.team && company.owner?.team === user.team) return;
+
+    if (
+      user.role === UserRole.MANAGER &&
+      user.team &&
+      company.owner?.team === user.team
+    ) {
+      return;
+    }
+
     throw new ForbiddenException('شما اجازه بایگانی یا بازیابی این شرکت را ندارید');
   }
 
-  // ============================================================
-  // ۹. متد کمکی: بررسی دسترسی تغییر مالکیت
-  // ============================================================
   private async assertChangeOwnerAccess(
     company: any,
     user: CurrentUserPayload,
@@ -419,5 +544,158 @@ export class CompaniesService {
     }
 
     throw new ForbiddenException('شما اجازه تغییر مالکیت شرکت‌ها را ندارید');
+  }
+
+  private async resolveCompanyReferences(input: {
+    industryId?: string;
+    industry?: string;
+    sourceId?: string;
+    source?: string;
+    applyDefaultSource: boolean;
+  }) {
+    const normalizedIndustry = await this.resolveIndustryReference(
+      input.industryId,
+      input.industry,
+    );
+
+    const normalizedSource = await this.resolveSourceReference(
+      input.sourceId,
+      input.source,
+      input.applyDefaultSource,
+    );
+
+    return {
+      ...normalizedIndustry,
+      ...normalizedSource,
+    };
+  }
+
+  private async resolveIndustryReference(
+    industryId?: string,
+    industryName?: string,
+  ): Promise<{
+    industryId: string | null;
+    industryName: string | null;
+  }> {
+    if (industryId) {
+      const industry = await this.prisma.industry.findUnique({
+        where: { id: industryId },
+      });
+
+      if (!industry) {
+        throw new BadRequestException('صنعت انتخاب‌شده معتبر نیست');
+      }
+
+      return {
+        industryId: industry.id,
+        industryName: industry.name,
+      };
+    }
+
+    const normalizedName = industryName?.trim();
+
+    if (!normalizedName) {
+      return {
+        industryId: null,
+        industryName: null,
+      };
+    }
+
+    const industry = await this.prisma.industry.findFirst({
+      where: {
+        name: {
+          equals: normalizedName,
+          mode: 'insensitive',
+        },
+      },
+    });
+
+    if (!industry) {
+      throw new BadRequestException(
+        'صنعت باید از کتابخانه صنایع انتخاب شود. مقدار متنی آزاد مجاز نیست',
+      );
+    }
+
+    return {
+      industryId: industry.id,
+      industryName: industry.name,
+    };
+  }
+
+  private async resolveSourceReference(
+    sourceId?: string,
+    source?: string,
+    applyDefaultSource = false,
+  ): Promise<{
+    sourceId: string | null;
+    sourceCode: string | null;
+  }> {
+    if (sourceId) {
+      const leadSource = await this.prisma.leadSource.findUnique({
+        where: { id: sourceId },
+      });
+
+      if (!leadSource || !leadSource.isActive) {
+        throw new BadRequestException('منبع جذب انتخاب‌شده معتبر یا فعال نیست');
+      }
+
+      return {
+        sourceId: leadSource.id,
+        sourceCode: leadSource.code,
+      };
+    }
+
+    const normalizedSource = source?.trim();
+
+    if (normalizedSource) {
+      const leadSource = await this.prisma.leadSource.findFirst({
+        where: {
+          isActive: true,
+          OR: [
+            {
+              code: {
+                equals: normalizedSource,
+                mode: 'insensitive',
+              },
+            },
+            {
+              name: {
+                equals: normalizedSource,
+                mode: 'insensitive',
+              },
+            },
+          ],
+        },
+      });
+
+      if (!leadSource) {
+        throw new BadRequestException(
+          'منبع جذب باید از کتابخانه Lead Sources انتخاب شود. مقدار متنی آزاد مجاز نیست',
+        );
+      }
+
+      return {
+        sourceId: leadSource.id,
+        sourceCode: leadSource.code,
+      };
+    }
+
+    if (applyDefaultSource) {
+      const defaultLeadSource = await this.prisma.leadSource.findUnique({
+        where: { code: 'SAM_LIST' },
+      });
+
+      if (defaultLeadSource?.isActive) {
+        return {
+          sourceId: defaultLeadSource.id,
+          sourceCode: defaultLeadSource.code,
+        };
+      }
+    }
+
+    return {
+      sourceId: null,
+      sourceCode: null,
+    };
   }
 }
