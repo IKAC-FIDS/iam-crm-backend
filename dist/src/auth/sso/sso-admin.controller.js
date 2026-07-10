@@ -14,13 +14,10 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SsoAdminController = void 0;
 const common_1 = require("@nestjs/common");
-const client_1 = require("@prisma/client");
 const current_user_decorator_1 = require("../../common/decorators/current-user.decorator");
 const permissions_decorator_1 = require("../../common/decorators/permissions.decorator");
-const roles_decorator_1 = require("../../common/decorators/roles.decorator");
 const jwt_auth_guard_1 = require("../../common/guards/jwt-auth.guard");
 const permissions_guard_1 = require("../../common/guards/permissions.guard");
-const roles_guard_1 = require("../../common/guards/roles.guard");
 const create_sso_provider_dto_1 = require("./dto/create-sso-provider.dto");
 const update_sso_provider_dto_1 = require("./dto/update-sso-provider.dto");
 const sso_provider_service_1 = require("./sso-provider.service");
@@ -65,7 +62,6 @@ __decorate([
 ], SsoAdminController.prototype, "getProvider", null);
 __decorate([
     (0, common_1.Post)(),
-    (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN),
     (0, permissions_decorator_1.Permissions)('sso-provider:manage'),
     __param(0, (0, common_1.Body)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
@@ -75,7 +71,6 @@ __decorate([
 ], SsoAdminController.prototype, "createProvider", null);
 __decorate([
     (0, common_1.Patch)(':id'),
-    (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN),
     (0, permissions_decorator_1.Permissions)('sso-provider:manage'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
@@ -86,7 +81,6 @@ __decorate([
 ], SsoAdminController.prototype, "updateProvider", null);
 __decorate([
     (0, common_1.Patch)(':id/disable'),
-    (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN),
     (0, permissions_decorator_1.Permissions)('sso-provider:manage'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
@@ -96,7 +90,6 @@ __decorate([
 ], SsoAdminController.prototype, "disableProvider", null);
 __decorate([
     (0, common_1.Delete)(':id'),
-    (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN),
     (0, permissions_decorator_1.Permissions)('sso-provider:manage'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
@@ -105,7 +98,7 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], SsoAdminController.prototype, "deleteProvider", null);
 exports.SsoAdminController = SsoAdminController = __decorate([
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard, permissions_guard_1.PermissionsGuard),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, permissions_guard_1.PermissionsGuard),
     (0, common_1.Controller)('admin/sso-providers'),
     __metadata("design:paramtypes", [sso_provider_service_1.SsoProviderService])
 ], SsoAdminController);

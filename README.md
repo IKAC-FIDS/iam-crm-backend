@@ -796,6 +796,28 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
   - `src/common/guards/permissions.guard.ts`
   - `src/admin/admin-permissions.controller.ts`
 
+### fix 000025 - Add granular passkey administration permissions
+
+- Replaced legacy admin role checks in passkey administration routes with granular permissions.
+- Kept self-service passkey routes under authenticated-user access only:
+  - `GET /api/me/passkeys`
+  - `POST /api/me/passkeys/registration/options`
+  - `POST /api/me/passkeys/registration/verify`
+  - `DELETE /api/me/passkeys/:id`
+- Kept passkey authentication routes public:
+  - `POST /api/auth/passkeys/authentication/options`
+  - `POST /api/auth/passkeys/authentication/verify`
+- Protected admin passkey routes with policy-driven permissions:
+  - `GET /api/admin/users/:id/passkeys` requires `user:passkey:view`
+  - `DELETE /api/admin/users/:id/passkeys/:passkeyId` requires `user:passkey:manage`
+- Confirmed passkey administration permissions are seeded:
+  - `user:passkey:view`
+  - `user:passkey:manage`
+- No Prisma schema migration was required.
+- Important changed/new files:
+  - `src/auth/passkeys/passkeys.controller.ts`
+  - `prisma/seed.ts`
+
 ---
 
 **Built with ❤️ for sales team**

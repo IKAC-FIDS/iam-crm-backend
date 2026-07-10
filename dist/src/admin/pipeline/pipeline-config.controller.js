@@ -14,13 +14,10 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.PipelineConfigController = void 0;
 const common_1 = require("@nestjs/common");
-const client_1 = require("@prisma/client");
 const current_user_decorator_1 = require("../../common/decorators/current-user.decorator");
 const permissions_decorator_1 = require("../../common/decorators/permissions.decorator");
-const roles_decorator_1 = require("../../common/decorators/roles.decorator");
 const jwt_auth_guard_1 = require("../../common/guards/jwt-auth.guard");
 const permissions_guard_1 = require("../../common/guards/permissions.guard");
-const roles_guard_1 = require("../../common/guards/roles.guard");
 const create_stage_dto_1 = require("./dto/create-stage.dto");
 const create_transition_dto_1 = require("./dto/create-transition.dto");
 const reorder_stages_dto_1 = require("./dto/reorder-stages.dto");
@@ -52,7 +49,6 @@ __decorate([
 ], PipelineConfigController.prototype, "getStages", null);
 __decorate([
     (0, common_1.Post)('stages'),
-    (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN),
     (0, permissions_decorator_1.Permissions)('pipeline:config:manage'),
     __param(0, (0, common_1.Body)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
@@ -62,7 +58,6 @@ __decorate([
 ], PipelineConfigController.prototype, "createStage", null);
 __decorate([
     (0, common_1.Patch)('stages/reorder'),
-    (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN),
     (0, permissions_decorator_1.Permissions)('pipeline:config:manage'),
     __param(0, (0, common_1.Body)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
@@ -80,7 +75,6 @@ __decorate([
 ], PipelineConfigController.prototype, "getStage", null);
 __decorate([
     (0, common_1.Patch)('stages/:id'),
-    (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN),
     (0, permissions_decorator_1.Permissions)('pipeline:config:manage'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
@@ -91,7 +85,6 @@ __decorate([
 ], PipelineConfigController.prototype, "updateStage", null);
 __decorate([
     (0, common_1.Delete)('stages/:id'),
-    (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN),
     (0, permissions_decorator_1.Permissions)('pipeline:config:manage'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Query)('replacementStageId')),
@@ -109,7 +102,6 @@ __decorate([
 ], PipelineConfigController.prototype, "getTransitions", null);
 __decorate([
     (0, common_1.Post)('transitions'),
-    (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN),
     (0, permissions_decorator_1.Permissions)('pipeline:transition:manage'),
     __param(0, (0, common_1.Body)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
@@ -119,7 +111,6 @@ __decorate([
 ], PipelineConfigController.prototype, "createTransition", null);
 __decorate([
     (0, common_1.Patch)('transitions/:id'),
-    (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN),
     (0, permissions_decorator_1.Permissions)('pipeline:transition:manage'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
@@ -130,7 +121,6 @@ __decorate([
 ], PipelineConfigController.prototype, "updateTransition", null);
 __decorate([
     (0, common_1.Delete)('transitions/:id'),
-    (0, roles_decorator_1.Roles)(client_1.UserRole.ADMIN),
     (0, permissions_decorator_1.Permissions)('pipeline:transition:manage'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
@@ -139,7 +129,7 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], PipelineConfigController.prototype, "deleteTransition", null);
 exports.PipelineConfigController = PipelineConfigController = __decorate([
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard, permissions_guard_1.PermissionsGuard),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, permissions_guard_1.PermissionsGuard),
     (0, common_1.Controller)('admin/pipeline'),
     __metadata("design:paramtypes", [pipeline_config_service_1.PipelineConfigService])
 ], PipelineConfigController);
