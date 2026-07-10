@@ -14,15 +14,13 @@ import {
   CurrentUserPayload,
 } from '../../common/decorators/current-user.decorator';
 import { Permissions } from '../../common/decorators/permissions.decorator';
-import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
-import { RolesGuard } from '../../common/guards/roles.guard';
 import { CreateSsoProviderDto } from './dto/create-sso-provider.dto';
 import { UpdateSsoProviderDto } from './dto/update-sso-provider.dto';
 import { SsoProviderService } from './sso-provider.service';
 
-@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('admin/sso-providers')
 export class SsoAdminController {
   constructor(private readonly service: SsoProviderService) {}
@@ -40,7 +38,6 @@ export class SsoAdminController {
   }
 
   @Post()
-  @Roles(UserRole.ADMIN)
   @Permissions('sso-provider:manage')
   createProvider(
     @Body() dto: CreateSsoProviderDto,
@@ -50,7 +47,6 @@ export class SsoAdminController {
   }
 
   @Patch(':id')
-  @Roles(UserRole.ADMIN)
   @Permissions('sso-provider:manage')
   updateProvider(
     @Param('id') id: string,
@@ -61,7 +57,6 @@ export class SsoAdminController {
   }
 
   @Patch(':id/disable')
-  @Roles(UserRole.ADMIN)
   @Permissions('sso-provider:manage')
   disableProvider(
     @Param('id') id: string,
@@ -71,7 +66,6 @@ export class SsoAdminController {
   }
 
   @Delete(':id')
-  @Roles(UserRole.ADMIN)
   @Permissions('sso-provider:manage')
   deleteProvider(
     @Param('id') id: string,
