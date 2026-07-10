@@ -1087,6 +1087,77 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
   - `src/opportunities/opportunities.service.ts`
   - `src/app.module.ts`
 
+### fix 000034 - Add proposal, proforma, contract, and payment tracking
+
+- Added commercial document tracking for opportunities.
+- Added supported commercial document types:
+  - `PROPOSAL`
+  - `PROFORMA`
+  - `CONTRACT`
+- Added commercial document lifecycle statuses:
+  - `DRAFT`
+  - `SENT`
+  - `ACCEPTED`
+  - `REJECTED`
+  - `SIGNED`
+  - `CANCELLED`
+  - `EXPIRED`
+- Added payment tracking for opportunities.
+- Added payment statuses:
+  - `PENDING`
+  - `PARTIAL`
+  - `PAID`
+  - `OVERDUE`
+  - `CANCELLED`
+  - `REFUNDED`
+- Added payment methods:
+  - `BANK_TRANSFER`
+  - `CASH`
+  - `CHECK`
+  - `CARD`
+  - `OTHER`
+- Added commercial document API:
+  - `GET /api/opportunities/:opportunityId/commercial-documents`
+  - `POST /api/opportunities/:opportunityId/commercial-documents`
+  - `GET /api/opportunities/:opportunityId/commercial-documents/:documentId`
+  - `PATCH /api/opportunities/:opportunityId/commercial-documents/:documentId`
+  - `PATCH /api/opportunities/:opportunityId/commercial-documents/:documentId/status`
+  - `DELETE /api/opportunities/:opportunityId/commercial-documents/:documentId`
+- Added payment API:
+  - `GET /api/opportunities/:opportunityId/payments`
+  - `POST /api/opportunities/:opportunityId/payments`
+  - `GET /api/opportunities/:opportunityId/payments/:paymentId`
+  - `PATCH /api/opportunities/:opportunityId/payments/:paymentId`
+  - `PATCH /api/opportunities/:opportunityId/payments/:paymentId/mark-paid`
+  - `PATCH /api/opportunities/:opportunityId/payments/:paymentId/cancel`
+  - `DELETE /api/opportunities/:opportunityId/payments/:paymentId`
+- Added permissions:
+  - `commercial-document:view`
+  - `commercial-document:manage`
+  - `payment:view`
+  - `payment:manage`
+- Updated opportunity detail response to include:
+  - `commercialDocuments`
+  - `payments`
+- Added audit logs for document and payment changes.
+- Important changed/new files:
+  - `prisma/schema.prisma`
+  - `prisma/seed.ts`
+  - `src/opportunities/dto/create-commercial-document.dto.ts`
+  - `src/opportunities/dto/update-commercial-document.dto.ts`
+  - `src/opportunities/dto/change-commercial-document-status.dto.ts`
+  - `src/opportunities/dto/find-commercial-documents.dto.ts`
+  - `src/opportunities/dto/create-opportunity-payment.dto.ts`
+  - `src/opportunities/dto/update-opportunity-payment.dto.ts`
+  - `src/opportunities/dto/mark-payment-paid.dto.ts`
+  - `src/opportunities/dto/find-opportunity-payments.dto.ts`
+  - `src/opportunities/opportunity-commercial-documents.controller.ts`
+  - `src/opportunities/opportunity-commercial-documents.service.ts`
+  - `src/opportunities/opportunity-payments.controller.ts`
+  - `src/opportunities/opportunity-payments.service.ts`
+  - `src/opportunities/opportunities.module.ts`
+  - `src/opportunities/opportunities.service.ts`
+
 ---
 
 **Built with ❤️ for sales team**

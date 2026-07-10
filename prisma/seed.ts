@@ -748,6 +748,12 @@ async function main() {
     { action: 'product:manage', description: 'مدیریت کاتالوگ محصولات و سرویس‌ها' },
     { action: 'opportunity-line-item:view', description: 'مشاهده آیتم‌های مالی فرصت فروش' },
     { action: 'opportunity-line-item:manage', description: 'مدیریت آیتم‌های مالی فرصت فروش' },
+
+    { action: 'commercial-document:view', description: 'مشاهده اسناد تجاری فرصت فروش' },
+    { action: 'commercial-document:manage', description: 'مدیریت اسناد تجاری فرصت فروش' },
+    { action: 'payment:view', description: 'مشاهده پرداخت‌های فرصت فروش' },
+    { action: 'payment:manage', description: 'مدیریت پرداخت‌های فرصت فروش' },
+
   ];
 
   for (const permission of permissions) {
@@ -814,6 +820,11 @@ async function main() {
     'product:view',
     'opportunity-line-item:view',
     'opportunity-line-item:manage',
+
+    'commercial-document:view',
+    'commercial-document:manage',
+    'payment:view',
+    'payment:manage',
   ];
 
   const repActions = [
@@ -855,6 +866,11 @@ async function main() {
     'product:view',
     'opportunity-line-item:view',
     'opportunity-line-item:manage',
+
+    'commercial-document:view',
+    'commercial-document:manage',
+    'payment:view',
+    'payment:manage',
   ];
 
   const boardsActions = [
@@ -867,6 +883,9 @@ async function main() {
     'library:use-case:view',
     'library:lead-source:view',
     'lookup:view',
+
+    'commercial-document:view',
+    'payment:view',
   ];
 
   await syncRolePermissions(UserRole.ADMIN, allActions);

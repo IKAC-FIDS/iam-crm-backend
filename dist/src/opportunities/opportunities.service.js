@@ -46,6 +46,46 @@ const opportunityInclude = {
     _count: {
         select: {
             lineItems: true,
+            commercialDocuments: true,
+            payments: true,
+        },
+    },
+    commercialDocuments: {
+        orderBy: [
+            { createdAt: 'desc' },
+        ],
+        include: {
+            payments: {
+                select: {
+                    id: true,
+                    status: true,
+                    amount: true,
+                    currency: true,
+                    dueDate: true,
+                    paidAt: true,
+                    method: true,
+                    referenceNumber: true,
+                },
+                orderBy: {
+                    createdAt: 'desc',
+                },
+            },
+        },
+    },
+    payments: {
+        orderBy: [
+            { createdAt: 'desc' },
+        ],
+        include: {
+            commercialDocument: {
+                select: {
+                    id: true,
+                    type: true,
+                    status: true,
+                    number: true,
+                    title: true,
+                },
+            },
         },
     },
 };

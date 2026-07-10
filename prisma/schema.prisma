@@ -89,6 +89,39 @@ enum SocialPlatform {
   WEBSITE
 }
 
+enum CommercialDocumentType {
+  PROPOSAL
+  PROFORMA
+  CONTRACT
+}
+
+enum CommercialDocumentStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+  SIGNED
+  CANCELLED
+  EXPIRED
+}
+
+enum PaymentStatus {
+  PENDING
+  PARTIAL
+  PAID
+  OVERDUE
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  BANK_TRANSFER
+  CASH
+  CHECK
+  CARD
+  OTHER
+}
+
 // ============================================================
 // Users & Auth
 // ============================================================
@@ -549,9 +582,11 @@ model Opportunity {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  stageHistories OpportunityStageHistory[]
-  activities     Activity[]
-  lineItems      OpportunityLineItem[]
+  stageHistories       OpportunityStageHistory[]
+  activities           Activity[]
+  lineItems            OpportunityLineItem[]
+  commercialDocuments  OpportunityCommercialDocument[]
+  payments             OpportunityPayment[]
 
   @@index([companyId])
   @@index([ownerId])
@@ -560,6 +595,85 @@ model Opportunity {
   @@index([archivedAt])
   @@index([ownerId, stageId])
   @@map("opportunities")
+}
+
+model OpportunityCommercialDocument {
+  id            String      @id @default(uuid())
+  opportunityId String
+  opportunity   Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+
+  type   CommercialDocumentType
+  status CommercialDocumentStatus @default(DRAFT)
+
+  number  String?
+  version Int     @default(1)
+
+  title       String
+  description String?
+
+  amount   Decimal? @db.Decimal(18, 2)
+  currency String   @default("IRR")
+
+  validUntil DateTime?
+  issuedAt   DateTime?
+  sentAt     DateTime?
+  acceptedAt DateTime?
+  rejectedAt DateTime?
+  signedAt   DateTime?
+
+  fileUrl     String?
+  externalRef String?
+  notes       String?
+
+  createdById String?
+  updatedById String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  payments OpportunityPayment[]
+
+  @@index([opportunityId])
+  @@index([type])
+  @@index([status])
+  @@index([number])
+  @@index([createdAt])
+  @@map("opportunity_commercial_documents")
+}
+
+model OpportunityPayment {
+  id            String      @id @default(uuid())
+  opportunityId String
+  opportunity   Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+
+  commercialDocumentId String?
+  commercialDocument   OpportunityCommercialDocument? @relation(fields: [commercialDocumentId], references: [id], onDelete: SetNull)
+
+  status PaymentStatus @default(PENDING)
+
+  amount   Decimal @db.Decimal(18, 2)
+  currency String  @default("IRR")
+
+  dueDate DateTime?
+  paidAt  DateTime?
+
+  method          PaymentMethod?
+  referenceNumber String?
+  description     String?
+  notes           String?
+
+  createdById String?
+  updatedById String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([opportunityId])
+  @@index([commercialDocumentId])
+  @@index([status])
+  @@index([dueDate])
+  @@index([paidAt])
+  @@map("opportunity_payments")
 }
 
 model ProductCatalogItem {
