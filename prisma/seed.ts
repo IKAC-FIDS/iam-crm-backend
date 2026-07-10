@@ -740,6 +740,9 @@ async function main() {
     { action: 'pipeline:transition:manage', description: 'مدیریت قوانین انتقال پایپ‌لاین' },
     { action: 'sso-provider:view', description: 'مشاهده تنظیمات SSO Providerها', },
     { action: 'sso-provider:manage', description: 'مدیریت تنظیمات SSO Providerها', },
+    { action: 'session:view', description: 'مشاهده نشست‌های فعال کاربر' },
+    { action: 'session:revoke', description: 'لغو نشست‌های فعال کاربر' },
+    { action: 'session:manage', description: 'مدیریت نشست‌های کاربران' },
   ];
 
   for (const permission of permissions) {
@@ -800,6 +803,8 @@ async function main() {
     'library:use-case:view',
     'library:lead-source:view',
     'lookup:view',
+    'session:view',
+    'session:revoke',
   ];
 
   const repActions = [
@@ -834,6 +839,9 @@ async function main() {
     'library:use-case:view',
     'library:lead-source:view',
     'lookup:view',
+
+    'session:view',
+    'session:revoke',
   ];
 
   const boardsActions = [

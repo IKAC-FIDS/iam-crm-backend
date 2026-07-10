@@ -8,12 +8,15 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuthModule = void 0;
 const common_1 = require("@nestjs/common");
+const config_1 = require("@nestjs/config");
 const jwt_1 = require("@nestjs/jwt");
 const passport_1 = require("@nestjs/passport");
-const config_1 = require("@nestjs/config");
-const auth_service_1 = require("./auth.service");
 const auth_controller_1 = require("./auth.controller");
+const auth_service_1 = require("./auth.service");
 const jwt_strategy_1 = require("./jwt.strategy");
+const refresh_token_service_1 = require("./refresh-token.service");
+const sessions_controller_1 = require("./sessions.controller");
+const sessions_service_1 = require("./sessions.service");
 let AuthModule = class AuthModule {
 };
 exports.AuthModule = AuthModule;
@@ -25,14 +28,26 @@ exports.AuthModule = AuthModule = __decorate([
                 imports: [config_1.ConfigModule],
                 useFactory: (configService) => ({
                     secret: configService.get('JWT_SECRET'),
-                    signOptions: { expiresIn: configService.get('JWT_EXPIRES_IN') || '8h' },
+                    signOptions: {
+                        expiresIn: configService.get('JWT_EXPIRES_IN') || '15m',
+                    },
                 }),
                 inject: [config_1.ConfigService],
             }),
         ],
-        providers: [auth_service_1.AuthService, jwt_strategy_1.JwtStrategy],
-        controllers: [auth_controller_1.AuthController],
-        exports: [auth_service_1.AuthService],
+        providers: [
+            auth_service_1.AuthService,
+            jwt_strategy_1.JwtStrategy,
+            refresh_token_service_1.RefreshTokenService,
+            sessions_service_1.SessionsService,
+        ],
+        controllers: [
+            auth_controller_1.AuthController,
+            sessions_controller_1.SessionsController,
+        ],
+        exports: [
+            auth_service_1.AuthService,
+        ],
     })
 ], AuthModule);
 //# sourceMappingURL=auth.module.js.map

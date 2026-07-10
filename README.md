@@ -689,6 +689,35 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 - Preserved the production-safe CORS configuration from fix 000017.
 - Added the `helmet` dependency.
 
+### fix 000019 - Add refresh tokens and session management
+
+- Added persistent refresh token sessions with hashed refresh tokens.
+- Added refresh token rotation on every refresh request.
+- Added HttpOnly cookie handling for refresh tokens.
+- Added `POST /api/auth/refresh`.
+- Added `POST /api/auth/logout`.
+- Added `POST /api/auth/logout-all`.
+- Added `GET /api/auth/sessions` for listing active user sessions.
+- Added `DELETE /api/auth/sessions/:sessionId` for revoking an active user session.
+- Updated SSO ticket exchange to create a refresh session and set the refresh cookie.
+- Added refresh-session Prisma model and migration.
+- Added `REFRESH_TOKEN_EXPIRES_IN` environment setting.
+- Reduced default access-token lifetime to `15m`.
+- Added session-related permissions to seed data.
+- Important changed/new files:
+    - `prisma/schema.prisma`
+    - `src/auth/auth.service.ts`
+    - `src/auth/auth.controller.ts`
+    - `src/auth/auth.module.ts`
+    - `src/auth/refresh-token.service.ts`
+    - `src/auth/sessions.service.ts`
+    - `src/auth/sessions.controller.ts`
+    - `src/auth/sso/sso-exchange.controller.ts`
+    - `src/common/cookies/refresh-token-cookie.ts`
+    - `src/common/validators/env.validator.ts`
+    - `.env.example`
+    - `prisma/seed.ts`
+
 ### fix 000021 - Add SSO relying-party foundation
 
 - Added the initial Prisma foundation for SSO relying-party support.

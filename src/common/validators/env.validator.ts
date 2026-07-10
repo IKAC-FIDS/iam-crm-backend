@@ -32,11 +32,18 @@ export const envValidationSchema = Joi.object({
     }),
 
   JWT_EXPIRES_IN: Joi.string()
-    .default('8h')
-    .pattern(/^\d+[smhdw]$/)
-    .messages({
-      'string.pattern.base': 'JWT_EXPIRES_IN باید فرمت زمان معتبر داشته باشد (مثلاً 8h, 30m, 7d)',
-    }),
+      .default('15m')
+      .pattern(/^\d+[smhdw]$/)
+      .messages({
+        'string.pattern.base': 'JWT_EXPIRES_IN باید فرمت زمان معتبر داشته باشد (مثلاً 15m, 8h, 7d)',
+      }),
+
+    REFRESH_TOKEN_EXPIRES_IN: Joi.string()
+      .default('30d')
+      .pattern(/^\d+[smhdw]$/)
+      .messages({
+        'string.pattern.base': 'REFRESH_TOKEN_EXPIRES_IN باید فرمت زمان معتبر داشته باشد (مثلاً 30d, 12h, 4w)',
+      }),
 
   NODE_ENV: Joi.string()
     .valid('development', 'production', 'test')
@@ -53,12 +60,12 @@ export const envValidationSchema = Joi.object({
     }),
 
   CORS_CREDENTIALS: Joi.boolean()
-    .truthy('true')
-    .falsy('false')
-    .default(false)
-    .messages({
-      'boolean.base': 'CORS_CREDENTIALS باید true یا false باشد',
-    }),
+      .truthy('true')
+      .falsy('false')
+      .default(true)
+      .messages({
+        'boolean.base': 'CORS_CREDENTIALS باید true یا false باشد',
+      }),
 
   // ---------- SSO ----------
   SSO_SECRET_ENCRYPTION_KEY: Joi.string()

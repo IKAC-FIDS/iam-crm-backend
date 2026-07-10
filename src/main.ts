@@ -1,6 +1,7 @@
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
+import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 
@@ -14,6 +15,8 @@ function parseCorsOrigins(value?: string): string[] {
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const config = app.get(ConfigService);
+
+  app.use(cookieParser());
 
   app.use(
     helmet({
@@ -35,7 +38,7 @@ async function bootstrap() {
 
       callback(new Error('Not allowed by CORS'), false);
     },
-    credentials: config.get<boolean>('CORS_CREDENTIALS', false),
+    credentials: config.get<boolean>('CORS_CREDENTIALS', true),
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   });

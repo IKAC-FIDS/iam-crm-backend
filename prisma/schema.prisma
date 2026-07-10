@@ -115,6 +115,7 @@ model User {
   passkeys                UserPasskey[]
   externalIdentities      ExternalIdentity[]
   ssoLoginTickets         SsoLoginTicket[]
+  refreshSessions         RefreshSession[]
 
   @@map("users")
 }
@@ -222,6 +223,32 @@ model SsoLoginTicket {
   @@index([expiresAt])
   @@index([consumedAt])
   @@map("sso_login_tickets")
+}
+
+model RefreshSession {
+  id String @id @default(uuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  refreshTokenHash String @unique
+
+  userAgent String?
+  ipAddress String?
+
+  createdAt  DateTime @default(now())
+  lastUsedAt DateTime @default(now())
+  expiresAt  DateTime
+
+  revokedAt          DateTime?
+  revokedReason      String?
+  replacedBySessionId String?
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([revokedAt])
+  @@index([userId, revokedAt, expiresAt])
+  @@map("refresh_sessions")
 }
 
 // ============================================================

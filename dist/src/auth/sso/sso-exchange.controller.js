@@ -15,33 +15,37 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.SsoExchangeController = void 0;
 const common_1 = require("@nestjs/common");
 const auth_service_1 = require("../auth.service");
+const refresh_token_cookie_1 = require("../../common/cookies/refresh-token-cookie");
 const exchange_sso_ticket_dto_1 = require("./dto/exchange-sso-ticket.dto");
-const sso_ticket_service_1 = require("./sso-ticket.service");
 const prisma_service_1 = require("../../prisma/prisma.service");
-const common_2 = require("@nestjs/common");
+const sso_ticket_service_1 = require("./sso-ticket.service");
 let SsoExchangeController = class SsoExchangeController {
     constructor(ticketService, prisma, authService) {
         this.ticketService = ticketService;
         this.prisma = prisma;
         this.authService = authService;
     }
-    async exchange(dto) {
+    async exchange(dto, req, res) {
         const consumed = await this.ticketService.consumeTicket(dto.ticket);
         const user = await this.prisma.user.findUnique({
             where: { id: consumed.userId },
         });
         if (!user || !user.isActive) {
-            throw new common_2.UnauthorizedException('SSO user is not active');
+            throw new common_1.UnauthorizedException('SSO user is not active');
         }
-        return this.authService.buildLoginResponse(user);
+        const result = await this.authService.buildSessionLoginResponse(user, req);
+        (0, refresh_token_cookie_1.setRefreshTokenCookie)(res, result.refreshToken, result.refreshTokenMaxAgeMs);
+        return this.authService.toPublicAuthResponse(result);
     }
 };
 exports.SsoExchangeController = SsoExchangeController;
 __decorate([
     (0, common_1.Post)('exchange'),
     __param(0, (0, common_1.Body)()),
+    __param(1, (0, common_1.Req)()),
+    __param(2, (0, common_1.Res)({ passthrough: true })),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [exchange_sso_ticket_dto_1.ExchangeSsoTicketDto]),
+    __metadata("design:paramtypes", [exchange_sso_ticket_dto_1.ExchangeSsoTicketDto, Object, Object]),
     __metadata("design:returntype", Promise)
 ], SsoExchangeController.prototype, "exchange", null);
 exports.SsoExchangeController = SsoExchangeController = __decorate([

@@ -62,10 +62,16 @@ exports.envValidationSchema = Joi.object({
         'number.max': 'PORT باید حداکثر ۶۵۵۳۵ باشد',
     }),
     JWT_EXPIRES_IN: Joi.string()
-        .default('8h')
+        .default('15m')
         .pattern(/^\d+[smhdw]$/)
         .messages({
-        'string.pattern.base': 'JWT_EXPIRES_IN باید فرمت زمان معتبر داشته باشد (مثلاً 8h, 30m, 7d)',
+        'string.pattern.base': 'JWT_EXPIRES_IN باید فرمت زمان معتبر داشته باشد (مثلاً 15m, 8h, 7d)',
+    }),
+    REFRESH_TOKEN_EXPIRES_IN: Joi.string()
+        .default('30d')
+        .pattern(/^\d+[smhdw]$/)
+        .messages({
+        'string.pattern.base': 'REFRESH_TOKEN_EXPIRES_IN باید فرمت زمان معتبر داشته باشد (مثلاً 30d, 12h, 4w)',
     }),
     NODE_ENV: Joi.string()
         .valid('development', 'production', 'test')
@@ -81,7 +87,7 @@ exports.envValidationSchema = Joi.object({
     CORS_CREDENTIALS: Joi.boolean()
         .truthy('true')
         .falsy('false')
-        .default(false)
+        .default(true)
         .messages({
         'boolean.base': 'CORS_CREDENTIALS باید true یا false باشد',
     }),

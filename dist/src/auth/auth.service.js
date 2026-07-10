@@ -44,16 +44,22 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuthService = void 0;
 const common_1 = require("@nestjs/common");
+const config_1 = require("@nestjs/config");
 const jwt_1 = require("@nestjs/jwt");
 const bcrypt = __importStar(require("bcryptjs"));
 const prisma_service_1 = require("../prisma/prisma.service");
+const refresh_token_service_1 = require("./refresh-token.service");
 let AuthService = class AuthService {
-    constructor(prisma, jwtService) {
+    constructor(prisma, jwtService, refreshTokenService, config) {
         this.prisma = prisma;
         this.jwtService = jwtService;
+        this.refreshTokenService = refreshTokenService;
+        this.config = config;
     }
-    async login(dto) {
-        const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
+    async login(dto, req) {
+        const user = await this.prisma.user.findUnique({
+            where: { email: dto.email },
+        });
         if (!user || !user.isActive) {
             throw new common_1.UnauthorizedException('ایمیل یا رمز عبور نادرست است');
         }
@@ -61,7 +67,36 @@ let AuthService = class AuthService {
         if (!passwordValid) {
             throw new common_1.UnauthorizedException('ایمیل یا رمز عبور نادرست است');
         }
-        return this.buildLoginResponse(user);
+        return this.buildSessionLoginResponse(user, req);
+    }
+    async refresh(refreshToken, req) {
+        const rotated = await this.refreshTokenService.rotateRefreshToken(refreshToken, req);
+        const accessResponse = await this.buildLoginResponse(rotated.user);
+        return {
+            ...accessResponse,
+            refreshToken: rotated.refreshToken,
+            refreshTokenMaxAgeMs: rotated.refreshTokenMaxAgeMs,
+            refreshTokenExpiresAt: rotated.refreshTokenExpiresAt,
+            refreshSessionId: rotated.refreshSessionId,
+        };
+    }
+    async logout(refreshToken) {
+        if (!refreshToken) {
+            return;
+        }
+        await this.refreshTokenService.revokeByToken(refreshToken, 'LOGOUT');
+    }
+    async logoutAll(userId) {
+        const revokedCount = await this.refreshTokenService.revokeAllUserSessions(userId, 'LOGOUT_ALL');
+        return { revokedCount };
+    }
+    async buildSessionLoginResponse(user, req) {
+        const accessResponse = await this.buildLoginResponse(user);
+        const refreshSession = await this.refreshTokenService.createSession(user.id, req);
+        return {
+            ...accessResponse,
+            ...refreshSession,
+        };
     }
     async buildLoginResponse(user) {
         const rolePermissions = await this.prisma.rolePermission.findMany({
@@ -77,6 +112,7 @@ let AuthService = class AuthService {
         };
         return {
             accessToken: await this.jwtService.signAsync(payload),
+            accessTokenExpiresIn: this.config.get('JWT_EXPIRES_IN', '15m'),
             user: {
                 id: user.id,
                 fullName: user.fullName,
@@ -87,11 +123,21 @@ let AuthService = class AuthService {
             },
         };
     }
+    toPublicAuthResponse(result) {
+        const { refreshToken, refreshTokenMaxAgeMs, refreshTokenExpiresAt, refreshSessionId, ...publicResponse } = result;
+        void refreshToken;
+        void refreshTokenMaxAgeMs;
+        void refreshTokenExpiresAt;
+        void refreshSessionId;
+        return publicResponse;
+    }
 };
 exports.AuthService = AuthService;
 exports.AuthService = AuthService = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
-        jwt_1.JwtService])
+        jwt_1.JwtService,
+        refresh_token_service_1.RefreshTokenService,
+        config_1.ConfigService])
 ], AuthService);
 //# sourceMappingURL=auth.service.js.map

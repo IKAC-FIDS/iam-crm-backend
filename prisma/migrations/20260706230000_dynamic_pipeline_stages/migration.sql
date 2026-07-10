@@ -1,5 +1,6 @@
 -- Evolve the existing config table into the canonical dynamic stage table.
 ALTER TABLE "pipeline_stage_configs" RENAME TO "pipeline_stages";
+ALTER TABLE "pipeline_stages" RENAME CONSTRAINT "pipeline_stage_configs_pkey" TO "pipeline_stages_pkey";
 DROP INDEX "pipeline_stage_configs_stage_key";
 DROP INDEX "pipeline_stage_configs_isActive_sortOrder_idx";
 ALTER TABLE "pipeline_stages" RENAME COLUMN "stage" TO "code";
