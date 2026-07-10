@@ -60,20 +60,19 @@ export class AuthPasskeysController {
   }
 }
 
-@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
-@Roles(UserRole.ADMIN)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('admin/users/:id/passkeys')
 export class AdminUserPasskeysController {
   constructor(private passkeysService: PasskeysService) {}
 
   @Get()
-  @Permissions('user:view')
+  @Permissions('user:passkey:view')
   listForUser(@Param('id') id: string) {
     return this.passkeysService.listForUser(id);
   }
 
   @Delete(':passkeyId')
-  @Permissions('user:manage')
+  @Permissions('user:passkey:manage')
   deleteForUser(
     @Param('id') id: string,
     @Param('passkeyId') passkeyId: string,
