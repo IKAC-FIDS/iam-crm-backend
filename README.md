@@ -1339,6 +1339,67 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
   - `src/tasks/tasks.module.ts`
   - `src/opportunities/opportunities.service.ts`
 
+### fix 000037 - Add notification center
+
+- Added internal notification center.
+- Added notification enums:
+  - `NotificationType`
+  - `NotificationPriority`
+  - `NotificationEntityType`
+- Added `Notification` model.
+- Added notification relations to `User`:
+  - received notifications
+  - actor notifications
+- Added notification APIs:
+  - `GET /api/notifications`
+  - `GET /api/notifications/unread-count`
+  - `POST /api/notifications`
+  - `GET /api/notifications/:id`
+  - `PATCH /api/notifications/read-all`
+  - `PATCH /api/notifications/:id/read`
+  - `PATCH /api/notifications/:id/unread`
+  - `PATCH /api/notifications/:id/archive`
+  - `PATCH /api/notifications/:id/unarchive`
+  - `DELETE /api/notifications/:id`
+- Added notification filters:
+  - type
+  - priority
+  - entity type
+  - entity ID
+  - read/unread status
+  - archived state
+  - search
+- Added unread notification count endpoint.
+- Added manual internal notification sending API.
+- Added notification permissions:
+  - `notification:view`
+  - `notification:manage`
+  - `notification:send`
+- Added notification audit logs for:
+  - create
+  - read
+  - unread
+  - read all
+  - archive
+  - unarchive
+  - delete
+- Integrated notification center with dedicated task management:
+  - task assignment notification
+  - task completion notification
+  - task reschedule notification
+- Important changed/new files:
+  - `prisma/schema.prisma`
+  - `prisma/seed.ts`
+  - `src/notifications/dto/create-notification.dto.ts`
+  - `src/notifications/dto/find-notifications.dto.ts`
+  - `src/notifications/dto/read-all-notifications.dto.ts`
+  - `src/notifications/notifications.controller.ts`
+  - `src/notifications/notifications.service.ts`
+  - `src/notifications/notifications.module.ts`
+  - `src/tasks/tasks.module.ts`
+  - `src/tasks/tasks.service.ts`
+  - `src/app.module.ts`
+
 ---
 
 **Built with ❤️ for sales team**

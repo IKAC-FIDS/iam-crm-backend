@@ -763,6 +763,10 @@ async function main() {
     { action: 'task:assign', description: 'ارجاع کار به کاربر دیگر' },
     { action: 'task:complete', description: 'تکمیل کار' },
     { action: 'task:delete', description: 'حذف کار' },
+
+    { action: 'notification:view', description: 'مشاهده اعلان‌ها' },
+    { action: 'notification:manage', description: 'مدیریت اعلان‌های شخصی' },
+    { action: 'notification:send', description: 'ارسال اعلان داخلی' },
   ];
 
   for (const permission of permissions) {
@@ -844,6 +848,10 @@ async function main() {
     'task:assign',
     'task:complete',
     'task:delete',
+
+    'notification:view',
+    'notification:manage',
+    'notification:send',
   ];
 
   const repActions = [
@@ -898,6 +906,9 @@ async function main() {
     'task:create',
     'task:update',
     'task:complete',
+
+    'notification:view',
+    'notification:manage',
   ];
 
   const boardsActions = [
@@ -917,6 +928,8 @@ async function main() {
     'attachment:view',
 
     'task:view',
+
+    'notification:view',
   ];
 
   await syncRolePermissions(UserRole.ADMIN, allActions);

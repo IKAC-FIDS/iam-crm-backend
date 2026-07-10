@@ -42,6 +42,7 @@ const health_module_1 = require("./health/health.module");
 const product_catalog_module_1 = require("./product-catalog/product-catalog.module");
 const attachments_module_1 = require("./attachments/attachments.module");
 const tasks_module_1 = require("./tasks/tasks.module");
+const notifications_module_1 = require("./notifications/notifications.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -94,6 +95,7 @@ exports.AppModule = AppModule = __decorate([
             product_catalog_module_1.ProductCatalogModule,
             attachments_module_1.AttachmentsModule,
             tasks_module_1.TasksModule,
+            notifications_module_1.NotificationsModule,
         ],
         providers: [
             {

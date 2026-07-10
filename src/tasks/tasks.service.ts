@@ -4,7 +4,15 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, TaskStatus, UserRole } from '@prisma/client';
+import {
+  NotificationEntityType,
+  NotificationPriority,
+  NotificationType,
+  Prisma,
+  TaskStatus,
+  UserRole,
+} from '@prisma/client';
+import { NotificationsService } from '../notifications/notifications.service';
 import { AuditLogService } from '../audit-log/audit-log.service';
 import { CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { PrismaService } from '../prisma/prisma.service';
@@ -92,6 +100,7 @@ export class TasksService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditLogService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async findAll(query: FindTasksDto, user: CurrentUserPayload) {
@@ -181,6 +190,8 @@ export class TasksService {
       after: task,
     });
 
+    await this.notifyTaskAssigned(task, user);
+
     return task;
   }
 
@@ -269,6 +280,8 @@ export class TasksService {
       before: current,
       after: updated,
     });
+
+    await this.notifyTaskAssigned(updated, user);
 
     return updated;
   }
@@ -395,6 +408,8 @@ export class TasksService {
         reminderAt: updated.reminderAt,
       },
     });
+
+    await this.notifyTaskRescheduled(updated, user);
 
     return updated;
   }
@@ -832,4 +847,86 @@ export class TasksService {
 
     return normalized;
   }
+
+private async notifyTaskAssigned(
+  task: {
+    id: string;
+    title: string;
+    assignedToId: string | null;
+  },
+  user: CurrentUserPayload,
+) {
+  if (!task.assignedToId) {
+    return;
+  }
+
+  await this.notifications.notifyUser({
+    recipientId: task.assignedToId,
+    actorId: user.userId,
+    type: NotificationType.TASK_ASSIGNED,
+    priority: NotificationPriority.NORMAL,
+    title: 'کار جدید به شما ارجاع شد',
+    body: task.title,
+    entityType: NotificationEntityType.TASK,
+    entityId: task.id,
+    actionUrl: `/tasks/${task.id}`,
+    skipSelf: true,
+  });
+}
+
+private async notifyTaskCompleted(
+  task: {
+    id: string;
+    title: string;
+    createdById: string | null;
+  },
+  user: CurrentUserPayload,
+) {
+  if (!task.createdById) {
+    return;
+  }
+
+  await this.notifications.notifyUser({
+    recipientId: task.createdById,
+    actorId: user.userId,
+    type: NotificationType.TASK_COMPLETED,
+    priority: NotificationPriority.NORMAL,
+    title: 'یک کار تکمیل شد',
+    body: task.title,
+    entityType: NotificationEntityType.TASK,
+    entityId: task.id,
+    actionUrl: `/tasks/${task.id}`,
+    skipSelf: true,
+  });
+}
+
+private async notifyTaskRescheduled(
+  task: {
+    id: string;
+    title: string;
+    assignedToId: string | null;
+    dueAt: Date | null;
+  },
+  user: CurrentUserPayload,
+) {
+  if (!task.assignedToId) {
+    return;
+  }
+
+  await this.notifications.notifyUser({
+    recipientId: task.assignedToId,
+    actorId: user.userId,
+    type: NotificationType.TASK_RESCHEDULED,
+    priority: NotificationPriority.NORMAL,
+    title: 'زمان‌بندی کار تغییر کرد',
+    body: task.title,
+    entityType: NotificationEntityType.TASK,
+    entityId: task.id,
+    actionUrl: `/tasks/${task.id}`,
+    metadata: {
+      dueAt: task.dueAt?.toISOString() ?? null,
+    },
+    skipSelf: true,
+  });
+}
 }

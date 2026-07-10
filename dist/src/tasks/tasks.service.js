@@ -12,6 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.TasksService = void 0;
 const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
+const notifications_service_1 = require("../notifications/notifications.service");
 const audit_log_service_1 = require("../audit-log/audit-log.service");
 const prisma_service_1 = require("../prisma/prisma.service");
 const taskInclude = {
@@ -85,9 +86,10 @@ const taskInclude = {
     },
 };
 let TasksService = class TasksService {
-    constructor(prisma, audit) {
+    constructor(prisma, audit, notifications) {
         this.prisma = prisma;
         this.audit = audit;
+        this.notifications = notifications;
     }
     async findAll(query, user) {
         const page = query.page ?? 1;
@@ -162,6 +164,7 @@ let TasksService = class TasksService {
             action: 'task.created',
             after: task,
         });
+        await this.notifyTaskAssigned(task, user);
         return task;
     }
     async update(id, dto, user) {
@@ -232,6 +235,7 @@ let TasksService = class TasksService {
             before: current,
             after: updated,
         });
+        await this.notifyTaskAssigned(updated, user);
         return updated;
     }
     async changeStatus(id, dto, user) {
@@ -336,6 +340,7 @@ let TasksService = class TasksService {
                 reminderAt: updated.reminderAt,
             },
         });
+        await this.notifyTaskRescheduled(updated, user);
         return updated;
     }
     async remove(id, user) {
@@ -702,11 +707,66 @@ let TasksService = class TasksService {
         }
         return normalized;
     }
+    async notifyTaskAssigned(task, user) {
+        if (!task.assignedToId) {
+            return;
+        }
+        await this.notifications.notifyUser({
+            recipientId: task.assignedToId,
+            actorId: user.userId,
+            type: client_1.NotificationType.TASK_ASSIGNED,
+            priority: client_1.NotificationPriority.NORMAL,
+            title: 'کار جدید به شما ارجاع شد',
+            body: task.title,
+            entityType: client_1.NotificationEntityType.TASK,
+            entityId: task.id,
+            actionUrl: `/tasks/${task.id}`,
+            skipSelf: true,
+        });
+    }
+    async notifyTaskCompleted(task, user) {
+        if (!task.createdById) {
+            return;
+        }
+        await this.notifications.notifyUser({
+            recipientId: task.createdById,
+            actorId: user.userId,
+            type: client_1.NotificationType.TASK_COMPLETED,
+            priority: client_1.NotificationPriority.NORMAL,
+            title: 'یک کار تکمیل شد',
+            body: task.title,
+            entityType: client_1.NotificationEntityType.TASK,
+            entityId: task.id,
+            actionUrl: `/tasks/${task.id}`,
+            skipSelf: true,
+        });
+    }
+    async notifyTaskRescheduled(task, user) {
+        if (!task.assignedToId) {
+            return;
+        }
+        await this.notifications.notifyUser({
+            recipientId: task.assignedToId,
+            actorId: user.userId,
+            type: client_1.NotificationType.TASK_RESCHEDULED,
+            priority: client_1.NotificationPriority.NORMAL,
+            title: 'زمان‌بندی کار تغییر کرد',
+            body: task.title,
+            entityType: client_1.NotificationEntityType.TASK,
+            entityId: task.id,
+            actionUrl: `/tasks/${task.id}`,
+            metadata: {
+                dueAt: task.dueAt?.toISOString() ?? null,
+            },
+            skipSelf: true,
+        });
+    }
 };
 exports.TasksService = TasksService;
 exports.TasksService = TasksService = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
-        audit_log_service_1.AuditLogService])
+        audit_log_service_1.AuditLogService,
+        notifications_service_1.NotificationsService])
 ], TasksService);
 //# sourceMappingURL=tasks.service.js.map

@@ -33,6 +33,7 @@ import { HealthModule } from './health/health.module';
 import { ProductCatalogModule } from './product-catalog/product-catalog.module';
 import { AttachmentsModule } from './attachments/attachments.module';
 import { TasksModule } from './tasks/tasks.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -82,6 +83,7 @@ import { TasksModule } from './tasks/tasks.module';
     ProductCatalogModule,
     AttachmentsModule,
     TasksModule,
+    NotificationsModule,
   ],
   providers: [
     {
