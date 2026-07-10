@@ -9,6 +9,8 @@ const core_1 = require("@nestjs/core");
 const cookie_parser_1 = __importDefault(require("cookie-parser"));
 const helmet_1 = __importDefault(require("helmet"));
 const app_module_1 = require("./app.module");
+const api_exception_filter_1 = require("./common/filters/api-exception.filter");
+const api_response_interceptor_1 = require("./common/interceptors/api-response.interceptor");
 function parseCorsOrigins(value) {
     return (value ?? '')
         .split(',')
@@ -34,13 +36,22 @@ async function bootstrap() {
         },
         credentials: config.get('CORS_CREDENTIALS', true),
         methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
-        allowedHeaders: ['Content-Type', 'Authorization'],
+        allowedHeaders: [
+            'Content-Type',
+            'Authorization',
+            'x-request-id',
+        ],
+        exposedHeaders: [
+            'x-request-id',
+        ],
     });
     app.useGlobalPipes(new common_1.ValidationPipe({
         whitelist: true,
         transform: true,
         forbidNonWhitelisted: true,
     }));
+    app.useGlobalInterceptors(new api_response_interceptor_1.ApiResponseInterceptor());
+    app.useGlobalFilters(new api_exception_filter_1.ApiExceptionFilter());
     app.setGlobalPrefix('api');
     const port = config.get('PORT', 3000);
     await app.listen(port);

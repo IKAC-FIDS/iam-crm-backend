@@ -11,11 +11,18 @@ import {
   PaginatedPayload,
 } from '../http/api-response.types';
 
+type AlreadyStandardResponse = {
+  success: boolean;
+  [key: string]: unknown;
+};
+
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function isAlreadyStandardResponse(value: unknown): value is { success: boolean } {
+function isAlreadyStandardResponse(
+  value: unknown,
+): value is AlreadyStandardResponse {
   return isObject(value) && typeof value.success === 'boolean';
 }
 
@@ -42,15 +49,15 @@ function getResponseRequestId(response: Response): string | null {
 }
 
 @Injectable()
-export class ApiResponseInterceptor implements NestInterceptor {
+export class ApiResponseInterceptor implements NestInterceptor<unknown, unknown> {
   intercept(
     context: ExecutionContext,
     next: CallHandler,
-  ): Observable<ApiSuccessResponse> {
+  ): Observable<unknown> {
     const response = context.switchToHttp().getResponse<Response>();
 
     return next.handle().pipe(
-      map((payload: unknown) => {
+      map((payload: unknown): unknown => {
         if (isAlreadyStandardResponse(payload)) {
           return payload;
         }
@@ -62,17 +69,21 @@ export class ApiResponseInterceptor implements NestInterceptor {
         };
 
         if (isPaginatedPayload(payload)) {
-          return {
+          const result: ApiSuccessResponse = {
             ...base,
             data: payload.data,
             meta: payload.meta,
           };
+
+          return result;
         }
 
-        return {
+        const result: ApiSuccessResponse = {
           ...base,
           data: payload ?? null,
         };
+
+        return result;
       }),
     );
   }
