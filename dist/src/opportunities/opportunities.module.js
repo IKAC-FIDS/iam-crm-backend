@@ -10,12 +10,28 @@ exports.OpportunitiesModule = void 0;
 const common_1 = require("@nestjs/common");
 const pipeline_config_module_1 = require("../admin/pipeline/pipeline-config.module");
 const company_opportunities_controller_1 = require("./company-opportunities.controller");
+const opportunity_line_items_controller_1 = require("./opportunity-line-items.controller");
+const opportunity_line_items_service_1 = require("./opportunity-line-items.service");
 const opportunities_controller_1 = require("./opportunities.controller");
 const opportunities_service_1 = require("./opportunities.service");
 let OpportunitiesModule = class OpportunitiesModule {
 };
 exports.OpportunitiesModule = OpportunitiesModule;
 exports.OpportunitiesModule = OpportunitiesModule = __decorate([
-    (0, common_1.Module)({ imports: [pipeline_config_module_1.PipelineConfigModule], controllers: [opportunities_controller_1.OpportunitiesController, company_opportunities_controller_1.CompanyOpportunitiesController], providers: [opportunities_service_1.OpportunitiesService], exports: [opportunities_service_1.OpportunitiesService] })
+    (0, common_1.Module)({
+        imports: [pipeline_config_module_1.PipelineConfigModule],
+        controllers: [
+            opportunities_controller_1.OpportunitiesController,
+            company_opportunities_controller_1.CompanyOpportunitiesController,
+            opportunity_line_items_controller_1.OpportunityLineItemsController,
+        ],
+        providers: [
+            opportunities_service_1.OpportunitiesService,
+            opportunity_line_items_service_1.OpportunityLineItemsService,
+        ],
+        exports: [
+            opportunities_service_1.OpportunitiesService,
+        ],
+    })
 ], OpportunitiesModule);
 //# sourceMappingURL=opportunities.module.js.map

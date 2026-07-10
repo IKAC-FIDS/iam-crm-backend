@@ -30,6 +30,7 @@ import { OpportunitiesModule } from './opportunities/opportunities.module';
 import { PasskeysModule } from './auth/passkeys/passkeys.module';
 import { SsoModule } from './auth/sso/sso.module';
 import { HealthModule } from './health/health.module';
+import { ProductCatalogModule } from './product-catalog/product-catalog.module';
 
 @Module({
   imports: [
@@ -76,6 +77,7 @@ import { HealthModule } from './health/health.module';
     AuditLogModule,
     OpportunitiesModule,
     PasskeysModule,
+    ProductCatalogModule,
   ],
   providers: [
     {

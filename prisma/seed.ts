@@ -743,6 +743,11 @@ async function main() {
     { action: 'session:view', description: 'مشاهده نشست‌های فعال کاربر' },
     { action: 'session:revoke', description: 'لغو نشست‌های فعال کاربر' },
     { action: 'session:manage', description: 'مدیریت نشست‌های کاربران' },
+
+    { action: 'product:view', description: 'مشاهده کاتالوگ محصولات و سرویس‌ها' },
+    { action: 'product:manage', description: 'مدیریت کاتالوگ محصولات و سرویس‌ها' },
+    { action: 'opportunity-line-item:view', description: 'مشاهده آیتم‌های مالی فرصت فروش' },
+    { action: 'opportunity-line-item:manage', description: 'مدیریت آیتم‌های مالی فرصت فروش' },
   ];
 
   for (const permission of permissions) {
@@ -805,6 +810,10 @@ async function main() {
     'lookup:view',
     'session:view',
     'session:revoke',
+
+    'product:view',
+    'opportunity-line-item:view',
+    'opportunity-line-item:manage',
   ];
 
   const repActions = [
@@ -842,6 +851,10 @@ async function main() {
 
     'session:view',
     'session:revoke',
+
+    'product:view',
+    'opportunity-line-item:view',
+    'opportunity-line-item:manage',
   ];
 
   const boardsActions = [

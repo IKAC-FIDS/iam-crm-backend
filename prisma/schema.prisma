@@ -551,6 +551,7 @@ model Opportunity {
 
   stageHistories OpportunityStageHistory[]
   activities     Activity[]
+  lineItems      OpportunityLineItem[]
 
   @@index([companyId])
   @@index([ownerId])
@@ -559,6 +560,57 @@ model Opportunity {
   @@index([archivedAt])
   @@index([ownerId, stageId])
   @@map("opportunities")
+}
+
+model ProductCatalogItem {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  name        String
+  description String?
+  category    String?
+  unit        String?
+  defaultUnitPrice Decimal @default(0) @db.Decimal(18, 2)
+  currency    String   @default("IRR")
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  lineItems OpportunityLineItem[]
+
+  @@index([isActive, sortOrder])
+  @@index([category])
+  @@map("product_catalog_items")
+}
+
+model OpportunityLineItem {
+  id            String      @id @default(uuid())
+  opportunityId String
+  opportunity   Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+
+  productId String?
+  product   ProductCatalogItem? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  productCodeSnapshot String
+  productNameSnapshot String
+
+  description String?
+
+  quantity       Decimal @db.Decimal(18, 2)
+  unitPrice      Decimal @db.Decimal(18, 2)
+  discountAmount Decimal @default(0) @db.Decimal(18, 2)
+  taxAmount      Decimal @default(0) @db.Decimal(18, 2)
+  lineTotal      Decimal @db.Decimal(18, 2)
+
+  sortOrder Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([opportunityId])
+  @@index([productId])
+  @@index([sortOrder])
+  @@map("opportunity_line_items")
 }
 
 model OpportunityStageHistory {

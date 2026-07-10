@@ -1030,6 +1030,63 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
   - `test/health/health.service.spec.ts`
   - `.github/workflows/backend-ci.yml`
 
+### fix 000033 - Add opportunity line items and product catalog
+
+- Added product catalog data model:
+  - `ProductCatalogItem`
+- Added opportunity line item data model:
+  - `OpportunityLineItem`
+- Connected opportunity line items to:
+  - `Opportunity`
+  - `ProductCatalogItem`
+- Added product snapshots on line items:
+  - `productCodeSnapshot`
+  - `productNameSnapshot`
+- Added financial line item fields:
+  - `quantity`
+  - `unitPrice`
+  - `discountAmount`
+  - `taxAmount`
+  - `lineTotal`
+- Added automatic line total calculation.
+- Added automatic recalculation of `Opportunity.estimatedValue` from line items.
+- Added product catalog API:
+  - `GET /api/product-catalog`
+  - `POST /api/product-catalog`
+  - `GET /api/product-catalog/:id`
+  - `PATCH /api/product-catalog/:id`
+  - `PATCH /api/product-catalog/:id/activate`
+  - `PATCH /api/product-catalog/:id/deactivate`
+- Added opportunity line item API:
+  - `GET /api/opportunities/:opportunityId/line-items`
+  - `POST /api/opportunities/:opportunityId/line-items`
+  - `GET /api/opportunities/:opportunityId/line-items/:lineItemId`
+  - `PATCH /api/opportunities/:opportunityId/line-items/:lineItemId`
+  - `DELETE /api/opportunities/:opportunityId/line-items/:lineItemId`
+- Added permissions:
+  - `product:view`
+  - `product:manage`
+  - `opportunity-line-item:view`
+  - `opportunity-line-item:manage`
+- Updated opportunity detail response to include line items.
+- Added audit logs for product catalog and opportunity line item changes.
+- Important changed/new files:
+  - `prisma/schema.prisma`
+  - `prisma/seed.ts`
+  - `src/product-catalog/dto/create-product-catalog-item.dto.ts`
+  - `src/product-catalog/dto/update-product-catalog-item.dto.ts`
+  - `src/product-catalog/dto/find-product-catalog-items.dto.ts`
+  - `src/product-catalog/product-catalog.controller.ts`
+  - `src/product-catalog/product-catalog.service.ts`
+  - `src/product-catalog/product-catalog.module.ts`
+  - `src/opportunities/dto/create-opportunity-line-item.dto.ts`
+  - `src/opportunities/dto/update-opportunity-line-item.dto.ts`
+  - `src/opportunities/opportunity-line-items.controller.ts`
+  - `src/opportunities/opportunity-line-items.service.ts`
+  - `src/opportunities/opportunities.module.ts`
+  - `src/opportunities/opportunities.service.ts`
+  - `src/app.module.ts`
+
 ---
 
 **Built with ❤️ for sales team**
