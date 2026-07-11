@@ -138,6 +138,35 @@ async function main() {
         },
     });
     console.log(`✅ کاربر ادمین آماده است: ${adminEmail} / ChangeMe123!`);
+    const defaultOrganization = await prisma.organization.upsert({
+        where: {
+            code: 'default',
+        },
+        update: {
+            name: 'Default Organization',
+            status: 'ACTIVE',
+            timezone: 'Asia/Tehran',
+            locale: 'fa-IR',
+        },
+        create: {
+            id: '00000000-0000-4000-8000-000000000001',
+            code: 'default',
+            name: 'Default Organization',
+            status: 'ACTIVE',
+            timezone: 'Asia/Tehran',
+            locale: 'fa-IR',
+        },
+    });
+    await prisma.user.updateMany({
+        where: {
+            organizationId: {
+                not: defaultOrganization.id,
+            },
+        },
+        data: {
+            organizationId: defaultOrganization.id,
+        },
+    });
     const personas = [
         {
             titlePattern: 'CIO',
@@ -596,6 +625,8 @@ async function main() {
         { action: 'permission:view', description: 'مشاهده ماتریس مجوزها' },
         { action: 'permission:manage', description: 'مدیریت مجوزهای نقش‌ها' },
         { action: 'audit-log:view', description: 'مشاهده لاگ ممیزی' },
+        { action: 'organization:view', description: 'View current organization' },
+        { action: 'organization:manage', description: 'Manage organizations' },
         { action: 'company:view', description: 'مشاهده شرکت‌ها' },
         { action: 'company:create', description: 'ایجاد شرکت' },
         { action: 'company:update', description: 'ویرایش شرکت' },
@@ -738,6 +769,7 @@ async function main() {
         'notification:view',
         'notification:manage',
         'notification:send',
+        'organization:view',
     ];
     const repActions = [
         'company:view',
@@ -783,6 +815,7 @@ async function main() {
         'task:complete',
         'notification:view',
         'notification:manage',
+        'organization:view',
     ];
     const boardsActions = [
         'report:view',
@@ -798,6 +831,7 @@ async function main() {
         'attachment:view',
         'task:view',
         'notification:view',
+        'organization:view',
     ];
     await syncRolePermissions(client_1.UserRole.ADMIN, allActions);
     await syncRolePermissions(client_1.UserRole.MANAGER, managerActions);

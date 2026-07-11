@@ -34,6 +34,7 @@ import { ProductCatalogModule } from './product-catalog/product-catalog.module';
 import { AttachmentsModule } from './attachments/attachments.module';
 import { TasksModule } from './tasks/tasks.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { OrganizationsModule } from './organizations/organizations.module';
 
 @Module({
   imports: [
@@ -84,6 +85,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     AttachmentsModule,
     TasksModule,
     NotificationsModule,
+    OrganizationsModule,
   ],
   providers: [
     {

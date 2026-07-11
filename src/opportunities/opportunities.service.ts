@@ -15,6 +15,7 @@ import { ChangeOpportunityStageDto } from './dto/change-opportunity-stage.dto';
 import { CreateOpportunityDto } from './dto/create-opportunity.dto';
 import { FindOpportunitiesDto } from './dto/find-opportunities.dto';
 import { UpdateOpportunityDto } from './dto/update-opportunity.dto';
+import { getCurrentOrganizationId } from '../common/tenant/tenant-scope.util';
 
 const opportunityInclude = {
   company: {
@@ -147,6 +148,7 @@ export class OpportunitiesService {
       where: {
         AND: [
           { id },
+          { organizationId: getCurrentOrganizationId(user) },
           this.scopeWhere(user),
         ],
       },
@@ -288,6 +290,7 @@ export class OpportunitiesService {
 
     const opportunity = await this.prisma.opportunity.create({
       data: {
+        organizationId: company.organizationId,
         companyId: company.id,
         ownerId,
         title: dto.title.trim(),
@@ -533,6 +536,9 @@ export class OpportunitiesService {
     user: CurrentUserPayload,
   ): Prisma.OpportunityWhereInput {
     const and: Prisma.OpportunityWhereInput[] = [
+      {
+        organizationId: getCurrentOrganizationId(user),
+      },
       this.scopeWhere(user),
       {
         company: {
@@ -701,6 +707,7 @@ export class OpportunitiesService {
       where: {
         AND: [
           { id },
+          { organizationId: getCurrentOrganizationId(user) },
           this.scopeWhere(user),
         ],
       },
@@ -718,9 +725,10 @@ export class OpportunitiesService {
     companyId: string,
     user: CurrentUserPayload,
   ) {
-    const company = await this.prisma.company.findUnique({
+    const company = await this.prisma.company.findFirst({
       where: {
         id: companyId,
+        organizationId: getCurrentOrganizationId(user),
       },
       include: {
         owner: {
@@ -758,6 +766,7 @@ export class OpportunitiesService {
     const owner = await this.prisma.user.findUnique({
       where: {
         id: ownerId,
+        organizationId: getCurrentOrganizationId(user),
       },
     });
 

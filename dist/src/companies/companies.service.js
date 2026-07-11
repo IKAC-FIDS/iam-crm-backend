@@ -13,6 +13,7 @@ exports.CompaniesService = void 0;
 const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
 const audit_log_service_1 = require("../audit-log/audit-log.service");
+const tenant_scope_util_1 = require("../common/tenant/tenant-scope.util");
 const prisma_service_1 = require("../prisma/prisma.service");
 let CompaniesService = class CompaniesService {
     constructor(prisma, audit) {
@@ -23,7 +24,9 @@ let CompaniesService = class CompaniesService {
         const page = pagination.page ?? 1;
         const limit = pagination.limit ?? 20;
         const skip = (page - 1) * limit;
-        let where = {};
+        let where = {
+            organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
+        };
         if (user.role === client_1.UserRole.REP) {
             where.ownerId = user.userId;
         }
@@ -32,11 +35,17 @@ let CompaniesService = class CompaniesService {
                 where.owner = { team: user.team };
             }
             else {
-                where = { id: { in: [] } };
+                where = {
+                    organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
+                    id: { in: [] },
+                };
             }
         }
         else if (user.role === client_1.UserRole.BOARDS) {
-            where = { id: { in: [] } };
+            where = {
+                organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
+                id: { in: [] },
+            };
         }
         if (filters?.withoutOwner && user.role !== client_1.UserRole.REP) {
             where.ownerId = null;
@@ -139,8 +148,8 @@ let CompaniesService = class CompaniesService {
         if (user.role === client_1.UserRole.BOARDS) {
             throw new common_1.ForbiddenException('شما دسترسی به شرکت‌ها را ندارید');
         }
-        const company = await this.prisma.company.findUnique({
-            where: { id },
+        const company = await this.prisma.company.findFirst({
+            where: { id, organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user) },
             include: {
                 owner: { select: { id: true, fullName: true, team: true } },
                 industryRef: true,
@@ -177,6 +186,9 @@ let CompaniesService = class CompaniesService {
             source,
             applyDefaultSource: true,
         });
+        if (dto.ownerId) {
+            await this.assertOwnerInOrganization(dto.ownerId, user);
+        }
         const company = await this.prisma.company.create({
             data: {
                 ...companyData,
@@ -185,6 +197,7 @@ let CompaniesService = class CompaniesService {
                 sourceId: normalizedRefs.sourceId,
                 source: normalizedRefs.sourceCode,
                 ownerId: dto.ownerId ?? user.userId,
+                organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
             },
             include: {
                 owner: { select: { id: true, fullName: true, team: true } },
@@ -194,6 +207,7 @@ let CompaniesService = class CompaniesService {
         });
         await this.audit.record({
             actorId: user.userId,
+            organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
             entityType: 'company',
             entityId: company.id,
             action: 'company.created',
@@ -205,7 +219,9 @@ let CompaniesService = class CompaniesService {
         if (user.role === client_1.UserRole.BOARDS) {
             throw new common_1.ForbiddenException('شما اجازه ویرایش شرکت را ندارید');
         }
-        const company = await this.prisma.company.findUnique({ where: { id } });
+        const company = await this.prisma.company.findFirst({
+            where: { id, organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user) },
+        });
         if (!company)
             throw new common_1.NotFoundException('شرکت پیدا نشد');
         this.assertAccess(company, user);
@@ -234,6 +250,7 @@ let CompaniesService = class CompaniesService {
         });
         await this.audit.record({
             actorId: user.userId,
+            organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
             entityType: 'company',
             entityId: id,
             action: 'company.updated',
@@ -246,8 +263,8 @@ let CompaniesService = class CompaniesService {
         if (user.role === client_1.UserRole.BOARDS) {
             throw new common_1.ForbiddenException('شما اجازه تغییر مالکیت شرکت را ندارید');
         }
-        const company = await this.prisma.company.findUnique({
-            where: { id },
+        const company = await this.prisma.company.findFirst({
+            where: { id, organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user) },
             include: { owner: true },
         });
         if (!company)
@@ -258,6 +275,9 @@ let CompaniesService = class CompaniesService {
         });
         if (!newOwner)
             throw new common_1.NotFoundException('کاربر جدید پیدا نشد');
+        if (newOwner.organizationId !== (0, tenant_scope_util_1.getCurrentOrganizationId)(user)) {
+            throw new common_1.BadRequestException('New owner must belong to the current organization');
+        }
         if (newOwner.role !== client_1.UserRole.REP && newOwner.role !== client_1.UserRole.MANAGER) {
             throw new common_1.BadRequestException('کاربر جدید باید نقش REP یا MANAGER داشته باشد');
         }
@@ -273,6 +293,7 @@ let CompaniesService = class CompaniesService {
         });
         await this.audit.record({
             actorId: user.userId,
+            organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
             entityType: 'company',
             entityId: id,
             action: 'company.owner_changed',
@@ -282,8 +303,8 @@ let CompaniesService = class CompaniesService {
         return updated;
     }
     async archive(id, dto, user) {
-        const company = await this.prisma.company.findUnique({
-            where: { id },
+        const company = await this.prisma.company.findFirst({
+            where: { id, organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user) },
             include: { owner: { select: { team: true } } },
         });
         if (!company)
@@ -302,6 +323,7 @@ let CompaniesService = class CompaniesService {
         });
         await this.audit.record({
             actorId: user.userId,
+            organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
             entityType: 'company',
             entityId: id,
             action: 'company.archived',
@@ -311,8 +333,8 @@ let CompaniesService = class CompaniesService {
         return archived;
     }
     async restore(id, user) {
-        const company = await this.prisma.company.findUnique({
-            where: { id },
+        const company = await this.prisma.company.findFirst({
+            where: { id, organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user) },
             include: { owner: { select: { team: true } } },
         });
         if (!company)
@@ -331,6 +353,7 @@ let CompaniesService = class CompaniesService {
         });
         await this.audit.record({
             actorId: user.userId,
+            organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
             entityType: 'company',
             entityId: id,
             action: 'company.restored',
@@ -351,8 +374,14 @@ let CompaniesService = class CompaniesService {
         if (newOwner.role !== client_1.UserRole.REP && newOwner.role !== client_1.UserRole.MANAGER) {
             throw new common_1.BadRequestException('کاربر جدید باید نقش REP یا MANAGER داشته باشد');
         }
+        if (newOwner.organizationId !== (0, tenant_scope_util_1.getCurrentOrganizationId)(user)) {
+            throw new common_1.BadRequestException('New owner must belong to the current organization');
+        }
         const companies = await this.prisma.company.findMany({
-            where: { id: { in: dto.companyIds } },
+            where: {
+                id: { in: dto.companyIds },
+                organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
+            },
             include: { owner: true },
         });
         if (companies.length === 0) {
@@ -370,11 +399,15 @@ let CompaniesService = class CompaniesService {
             }
         }
         const result = await this.prisma.company.updateMany({
-            where: { id: { in: dto.companyIds } },
+            where: {
+                id: { in: dto.companyIds },
+                organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
+            },
             data: { ownerId: dto.newOwnerId },
         });
         await Promise.all(companies.map((company) => this.audit.record({
             actorId: user.userId,
+            organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
             entityType: 'company',
             entityId: company.id,
             action: 'company.owner_changed',
@@ -422,6 +455,18 @@ let CompaniesService = class CompaniesService {
             return;
         }
         throw new common_1.ForbiddenException('شما اجازه تغییر مالکیت شرکت‌ها را ندارید');
+    }
+    async assertOwnerInOrganization(ownerId, user) {
+        const owner = await this.prisma.user.findFirst({
+            where: {
+                id: ownerId,
+                organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
+                isActive: true,
+            },
+        });
+        if (!owner) {
+            throw new common_1.BadRequestException('Owner must belong to the current organization');
+        }
     }
     async resolveCompanyReferences(input) {
         const normalizedIndustry = await this.resolveIndustryReference(input.industryId, input.industry);

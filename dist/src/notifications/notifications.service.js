@@ -14,6 +14,7 @@ const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
 const audit_log_service_1 = require("../audit-log/audit-log.service");
 const prisma_service_1 = require("../prisma/prisma.service");
+const tenant_scope_util_1 = require("../common/tenant/tenant-scope.util");
 const notificationInclude = {
     recipient: {
         select: {
@@ -71,6 +72,7 @@ let NotificationsService = class NotificationsService {
     async unreadCount(user) {
         const total = await this.prisma.notification.count({
             where: {
+                organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
                 recipientId: user.userId,
                 readAt: null,
                 archivedAt: null,
@@ -90,6 +92,7 @@ let NotificationsService = class NotificationsService {
         const recipients = await this.validateRecipients(dto.recipientIds, user);
         const notifications = await Promise.all(recipients.map((recipient) => this.prisma.notification.create({
             data: {
+                organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
                 recipientId: recipient.id,
                 actorId: user.userId,
                 type: dto.type,
@@ -173,6 +176,7 @@ let NotificationsService = class NotificationsService {
     }
     async readAll(dto, user) {
         const where = {
+            organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
             recipientId: user.userId,
             readAt: null,
             archivedAt: null,
@@ -272,6 +276,7 @@ let NotificationsService = class NotificationsService {
             select: {
                 id: true,
                 isActive: true,
+                organizationId: true,
             },
         });
         if (!recipient?.isActive) {
@@ -279,6 +284,7 @@ let NotificationsService = class NotificationsService {
         }
         return this.prisma.notification.create({
             data: {
+                organizationId: input.organizationId ?? recipient.organizationId,
                 recipientId: input.recipientId,
                 actorId: input.actorId ?? undefined,
                 type: input.type,
@@ -295,6 +301,7 @@ let NotificationsService = class NotificationsService {
     buildWhere(query, user) {
         const and = [
             {
+                organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
                 recipientId: user.userId,
             },
         ];
@@ -369,6 +376,7 @@ let NotificationsService = class NotificationsService {
         const notification = await this.prisma.notification.findFirst({
             where: {
                 id,
+                organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
                 recipientId: user.userId,
             },
             include: notificationInclude,
@@ -388,6 +396,7 @@ let NotificationsService = class NotificationsService {
                 id: {
                     in: uniqueIds,
                 },
+                organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
                 isActive: true,
             },
             select: {
@@ -397,6 +406,7 @@ let NotificationsService = class NotificationsService {
                 role: true,
                 team: true,
                 isActive: true,
+                organizationId: true,
             },
         });
         if (recipients.length !== uniqueIds.length) {

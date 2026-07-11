@@ -15,6 +15,7 @@ const client_1 = require("@prisma/client");
 const notifications_service_1 = require("../notifications/notifications.service");
 const audit_log_service_1 = require("../audit-log/audit-log.service");
 const prisma_service_1 = require("../prisma/prisma.service");
+const tenant_scope_util_1 = require("../common/tenant/tenant-scope.util");
 const taskInclude = {
     company: {
         select: {
@@ -138,6 +139,7 @@ let TasksService = class TasksService {
         const now = new Date();
         const task = await this.prisma.task.create({
             data: {
+                organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
                 title: this.requiredText(dto.title, 'عنوان کار الزامی است'),
                 description: dto.description?.trim() || undefined,
                 status,
@@ -358,7 +360,12 @@ let TasksService = class TasksService {
         return deleted;
     }
     buildWhere(query, user) {
-        const and = [this.taskScopeWhere(user)];
+        const and = [
+            {
+                organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
+            },
+            this.taskScopeWhere(user),
+        ];
         if (query.status)
             and.push({ status: query.status });
         if (query.priority)
@@ -408,6 +415,7 @@ let TasksService = class TasksService {
             where: {
                 AND: [
                     { id },
+                    { organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user) },
                     this.taskScopeWhere(user),
                 ],
             },
@@ -522,7 +530,11 @@ let TasksService = class TasksService {
         const company = await this.prisma.company.findFirst({
             where: {
                 AND: [
-                    { id: companyId, archivedAt: null },
+                    {
+                        id: companyId,
+                        archivedAt: null,
+                        organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
+                    },
                     this.companyScopeWhere(user),
                 ],
             },
@@ -535,7 +547,7 @@ let TasksService = class TasksService {
         const opportunity = await this.prisma.opportunity.findFirst({
             where: {
                 AND: [
-                    { id: opportunityId },
+                    { id: opportunityId, organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user) },
                     this.opportunityScopeWhere(user),
                 ],
             },
@@ -551,7 +563,12 @@ let TasksService = class TasksService {
         const person = await this.prisma.person.findFirst({
             where: {
                 id: personId,
-                company: this.companyScopeWhere(user),
+                company: {
+                    AND: [
+                        { organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user) },
+                        this.companyScopeWhere(user),
+                    ],
+                },
             },
         });
         if (!person) {
@@ -562,7 +579,12 @@ let TasksService = class TasksService {
         const document = await this.prisma.opportunityCommercialDocument.findFirst({
             where: {
                 id: documentId,
-                opportunity: this.opportunityScopeWhere(user),
+                opportunity: {
+                    AND: [
+                        { organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user) },
+                        this.opportunityScopeWhere(user),
+                    ],
+                },
             },
             include: {
                 opportunity: true,
@@ -579,7 +601,12 @@ let TasksService = class TasksService {
         const payment = await this.prisma.opportunityPayment.findFirst({
             where: {
                 id: paymentId,
-                opportunity: this.opportunityScopeWhere(user),
+                opportunity: {
+                    AND: [
+                        { organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user) },
+                        this.opportunityScopeWhere(user),
+                    ],
+                },
             },
             include: {
                 opportunity: true,
@@ -649,6 +676,7 @@ let TasksService = class TasksService {
         const assignee = await this.prisma.user.findUnique({
             where: {
                 id: assignedToId,
+                organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
             },
         });
         if (!assignee || !assignee.isActive || assignee.role === client_1.UserRole.BOARDS) {

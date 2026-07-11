@@ -23,6 +23,7 @@ import { CreateTaskDto } from './dto/create-task.dto';
 import { FindTasksDto } from './dto/find-tasks.dto';
 import { RescheduleTaskDto } from './dto/reschedule-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
+import { getCurrentOrganizationId } from '../common/tenant/tenant-scope.util';
 
 const taskInclude = {
   company: {
@@ -162,6 +163,7 @@ export class TasksService {
 
     const task = await this.prisma.task.create({
       data: {
+        organizationId: getCurrentOrganizationId(user),
         title: this.requiredText(dto.title, 'عنوان کار الزامی است'),
         description: dto.description?.trim() || undefined,
         status,
@@ -436,7 +438,12 @@ export class TasksService {
     query: FindTasksDto,
     user: CurrentUserPayload,
   ): Prisma.TaskWhereInput {
-    const and: Prisma.TaskWhereInput[] = [this.taskScopeWhere(user)];
+    const and: Prisma.TaskWhereInput[] = [
+      {
+        organizationId: getCurrentOrganizationId(user),
+      },
+      this.taskScopeWhere(user),
+    ];
 
     if (query.status) and.push({ status: query.status });
     if (query.priority) and.push({ priority: query.priority });
@@ -484,6 +491,7 @@ export class TasksService {
       where: {
         AND: [
           { id },
+          { organizationId: getCurrentOrganizationId(user) },
           this.taskScopeWhere(user),
         ],
       },
@@ -615,7 +623,11 @@ export class TasksService {
     const company = await this.prisma.company.findFirst({
       where: {
         AND: [
-          { id: companyId, archivedAt: null },
+          {
+            id: companyId,
+            archivedAt: null,
+            organizationId: getCurrentOrganizationId(user),
+          },
           this.companyScopeWhere(user),
         ],
       },
@@ -633,7 +645,7 @@ export class TasksService {
     const opportunity = await this.prisma.opportunity.findFirst({
       where: {
         AND: [
-          { id: opportunityId },
+          { id: opportunityId, organizationId: getCurrentOrganizationId(user) },
           this.opportunityScopeWhere(user),
         ],
       },
@@ -652,7 +664,12 @@ export class TasksService {
     const person = await this.prisma.person.findFirst({
       where: {
         id: personId,
-        company: this.companyScopeWhere(user),
+        company: {
+          AND: [
+            { organizationId: getCurrentOrganizationId(user) },
+            this.companyScopeWhere(user),
+          ],
+        },
       },
     });
 
@@ -668,7 +685,12 @@ export class TasksService {
     const document = await this.prisma.opportunityCommercialDocument.findFirst({
       where: {
         id: documentId,
-        opportunity: this.opportunityScopeWhere(user),
+        opportunity: {
+          AND: [
+            { organizationId: getCurrentOrganizationId(user) },
+            this.opportunityScopeWhere(user),
+          ],
+        },
       },
       include: {
         opportunity: true,
@@ -688,7 +710,12 @@ export class TasksService {
     const payment = await this.prisma.opportunityPayment.findFirst({
       where: {
         id: paymentId,
-        opportunity: this.opportunityScopeWhere(user),
+        opportunity: {
+          AND: [
+            { organizationId: getCurrentOrganizationId(user) },
+            this.opportunityScopeWhere(user),
+          ],
+        },
       },
       include: {
         opportunity: true,
@@ -772,6 +799,7 @@ export class TasksService {
     const assignee = await this.prisma.user.findUnique({
       where: {
         id: assignedToId,
+        organizationId: getCurrentOrganizationId(user),
       },
     });
 

@@ -7,6 +7,7 @@ export interface AuditRequestContext {
   userAgent?: string | null;
   requestMethod?: string | null;
   requestPath?: string | null;
+  organizationId?: string | null;
 }
 
 @Injectable()

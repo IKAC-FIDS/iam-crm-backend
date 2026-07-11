@@ -151,6 +151,37 @@ async function main() {
 
   console.log(`✅ کاربر ادمین آماده است: ${adminEmail} / ChangeMe123!`);
 
+  const defaultOrganization = await prisma.organization.upsert({
+    where: {
+      code: 'default',
+    },
+    update: {
+      name: 'Default Organization',
+      status: 'ACTIVE',
+      timezone: 'Asia/Tehran',
+      locale: 'fa-IR',
+    },
+    create: {
+      id: '00000000-0000-4000-8000-000000000001',
+      code: 'default',
+      name: 'Default Organization',
+      status: 'ACTIVE',
+      timezone: 'Asia/Tehran',
+      locale: 'fa-IR',
+    },
+  });
+
+  await prisma.user.updateMany({
+    where: {
+      organizationId: {
+        not: defaultOrganization.id,
+      },
+    },
+    data: {
+      organizationId: defaultOrganization.id,
+    },
+  });
+
   // ============================================================
   // ۲. کتابخانه Persona
   // ============================================================
@@ -676,6 +707,9 @@ async function main() {
 
     { action: 'audit-log:view', description: 'مشاهده لاگ ممیزی' },
 
+    { action: 'organization:view', description: 'View current organization' },
+    { action: 'organization:manage', description: 'Manage organizations' },
+
     { action: 'company:view', description: 'مشاهده شرکت‌ها' },
     { action: 'company:create', description: 'ایجاد شرکت' },
     { action: 'company:update', description: 'ویرایش شرکت' },
@@ -852,6 +886,8 @@ async function main() {
     'notification:view',
     'notification:manage',
     'notification:send',
+
+    'organization:view',
   ];
 
   const repActions = [
@@ -909,6 +945,8 @@ async function main() {
 
     'notification:view',
     'notification:manage',
+
+    'organization:view',
   ];
 
   const boardsActions = [
@@ -930,6 +968,8 @@ async function main() {
     'task:view',
 
     'notification:view',
+
+    'organization:view',
   ];
 
   await syncRolePermissions(UserRole.ADMIN, allActions);

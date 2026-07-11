@@ -114,6 +114,7 @@ let AuthService = class AuthService {
             email: user.email,
             role: user.role,
             team: user.team,
+            organizationId: user.organizationId,
         };
         return {
             accessToken: await this.jwtService.signAsync(payload),
@@ -124,6 +125,7 @@ let AuthService = class AuthService {
                 email: user.email,
                 role: user.role,
                 team: user.team,
+                organizationId: user.organizationId,
                 permissions,
             },
         };

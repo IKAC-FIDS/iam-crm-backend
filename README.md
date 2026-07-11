@@ -1402,6 +1402,26 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 
 ---
 
+### backend fix 000038 - Add tenant/organization foundation
+
+- Added a clean tenant foundation with `OrganizationStatus`, `Organization`, and one `organizationId` relation/index set on core tenant-owned models: `User`, `Company`, `Opportunity`, `Task`, `Notification`, `FileAttachment`, and nullable `AuditLog`.
+- Added migration `20260710203701_add_tenant_organization_foundation`.
+- Migration requirement: run `npx prisma migrate dev` locally or `npx prisma migrate deploy` in deployed environments. The migration creates `organizations`, inserts the default organization, backfills existing core records, adds indexes, and then adds foreign keys.
+- Added default organization `00000000-0000-4000-8000-000000000001` with code `default`, name `Default Organization`, timezone `Asia/Tehran`, and locale `fa-IR`.
+- Updated auth/JWT current user payloads to carry `organizationId`.
+- Added tenant helpers: `src/common/tenant/default-organization.constants.ts` and `src/common/tenant/tenant-scope.util.ts`.
+- Added organization APIs: `GET /api/organizations/current`, `GET /api/admin/organizations`, `POST /api/admin/organizations`, `GET /api/admin/organizations/:id`, `PATCH /api/admin/organizations/:id`, `PATCH /api/admin/organizations/:id/activate`, and `PATCH /api/admin/organizations/:id/suspend`.
+- Added permissions `organization:view` and `organization:manage`.
+- Updated seed to upsert the default organization, assign seeded users to it, and grant organization view/manage permissions by role.
+- Added tenant scoping foundation to companies, opportunities, tasks, notifications, and attachments while preserving existing role/team/owner visibility rules.
+- Updated audit logging to optionally record `organizationId`.
+- Important changed/new files: `prisma/schema.prisma`, `prisma/migrations/20260710203701_add_tenant_organization_foundation/migration.sql`, `prisma/seed.ts`, `src/auth/auth.service.ts`, `src/auth/jwt.strategy.ts`, `src/common/decorators/current-user.decorator.ts`, `src/common/tenant/*`, `src/organizations/*`, `src/companies/companies.service.ts`, `src/opportunities/opportunities.service.ts`, `src/tasks/tasks.service.ts`, `src/notifications/notifications.service.ts`, `src/attachments/attachments.service.ts`, and `src/audit-log/audit-log.service.ts`.
+- Assumptions: existing `User.email @unique` remains global for now; this is only the foundation, and full tenant scoping for library/configuration models will be handled later.
+- Validation status: `npx prisma validate` passed; `npx prisma generate` passed; `npm run build` passed; `npm run lint` passed with 10 existing warnings and 0 errors; `npm run test` passed with 1 suite and 4 tests.
+
+---
+
+
 **Built with ❤️ for sales team**
 
 ---

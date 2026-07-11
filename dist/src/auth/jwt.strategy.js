@@ -14,8 +14,9 @@ const common_1 = require("@nestjs/common");
 const config_1 = require("@nestjs/config");
 const passport_1 = require("@nestjs/passport");
 const passport_jwt_1 = require("passport-jwt");
+const prisma_service_1 = require("../prisma/prisma.service");
 let JwtStrategy = class JwtStrategy extends (0, passport_1.PassportStrategy)(passport_jwt_1.Strategy) {
-    constructor(configService) {
+    constructor(configService, prisma) {
         const secret = configService.get('JWT_SECRET');
         if (!secret) {
             throw new Error('JWT_SECRET is not configured');
@@ -25,22 +26,39 @@ let JwtStrategy = class JwtStrategy extends (0, passport_1.PassportStrategy)(pas
             ignoreExpiration: false,
             secretOrKey: secret,
         });
+        this.prisma = prisma;
     }
     async validate(payload) {
         if (!payload?.sub || !payload.email || !payload.role) {
             throw new common_1.UnauthorizedException('Invalid token payload');
         }
+        const user = await this.prisma.user.findUnique({
+            where: { id: payload.sub },
+            select: {
+                id: true,
+                email: true,
+                role: true,
+                team: true,
+                organizationId: true,
+                isActive: true,
+            },
+        });
+        if (!user?.isActive) {
+            throw new common_1.UnauthorizedException('Invalid token payload');
+        }
         return {
-            userId: payload.sub,
-            email: payload.email,
-            role: payload.role,
-            team: payload.team ?? null,
+            userId: user.id,
+            email: user.email,
+            role: user.role,
+            team: user.team,
+            organizationId: user.organizationId ?? payload.organizationId ?? null,
         };
     }
 };
 exports.JwtStrategy = JwtStrategy;
 exports.JwtStrategy = JwtStrategy = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [config_1.ConfigService])
+    __metadata("design:paramtypes", [config_1.ConfigService,
+        prisma_service_1.PrismaService])
 ], JwtStrategy);
 //# sourceMappingURL=jwt.strategy.js.map

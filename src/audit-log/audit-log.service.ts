@@ -18,6 +18,7 @@ export interface RecordAuditInput {
   userAgent?: string | null;
   requestMethod?: string | null;
   requestPath?: string | null;
+  organizationId?: string | null;
 }
 
 @Injectable()
@@ -42,7 +43,7 @@ export class AuditLogService {
         userAgent: input.userAgent ?? context?.userAgent ?? null,
         requestMethod: input.requestMethod ?? context?.requestMethod ?? null,
         requestPath: input.requestPath ?? context?.requestPath ?? null,
-
+        organizationId: input.organizationId ?? context?.organizationId ?? null,
         ...(input.before !== undefined && {
           before: this.sanitize(input.before) as Prisma.InputJsonValue,
         }),

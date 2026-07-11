@@ -15,6 +15,7 @@ const client_1 = require("@prisma/client");
 const pipeline_config_service_1 = require("../admin/pipeline/pipeline-config.service");
 const audit_log_service_1 = require("../audit-log/audit-log.service");
 const prisma_service_1 = require("../prisma/prisma.service");
+const tenant_scope_util_1 = require("../common/tenant/tenant-scope.util");
 const opportunityInclude = {
     company: {
         select: {
@@ -133,6 +134,7 @@ let OpportunitiesService = class OpportunitiesService {
             where: {
                 AND: [
                     { id },
+                    { organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user) },
                     this.scopeWhere(user),
                 ],
             },
@@ -263,6 +265,7 @@ let OpportunitiesService = class OpportunitiesService {
         }
         const opportunity = await this.prisma.opportunity.create({
             data: {
+                organizationId: company.organizationId,
                 companyId: company.id,
                 ownerId,
                 title: dto.title.trim(),
@@ -456,6 +459,9 @@ let OpportunitiesService = class OpportunitiesService {
     }
     buildWhere(query, user) {
         const and = [
+            {
+                organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
+            },
             this.scopeWhere(user),
             {
                 company: {
@@ -609,6 +615,7 @@ let OpportunitiesService = class OpportunitiesService {
             where: {
                 AND: [
                     { id },
+                    { organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user) },
                     this.scopeWhere(user),
                 ],
             },
@@ -620,9 +627,10 @@ let OpportunitiesService = class OpportunitiesService {
         return item;
     }
     async getCompanyInScope(companyId, user) {
-        const company = await this.prisma.company.findUnique({
+        const company = await this.prisma.company.findFirst({
             where: {
                 id: companyId,
+                organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
             },
             include: {
                 owner: {
@@ -652,6 +660,7 @@ let OpportunitiesService = class OpportunitiesService {
         const owner = await this.prisma.user.findUnique({
             where: {
                 id: ownerId,
+                organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
             },
         });
         if (!owner ||

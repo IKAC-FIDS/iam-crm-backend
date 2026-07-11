@@ -12,6 +12,7 @@ import {
   Prisma,
   UserRole,
 } from '@prisma/client';
+import { getCurrentOrganizationId } from '../common/tenant/tenant-scope.util';
 import { createHash, randomUUID } from 'node:crypto';
 import { basename, extname, join } from 'node:path';
 import { AuditLogService } from '../audit-log/audit-log.service';
@@ -41,6 +42,7 @@ export class AttachmentsService {
     const limit = query.limit ?? 20;
 
     const where: Prisma.FileAttachmentWhereInput = {
+      organizationId: getCurrentOrganizationId(user),
       entityType: query.entityType,
       entityId: query.entityId,
       deletedAt: null,
@@ -74,7 +76,7 @@ export class AttachmentsService {
   }
 
   async findOne(id: string, user: CurrentUserPayload) {
-    const attachment = await this.getActiveAttachment(id);
+    const attachment = await this.getActiveAttachment(id, user);
 
     await this.assertEntityAccess(
       attachment.entityType,
@@ -117,6 +119,7 @@ export class AttachmentsService {
 
     const attachment = await this.prisma.fileAttachment.create({
       data: {
+        organizationId: getCurrentOrganizationId(user),
         entityType: dto.entityType,
         entityId: dto.entityId,
         storageProvider: stored.storageProvider,
@@ -155,7 +158,7 @@ export class AttachmentsService {
   }
 
   async getDownloadStream(id: string, user: CurrentUserPayload) {
-    const attachment = await this.getActiveAttachment(id);
+    const attachment = await this.getActiveAttachment(id, user);
 
     await this.assertEntityAccess(
       attachment.entityType,
@@ -190,7 +193,7 @@ export class AttachmentsService {
   }
 
   async remove(id: string, user: CurrentUserPayload) {
-    const attachment = await this.getActiveAttachment(id);
+    const attachment = await this.getActiveAttachment(id, user);
 
     await this.assertEntityAccess(
       attachment.entityType,
@@ -226,10 +229,14 @@ export class AttachmentsService {
     return deleted;
   }
 
-  private async getActiveAttachment(id: string): Promise<FileAttachment> {
+  private async getActiveAttachment(
+    id: string,
+    user: CurrentUserPayload,
+  ): Promise<FileAttachment> {
     const attachment = await this.prisma.fileAttachment.findFirst({
       where: {
         id,
+        organizationId: getCurrentOrganizationId(user),
         deletedAt: null,
       },
     });
@@ -276,8 +283,12 @@ export class AttachmentsService {
   }
 
   private sanitizeFileName(fileName: string) {
-    const cleanName = basename(fileName)
-      .replace(/[<>:"/\\|?*\x00-\x1F]/g, '_')
+    const unsafeCharacters = new Set(['<', '>', ':', '"', '/', '\\', '|', '?', '*']);
+    const cleanName = Array.from(basename(fileName))
+      .map((char) =>
+        unsafeCharacters.has(char) || char.charCodeAt(0) < 32 ? '_' : char,
+      )
+      .join('')
       .trim();
 
     return cleanName || 'attachment.bin';
@@ -308,6 +319,7 @@ export class AttachmentsService {
         where: {
           AND: [
             { id: entityId },
+            { organizationId: getCurrentOrganizationId(user) },
             this.opportunityScopeWhere(user),
           ],
         },
@@ -330,7 +342,12 @@ export class AttachmentsService {
       const document = await this.prisma.opportunityCommercialDocument.findFirst({
         where: {
           id: entityId,
-          opportunity: this.opportunityScopeWhere(user),
+          opportunity: {
+            AND: [
+              { organizationId: getCurrentOrganizationId(user) },
+              this.opportunityScopeWhere(user),
+            ],
+          },
         },
         include: {
           opportunity: true,
@@ -354,7 +371,12 @@ export class AttachmentsService {
       const payment = await this.prisma.opportunityPayment.findFirst({
         where: {
           id: entityId,
-          opportunity: this.opportunityScopeWhere(user),
+          opportunity: {
+            AND: [
+              { organizationId: getCurrentOrganizationId(user) },
+              this.opportunityScopeWhere(user),
+            ],
+          },
         },
         include: {
           opportunity: true,

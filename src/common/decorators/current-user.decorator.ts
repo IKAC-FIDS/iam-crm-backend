@@ -4,12 +4,14 @@ export interface CurrentUserPayload {
   userId: string;
   email: string;
   role: 'ADMIN' | 'MANAGER' | 'REP' | 'BOARDS';
-  team?: string | null; 
+  team?: string | null;
+  organizationId?: string | null;
 }
 
 export const CurrentUser = createParamDecorator(
   (data: unknown, ctx: ExecutionContext): CurrentUserPayload => {
     const request = ctx.switchToHttp().getRequest();
+
     return request.user;
   },
 );

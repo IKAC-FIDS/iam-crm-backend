@@ -16,6 +16,7 @@ exports.AttachmentsService = void 0;
 const common_1 = require("@nestjs/common");
 const config_1 = require("@nestjs/config");
 const client_1 = require("@prisma/client");
+const tenant_scope_util_1 = require("../common/tenant/tenant-scope.util");
 const node_crypto_1 = require("node:crypto");
 const node_path_1 = require("node:path");
 const audit_log_service_1 = require("../audit-log/audit-log.service");
@@ -33,6 +34,7 @@ let AttachmentsService = class AttachmentsService {
         const page = query.page ?? 1;
         const limit = query.limit ?? 20;
         const where = {
+            organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
             entityType: query.entityType,
             entityId: query.entityId,
             deletedAt: null,
@@ -62,7 +64,7 @@ let AttachmentsService = class AttachmentsService {
         };
     }
     async findOne(id, user) {
-        const attachment = await this.getActiveAttachment(id);
+        const attachment = await this.getActiveAttachment(id, user);
         await this.assertEntityAccess(attachment.entityType, attachment.entityId, user);
         return attachment;
     }
@@ -88,6 +90,7 @@ let AttachmentsService = class AttachmentsService {
         });
         const attachment = await this.prisma.fileAttachment.create({
             data: {
+                organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
                 entityType: dto.entityType,
                 entityId: dto.entityId,
                 storageProvider: stored.storageProvider,
@@ -123,7 +126,7 @@ let AttachmentsService = class AttachmentsService {
         return attachment;
     }
     async getDownloadStream(id, user) {
-        const attachment = await this.getActiveAttachment(id);
+        const attachment = await this.getActiveAttachment(id, user);
         await this.assertEntityAccess(attachment.entityType, attachment.entityId, user);
         const stream = await this.storage.getStream(attachment.objectKey, attachment.storagePath);
         await this.audit.record({
@@ -146,7 +149,7 @@ let AttachmentsService = class AttachmentsService {
         };
     }
     async remove(id, user) {
-        const attachment = await this.getActiveAttachment(id);
+        const attachment = await this.getActiveAttachment(id, user);
         await this.assertEntityAccess(attachment.entityType, attachment.entityId, user, true);
         const deleted = await this.prisma.fileAttachment.update({
             where: { id },
@@ -172,10 +175,11 @@ let AttachmentsService = class AttachmentsService {
         });
         return deleted;
     }
-    async getActiveAttachment(id) {
+    async getActiveAttachment(id, user) {
         const attachment = await this.prisma.fileAttachment.findFirst({
             where: {
                 id,
+                organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
                 deletedAt: null,
             },
         });
@@ -205,8 +209,10 @@ let AttachmentsService = class AttachmentsService {
             .filter(Boolean);
     }
     sanitizeFileName(fileName) {
-        const cleanName = (0, node_path_1.basename)(fileName)
-            .replace(/[<>:"/\\|?*\x00-\x1F]/g, '_')
+        const unsafeCharacters = new Set(['<', '>', ':', '"', '/', '\\', '|', '?', '*']);
+        const cleanName = Array.from((0, node_path_1.basename)(fileName))
+            .map((char) => unsafeCharacters.has(char) || char.charCodeAt(0) < 32 ? '_' : char)
+            .join('')
             .trim();
         return cleanName || 'attachment.bin';
     }
@@ -226,6 +232,7 @@ let AttachmentsService = class AttachmentsService {
                 where: {
                     AND: [
                         { id: entityId },
+                        { organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user) },
                         this.opportunityScopeWhere(user),
                     ],
                 },
@@ -242,7 +249,12 @@ let AttachmentsService = class AttachmentsService {
             const document = await this.prisma.opportunityCommercialDocument.findFirst({
                 where: {
                     id: entityId,
-                    opportunity: this.opportunityScopeWhere(user),
+                    opportunity: {
+                        AND: [
+                            { organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user) },
+                            this.opportunityScopeWhere(user),
+                        ],
+                    },
                 },
                 include: {
                     opportunity: true,
@@ -260,7 +272,12 @@ let AttachmentsService = class AttachmentsService {
             const payment = await this.prisma.opportunityPayment.findFirst({
                 where: {
                     id: entityId,
-                    opportunity: this.opportunityScopeWhere(user),
+                    opportunity: {
+                        AND: [
+                            { organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user) },
+                            this.opportunityScopeWhere(user),
+                        ],
+                    },
                 },
                 include: {
                     opportunity: true,

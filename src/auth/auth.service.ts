@@ -14,6 +14,7 @@ export interface AuthUserResponse {
   email: string;
   role: UserRole;
   team: string | null;
+  organizationId: string | null;
   permissions: string[];
 }
 
@@ -136,6 +137,7 @@ export class AuthService {
       email: user.email,
       role: user.role,
       team: user.team,
+      organizationId: user.organizationId,
     };
 
     return {
@@ -147,6 +149,7 @@ export class AuthService {
         email: user.email,
         role: user.role,
         team: user.team,
+        organizationId: user.organizationId,
         permissions,
       },
     };

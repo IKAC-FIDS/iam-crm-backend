@@ -18,6 +18,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateNotificationDto } from './dto/create-notification.dto';
 import { FindNotificationsDto } from './dto/find-notifications.dto';
 import { ReadAllNotificationsDto } from './dto/read-all-notifications.dto';
+import { getCurrentOrganizationId } from '../common/tenant/tenant-scope.util';
 
 const notificationInclude = {
   recipient: {
@@ -43,6 +44,7 @@ const notificationInclude = {
 export interface NotifyUserInput {
   recipientId: string;
   actorId?: string | null;
+  organizationId?: string | null;
   type: NotificationType;
   priority?: NotificationPriority;
   title: string;
@@ -50,7 +52,7 @@ export interface NotifyUserInput {
   entityType?: NotificationEntityType | null;
   entityId?: string | null;
   actionUrl?: string | null;
-  metadata?: Prisma.InputJsonObject;
+  metadata?: Record<string, unknown>;
   skipSelf?: boolean;
 }
 
@@ -97,6 +99,7 @@ export class NotificationsService {
   async unreadCount(user: CurrentUserPayload) {
     const total = await this.prisma.notification.count({
       where: {
+        organizationId: getCurrentOrganizationId(user),
         recipientId: user.userId,
         readAt: null,
         archivedAt: null,
@@ -123,6 +126,7 @@ export class NotificationsService {
       recipients.map((recipient) =>
         this.prisma.notification.create({
           data: {
+            organizationId: getCurrentOrganizationId(user),
             recipientId: recipient.id,
             actorId: user.userId,
             type: dto.type,
@@ -220,6 +224,7 @@ export class NotificationsService {
 
   async readAll(dto: ReadAllNotificationsDto, user: CurrentUserPayload) {
     const where: Prisma.NotificationWhereInput = {
+      organizationId: getCurrentOrganizationId(user),
       recipientId: user.userId,
       readAt: null,
       archivedAt: null,
@@ -336,6 +341,7 @@ export class NotificationsService {
       select: {
         id: true,
         isActive: true,
+        organizationId: true,
       },
     });
 
@@ -345,6 +351,7 @@ export class NotificationsService {
 
     return this.prisma.notification.create({
       data: {
+        organizationId: input.organizationId ?? recipient.organizationId,
         recipientId: input.recipientId,
         actorId: input.actorId ?? undefined,
         type: input.type,
@@ -354,7 +361,7 @@ export class NotificationsService {
         entityType: input.entityType ?? undefined,
         entityId: input.entityId ?? undefined,
         actionUrl: input.actionUrl ?? undefined,
-        metadata: input.metadata,
+        metadata: input.metadata as Prisma.InputJsonValue | undefined,
       },
     });
   }
@@ -365,6 +372,7 @@ export class NotificationsService {
   ): Prisma.NotificationWhereInput {
     const and: Prisma.NotificationWhereInput[] = [
       {
+        organizationId: getCurrentOrganizationId(user),
         recipientId: user.userId,
       },
     ];
@@ -452,6 +460,7 @@ export class NotificationsService {
     const notification = await this.prisma.notification.findFirst({
       where: {
         id,
+        organizationId: getCurrentOrganizationId(user),
         recipientId: user.userId,
       },
       include: notificationInclude,
@@ -479,6 +488,7 @@ export class NotificationsService {
         id: {
           in: uniqueIds,
         },
+        organizationId: getCurrentOrganizationId(user),
         isActive: true,
       },
       select: {
@@ -488,6 +498,7 @@ export class NotificationsService {
         role: true,
         team: true,
         isActive: true,
+        organizationId: true,
       },
     });
 

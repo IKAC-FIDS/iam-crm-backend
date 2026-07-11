@@ -43,6 +43,7 @@ const product_catalog_module_1 = require("./product-catalog/product-catalog.modu
 const attachments_module_1 = require("./attachments/attachments.module");
 const tasks_module_1 = require("./tasks/tasks.module");
 const notifications_module_1 = require("./notifications/notifications.module");
+const organizations_module_1 = require("./organizations/organizations.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -96,6 +97,7 @@ exports.AppModule = AppModule = __decorate([
             attachments_module_1.AttachmentsModule,
             tasks_module_1.TasksModule,
             notifications_module_1.NotificationsModule,
+            organizations_module_1.OrganizationsModule,
         ],
         providers: [
             {
