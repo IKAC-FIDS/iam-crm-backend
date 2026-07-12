@@ -16,6 +16,7 @@ import { CreateOpportunityDto } from './dto/create-opportunity.dto';
 import { FindOpportunitiesDto } from './dto/find-opportunities.dto';
 import { UpdateOpportunityDto } from './dto/update-opportunity.dto';
 import { getCurrentOrganizationId } from '../common/tenant/tenant-scope.util';
+import { parseApiDate, parseApiDateRange } from '../common/dates/api-date.util';
 
 const opportunityInclude = {
   company: {
@@ -326,7 +327,7 @@ export class OpportunitiesService {
         priority: dto.priority,
         estimatedValue: dto.estimatedValue,
         expectedCloseDate: dto.expectedCloseDate
-          ? new Date(dto.expectedCloseDate)
+          ? parseApiDate(dto.expectedCloseDate, 'expectedCloseDate')
           : undefined,
         sourceOptionId: source.sourceOptionId,
         source: source.source,
@@ -394,7 +395,7 @@ export class OpportunitiesService {
           title: dto.title.trim(),
         }),
         ...(dto.expectedCloseDate !== undefined && {
-          expectedCloseDate: new Date(dto.expectedCloseDate),
+          expectedCloseDate: parseApiDate(dto.expectedCloseDate, 'expectedCloseDate'),
         }),
         ...(source !== undefined && {
           sourceOptionId: source.sourceOptionId,
@@ -688,13 +689,14 @@ export class OpportunitiesService {
       });
     }
 
-    if (query.expectedCloseFrom || query.expectedCloseTo) {
-      and.push({
-        expectedCloseDate: {
-          ...(query.expectedCloseFrom && { gte: new Date(query.expectedCloseFrom) }),
-          ...(query.expectedCloseTo && { lte: new Date(query.expectedCloseTo) }),
-        },
-      });
+    const expectedCloseRange = parseApiDateRange(
+      query.expectedCloseFrom,
+      query.expectedCloseTo,
+      'expectedCloseFrom',
+      'expectedCloseTo',
+    );
+    if (expectedCloseRange) {
+      and.push({ expectedCloseDate: expectedCloseRange });
     }
 
     if (query.archivedOnly === 'true') {

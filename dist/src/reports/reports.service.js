@@ -13,6 +13,7 @@ exports.ReportsService = void 0;
 const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
 const prisma_service_1 = require("../prisma/prisma.service");
+const api_date_util_1 = require("../common/dates/api-date.util");
 let ReportsService = class ReportsService {
     constructor(prisma) {
         this.prisma = prisma;
@@ -75,21 +76,21 @@ let ReportsService = class ReportsService {
         return { AND: and };
     }
     dateRange(filters, defaultToLast30Days = false) {
-        const startDate = filters.startDate
-            ? new Date(filters.startDate)
-            : defaultToLast30Days ? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) : undefined;
-        const endDate = filters.endDate ? new Date(filters.endDate) : defaultToLast30Days ? new Date() : undefined;
-        if (startDate && endDate && startDate > endDate) {
-            throw new common_1.BadRequestException('startDate must be before or equal to endDate');
-        }
-        return { startDate, endDate };
+        const defaultStartDate = defaultToLast30Days ? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) : undefined;
+        const defaultEndDate = defaultToLast30Days ? new Date() : undefined;
+        const range = (0, api_date_util_1.parseApiDateRange)(filters.startDate, filters.endDate, 'startDate', 'endDate');
+        return {
+            startDate: range?.gte ?? defaultStartDate,
+            endDate: range?.lte ?? range?.lt ?? defaultEndDate,
+            range: range ?? (defaultToLast30Days ? { gte: defaultStartDate, lte: defaultEndDate } : undefined),
+        };
     }
     activityWhere(filters, user, defaultToLast30Days = false) {
-        const { startDate, endDate } = this.dateRange(filters, defaultToLast30Days);
+        const { range } = this.dateRange(filters, defaultToLast30Days);
         const companyFilters = { ...filters, teams: undefined };
         const and = [{ company: this.companyWhere(companyFilters, user) }];
-        if (startDate || endDate)
-            and.push({ occurredAt: { gte: startDate, lte: endDate } });
+        if (range)
+            and.push({ occurredAt: range });
         if (filters.userIds?.length)
             and.push({ userId: { in: filters.userIds } });
         if (filters.activityTypes?.length)

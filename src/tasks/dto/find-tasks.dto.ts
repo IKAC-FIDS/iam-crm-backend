@@ -1,6 +1,7 @@
 import { Priority, TaskStatus } from '@prisma/client';
-import { IsDateString, IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
 import { PaginationDto } from '../../common/dto/pagination.dto';
+import { IsApiDateString } from '../../common/validators/api-date-string.validator';
 
 export class FindTasksDto extends PaginationDto {
   @IsOptional()
@@ -40,11 +41,11 @@ export class FindTasksDto extends PaginationDto {
   paymentId?: string;
 
   @IsOptional()
-  @IsDateString()
+  @IsApiDateString()
   dueFrom?: string;
 
   @IsOptional()
-  @IsDateString()
+  @IsApiDateString()
   dueTo?: string;
 
   @IsOptional()

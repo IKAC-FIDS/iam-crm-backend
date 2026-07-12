@@ -1,10 +1,10 @@
 import {
-  IsDateString,
   IsOptional,
   IsString,
   IsUUID,
 } from 'class-validator';
 import { PaginationDto } from '../../common/dto/pagination.dto';
+import { IsApiDateString } from '../../common/validators/api-date-string.validator';
 
 export class FindAuditLogsDto extends PaginationDto {
   @IsOptional()
@@ -40,10 +40,10 @@ export class FindAuditLogsDto extends PaginationDto {
   requestPath?: string;
 
   @IsOptional()
-  @IsDateString()
+  @IsApiDateString()
   startDate?: string;
 
   @IsOptional()
-  @IsDateString()
+  @IsApiDateString()
   endDate?: string;
 }

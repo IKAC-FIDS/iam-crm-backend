@@ -1,6 +1,7 @@
 import { Transform } from 'class-transformer';
 import { ActivityType, Priority } from '@prisma/client';
-import { IsArray, IsDateString, IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsArray, IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsApiDateString } from '../../common/validators/api-date-string.validator';
 
 const csv = ({ value }: { value: unknown }): string[] | undefined => {
   if (value === undefined || value === null || value === '') return undefined;
@@ -12,11 +13,11 @@ const csv = ({ value }: { value: unknown }): string[] | undefined => {
 
 export class ReportFiltersDto {
   @IsOptional()
-  @IsDateString()
+  @IsApiDateString()
   startDate?: string;
 
   @IsOptional()
-  @IsDateString()
+  @IsApiDateString()
   endDate?: string;
 
   @Transform(csv)

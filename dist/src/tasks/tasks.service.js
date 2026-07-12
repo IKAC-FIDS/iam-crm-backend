@@ -16,6 +16,7 @@ const notifications_service_1 = require("../notifications/notifications.service"
 const audit_log_service_1 = require("../audit-log/audit-log.service");
 const prisma_service_1 = require("../prisma/prisma.service");
 const tenant_scope_util_1 = require("../common/tenant/tenant-scope.util");
+const api_date_util_1 = require("../common/dates/api-date.util");
 const taskInclude = {
     company: {
         select: {
@@ -144,8 +145,8 @@ let TasksService = class TasksService {
                 description: dto.description?.trim() || undefined,
                 status,
                 priority: dto.priority,
-                dueAt: dto.dueAt ? new Date(dto.dueAt) : undefined,
-                reminderAt: dto.reminderAt ? new Date(dto.reminderAt) : undefined,
+                dueAt: dto.dueAt ? (0, api_date_util_1.parseApiDate)(dto.dueAt, 'dueAt') : undefined,
+                reminderAt: dto.reminderAt ? (0, api_date_util_1.parseApiDate)(dto.reminderAt, 'reminderAt') : undefined,
                 companyId: dto.companyId,
                 personId: dto.personId,
                 opportunityId: dto.opportunityId,
@@ -186,10 +187,10 @@ let TasksService = class TasksService {
             data.priority = dto.priority;
         }
         if (dto.dueAt !== undefined) {
-            data.dueAt = dto.dueAt ? new Date(dto.dueAt) : null;
+            data.dueAt = dto.dueAt ? (0, api_date_util_1.parseApiDate)(dto.dueAt, 'dueAt') : null;
         }
         if (dto.reminderAt !== undefined) {
-            data.reminderAt = dto.reminderAt ? new Date(dto.reminderAt) : null;
+            data.reminderAt = dto.reminderAt ? (0, api_date_util_1.parseApiDate)(dto.reminderAt, 'reminderAt') : null;
         }
         if (dto.companyId !== undefined) {
             data.company = dto.companyId
@@ -323,8 +324,8 @@ let TasksService = class TasksService {
         const updated = await this.prisma.task.update({
             where: { id },
             data: {
-                dueAt: new Date(dto.dueAt),
-                reminderAt: dto.reminderAt !== undefined ? new Date(dto.reminderAt) : undefined,
+                dueAt: (0, api_date_util_1.parseApiDate)(dto.dueAt, 'dueAt'),
+                reminderAt: dto.reminderAt !== undefined ? (0, api_date_util_1.parseApiDate)(dto.reminderAt, 'reminderAt') : undefined,
             },
             include: taskInclude,
         });
@@ -385,13 +386,9 @@ let TasksService = class TasksService {
         }
         if (query.paymentId)
             and.push({ paymentId: query.paymentId });
-        if (query.dueFrom || query.dueTo) {
-            and.push({
-                dueAt: {
-                    ...(query.dueFrom && { gte: new Date(query.dueFrom) }),
-                    ...(query.dueTo && { lte: new Date(query.dueTo) }),
-                },
-            });
+        const dueRange = (0, api_date_util_1.parseApiDateRange)(query.dueFrom, query.dueTo, 'dueFrom', 'dueTo');
+        if (dueRange) {
+            and.push({ dueAt: dueRange });
         }
         const search = query.search?.trim();
         if (search) {

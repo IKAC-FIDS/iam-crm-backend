@@ -3,7 +3,6 @@ import {
   PaymentStatus,
 } from '@prisma/client';
 import {
-  IsDateString,
   IsEnum,
   IsNumber,
   IsOptional,
@@ -13,6 +12,7 @@ import {
   Min,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { IsApiDateString } from '../../common/validators/api-date-string.validator';
 
 export class CreateOpportunityPaymentDto {
   @IsOptional()
@@ -34,11 +34,11 @@ export class CreateOpportunityPaymentDto {
   currency?: string;
 
   @IsOptional()
-  @IsDateString()
+  @IsApiDateString()
   dueDate?: string;
 
   @IsOptional()
-  @IsDateString()
+  @IsApiDateString()
   paidAt?: string;
 
   @IsOptional()

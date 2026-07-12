@@ -13,6 +13,7 @@ exports.CreateCommercialDocumentDto = void 0;
 const client_1 = require("@prisma/client");
 const class_validator_1 = require("class-validator");
 const class_transformer_1 = require("class-transformer");
+const api_date_string_validator_1 = require("../../common/validators/api-date-string.validator");
 class CreateCommercialDocumentDto {
 }
 exports.CreateCommercialDocumentDto = CreateCommercialDocumentDto;
@@ -63,32 +64,32 @@ __decorate([
 ], CreateCommercialDocumentDto.prototype, "currency", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsDateString)(),
+    (0, api_date_string_validator_1.IsApiDateString)(),
     __metadata("design:type", String)
 ], CreateCommercialDocumentDto.prototype, "validUntil", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsDateString)(),
+    (0, api_date_string_validator_1.IsApiDateString)(),
     __metadata("design:type", String)
 ], CreateCommercialDocumentDto.prototype, "issuedAt", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsDateString)(),
+    (0, api_date_string_validator_1.IsApiDateString)(),
     __metadata("design:type", String)
 ], CreateCommercialDocumentDto.prototype, "sentAt", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsDateString)(),
+    (0, api_date_string_validator_1.IsApiDateString)(),
     __metadata("design:type", String)
 ], CreateCommercialDocumentDto.prototype, "acceptedAt", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsDateString)(),
+    (0, api_date_string_validator_1.IsApiDateString)(),
     __metadata("design:type", String)
 ], CreateCommercialDocumentDto.prototype, "rejectedAt", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsDateString)(),
+    (0, api_date_string_validator_1.IsApiDateString)(),
     __metadata("design:type", String)
 ], CreateCommercialDocumentDto.prototype, "signedAt", void 0);
 __decorate([

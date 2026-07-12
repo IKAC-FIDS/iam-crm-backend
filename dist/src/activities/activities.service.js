@@ -14,6 +14,7 @@ const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../prisma/prisma.service");
 const client_1 = require("@prisma/client");
 const audit_log_service_1 = require("../audit-log/audit-log.service");
+const api_date_util_1 = require("../common/dates/api-date.util");
 let ActivitiesService = class ActivitiesService {
     constructor(prisma, audit) {
         this.prisma = prisma;
@@ -115,8 +116,8 @@ let ActivitiesService = class ActivitiesService {
                 type: dto.type,
                 notes: dto.notes,
                 outcome: dto.outcome,
-                occurredAt: dto.occurredAt ? new Date(dto.occurredAt) : undefined,
-                nextActionDate: dto.nextActionDate ? new Date(dto.nextActionDate) : undefined,
+                occurredAt: dto.occurredAt ? (0, api_date_util_1.parseApiDate)(dto.occurredAt, 'occurredAt') : undefined,
+                nextActionDate: dto.nextActionDate ? (0, api_date_util_1.parseApiDate)(dto.nextActionDate, 'nextActionDate') : undefined,
                 opportunityId: dto.opportunityId,
             },
         });
@@ -144,11 +145,11 @@ let ActivitiesService = class ActivitiesService {
             data: {
                 ...(dto.type !== undefined && { type: dto.type }),
                 ...(dto.personId !== undefined && { personId: dto.personId }),
-                ...(dto.occurredAt != null && { occurredAt: new Date(dto.occurredAt) }),
+                ...(dto.occurredAt != null && { occurredAt: (0, api_date_util_1.parseApiDate)(dto.occurredAt, 'occurredAt') }),
                 ...(dto.notes !== undefined && { notes: dto.notes }),
                 ...(dto.outcome !== undefined && { outcome: dto.outcome }),
                 ...(dto.nextActionDate !== undefined && {
-                    nextActionDate: dto.nextActionDate === null ? null : new Date(dto.nextActionDate),
+                    nextActionDate: (0, api_date_util_1.parseNullableApiDate)(dto.nextActionDate, 'nextActionDate'),
                 }),
                 ...(dto.opportunityId !== undefined && { opportunityId: dto.opportunityId }),
             },
@@ -182,7 +183,7 @@ let ActivitiesService = class ActivitiesService {
         if (activity.completedAt) {
             throw new common_1.BadRequestException('Completed follow-ups cannot be rescheduled');
         }
-        const nextActionDate = new Date(dto.nextActionDate);
+        const nextActionDate = (0, api_date_util_1.parseApiDate)(dto.nextActionDate, 'nextActionDate');
         if (nextActionDate <= new Date()) {
             throw new common_1.BadRequestException('nextActionDate must be in the future');
         }

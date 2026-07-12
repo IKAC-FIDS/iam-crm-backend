@@ -13,6 +13,7 @@ exports.AuditLogService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../prisma/prisma.service");
 const audit_request_context_service_1 = require("./audit-request-context.service");
+const api_date_util_1 = require("../common/dates/api-date.util");
 let AuditLogService = class AuditLogService {
     constructor(prisma, requestContext) {
         this.prisma = prisma;
@@ -47,11 +48,7 @@ let AuditLogService = class AuditLogService {
     async findAll(query) {
         const page = query.page ?? 1;
         const limit = query.limit ?? 20;
-        const startDate = query.startDate ? new Date(query.startDate) : undefined;
-        const endDate = query.endDate ? new Date(query.endDate) : undefined;
-        if (startDate && endDate && startDate > endDate) {
-            throw new common_1.BadRequestException('startDate must be before or equal to endDate');
-        }
+        const createdAtRange = (0, api_date_util_1.parseApiDateRange)(query.startDate, query.endDate, 'startDate', 'endDate');
         const where = {
             ...(query.actorId && { actorId: query.actorId }),
             ...(query.entityType && { entityType: query.entityType }),
@@ -73,12 +70,7 @@ let AuditLogService = class AuditLogService {
                     mode: 'insensitive',
                 },
             }),
-            ...((startDate || endDate) && {
-                createdAt: {
-                    gte: startDate,
-                    lte: endDate,
-                },
-            }),
+            ...(createdAtRange && { createdAt: createdAtRange }),
         };
         const [data, total] = await Promise.all([
             this.prisma.auditLog.findMany({

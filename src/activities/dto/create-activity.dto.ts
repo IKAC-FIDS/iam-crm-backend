@@ -1,5 +1,6 @@
-import { IsDateString, IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
 import { ActivityType } from '@prisma/client';
+import { IsApiDateString } from '../../common/validators/api-date-string.validator';
 
 export class CreateActivityDto {
   @IsString()
@@ -21,11 +22,11 @@ export class CreateActivityDto {
   outcome?: string;
 
   @IsOptional()
-  @IsDateString()
+  @IsApiDateString()
   occurredAt?: string;
 
   @IsOptional()
-  @IsDateString()
+  @IsApiDateString()
   nextActionDate?: string;
 
   @IsOptional()

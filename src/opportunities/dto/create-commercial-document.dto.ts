@@ -3,7 +3,6 @@ import {
   CommercialDocumentType,
 } from '@prisma/client';
 import {
-  IsDateString,
   IsEnum,
   IsNumber,
   IsOptional,
@@ -12,6 +11,7 @@ import {
   Min,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { IsApiDateString } from '../../common/validators/api-date-string.validator';
 
 export class CreateCommercialDocumentDto {
   @IsEnum(CommercialDocumentType)
@@ -52,27 +52,27 @@ export class CreateCommercialDocumentDto {
   currency?: string;
 
   @IsOptional()
-  @IsDateString()
+  @IsApiDateString()
   validUntil?: string;
 
   @IsOptional()
-  @IsDateString()
+  @IsApiDateString()
   issuedAt?: string;
 
   @IsOptional()
-  @IsDateString()
+  @IsApiDateString()
   sentAt?: string;
 
   @IsOptional()
-  @IsDateString()
+  @IsApiDateString()
   acceptedAt?: string;
 
   @IsOptional()
-  @IsDateString()
+  @IsApiDateString()
   rejectedAt?: string;
 
   @IsOptional()
-  @IsDateString()
+  @IsApiDateString()
   signedAt?: string;
 
   @IsOptional()

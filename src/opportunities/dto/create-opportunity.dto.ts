@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
 import { Priority } from '@prisma/client';
-import { IsDateString, IsEnum, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
+import { IsEnum, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
+import { IsApiDateString } from '../../common/validators/api-date-string.validator';
 
 export class CreateOpportunityDto {
   @IsUUID()
@@ -32,7 +33,7 @@ export class CreateOpportunityDto {
   estimatedValue?: number;
 
   @IsOptional()
-  @IsDateString()
+  @IsApiDateString()
   expectedCloseDate?: string;
 
   @IsOptional()

@@ -14,6 +14,7 @@ const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
 const audit_log_service_1 = require("../audit-log/audit-log.service");
 const prisma_service_1 = require("../prisma/prisma.service");
+const api_date_util_1 = require("../common/dates/api-date.util");
 const commercialDocumentInclude = {
     payments: {
         select: {
@@ -112,8 +113,8 @@ let OpportunityCommercialDocumentsService = class OpportunityCommercialDocuments
                     ? new client_1.Prisma.Decimal(dto.amount)
                     : opportunity.estimatedValue ?? undefined,
                 currency: dto.currency?.trim().toUpperCase() || 'IRR',
-                validUntil: dto.validUntil ? new Date(dto.validUntil) : undefined,
-                issuedAt: dto.issuedAt ? new Date(dto.issuedAt) : undefined,
+                validUntil: dto.validUntil ? (0, api_date_util_1.parseApiDate)(dto.validUntil, 'validUntil') : undefined,
+                issuedAt: dto.issuedAt ? (0, api_date_util_1.parseApiDate)(dto.issuedAt, 'issuedAt') : undefined,
                 sentAt: statusDates.sentAt,
                 acceptedAt: statusDates.acceptedAt,
                 rejectedAt: statusDates.rejectedAt,
@@ -179,22 +180,22 @@ let OpportunityCommercialDocumentsService = class OpportunityCommercialDocuments
             data.currency = dto.currency.trim().toUpperCase() || 'IRR';
         }
         if (dto.validUntil !== undefined) {
-            data.validUntil = dto.validUntil ? new Date(dto.validUntil) : null;
+            data.validUntil = dto.validUntil ? (0, api_date_util_1.parseApiDate)(dto.validUntil, 'validUntil') : null;
         }
         if (dto.issuedAt !== undefined) {
-            data.issuedAt = dto.issuedAt ? new Date(dto.issuedAt) : null;
+            data.issuedAt = dto.issuedAt ? (0, api_date_util_1.parseApiDate)(dto.issuedAt, 'issuedAt') : null;
         }
         if (dto.sentAt !== undefined) {
-            data.sentAt = dto.sentAt ? new Date(dto.sentAt) : null;
+            data.sentAt = dto.sentAt ? (0, api_date_util_1.parseApiDate)(dto.sentAt, 'sentAt') : null;
         }
         if (dto.acceptedAt !== undefined) {
-            data.acceptedAt = dto.acceptedAt ? new Date(dto.acceptedAt) : null;
+            data.acceptedAt = dto.acceptedAt ? (0, api_date_util_1.parseApiDate)(dto.acceptedAt, 'acceptedAt') : null;
         }
         if (dto.rejectedAt !== undefined) {
-            data.rejectedAt = dto.rejectedAt ? new Date(dto.rejectedAt) : null;
+            data.rejectedAt = dto.rejectedAt ? (0, api_date_util_1.parseApiDate)(dto.rejectedAt, 'rejectedAt') : null;
         }
         if (dto.signedAt !== undefined) {
-            data.signedAt = dto.signedAt ? new Date(dto.signedAt) : null;
+            data.signedAt = dto.signedAt ? (0, api_date_util_1.parseApiDate)(dto.signedAt, 'signedAt') : null;
         }
         if (dto.fileUrl !== undefined) {
             data.fileUrl = dto.fileUrl?.trim() || null;
@@ -302,22 +303,22 @@ let OpportunityCommercialDocumentsService = class OpportunityCommercialDocuments
         const now = new Date();
         return {
             sentAt: dto.sentAt
-                ? new Date(dto.sentAt)
+                ? (0, api_date_util_1.parseApiDate)(dto.sentAt, 'sentAt')
                 : status === client_1.CommercialDocumentStatus.SENT
                     ? now
                     : undefined,
             acceptedAt: dto.acceptedAt
-                ? new Date(dto.acceptedAt)
+                ? (0, api_date_util_1.parseApiDate)(dto.acceptedAt, 'acceptedAt')
                 : status === client_1.CommercialDocumentStatus.ACCEPTED
                     ? now
                     : undefined,
             rejectedAt: dto.rejectedAt
-                ? new Date(dto.rejectedAt)
+                ? (0, api_date_util_1.parseApiDate)(dto.rejectedAt, 'rejectedAt')
                 : status === client_1.CommercialDocumentStatus.REJECTED
                     ? now
                     : undefined,
             signedAt: dto.signedAt
-                ? new Date(dto.signedAt)
+                ? (0, api_date_util_1.parseApiDate)(dto.signedAt, 'signedAt')
                 : status === client_1.CommercialDocumentStatus.SIGNED
                     ? now
                     : undefined,

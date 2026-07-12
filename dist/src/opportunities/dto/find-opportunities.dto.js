@@ -13,6 +13,7 @@ exports.FindOpportunitiesDto = void 0;
 const client_1 = require("@prisma/client");
 const class_validator_1 = require("class-validator");
 const pagination_dto_1 = require("../../common/dto/pagination.dto");
+const api_date_string_validator_1 = require("../../common/validators/api-date-string.validator");
 class FindOpportunitiesDto extends pagination_dto_1.PaginationDto {
 }
 exports.FindOpportunitiesDto = FindOpportunitiesDto;
@@ -73,12 +74,12 @@ __decorate([
 ], FindOpportunitiesDto.prototype, "primaryContactId", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsDateString)(),
+    (0, api_date_string_validator_1.IsApiDateString)(),
     __metadata("design:type", String)
 ], FindOpportunitiesDto.prototype, "expectedCloseFrom", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsDateString)(),
+    (0, api_date_string_validator_1.IsApiDateString)(),
     __metadata("design:type", String)
 ], FindOpportunitiesDto.prototype, "expectedCloseTo", void 0);
 __decorate([

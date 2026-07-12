@@ -8,6 +8,7 @@ import { CurrentUserPayload } from '../common/decorators/current-user.decorator'
 import { PaginationDto, PaginatedResponse } from '../common/dto/pagination.dto';
 import { UserRole } from '@prisma/client';
 import { AuditLogService } from '../audit-log/audit-log.service';
+import { parseApiDate, parseNullableApiDate } from '../common/dates/api-date.util';
 
 @Injectable()
 export class ActivitiesService {
@@ -142,8 +143,8 @@ export class ActivitiesService {
         type: dto.type,
         notes: dto.notes,
         outcome: dto.outcome,
-        occurredAt: dto.occurredAt ? new Date(dto.occurredAt) : undefined,
-        nextActionDate: dto.nextActionDate ? new Date(dto.nextActionDate) : undefined,
+        occurredAt: dto.occurredAt ? parseApiDate(dto.occurredAt, 'occurredAt') : undefined,
+        nextActionDate: dto.nextActionDate ? parseApiDate(dto.nextActionDate, 'nextActionDate') : undefined,
         opportunityId: dto.opportunityId,
       },
     });
@@ -173,11 +174,11 @@ export class ActivitiesService {
       data: {
         ...(dto.type !== undefined && { type: dto.type }),
         ...(dto.personId !== undefined && { personId: dto.personId }),
-        ...(dto.occurredAt != null && { occurredAt: new Date(dto.occurredAt) }),
+        ...(dto.occurredAt != null && { occurredAt: parseApiDate(dto.occurredAt, 'occurredAt') }),
         ...(dto.notes !== undefined && { notes: dto.notes }),
         ...(dto.outcome !== undefined && { outcome: dto.outcome }),
         ...(dto.nextActionDate !== undefined && {
-          nextActionDate: dto.nextActionDate === null ? null : new Date(dto.nextActionDate),
+          nextActionDate: parseNullableApiDate(dto.nextActionDate, 'nextActionDate'),
         }),
         ...(dto.opportunityId !== undefined && { opportunityId: dto.opportunityId }),
       },
@@ -214,7 +215,7 @@ export class ActivitiesService {
       throw new BadRequestException('Completed follow-ups cannot be rescheduled');
     }
 
-    const nextActionDate = new Date(dto.nextActionDate);
+    const nextActionDate = parseApiDate(dto.nextActionDate, 'nextActionDate');
     if (nextActionDate <= new Date()) {
       throw new BadRequestException('nextActionDate must be in the future');
     }

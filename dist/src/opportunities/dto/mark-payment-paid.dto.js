@@ -12,12 +12,13 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.MarkPaymentPaidDto = void 0;
 const client_1 = require("@prisma/client");
 const class_validator_1 = require("class-validator");
+const api_date_string_validator_1 = require("../../common/validators/api-date-string.validator");
 class MarkPaymentPaidDto {
 }
 exports.MarkPaymentPaidDto = MarkPaymentPaidDto;
 __decorate([
     (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsDateString)(),
+    (0, api_date_string_validator_1.IsApiDateString)(),
     __metadata("design:type", String)
 ], MarkPaymentPaidDto.prototype, "paidAt", void 0);
 __decorate([

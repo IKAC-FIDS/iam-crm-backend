@@ -13,6 +13,7 @@ exports.CreateOpportunityPaymentDto = void 0;
 const client_1 = require("@prisma/client");
 const class_validator_1 = require("class-validator");
 const class_transformer_1 = require("class-transformer");
+const api_date_string_validator_1 = require("../../common/validators/api-date-string.validator");
 class CreateOpportunityPaymentDto {
 }
 exports.CreateOpportunityPaymentDto = CreateOpportunityPaymentDto;
@@ -40,12 +41,12 @@ __decorate([
 ], CreateOpportunityPaymentDto.prototype, "currency", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsDateString)(),
+    (0, api_date_string_validator_1.IsApiDateString)(),
     __metadata("design:type", String)
 ], CreateOpportunityPaymentDto.prototype, "dueDate", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsDateString)(),
+    (0, api_date_string_validator_1.IsApiDateString)(),
     __metadata("design:type", String)
 ], CreateOpportunityPaymentDto.prototype, "paidAt", void 0);
 __decorate([

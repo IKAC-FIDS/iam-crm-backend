@@ -1,12 +1,12 @@
 import { Priority, TaskStatus } from '@prisma/client';
 import {
-  IsDateString,
   IsEnum,
   IsOptional,
   IsString,
   IsUUID,
   MaxLength,
 } from 'class-validator';
+import { IsApiDateString } from '../../common/validators/api-date-string.validator';
 
 export class CreateTaskDto {
   @IsString()
@@ -26,11 +26,11 @@ export class CreateTaskDto {
   priority?: Priority;
 
   @IsOptional()
-  @IsDateString()
+  @IsApiDateString()
   dueAt?: string;
 
   @IsOptional()
-  @IsDateString()
+  @IsApiDateString()
   reminderAt?: string;
 
   @IsOptional()

@@ -11,16 +11,17 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.RescheduleTaskDto = void 0;
 const class_validator_1 = require("class-validator");
+const api_date_string_validator_1 = require("../../common/validators/api-date-string.validator");
 class RescheduleTaskDto {
 }
 exports.RescheduleTaskDto = RescheduleTaskDto;
 __decorate([
-    (0, class_validator_1.IsDateString)(),
+    (0, api_date_string_validator_1.IsApiDateString)(),
     __metadata("design:type", String)
 ], RescheduleTaskDto.prototype, "dueAt", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsDateString)(),
+    (0, api_date_string_validator_1.IsApiDateString)(),
     __metadata("design:type", String)
 ], RescheduleTaskDto.prototype, "reminderAt", void 0);
 //# sourceMappingURL=reschedule-task.dto.js.map

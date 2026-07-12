@@ -12,6 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.FindAuditLogsDto = void 0;
 const class_validator_1 = require("class-validator");
 const pagination_dto_1 = require("../../common/dto/pagination.dto");
+const api_date_string_validator_1 = require("../../common/validators/api-date-string.validator");
 class FindAuditLogsDto extends pagination_dto_1.PaginationDto {
 }
 exports.FindAuditLogsDto = FindAuditLogsDto;
@@ -57,12 +58,12 @@ __decorate([
 ], FindAuditLogsDto.prototype, "requestPath", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsDateString)(),
+    (0, api_date_string_validator_1.IsApiDateString)(),
     __metadata("design:type", String)
 ], FindAuditLogsDto.prototype, "startDate", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsDateString)(),
+    (0, api_date_string_validator_1.IsApiDateString)(),
     __metadata("design:type", String)
 ], FindAuditLogsDto.prototype, "endDate", void 0);
 //# sourceMappingURL=find-audit-logs.dto.js.map

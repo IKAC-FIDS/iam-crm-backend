@@ -12,6 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.CreateActivityDto = void 0;
 const class_validator_1 = require("class-validator");
 const client_1 = require("@prisma/client");
+const api_date_string_validator_1 = require("../../common/validators/api-date-string.validator");
 class CreateActivityDto {
 }
 exports.CreateActivityDto = CreateActivityDto;
@@ -40,12 +41,12 @@ __decorate([
 ], CreateActivityDto.prototype, "outcome", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsDateString)(),
+    (0, api_date_string_validator_1.IsApiDateString)(),
     __metadata("design:type", String)
 ], CreateActivityDto.prototype, "occurredAt", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsDateString)(),
+    (0, api_date_string_validator_1.IsApiDateString)(),
     __metadata("design:type", String)
 ], CreateActivityDto.prototype, "nextActionDate", void 0);
 __decorate([

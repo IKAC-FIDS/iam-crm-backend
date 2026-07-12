@@ -14,6 +14,7 @@ const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
 const audit_log_service_1 = require("../audit-log/audit-log.service");
 const prisma_service_1 = require("../prisma/prisma.service");
+const api_date_util_1 = require("../common/dates/api-date.util");
 const paymentInclude = {
     commercialDocument: {
         select: {
@@ -45,12 +46,9 @@ let OpportunityPaymentsService = class OpportunityPaymentsService {
         if (query.commercialDocumentId) {
             where.commercialDocumentId = query.commercialDocumentId;
         }
-        if (query.dueFrom || query.dueTo) {
-            where.dueDate = {
-                ...(query.dueFrom && { gte: new Date(query.dueFrom) }),
-                ...(query.dueTo && { lte: new Date(query.dueTo) }),
-            };
-        }
+        const dueRange = (0, api_date_util_1.parseApiDateRange)(query.dueFrom, query.dueTo, 'dueFrom', 'dueTo');
+        if (dueRange)
+            where.dueDate = dueRange;
         const [data, total] = await Promise.all([
             this.prisma.opportunityPayment.findMany({
                 where,
@@ -100,8 +98,8 @@ let OpportunityPaymentsService = class OpportunityPaymentsService {
                 status: dto.status ?? client_1.PaymentStatus.PENDING,
                 amount: this.toPositiveDecimal(dto.amount, 'amount'),
                 currency: dto.currency?.trim().toUpperCase() || 'IRR',
-                dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
-                paidAt: dto.paidAt ? new Date(dto.paidAt) : undefined,
+                dueDate: dto.dueDate ? (0, api_date_util_1.parseApiDate)(dto.dueDate, 'dueDate') : undefined,
+                paidAt: dto.paidAt ? (0, api_date_util_1.parseApiDate)(dto.paidAt, 'paidAt') : undefined,
                 method: dto.method,
                 referenceNumber: dto.referenceNumber?.trim() || undefined,
                 description: dto.description?.trim() || undefined,
@@ -152,9 +150,9 @@ let OpportunityPaymentsService = class OpportunityPaymentsService {
         if (dto.currency !== undefined)
             data.currency = dto.currency.trim().toUpperCase() || 'IRR';
         if (dto.dueDate !== undefined)
-            data.dueDate = dto.dueDate ? new Date(dto.dueDate) : null;
+            data.dueDate = dto.dueDate ? (0, api_date_util_1.parseApiDate)(dto.dueDate, 'dueDate') : null;
         if (dto.paidAt !== undefined)
-            data.paidAt = dto.paidAt ? new Date(dto.paidAt) : null;
+            data.paidAt = dto.paidAt ? (0, api_date_util_1.parseApiDate)(dto.paidAt, 'paidAt') : null;
         if (dto.method !== undefined)
             data.method = dto.method;
         if (dto.referenceNumber !== undefined)
@@ -197,7 +195,7 @@ let OpportunityPaymentsService = class OpportunityPaymentsService {
             where: { id: paymentId },
             data: {
                 status: client_1.PaymentStatus.PAID,
-                paidAt: dto.paidAt ? new Date(dto.paidAt) : new Date(),
+                paidAt: dto.paidAt ? (0, api_date_util_1.parseApiDate)(dto.paidAt, 'paidAt') : new Date(),
                 method: dto.method ?? current.method,
                 referenceNumber: dto.referenceNumber?.trim() || current.referenceNumber,
                 notes: dto.notes?.trim() || current.notes,

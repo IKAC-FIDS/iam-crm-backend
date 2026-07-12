@@ -1,9 +1,10 @@
 import { PaymentMethod } from '@prisma/client';
-import { IsDateString, IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsApiDateString } from '../../common/validators/api-date-string.validator';
 
 export class MarkPaymentPaidDto {
   @IsOptional()
-  @IsDateString()
+  @IsApiDateString()
   paidAt?: string;
 
   @IsOptional()

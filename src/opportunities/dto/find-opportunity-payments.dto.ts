@@ -1,6 +1,7 @@
 import { PaymentStatus } from '@prisma/client';
-import { IsDateString, IsEnum, IsOptional, IsString } from 'class-validator';
+import { IsEnum, IsOptional, IsString } from 'class-validator';
 import { PaginationDto } from '../../common/dto/pagination.dto';
+import { IsApiDateString } from '../../common/validators/api-date-string.validator';
 
 export class FindOpportunityPaymentsDto extends PaginationDto {
   @IsOptional()
@@ -12,10 +13,10 @@ export class FindOpportunityPaymentsDto extends PaginationDto {
   commercialDocumentId?: string;
 
   @IsOptional()
-  @IsDateString()
+  @IsApiDateString()
   dueFrom?: string;
 
   @IsOptional()
-  @IsDateString()
+  @IsApiDateString()
   dueTo?: string;
 }

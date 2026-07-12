@@ -16,6 +16,7 @@ const pipeline_config_service_1 = require("../admin/pipeline/pipeline-config.ser
 const audit_log_service_1 = require("../audit-log/audit-log.service");
 const prisma_service_1 = require("../prisma/prisma.service");
 const tenant_scope_util_1 = require("../common/tenant/tenant-scope.util");
+const api_date_util_1 = require("../common/dates/api-date.util");
 const opportunityInclude = {
     company: {
         select: {
@@ -296,7 +297,7 @@ let OpportunitiesService = class OpportunitiesService {
                 priority: dto.priority,
                 estimatedValue: dto.estimatedValue,
                 expectedCloseDate: dto.expectedCloseDate
-                    ? new Date(dto.expectedCloseDate)
+                    ? (0, api_date_util_1.parseApiDate)(dto.expectedCloseDate, 'expectedCloseDate')
                     : undefined,
                 sourceOptionId: source.sourceOptionId,
                 source: source.source,
@@ -346,7 +347,7 @@ let OpportunitiesService = class OpportunitiesService {
                     title: dto.title.trim(),
                 }),
                 ...(dto.expectedCloseDate !== undefined && {
-                    expectedCloseDate: new Date(dto.expectedCloseDate),
+                    expectedCloseDate: (0, api_date_util_1.parseApiDate)(dto.expectedCloseDate, 'expectedCloseDate'),
                 }),
                 ...(source !== undefined && {
                     sourceOptionId: source.sourceOptionId,
@@ -581,13 +582,9 @@ let OpportunitiesService = class OpportunitiesService {
                 primaryContactId: query.primaryContactId,
             });
         }
-        if (query.expectedCloseFrom || query.expectedCloseTo) {
-            and.push({
-                expectedCloseDate: {
-                    ...(query.expectedCloseFrom && { gte: new Date(query.expectedCloseFrom) }),
-                    ...(query.expectedCloseTo && { lte: new Date(query.expectedCloseTo) }),
-                },
-            });
+        const expectedCloseRange = (0, api_date_util_1.parseApiDateRange)(query.expectedCloseFrom, query.expectedCloseTo, 'expectedCloseFrom', 'expectedCloseTo');
+        if (expectedCloseRange) {
+            and.push({ expectedCloseDate: expectedCloseRange });
         }
         if (query.archivedOnly === 'true') {
             and.push({

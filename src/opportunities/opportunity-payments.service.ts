@@ -16,6 +16,7 @@ import { CreateOpportunityPaymentDto } from './dto/create-opportunity-payment.dt
 import { FindOpportunityPaymentsDto } from './dto/find-opportunity-payments.dto';
 import { MarkPaymentPaidDto } from './dto/mark-payment-paid.dto';
 import { UpdateOpportunityPaymentDto } from './dto/update-opportunity-payment.dto';
+import { parseApiDate, parseApiDateRange } from '../common/dates/api-date.util';
 
 const paymentInclude = {
   commercialDocument: {
@@ -60,12 +61,8 @@ export class OpportunityPaymentsService {
       where.commercialDocumentId = query.commercialDocumentId;
     }
 
-    if (query.dueFrom || query.dueTo) {
-      where.dueDate = {
-        ...(query.dueFrom && { gte: new Date(query.dueFrom) }),
-        ...(query.dueTo && { lte: new Date(query.dueTo) }),
-      };
-    }
+    const dueRange = parseApiDateRange(query.dueFrom, query.dueTo, 'dueFrom', 'dueTo');
+    if (dueRange) where.dueDate = dueRange;
 
     const [data, total] = await Promise.all([
       this.prisma.opportunityPayment.findMany({
@@ -136,8 +133,8 @@ export class OpportunityPaymentsService {
         status: dto.status ?? PaymentStatus.PENDING,
         amount: this.toPositiveDecimal(dto.amount, 'amount'),
         currency: dto.currency?.trim().toUpperCase() || 'IRR',
-        dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
-        paidAt: dto.paidAt ? new Date(dto.paidAt) : undefined,
+        dueDate: dto.dueDate ? parseApiDate(dto.dueDate, 'dueDate') : undefined,
+        paidAt: dto.paidAt ? parseApiDate(dto.paidAt, 'paidAt') : undefined,
         method: dto.method,
         referenceNumber: dto.referenceNumber?.trim() || undefined,
         description: dto.description?.trim() || undefined,
@@ -201,8 +198,8 @@ export class OpportunityPaymentsService {
     if (dto.status !== undefined) data.status = dto.status;
     if (dto.amount !== undefined) data.amount = this.toPositiveDecimal(dto.amount, 'amount');
     if (dto.currency !== undefined) data.currency = dto.currency.trim().toUpperCase() || 'IRR';
-    if (dto.dueDate !== undefined) data.dueDate = dto.dueDate ? new Date(dto.dueDate) : null;
-    if (dto.paidAt !== undefined) data.paidAt = dto.paidAt ? new Date(dto.paidAt) : null;
+    if (dto.dueDate !== undefined) data.dueDate = dto.dueDate ? parseApiDate(dto.dueDate, 'dueDate') : null;
+    if (dto.paidAt !== undefined) data.paidAt = dto.paidAt ? parseApiDate(dto.paidAt, 'paidAt') : null;
     if (dto.method !== undefined) data.method = dto.method;
     if (dto.referenceNumber !== undefined) data.referenceNumber = dto.referenceNumber?.trim() || null;
     if (dto.description !== undefined) data.description = dto.description?.trim() || null;
@@ -253,7 +250,7 @@ export class OpportunityPaymentsService {
       where: { id: paymentId },
       data: {
         status: PaymentStatus.PAID,
-        paidAt: dto.paidAt ? new Date(dto.paidAt) : new Date(),
+        paidAt: dto.paidAt ? parseApiDate(dto.paidAt, 'paidAt') : new Date(),
         method: dto.method ?? current.method,
         referenceNumber: dto.referenceNumber?.trim() || current.referenceNumber,
         notes: dto.notes?.trim() || current.notes,

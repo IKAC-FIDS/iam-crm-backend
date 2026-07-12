@@ -1,8 +1,9 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditRequestContextService } from './audit-request-context.service';
 import { FindAuditLogsDto } from './dto/find-audit-logs.dto';
+import { parseApiDateRange } from '../common/dates/api-date.util';
 
 export interface RecordAuditInput {
   actorId?: string | null;
@@ -60,12 +61,7 @@ export class AuditLogService {
   async findAll(query: FindAuditLogsDto) {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
-    const startDate = query.startDate ? new Date(query.startDate) : undefined;
-    const endDate = query.endDate ? new Date(query.endDate) : undefined;
-
-    if (startDate && endDate && startDate > endDate) {
-      throw new BadRequestException('startDate must be before or equal to endDate');
-    }
+    const createdAtRange = parseApiDateRange(query.startDate, query.endDate, 'startDate', 'endDate');
 
     const where: Prisma.AuditLogWhereInput = {
       ...(query.actorId && { actorId: query.actorId }),
@@ -88,12 +84,7 @@ export class AuditLogService {
           mode: 'insensitive',
         },
       }),
-      ...((startDate || endDate) && {
-        createdAt: {
-          gte: startDate,
-          lte: endDate,
-        },
-      }),
+      ...(createdAtRange && { createdAt: createdAtRange }),
     };
 
     const [data, total] = await Promise.all([

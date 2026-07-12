@@ -1,10 +1,11 @@
-import { IsDateString, IsOptional } from 'class-validator';
+import { IsOptional } from 'class-validator';
+import { IsApiDateString } from '../../common/validators/api-date-string.validator';
 
 export class RescheduleTaskDto {
-  @IsDateString()
+  @IsApiDateString()
   dueAt!: string;
 
   @IsOptional()
-  @IsDateString()
+  @IsApiDateString()
   reminderAt?: string;
 }

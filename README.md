@@ -1469,6 +1469,36 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 ---
 
 
+### fix 000041 - استانداردسازی قرارداد تاریخ‌ها برای پشتیبانی از نمایش شمسی در فرانت
+
+- همه فیلدهای `DateTime` در Prisma بررسی شدند و هیچ فیلدی برای پشتیبانی از نمایش شمسی از `DateTime` به `String` تغییر نکرد.
+- قرارداد ورودی تاریخ‌ها در DTOهای فعالیت، کار، فرصت فروش، سند تجاری، پرداخت، گزارش و Audit Log به validator مشترک `IsApiDateString` منتقل شد.
+- API همچنان مقدارهای تاریخ را به صورت Gregorian/ISO 8601 یا `YYYY-MM-DD` برای تاریخ‌های business/date-only می‌پذیرد؛ رشته‌های جلالی/فارسی مثل `۱۴۰۳/۰۵/۲۰` معتبر نیستند و نباید به backend ارسال شوند.
+- مقدارهای `YYYY-MM-DD` برای persistence به UTC midnight تبدیل می‌شوند تا خطای timezone/off-by-one کاهش پیدا کند.
+- فیلترهای بازه‌ای تاریخ برای `to` date-only به صورت exclusive next-day ساخته می‌شوند؛ بنابراین `dueTo=2026-07-12` کل روز 12 جولای 2026 را پوشش می‌دهد.
+- تبدیل Jalali فقط مسئولیت فرانت‌اند است: فرانت باید تاریخ انتخاب‌شده در UI شمسی را پیش از ارسال به backend به Gregorian `YYYY-MM-DD` یا ISO date-time تبدیل کند.
+- خروجی API به رشته جلالی تبدیل نشد و مقدارهای `DateTime` همچنان به شکل استاندارد سریالایز می‌شوند.
+- Import اکسل SAM تاریخ business قابل parse نداشت و تغییری در رفتار import/export داده نشد.
+- migration لازم نبود؛ schema و نوع ستون‌های دیتابیس بدون تغییر ماندند.
+- فایل‌های مهم تغییرکرده/جدید:
+  - `src/common/dates/api-date.util.ts`
+  - `src/common/validators/api-date-string.validator.ts`
+  - `src/activities/dto/*` و `src/activities/activities.service.ts`
+  - `src/tasks/dto/*` و `src/tasks/tasks.service.ts`
+  - `src/opportunities/dto/*`
+  - `src/opportunities/opportunities.service.ts`
+  - `src/opportunities/opportunity-commercial-documents.service.ts`
+  - `src/opportunities/opportunity-payments.service.ts`
+  - `src/reports/dto/report-filters.dto.ts`
+  - `src/reports/reports.service.ts`
+  - `src/audit-log/dto/find-audit-logs.dto.ts`
+  - `src/audit-log/audit-log.service.ts`
+  - `test/api-date.util.spec.ts`
+- وضعیت بررسی‌ها: `npx prisma validate` موفق بود؛ `npx prisma generate` موفق بود؛ `npm run lint` موفق بود با 10 warning غیرمسدودکننده موجود؛ `npm run test` موفق بود: 2 suite و 9 test؛ `npm run build` موفق بود.
+- هشدار غیرمسدودکننده: `npx prisma validate` پیام در دسترس بودن نسخه major جدید Prisma را نمایش داد؛ این پیام خطا نبود.
+
+---
+
 **Built with ❤️ for sales team**
 
 ---

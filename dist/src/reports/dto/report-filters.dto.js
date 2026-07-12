@@ -13,6 +13,7 @@ exports.ReportFiltersDto = void 0;
 const class_transformer_1 = require("class-transformer");
 const client_1 = require("@prisma/client");
 const class_validator_1 = require("class-validator");
+const api_date_string_validator_1 = require("../../common/validators/api-date-string.validator");
 const csv = ({ value }) => {
     if (value === undefined || value === null || value === '')
         return undefined;
@@ -26,12 +27,12 @@ class ReportFiltersDto {
 exports.ReportFiltersDto = ReportFiltersDto;
 __decorate([
     (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsDateString)(),
+    (0, api_date_string_validator_1.IsApiDateString)(),
     __metadata("design:type", String)
 ], ReportFiltersDto.prototype, "startDate", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsDateString)(),
+    (0, api_date_string_validator_1.IsApiDateString)(),
     __metadata("design:type", String)
 ], ReportFiltersDto.prototype, "endDate", void 0);
 __decorate([

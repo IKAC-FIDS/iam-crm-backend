@@ -1,8 +1,9 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ActivityType, Prisma, Priority, UserRole } from '@prisma/client';
 import { CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReportFiltersDto } from './dto/report-filters.dto';
+import { parseApiDateRange } from '../common/dates/api-date.util';
 
 interface StageConversion {
   fromStageId: string | null;
@@ -79,14 +80,15 @@ export class ReportsService {
   }
 
   private dateRange(filters: ReportFiltersDto, defaultToLast30Days = false) {
-    const startDate = filters.startDate
-      ? new Date(filters.startDate)
-      : defaultToLast30Days ? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) : undefined;
-    const endDate = filters.endDate ? new Date(filters.endDate) : defaultToLast30Days ? new Date() : undefined;
-    if (startDate && endDate && startDate > endDate) {
-      throw new BadRequestException('startDate must be before or equal to endDate');
-    }
-    return { startDate, endDate };
+    const defaultStartDate = defaultToLast30Days ? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) : undefined;
+    const defaultEndDate = defaultToLast30Days ? new Date() : undefined;
+    const range = parseApiDateRange(filters.startDate, filters.endDate, 'startDate', 'endDate');
+
+    return {
+      startDate: range?.gte ?? defaultStartDate,
+      endDate: range?.lte ?? range?.lt ?? defaultEndDate,
+      range: range ?? (defaultToLast30Days ? { gte: defaultStartDate, lte: defaultEndDate } : undefined),
+    };
   }
 
   private activityWhere(
@@ -94,10 +96,10 @@ export class ReportsService {
     user: CurrentUserPayload,
     defaultToLast30Days = false,
   ): Prisma.ActivityWhereInput {
-    const { startDate, endDate } = this.dateRange(filters, defaultToLast30Days);
+    const { range } = this.dateRange(filters, defaultToLast30Days);
     const companyFilters = { ...filters, teams: undefined };
     const and: Prisma.ActivityWhereInput[] = [{ company: this.companyWhere(companyFilters, user) }];
-    if (startDate || endDate) and.push({ occurredAt: { gte: startDate, lte: endDate } });
+    if (range) and.push({ occurredAt: range });
     if (filters.userIds?.length) and.push({ userId: { in: filters.userIds } });
     if (filters.activityTypes?.length) and.push({ type: { in: filters.activityTypes } });
     if (filters.teams?.length) and.push({ user: { team: { in: filters.teams } } });

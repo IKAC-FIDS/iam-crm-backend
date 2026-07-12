@@ -24,6 +24,7 @@ import { FindTasksDto } from './dto/find-tasks.dto';
 import { RescheduleTaskDto } from './dto/reschedule-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { getCurrentOrganizationId } from '../common/tenant/tenant-scope.util';
+import { parseApiDate, parseApiDateRange } from '../common/dates/api-date.util';
 
 const taskInclude = {
   company: {
@@ -168,8 +169,8 @@ export class TasksService {
         description: dto.description?.trim() || undefined,
         status,
         priority: dto.priority,
-        dueAt: dto.dueAt ? new Date(dto.dueAt) : undefined,
-        reminderAt: dto.reminderAt ? new Date(dto.reminderAt) : undefined,
+        dueAt: dto.dueAt ? parseApiDate(dto.dueAt, 'dueAt') : undefined,
+        reminderAt: dto.reminderAt ? parseApiDate(dto.reminderAt, 'reminderAt') : undefined,
         companyId: dto.companyId,
         personId: dto.personId,
         opportunityId: dto.opportunityId,
@@ -221,11 +222,11 @@ export class TasksService {
     }
 
     if (dto.dueAt !== undefined) {
-      data.dueAt = dto.dueAt ? new Date(dto.dueAt) : null;
+      data.dueAt = dto.dueAt ? parseApiDate(dto.dueAt, 'dueAt') : null;
     }
 
     if (dto.reminderAt !== undefined) {
-      data.reminderAt = dto.reminderAt ? new Date(dto.reminderAt) : null;
+      data.reminderAt = dto.reminderAt ? parseApiDate(dto.reminderAt, 'reminderAt') : null;
     }
 
     if (dto.companyId !== undefined) {
@@ -389,9 +390,9 @@ export class TasksService {
     const updated = await this.prisma.task.update({
       where: { id },
       data: {
-        dueAt: new Date(dto.dueAt),
+        dueAt: parseApiDate(dto.dueAt, 'dueAt'),
         reminderAt:
-          dto.reminderAt !== undefined ? new Date(dto.reminderAt) : undefined,
+          dto.reminderAt !== undefined ? parseApiDate(dto.reminderAt, 'reminderAt') : undefined,
       },
       include: taskInclude,
     });
@@ -457,13 +458,9 @@ export class TasksService {
     }
     if (query.paymentId) and.push({ paymentId: query.paymentId });
 
-    if (query.dueFrom || query.dueTo) {
-      and.push({
-        dueAt: {
-          ...(query.dueFrom && { gte: new Date(query.dueFrom) }),
-          ...(query.dueTo && { lte: new Date(query.dueTo) }),
-        },
-      });
+    const dueRange = parseApiDateRange(query.dueFrom, query.dueTo, 'dueFrom', 'dueTo');
+    if (dueRange) {
+      and.push({ dueAt: dueRange });
     }
 
     const search = query.search?.trim();

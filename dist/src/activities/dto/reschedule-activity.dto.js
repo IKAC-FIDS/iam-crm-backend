@@ -12,6 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.RescheduleActivityDto = void 0;
 const class_transformer_1 = require("class-transformer");
 const class_validator_1 = require("class-validator");
+const api_date_string_validator_1 = require("../../common/validators/api-date-string.validator");
 const emptyStringToUndefined = ({ value }) => typeof value === 'string' && value.trim() === '' ? undefined : value;
 class RescheduleActivityDto {
 }
@@ -19,7 +20,7 @@ exports.RescheduleActivityDto = RescheduleActivityDto;
 __decorate([
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.IsNotEmpty)(),
-    (0, class_validator_1.IsDateString)(),
+    (0, api_date_string_validator_1.IsApiDateString)(),
     __metadata("design:type", String)
 ], RescheduleActivityDto.prototype, "nextActionDate", void 0);
 __decorate([

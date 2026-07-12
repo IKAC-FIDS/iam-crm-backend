@@ -16,6 +16,7 @@ import { ChangeCommercialDocumentStatusDto } from './dto/change-commercial-docum
 import { CreateCommercialDocumentDto } from './dto/create-commercial-document.dto';
 import { FindCommercialDocumentsDto } from './dto/find-commercial-documents.dto';
 import { UpdateCommercialDocumentDto } from './dto/update-commercial-document.dto';
+import { parseApiDate } from '../common/dates/api-date.util';
 
 const commercialDocumentInclude = {
   payments: {
@@ -147,8 +148,8 @@ export class OpportunityCommercialDocumentsService {
             ? new Prisma.Decimal(dto.amount)
             : opportunity.estimatedValue ?? undefined,
         currency: dto.currency?.trim().toUpperCase() || 'IRR',
-        validUntil: dto.validUntil ? new Date(dto.validUntil) : undefined,
-        issuedAt: dto.issuedAt ? new Date(dto.issuedAt) : undefined,
+        validUntil: dto.validUntil ? parseApiDate(dto.validUntil, 'validUntil') : undefined,
+        issuedAt: dto.issuedAt ? parseApiDate(dto.issuedAt, 'issuedAt') : undefined,
         sentAt: statusDates.sentAt,
         acceptedAt: statusDates.acceptedAt,
         rejectedAt: statusDates.rejectedAt,
@@ -229,27 +230,27 @@ export class OpportunityCommercialDocumentsService {
     }
 
     if (dto.validUntil !== undefined) {
-      data.validUntil = dto.validUntil ? new Date(dto.validUntil) : null;
+      data.validUntil = dto.validUntil ? parseApiDate(dto.validUntil, 'validUntil') : null;
     }
 
     if (dto.issuedAt !== undefined) {
-      data.issuedAt = dto.issuedAt ? new Date(dto.issuedAt) : null;
+      data.issuedAt = dto.issuedAt ? parseApiDate(dto.issuedAt, 'issuedAt') : null;
     }
 
     if (dto.sentAt !== undefined) {
-      data.sentAt = dto.sentAt ? new Date(dto.sentAt) : null;
+      data.sentAt = dto.sentAt ? parseApiDate(dto.sentAt, 'sentAt') : null;
     }
 
     if (dto.acceptedAt !== undefined) {
-      data.acceptedAt = dto.acceptedAt ? new Date(dto.acceptedAt) : null;
+      data.acceptedAt = dto.acceptedAt ? parseApiDate(dto.acceptedAt, 'acceptedAt') : null;
     }
 
     if (dto.rejectedAt !== undefined) {
-      data.rejectedAt = dto.rejectedAt ? new Date(dto.rejectedAt) : null;
+      data.rejectedAt = dto.rejectedAt ? parseApiDate(dto.rejectedAt, 'rejectedAt') : null;
     }
 
     if (dto.signedAt !== undefined) {
-      data.signedAt = dto.signedAt ? new Date(dto.signedAt) : null;
+      data.signedAt = dto.signedAt ? parseApiDate(dto.signedAt, 'signedAt') : null;
     }
 
     if (dto.fileUrl !== undefined) {
@@ -389,25 +390,25 @@ export class OpportunityCommercialDocumentsService {
     return {
       sentAt:
         dto.sentAt
-          ? new Date(dto.sentAt)
+          ? parseApiDate(dto.sentAt, 'sentAt')
           : status === CommercialDocumentStatus.SENT
             ? now
             : undefined,
       acceptedAt:
         dto.acceptedAt
-          ? new Date(dto.acceptedAt)
+          ? parseApiDate(dto.acceptedAt, 'acceptedAt')
           : status === CommercialDocumentStatus.ACCEPTED
             ? now
             : undefined,
       rejectedAt:
         dto.rejectedAt
-          ? new Date(dto.rejectedAt)
+          ? parseApiDate(dto.rejectedAt, 'rejectedAt')
           : status === CommercialDocumentStatus.REJECTED
             ? now
             : undefined,
       signedAt:
         dto.signedAt
-          ? new Date(dto.signedAt)
+          ? parseApiDate(dto.signedAt, 'signedAt')
           : status === CommercialDocumentStatus.SIGNED
             ? now
             : undefined,
