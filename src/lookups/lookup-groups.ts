@@ -1,7 +1,9 @@
 export const LOOKUP_GROUPS = [
   'teams',
   'departments',
+  'job-titles',
   'seniority-levels',
+  'persona-roles',
   'persona-tags',
   'contact-types',
   'person-social-platforms',

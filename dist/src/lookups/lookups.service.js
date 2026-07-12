@@ -53,10 +53,19 @@ let LookupsService = class LookupsService {
         return item;
     }
     parseGroup(value) {
-        if (!lookup_groups_1.LOOKUP_GROUPS.includes(value)) {
+        const groupAliases = {
+            DEPARTMENTS: 'departments',
+            JOB_TITLES: 'job-titles',
+            POSITIONS: 'job-titles',
+            SENIORITY_LEVELS: 'seniority-levels',
+            PERSONA_ROLES: 'persona-roles',
+            PERSONA_TAGS: 'persona-tags',
+        };
+        const normalized = groupAliases[value.trim().toUpperCase()] ?? value;
+        if (!lookup_groups_1.LOOKUP_GROUPS.includes(normalized)) {
             throw new common_1.BadRequestException(`Invalid lookup group. Allowed groups: ${lookup_groups_1.LOOKUP_GROUPS.join(', ')}`);
         }
-        return value;
+        return normalized;
     }
 };
 exports.LookupsService = LookupsService;

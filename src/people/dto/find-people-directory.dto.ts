@@ -24,7 +24,19 @@ export class FindPeopleDirectoryDto extends PaginationDto {
 
   @IsOptional()
   @IsString()
+  jobTitle?: string;
+
+  @IsOptional()
+  @IsString()
   personaTag?: string;
+
+  @IsOptional()
+  @IsString()
+  personaRole?: string;
+
+  @IsOptional()
+  @IsString()
+  seniorityLevel?: string;
 
   @IsOptional()
   @IsBooleanString()

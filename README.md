@@ -1421,6 +1421,29 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 
 ---
 
+### fix 000039 - اصلاح تفکیک دپارتمان، سمت سازمانی و نقش فروش در اشخاص
+
+- تفکیک معنایی فیلدهای شخص/مخاطب اصلاح شد:
+  - `department` برای دپارتمان یا واحد سازمانی.
+  - `title` برای سمت سازمانی / Job Title.
+  - `personaTag` برای نقش در فرآیند فروش / Buying Role.
+  - `seniorityLevel` برای سطح ارشدیت.
+- برای سازگاری API، نام‌های جدید و شفاف هم پشتیبانی می‌شوند: `jobTitle` به `title` و `personaRole` به `personaTag` نگاشت می‌شود.
+- پاسخ‌های People API اکنون aliasهای `jobTitle` و `personaRole` را هم کنار فیلدهای قدیمی برمی‌گردانند.
+- فیلترهای Global People Directory برای `jobTitle`, `personaRole`, و `seniorityLevel` اضافه شد.
+- گروه‌های lookup جدید `job-titles` و `persona-roles` اضافه شدند.
+- گروه‌های موجود `departments` و `seniority-levels` تکمیل شدند.
+- گروه `persona-tags` برای سازگاری با کلاینت‌های قبلی حفظ شد و با همان نقش‌های فروش seed می‌شود.
+- مقدارهای شغلی مثل `CEO`, `CIO`, `CISO`, `IT_MANAGER` و موارد مشابه دیگر به عنوان persona فروش seed نمی‌شوند؛ این‌ها در `job-titles` قرار گرفتند.
+- Persona Library به عنوان کتابخانه محتوای استراتژیک مبتنی بر الگوی سمت حفظ شد و با فیلد فرم شخص جایگزین یا ادغام نشد.
+- Migration جدید `20260712120000_separate_person_domain_lookups` lookupهای دپارتمان، سمت سازمانی، سطح ارشدیت و نقش فروش را upsert می‌کند.
+- Migration به صورت غیرمخرب، اگر `title` خالی باشد و `personaTag` مقدار شبیه سمت سازمانی داشته باشد، همان مقدار را در `title` کپی می‌کند و مقدار قدیمی `personaTag` را حذف نمی‌کند.
+- فایل‌های مهم تغییرکرده/جدید: `prisma/seed.ts`, `prisma/migrations/20260712120000_separate_person_domain_lookups/migration.sql`, `src/lookups/lookup-groups.ts`, `src/lookups/lookups.service.ts`, `src/people/dto/create-person.dto.ts`, `src/people/dto/find-people-directory.dto.ts`, `src/people/people.service.ts`, و `README.md`.
+- وابستگی فرانت‌اند: برای dropdownهای جدید از گروه‌های `departments`, `job-titles`, `persona-roles`, و `seniority-levels` استفاده شود. aliasهای `JOB_TITLES`, `POSITIONS`, `PERSONA_ROLES`, و `SENIORITY_LEVELS` هم به slugهای canonical نگاشت می‌شوند. endpoint lookup به صورت پیش‌فرض فقط گزینه‌های فعال را برمی‌گرداند.
+- وضعیت بررسی‌ها: `npx prisma validate` موفق بود؛ `npx prisma generate` موفق بود؛ `npm run build` موفق بود؛ `npm run lint` موفق بود با 10 warning غیرمسدودکننده موجود؛ `npm run test` موفق بود: 1 suite و 4 test.
+
+---
+
 
 **Built with ❤️ for sales team**
 

@@ -22,11 +22,23 @@ export class CreatePersonDto {
 
   @IsOptional()
   @IsString()
+  jobTitle?: string;
+
+  @IsOptional()
+  @IsString()
   department?: string;
 
   @IsOptional()
   @IsString()
   personaTag?: string;
+
+  @IsOptional()
+  @IsString()
+  personaRole?: string;
+
+  @IsOptional()
+  @IsString()
+  seniorityLevel?: string;
 
   @IsOptional()
   @IsString()

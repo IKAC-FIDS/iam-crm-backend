@@ -38,8 +38,13 @@ let PeopleService = class PeopleService {
             and.push({ company: { owner: { team: query.team.trim() } } });
         if (query.department?.trim())
             and.push({ department: query.department.trim() });
-        if (query.personaTag?.trim())
-            and.push({ personaTag: query.personaTag.trim() });
+        if (query.jobTitle?.trim())
+            and.push({ title: query.jobTitle.trim() });
+        if (query.seniorityLevel?.trim())
+            and.push({ seniorityLevel: query.seniorityLevel.trim() });
+        const personaRoleFilter = query.personaRole?.trim() || query.personaTag?.trim();
+        if (personaRoleFilter)
+            and.push({ personaTag: personaRoleFilter });
         if (query.isPrimaryContact !== undefined)
             and.push({ isPrimaryContact: query.isPrimaryContact === 'true' });
         const emailAvailability = {
@@ -78,7 +83,7 @@ let PeopleService = class PeopleService {
             this.prisma.person.findMany({
                 where,
                 select: {
-                    id: true, companyId: true, fullName: true, title: true, department: true, personaTag: true,
+                    id: true, companyId: true, fullName: true, title: true, department: true, personaTag: true, seniorityLevel: true,
                     email: true, phone: true, isPrimaryContact: true, createdAt: true, updatedAt: true,
                     company: { select: { id: true, legalName: true, brandName: true, owner: { select: { id: true, fullName: true, email: true, team: true } } } },
                     contacts: {
@@ -109,7 +114,7 @@ let PeopleService = class PeopleService {
         const emailContact = (contacts) => contacts.find((item) => item.type.toUpperCase().includes('EMAIL'))?.value ?? null;
         const phoneContact = (contacts) => contacts.find((item) => phoneTypes.includes(item.type.toUpperCase()))?.value ?? null;
         const data = people.map((person) => ({
-            ...person,
+            ...this.withDomainAliases(person),
             emailSummary: person.email || emailContact(person.contacts),
             phoneSummary: person.phone || phoneContact(person.contacts),
         }));
@@ -135,7 +140,7 @@ let PeopleService = class PeopleService {
         ]);
         const totalPages = Math.ceil(total / limit);
         return {
-            data,
+            data: data.map((person) => this.withDomainAliases(person)),
             meta: {
                 total,
                 page,
@@ -158,11 +163,11 @@ let PeopleService = class PeopleService {
         if (!person)
             throw new common_1.NotFoundException('مخاطب پیدا نشد');
         await this.validateCompanyAccess(person.companyId, user);
-        return person;
+        return this.withDomainAliases(person);
     }
     async create(dto, user) {
         await this.validateCompanyAccess(dto.companyId, user);
-        const { contacts, socials, ...personData } = dto;
+        const { contacts, socials, jobTitle, personaRole, ...personData } = dto;
         const normalizedContacts = await Promise.all((contacts ?? []).map(async (contact) => {
             const normalizedType = await this.resolveContactTypeReference(contact.typeOptionId, contact.type, true);
             const value = contact.value.trim();
@@ -194,6 +199,8 @@ let PeopleService = class PeopleService {
         return this.prisma.person.create({
             data: {
                 ...personData,
+                title: jobTitle ?? personData.title,
+                personaTag: personaRole ?? personData.personaTag,
                 contacts: {
                     create: normalizedContacts,
                 },
@@ -213,7 +220,7 @@ let PeopleService = class PeopleService {
                     },
                 },
             },
-        });
+        }).then((person) => this.withDomainAliases(person));
     }
     async update(id, dto, user) {
         const person = await this.prisma.person.findUnique({
@@ -223,10 +230,15 @@ let PeopleService = class PeopleService {
         if (!person)
             throw new common_1.NotFoundException('مخاطب پیدا نشد');
         await this.validateCompanyAccess(person.companyId, user);
+        const { jobTitle, personaRole, ...personData } = dto;
         return this.prisma.person.update({
             where: { id },
-            data: dto,
-        });
+            data: {
+                ...personData,
+                ...(jobTitle !== undefined && { title: jobTitle }),
+                ...(personaRole !== undefined && { personaTag: personaRole }),
+            },
+        }).then((updated) => this.withDomainAliases(updated));
     }
     async remove(id, user) {
         const person = await this.prisma.person.findUnique({
@@ -239,6 +251,13 @@ let PeopleService = class PeopleService {
         return this.prisma.person.delete({
             where: { id },
         });
+    }
+    withDomainAliases(person) {
+        return {
+            ...person,
+            jobTitle: person.title ?? null,
+            personaRole: person.personaTag ?? null,
+        };
     }
     async validateCompanyAccess(companyId, user) {
         const company = await this.prisma.company.findUnique({

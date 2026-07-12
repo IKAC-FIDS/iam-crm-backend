@@ -28,7 +28,10 @@ export class PeopleService {
     if (query.ownerId) and.push({ company: { ownerId: query.ownerId } });
     if (query.team?.trim()) and.push({ company: { owner: { team: query.team.trim() } } });
     if (query.department?.trim()) and.push({ department: query.department.trim() });
-    if (query.personaTag?.trim()) and.push({ personaTag: query.personaTag.trim() });
+    if (query.jobTitle?.trim()) and.push({ title: query.jobTitle.trim() });
+    if (query.seniorityLevel?.trim()) and.push({ seniorityLevel: query.seniorityLevel.trim() });
+    const personaRoleFilter = query.personaRole?.trim() || query.personaTag?.trim();
+    if (personaRoleFilter) and.push({ personaTag: personaRoleFilter });
     if (query.isPrimaryContact !== undefined) and.push({ isPrimaryContact: query.isPrimaryContact === 'true' });
 
     const emailAvailability: Prisma.PersonWhereInput = {
@@ -67,7 +70,7 @@ export class PeopleService {
       this.prisma.person.findMany({
         where,
         select: {
-          id: true, companyId: true, fullName: true, title: true, department: true, personaTag: true,
+          id: true, companyId: true, fullName: true, title: true, department: true, personaTag: true, seniorityLevel: true,
           email: true, phone: true, isPrimaryContact: true, createdAt: true, updatedAt: true,
           company: { select: { id: true, legalName: true, brandName: true, owner: { select: { id: true, fullName: true, email: true, team: true } } } },
           contacts: {
@@ -98,7 +101,7 @@ export class PeopleService {
     const emailContact = (contacts: Array<{ type: string; value: string }>) => contacts.find((item) => item.type.toUpperCase().includes('EMAIL'))?.value ?? null;
     const phoneContact = (contacts: Array<{ type: string; value: string }>) => contacts.find((item) => phoneTypes.includes(item.type.toUpperCase()))?.value ?? null;
     const data = people.map((person) => ({
-      ...person,
+      ...this.withDomainAliases(person),
       emailSummary: person.email || emailContact(person.contacts),
       phoneSummary: person.phone || phoneContact(person.contacts),
     }));
@@ -136,7 +139,7 @@ export class PeopleService {
 
     const totalPages = Math.ceil(total / limit);
     return {
-      data,
+      data: data.map((person) => this.withDomainAliases(person)),
       meta: {
         total,
         page,
@@ -163,7 +166,7 @@ export class PeopleService {
     if (!person) throw new NotFoundException('مخاطب پیدا نشد');
 
     await this.validateCompanyAccess(person.companyId, user);
-    return person;
+    return this.withDomainAliases(person);
   }
 
   // ============================================================
@@ -172,7 +175,7 @@ export class PeopleService {
   async create(dto: CreatePersonDto, user: CurrentUserPayload) {
     await this.validateCompanyAccess(dto.companyId, user);
 
-    const { contacts, socials, ...personData } = dto;
+    const { contacts, socials, jobTitle, personaRole, ...personData } = dto;
 
     const normalizedContacts = await Promise.all(
       (contacts ?? []).map(async (contact) => {
@@ -225,6 +228,8 @@ export class PeopleService {
     return this.prisma.person.create({
       data: {
         ...personData,
+        title: jobTitle ?? personData.title,
+        personaTag: personaRole ?? personData.personaTag,
         contacts: {
           create: normalizedContacts,
         },
@@ -244,7 +249,7 @@ export class PeopleService {
           },
         },
       },
-    });
+    }).then((person) => this.withDomainAliases(person));
   }
 
   // ============================================================
@@ -259,10 +264,16 @@ export class PeopleService {
 
     await this.validateCompanyAccess(person.companyId, user);
 
+    const { jobTitle, personaRole, ...personData } = dto;
+
     return this.prisma.person.update({
       where: { id },
-      data: dto,
-    });
+      data: {
+        ...personData,
+        ...(jobTitle !== undefined && { title: jobTitle }),
+        ...(personaRole !== undefined && { personaTag: personaRole }),
+      },
+    }).then((updated) => this.withDomainAliases(updated));
   }
 
   // ============================================================
@@ -280,6 +291,16 @@ export class PeopleService {
     return this.prisma.person.delete({
       where: { id },
     });
+  }
+
+  private withDomainAliases<T extends { title?: string | null; personaTag?: string | null }>(
+    person: T,
+  ): T & { jobTitle: string | null; personaRole: string | null } {
+    return {
+      ...person,
+      jobTitle: person.title ?? null,
+      personaRole: person.personaTag ?? null,
+    };
   }
 
   // ============================================================

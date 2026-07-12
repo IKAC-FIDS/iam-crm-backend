@@ -46,9 +46,19 @@ export class LookupsService {
   }
 
   private parseGroup(value: string): LookupGroup {
-    if (!LOOKUP_GROUPS.includes(value as LookupGroup)) {
+    const groupAliases: Record<string, LookupGroup> = {
+      DEPARTMENTS: 'departments',
+      JOB_TITLES: 'job-titles',
+      POSITIONS: 'job-titles',
+      SENIORITY_LEVELS: 'seniority-levels',
+      PERSONA_ROLES: 'persona-roles',
+      PERSONA_TAGS: 'persona-tags',
+    };
+    const normalized = groupAliases[value.trim().toUpperCase()] ?? value;
+
+    if (!LOOKUP_GROUPS.includes(normalized as LookupGroup)) {
       throw new BadRequestException(`Invalid lookup group. Allowed groups: ${LOOKUP_GROUPS.join(', ')}`);
     }
-    return value as LookupGroup;
+    return normalized as LookupGroup;
   }
 }
