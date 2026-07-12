@@ -3,7 +3,7 @@ import { ActivityType, Prisma, Priority, UserRole } from '@prisma/client';
 import { CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReportFiltersDto } from './dto/report-filters.dto';
-import { parseApiDateRange } from '../common/dates/api-date.util';
+import { parseApiDate, parseApiDateRange } from '../common/dates/api-date.util';
 
 interface StageConversion {
   fromStageId: string | null;
@@ -83,10 +83,11 @@ export class ReportsService {
     const defaultStartDate = defaultToLast30Days ? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) : undefined;
     const defaultEndDate = defaultToLast30Days ? new Date() : undefined;
     const range = parseApiDateRange(filters.startDate, filters.endDate, 'startDate', 'endDate');
+    const explicitEndDate = filters.endDate ? parseApiDate(filters.endDate, 'endDate') : undefined;
 
     return {
       startDate: range?.gte ?? defaultStartDate,
-      endDate: range?.lte ?? range?.lt ?? defaultEndDate,
+      endDate: explicitEndDate ?? defaultEndDate,
       range: range ?? (defaultToLast30Days ? { gte: defaultStartDate, lte: defaultEndDate } : undefined),
     };
   }

@@ -79,9 +79,10 @@ let ReportsService = class ReportsService {
         const defaultStartDate = defaultToLast30Days ? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) : undefined;
         const defaultEndDate = defaultToLast30Days ? new Date() : undefined;
         const range = (0, api_date_util_1.parseApiDateRange)(filters.startDate, filters.endDate, 'startDate', 'endDate');
+        const explicitEndDate = filters.endDate ? (0, api_date_util_1.parseApiDate)(filters.endDate, 'endDate') : undefined;
         return {
             startDate: range?.gte ?? defaultStartDate,
-            endDate: range?.lte ?? range?.lt ?? defaultEndDate,
+            endDate: explicitEndDate ?? defaultEndDate,
             range: range ?? (defaultToLast30Days ? { gte: defaultStartDate, lte: defaultEndDate } : undefined),
         };
     }

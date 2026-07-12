@@ -1499,6 +1499,24 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 
 ---
 
+### fix 000042 - بازبینی قرارداد تاریخ و زمان برای انتخابگر شمسی فرانت
+
+- DTOهای ورودی تاریخ/زمان برای activity، task، opportunity، payment، commercial document، report و audit log بازبینی شدند؛ قرارداد فعلی همچنان `IsApiDateString` و مقدار Gregorian `YYYY-MM-DD` یا ISO 8601 date-time است.
+- ذخیره‌سازی دیتابیس بدون تغییر ماند: هیچ فیلد `DateTime` به `String` تبدیل نشد و هیچ رشته Jalali/Persian در persistence اضافه نشد.
+- خروجی‌های API همچنان machine-readable هستند و تبدیل/نمایش Jalali مسئولیت فرانت‌اند باقی ماند.
+- اصلاح کمینه انجام شد: در گزارش activity، وقتی `endDate` به شکل date-only ارسال شود، فیلتر دیتابیس همچنان از upper-bound انحصاری روز بعد استفاده می‌کند، اما metadata خروجی `endDate` همان تاریخ انتخاب‌شده Gregorian را برمی‌گرداند تا فرانت با off-by-one نمایشی روبه‌رو نشود.
+- تست واحد اضافه شد تا ثابت کند `endDate=2026-07-12` در query به `lt: 2026-07-13T00:00:00.000Z` تبدیل می‌شود ولی response metadata مقدار `2026-07-12T00:00:00.000Z` را نگه می‌دارد.
+- فیلدهای date-only/business طبق convention فعلی: `expectedCloseDate`، payment `dueDate`، document `validUntil` و report range endpoints می‌توانند با `YYYY-MM-DD` ارسال شوند؛ فیلدهای true date-time مثل `reminderAt`، `paidAt`، `sentAt`، `acceptedAt`، `rejectedAt`، `signedAt` و lifecycle timestamps همچنان ISO date-time را هم می‌پذیرند.
+- فایل‌های مهم تغییرکرده:
+  - `src/reports/reports.service.ts`
+  - `test/reports.service.spec.ts`
+  - `README.md`
+- وابستگی فرانت‌اند: انتخابگر شمسی باید مقدار انتخاب‌شده را پیش از ارسال به backend به Gregorian `YYYY-MM-DD` برای date-only یا ISO 8601 برای date-time تبدیل کند؛ backend رشته Jalali مثل `1403/05/20` را نمی‌پذیرد.
+- migration لازم نبود؛ schema و نوع ستون‌های دیتابیس بدون تغییر ماندند.
+- وضعیت بررسی‌ها: `npx prisma validate` موفق بود؛ `npx prisma generate` موفق بود؛ `npm run lint` موفق بود با 10 warning موجود و 0 error؛ `npm run test` موفق بود: 3 suite و 10 test؛ `npm run build` موفق بود.
+
+---
+
 **Built with ❤️ for sales team**
 
 ---
