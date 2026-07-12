@@ -5,6 +5,7 @@ export const LOOKUP_GROUPS = [
   'seniority-levels',
   'persona-roles',
   'persona-tags',
+  'opportunity-sources',
   'contact-types',
   'person-social-platforms',
   'company-sources',

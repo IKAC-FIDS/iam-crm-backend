@@ -53,6 +53,7 @@ export class LookupsService {
       SENIORITY_LEVELS: 'seniority-levels',
       PERSONA_ROLES: 'persona-roles',
       PERSONA_TAGS: 'persona-tags',
+      OPPORTUNITY_SOURCES: 'opportunity-sources',
     };
     const normalized = groupAliases[value.trim().toUpperCase()] ?? value;
 

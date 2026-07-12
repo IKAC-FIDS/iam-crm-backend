@@ -58,6 +58,31 @@ __decorate([
 ], FindOpportunitiesDto.prototype, "source", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsUUID)(),
+    __metadata("design:type", String)
+], FindOpportunitiesDto.prototype, "sourceOptionId", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], FindOpportunitiesDto.prototype, "opportunitySource", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsUUID)(),
+    __metadata("design:type", String)
+], FindOpportunitiesDto.prototype, "primaryContactId", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsDateString)(),
+    __metadata("design:type", String)
+], FindOpportunitiesDto.prototype, "expectedCloseFrom", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsDateString)(),
+    __metadata("design:type", String)
+], FindOpportunitiesDto.prototype, "expectedCloseTo", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsBooleanString)(),
     __metadata("design:type", String)
 ], FindOpportunitiesDto.prototype, "includeArchived", void 0);

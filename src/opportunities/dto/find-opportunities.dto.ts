@@ -1,5 +1,5 @@
 import { Priority } from '@prisma/client';
-import { IsBooleanString, IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsBooleanString, IsDateString, IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 
 export class FindOpportunitiesDto extends PaginationDto {
@@ -11,6 +11,11 @@ export class FindOpportunitiesDto extends PaginationDto {
   @IsOptional() @IsUUID() stageId?: string;
   @IsOptional() @IsEnum(Priority) priority?: Priority;
   @IsOptional() @IsString() source?: string;
+  @IsOptional() @IsUUID() sourceOptionId?: string;
+  @IsOptional() @IsString() opportunitySource?: string;
+  @IsOptional() @IsUUID() primaryContactId?: string;
+  @IsOptional() @IsDateString() expectedCloseFrom?: string;
+  @IsOptional() @IsDateString() expectedCloseTo?: string;
   @IsOptional() @IsBooleanString() includeArchived?: string;
   @IsOptional() @IsBooleanString() archivedOnly?: string;
 }

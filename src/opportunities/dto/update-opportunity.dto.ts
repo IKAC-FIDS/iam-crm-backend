@@ -1,6 +1,6 @@
 import { Type } from 'class-transformer';
 import { Priority } from '@prisma/client';
-import { IsDateString, IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { IsDateString, IsEnum, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
 
 export class UpdateOpportunityDto {
   @IsOptional()
@@ -29,6 +29,29 @@ export class UpdateOpportunityDto {
   @IsOptional()
   @IsString()
   source?: string;
+
+  @IsOptional()
+  @IsUUID()
+  sourceOptionId?: string;
+
+  @IsOptional()
+  @IsString()
+  opportunitySource?: string;
+
+  @IsOptional()
+  @IsUUID()
+  primaryContactId?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  probability?: number;
+
+  @IsOptional()
+  @IsString()
+  competitor?: string;
 
   @IsOptional()
   @IsString()

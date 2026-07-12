@@ -1445,6 +1445,30 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 ---
 
 
+### fix 000040 - تکمیل و شفاف‌سازی فیلدهای تعریف فرصت فروش
+
+- تفاوت دامنه‌ای `Company.source` و منبع ایجاد فرصت فروش شفاف شد:
+  - `Company.source` / `sourceId` همچنان منبع ورود شرکت یا لید به CRM است.
+  - `Opportunity.sourceOptionId` / `sourceOption` منبع ایجاد همان فرصت فروش است.
+  - `Opportunity.source` به عنوان snapshot متنی سازگار با نسخه‌های قبلی حفظ شد.
+- گروه lookup جدید `opportunity-sources` اضافه شد و alias `OPPORTUNITY_SOURCES` به آن نگاشت می‌شود.
+- مقدارهای پیش‌فرض منبع ایجاد فرصت seed شدند: `CUSTOMER_REQUEST`, `DEMO_MEETING`, `DISCOVERY_MEETING`, `UPSELL`, `CROSS_SELL`, `RENEWAL`, `RFP_TENDER`, `PARTNER_REFERRAL`, `INTERNAL_REFERRAL`, `CAMPAIGN_FOLLOWUP`, و `OTHER`.
+- فیلدهای اختیاری زیر به Opportunity اضافه شدند: `sourceOptionId`, `primaryContactId`, `probability`, و `competitor`.
+- `primaryContactId` فقط مخاطبی را قبول می‌کند که متعلق به همان شرکت فرصت باشد.
+- `probability` اختیاری است و در DTO و migration به بازه 0 تا 100 محدود شد.
+- Create/Update Opportunity همچنان `source` قدیمی را می‌پذیرد؛ اگر مقدار آن با lookup منبع فرصت match شود، `sourceOptionId` هم پر می‌شود، و اگر match نشود مقدار متنی قدیمی حفظ می‌شود.
+- List/Detail Opportunity اکنون summaryهای `sourceOption` و `primaryContact` را برمی‌گردانند.
+- فیلترهای فرصت فروش تکمیل شدند: `source`, `opportunitySource`, `sourceOptionId`, `primaryContactId`, `expectedCloseFrom`, و `expectedCloseTo`.
+- Migration جدید `20260712123000_clarify_opportunity_definition_fields` ستون‌های nullable جدید، lookupهای منبع فرصت، backfill امن `sourceOptionId` از `source`، ایندکس‌ها و foreign keyها را اضافه می‌کند.
+- داده‌های قدیمی حذف یا rename نشدند. اگر `Opportunity.source` شامل مقدارهای lead-source باشد که با opportunity-source match نمی‌شوند، به صورت متن legacy حفظ می‌شود و نیاز به تصمیم/backfill دستی دارد.
+- محصولات مرتبط از مسیر موجود line item و `ProductCatalogItem` در detail فرصت نمایش داده می‌شوند؛ رابطه مستقیم Opportunity به Use Case در این fix اضافه نشد و بهبود آینده محسوب می‌شود.
+- فایل‌های مهم تغییرکرده/جدید: `prisma/schema.prisma`, `prisma/seed.ts`, `prisma/migrations/20260712123000_clarify_opportunity_definition_fields/migration.sql`, `src/lookups/lookup-groups.ts`, `src/lookups/lookups.service.ts`, `src/opportunities/dto/create-opportunity.dto.ts`, `src/opportunities/dto/update-opportunity.dto.ts`, `src/opportunities/dto/find-opportunities.dto.ts`, `src/opportunities/opportunities.service.ts`, و `README.md`.
+- وابستگی فرانت‌اند: برای dropdown منبع ایجاد فرصت از `/api/lookups/opportunity-sources` یا alias `OPPORTUNITY_SOURCES` استفاده شود. `estimatedValue` و `expectedCloseDate` همان نام‌های قبلی را حفظ کرده‌اند.
+- وضعیت بررسی‌ها: `npx prisma validate` موفق بود؛ `npx prisma generate` موفق بود؛ `npm run build` موفق بود؛ `npm run lint` موفق بود با 10 warning غیرمسدودکننده موجود؛ `npm run test` موفق بود: 1 suite و 4 test.
+
+---
+
+
 **Built with ❤️ for sales team**
 
 ---

@@ -45,6 +45,24 @@ const opportunityInclude = {
         terminalType: true,
       },
     },
+    sourceOption: {
+      select: {
+        id: true,
+        code: true,
+        label: true,
+      },
+    },
+    primaryContact: {
+      select: {
+        id: true,
+        fullName: true,
+        title: true,
+        department: true,
+        email: true,
+        phone: true,
+        isPrimaryContact: true,
+      },
+    },
     _count: {
       select: {
         lineItems: true,
@@ -283,9 +301,18 @@ export class OpportunitiesService {
     const company = await this.getCompanyInScope(dto.companyId, user);
     const stage = await this.resolveStage(dto.stageId, dto.stage);
     const ownerId = dto.ownerId ?? company.ownerId;
+    const source = await this.resolveOpportunitySource(
+      dto.sourceOptionId,
+      dto.opportunitySource,
+      dto.source,
+    );
 
     if (dto.ownerId) {
       await this.validateOwner(dto.ownerId, user);
+    }
+
+    if (dto.primaryContactId) {
+      await this.validatePrimaryContact(dto.primaryContactId, company.id);
     }
 
     const opportunity = await this.prisma.opportunity.create({
@@ -301,7 +328,11 @@ export class OpportunitiesService {
         expectedCloseDate: dto.expectedCloseDate
           ? new Date(dto.expectedCloseDate)
           : undefined,
-        source: dto.source,
+        sourceOptionId: source.sourceOptionId,
+        source: source.source,
+        primaryContactId: dto.primaryContactId,
+        probability: dto.probability,
+        competitor: dto.competitor?.trim() || undefined,
         wonAt: stage.terminalType === 'WON' ? new Date() : undefined,
         lostAt: stage.terminalType === 'LOST' ? new Date() : undefined,
         stageHistories: {
@@ -328,16 +359,52 @@ export class OpportunitiesService {
 
   async update(id: string, dto: UpdateOpportunityDto, user: CurrentUserPayload) {
     const current = await this.getForMutation(id, user);
+    const source =
+      dto.sourceOptionId !== undefined ||
+      dto.opportunitySource !== undefined ||
+      dto.source !== undefined
+        ? await this.resolveOpportunitySource(
+            dto.sourceOptionId,
+            dto.opportunitySource,
+            dto.source,
+          )
+        : undefined;
+
+    if (dto.primaryContactId) {
+      await this.validatePrimaryContact(dto.primaryContactId, current.companyId);
+    }
+
+    const {
+      sourceOptionId,
+      opportunitySource,
+      source: legacySource,
+      primaryContactId,
+      ...rest
+    } = dto;
+
+    void sourceOptionId;
+    void opportunitySource;
+    void legacySource;
 
     const updated = await this.prisma.opportunity.update({
       where: { id },
       data: {
-        ...dto,
+        ...rest,
         ...(dto.title !== undefined && {
           title: dto.title.trim(),
         }),
         ...(dto.expectedCloseDate !== undefined && {
           expectedCloseDate: new Date(dto.expectedCloseDate),
+        }),
+        ...(source !== undefined && {
+          sourceOptionId: source.sourceOptionId,
+          source: source.source,
+        }),
+        ...(primaryContactId !== undefined && {
+          primaryContactId,
+        }),
+        ...(dto.competitor !== undefined && {
+          competitor: dto.competitor?.trim() || null,
         }),
       },
       include: opportunityInclude,
@@ -588,8 +655,45 @@ export class OpportunitiesService {
     }
 
     if (query.source?.trim()) {
+      const source = query.source.trim();
       and.push({
-        source: query.source.trim(),
+        OR: [
+          { source },
+          { sourceOption: { code: { equals: source, mode: 'insensitive' } } },
+          { sourceOption: { label: { equals: source, mode: 'insensitive' } } },
+        ],
+      });
+    }
+
+    if (query.opportunitySource?.trim()) {
+      const source = query.opportunitySource.trim();
+      and.push({
+        OR: [
+          { source },
+          { sourceOption: { code: { equals: source, mode: 'insensitive' } } },
+          { sourceOption: { label: { equals: source, mode: 'insensitive' } } },
+        ],
+      });
+    }
+
+    if (query.sourceOptionId) {
+      and.push({
+        sourceOptionId: query.sourceOptionId,
+      });
+    }
+
+    if (query.primaryContactId) {
+      and.push({
+        primaryContactId: query.primaryContactId,
+      });
+    }
+
+    if (query.expectedCloseFrom || query.expectedCloseTo) {
+      and.push({
+        expectedCloseDate: {
+          ...(query.expectedCloseFrom && { gte: new Date(query.expectedCloseFrom) }),
+          ...(query.expectedCloseTo && { lte: new Date(query.expectedCloseTo) }),
+        },
       });
     }
 
@@ -789,6 +893,99 @@ export class OpportunitiesService {
       (!user.team || owner.team !== user.team)
     ) {
       throw new ForbiddenException('Owner must belong to the manager team');
+    }
+  }
+
+  private async resolveOpportunitySource(
+    sourceOptionId?: string,
+    opportunitySource?: string,
+    legacySource?: string,
+  ): Promise<{ sourceOptionId?: string | null; source?: string | null }> {
+    if (sourceOptionId) {
+      const option = await this.prisma.lookupOption.findFirst({
+        where: {
+          id: sourceOptionId,
+          group: 'opportunity-sources',
+          isActive: true,
+        },
+      });
+
+      if (!option) {
+        throw new BadRequestException(
+          'Selected opportunity source is invalid or inactive',
+        );
+      }
+
+      return {
+        sourceOptionId: option.id,
+        source: option.code,
+      };
+    }
+
+    const normalizedSource = (opportunitySource ?? legacySource)?.trim();
+
+    if (!normalizedSource) {
+      return {};
+    }
+
+    const option = await this.prisma.lookupOption.findFirst({
+      where: {
+        group: 'opportunity-sources',
+        isActive: true,
+        OR: [
+          {
+            code: {
+              equals: normalizedSource,
+              mode: 'insensitive',
+            },
+          },
+          {
+            label: {
+              equals: normalizedSource,
+              mode: 'insensitive',
+            },
+          },
+        ],
+      },
+    });
+
+    if (option) {
+      return {
+        sourceOptionId: option.id,
+        source: option.code,
+      };
+    }
+
+    if (opportunitySource) {
+      throw new BadRequestException(
+        'Opportunity source must be selected from opportunity-sources lookup options',
+      );
+    }
+
+    return {
+      sourceOptionId: undefined,
+      source: normalizedSource,
+    };
+  }
+
+  private async validatePrimaryContact(
+    primaryContactId: string,
+    companyId: string,
+  ) {
+    const contact = await this.prisma.person.findFirst({
+      where: {
+        id: primaryContactId,
+        companyId,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!contact) {
+      throw new BadRequestException(
+        'Primary contact must belong to the opportunity company',
+      );
     }
   }
 

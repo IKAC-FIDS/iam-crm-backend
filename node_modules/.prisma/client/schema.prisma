@@ -547,7 +547,8 @@ model Person {
   socials  PersonSocial[]
   tasks    Task[]
 
-  activities Activity[]
+  activities           Activity[]
+  primaryOpportunities Opportunity[] @relation("OpportunityPrimaryContact")
 
   @@index([companyId])
   @@index([personaTag])
@@ -670,10 +671,20 @@ model Opportunity {
   estimatedValue    Decimal?  @db.Decimal(18, 2)
   expectedCloseDate DateTime?
 
-  source     String?
-  lostReason String?
-  wonAt      DateTime?
-  lostAt     DateTime?
+  sourceOptionId String?
+  sourceOption   LookupOption? @relation("OpportunitySourceOption", fields: [sourceOptionId], references: [id], onDelete: SetNull)
+
+  // Backward-compatible snapshot. New writes should prefer sourceOptionId/opportunitySource.
+  source String?
+
+  primaryContactId String?
+  primaryContact   Person? @relation("OpportunityPrimaryContact", fields: [primaryContactId], references: [id], onDelete: SetNull)
+
+  probability Int?
+  competitor  String?
+  lostReason  String?
+  wonAt       DateTime?
+  lostAt      DateTime?
 
   archivedAt    DateTime?
   archivedById  String?
@@ -696,11 +707,15 @@ model Opportunity {
   @@index([ownerId])
   @@index([stageId])
   @@index([priority])
+  @@index([sourceOptionId])
+  @@index([primaryContactId])
+  @@index([expectedCloseDate])
   @@index([archivedAt])
   @@index([ownerId, stageId])
   @@index([organizationId])
   @@index([organizationId, ownerId])
   @@index([organizationId, stageId])
+  @@index([organizationId, sourceOptionId])
   @@map("opportunities")
 }
 
@@ -1117,6 +1132,7 @@ model LookupOption {
 
   personContactTypes    PersonContact[] @relation("PersonContactTypeOption")
   personSocialPlatforms PersonSocial[]  @relation("PersonSocialPlatformOption")
+  opportunitySources    Opportunity[]   @relation("OpportunitySourceOption")
 
   @@unique([group, code])
   @@index([group])
