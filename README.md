@@ -1517,6 +1517,25 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 
 ---
 
+### fix 000043 - اصلاح انتساب شرکت در ایجاد کار از داخل فرصت
+
+- رفتار ایجاد و ویرایش task بازبینی شد تا وقتی `opportunityId` ارسال می‌شود، `companyId` همیشه از `opportunity.companyId` مشتق شود و مقدار ارسالی کاربر منبع حقیقت نباشد.
+- اگر در create/update همزمان `opportunityId` و `companyId` ناسازگار ارسال شوند، API با پیام روشن `Task company must match the selected opportunity company.` خطای `BadRequestException` برمی‌گرداند.
+- ایجاد task عمومی از صفحه Tasks همچنان با `companyId` مستقل پشتیبانی می‌شود و task مستقل بدون company/opportunity طبق رفتار قبلی مجاز باقی ماند.
+- اعتبارسنجی رابطه‌ها متمرکز شد: person باید با شرکت task هم‌خوان باشد؛ commercial document و payment باید با همان opportunity/company context سازگار باشند و لینک cross-company/cross-opportunity پذیرفته نمی‌شود.
+- lookupهای company، opportunity، person، commercial document و payment همچنان با scope سازمان فعلی و visibility نقش کاربر انجام می‌شوند؛ `organizationId` خود task مثل قبل از کاربر فعلی تنظیم می‌شود.
+- پاسخ‌های list/detail task همچنان context لازم برای فرانت را دارد: summary شرکت، فرصت، شخص، سند تجاری و پرداخت در `taskInclude` حفظ شد و `opportunity.archivedAt` برای منطق داخلی scope/consistency اضافه شد.
+- فایل‌های مهم تغییرکرده/جدید:
+  - `src/tasks/tasks.service.ts`
+  - `test/tasks.service.spec.ts`
+  - `README.md`
+- وابستگی فرانت‌اند: در فرم ایجاد task داخل Opportunity کافی است `opportunityId` ارسال شود؛ ارسال `companyId` اختیاری و فقط در صورت تطابق با شرکت فرصت پذیرفته می‌شود. برای task عمومی، `companyId` همچنان قابل استفاده است.
+- migration لازم نبود؛ schema و داده‌های موجود تغییر نکردند و هیچ داده‌ای حذف نشد.
+- وضعیت بررسی‌ها: `npx prisma validate` موفق بود؛ `npx prisma generate` موفق بود؛ `npm run lint` موفق بود با 10 warning موجود و 0 error؛ `npm run test` موفق بود: 4 suite و 14 test؛ `npm run build` موفق بود.
+- هشدار غیرمسدودکننده: `npx prisma validate` پیام در دسترس بودن نسخه major جدید Prisma را نمایش داد؛ این پیام خطا نبود.
+
+---
+
 **Built with ❤️ for sales team**
 
 ---

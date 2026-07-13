@@ -50,6 +50,7 @@ const taskInclude = {
       companyId: true,
       ownerId: true,
       priority: true,
+      archivedAt: true,
     },
   },
   commercialDocument: {
@@ -96,6 +97,54 @@ const taskInclude = {
     },
   },
 } satisfies Prisma.TaskInclude;
+
+type TaskRelationDto = {
+  companyId?: string | null;
+  personId?: string | null;
+  opportunityId?: string | null;
+  commercialDocumentId?: string | null;
+  paymentId?: string | null;
+};
+
+type ScopedCompany = {
+  id: string;
+};
+
+type ScopedOpportunity = {
+  id: string;
+  companyId: string;
+  archivedAt: Date | null;
+};
+
+type ScopedPerson = {
+  id: string;
+  companyId: string;
+};
+
+type ScopedCommercialDocument = {
+  id: string;
+  opportunityId: string;
+  opportunity: ScopedOpportunity;
+};
+
+type ScopedPayment = {
+  id: string;
+  opportunityId: string;
+  commercialDocumentId: string | null;
+  opportunity: ScopedOpportunity;
+};
+
+type TaskWithRelations = Prisma.TaskGetPayload<{
+  include: typeof taskInclude;
+}>;
+
+type TaskRelationResolution = {
+  companyId: string | null;
+  personId: string | null;
+  opportunityId: string | null;
+  commercialDocumentId: string | null;
+  paymentId: string | null;
+};
 
 @Injectable()
 export class TasksService {
@@ -151,7 +200,7 @@ export class TasksService {
       throw new ForbiddenException('Tasks are read-only for this role');
     }
 
-    await this.validateLinkedEntities(dto, user);
+    const relations = await this.resolveCreateRelations(dto, user);
 
     const assignedToId = dto.assignedToId ?? user.userId;
 
@@ -171,11 +220,11 @@ export class TasksService {
         priority: dto.priority,
         dueAt: dto.dueAt ? parseApiDate(dto.dueAt, 'dueAt') : undefined,
         reminderAt: dto.reminderAt ? parseApiDate(dto.reminderAt, 'reminderAt') : undefined,
-        companyId: dto.companyId,
-        personId: dto.personId,
-        opportunityId: dto.opportunityId,
-        commercialDocumentId: dto.commercialDocumentId,
-        paymentId: dto.paymentId,
+        companyId: relations.companyId ?? undefined,
+        personId: relations.personId ?? undefined,
+        opportunityId: relations.opportunityId ?? undefined,
+        commercialDocumentId: relations.commercialDocumentId ?? undefined,
+        paymentId: relations.paymentId ?? undefined,
         assignedToId,
         createdById: user.userId,
         completedAt: status === TaskStatus.DONE ? now : undefined,
@@ -201,7 +250,7 @@ export class TasksService {
   async update(id: string, dto: UpdateTaskDto, user: CurrentUserPayload) {
     const current = await this.getTaskForMutation(id, user);
 
-    await this.validateLinkedEntities(dto, user);
+    const relations = await this.resolveUpdateRelations(current, dto, user);
 
     const data: Prisma.TaskUpdateInput = {};
 
@@ -229,33 +278,33 @@ export class TasksService {
       data.reminderAt = dto.reminderAt ? parseApiDate(dto.reminderAt, 'reminderAt') : null;
     }
 
-    if (dto.companyId !== undefined) {
-      data.company = dto.companyId
-        ? { connect: { id: dto.companyId } }
+    if (relations.companyId !== current.companyId) {
+      data.company = relations.companyId
+        ? { connect: { id: relations.companyId } }
         : { disconnect: true };
     }
 
-    if (dto.personId !== undefined) {
-      data.person = dto.personId
-        ? { connect: { id: dto.personId } }
+    if (relations.personId !== current.personId) {
+      data.person = relations.personId
+        ? { connect: { id: relations.personId } }
         : { disconnect: true };
     }
 
-    if (dto.opportunityId !== undefined) {
-      data.opportunity = dto.opportunityId
-        ? { connect: { id: dto.opportunityId } }
+    if (relations.opportunityId !== current.opportunityId) {
+      data.opportunity = relations.opportunityId
+        ? { connect: { id: relations.opportunityId } }
         : { disconnect: true };
     }
 
-    if (dto.commercialDocumentId !== undefined) {
-      data.commercialDocument = dto.commercialDocumentId
-        ? { connect: { id: dto.commercialDocumentId } }
+    if (relations.commercialDocumentId !== current.commercialDocumentId) {
+      data.commercialDocument = relations.commercialDocumentId
+        ? { connect: { id: relations.commercialDocumentId } }
         : { disconnect: true };
     }
 
-    if (dto.paymentId !== undefined) {
-      data.payment = dto.paymentId
-        ? { connect: { id: dto.paymentId } }
+    if (relations.paymentId !== current.paymentId) {
+      data.payment = relations.paymentId
+        ? { connect: { id: relations.paymentId } }
         : { disconnect: true };
     }
 
@@ -591,32 +640,221 @@ export class TasksService {
     };
   }
 
-  private async validateLinkedEntities(
-    dto: Partial<CreateTaskDto>,
+  private async resolveCreateRelations(
+    dto: TaskRelationDto,
     user: CurrentUserPayload,
-  ) {
-    if (dto.companyId) {
-      await this.assertCompanyAccess(dto.companyId, user);
+  ): Promise<TaskRelationResolution> {
+    return this.resolveRelations(
+      {
+        companyId: null,
+        personId: null,
+        opportunityId: null,
+        commercialDocumentId: null,
+        paymentId: null,
+      },
+      dto,
+      user,
+    );
+  }
+
+  private async resolveUpdateRelations(
+    current: TaskWithRelations,
+    dto: TaskRelationDto,
+    user: CurrentUserPayload,
+  ): Promise<TaskRelationResolution> {
+    const currentRelations = {
+      companyId: current.companyId,
+      personId: current.personId,
+      opportunityId: current.opportunityId,
+      commercialDocumentId: current.commercialDocumentId,
+      paymentId: current.paymentId,
+    };
+
+    if (!this.hasRelationChanges(dto)) {
+      return currentRelations;
     }
 
-    if (dto.opportunityId) {
-      await this.assertOpportunityAccess(dto.opportunityId, user);
+    return this.resolveRelations(
+      currentRelations,
+      dto,
+      user,
+      current,
+    );
+  }
+
+  private async resolveRelations(
+    current: TaskRelationResolution,
+    dto: TaskRelationDto,
+    user: CurrentUserPayload,
+    currentTask?: TaskWithRelations,
+  ): Promise<TaskRelationResolution> {
+    const explicitCompanyId = this.normalizeOptionalRelationId(dto.companyId);
+    const explicitPersonId = this.normalizeOptionalRelationId(dto.personId);
+    const explicitOpportunityId = this.normalizeOptionalRelationId(dto.opportunityId);
+    const explicitDocumentId = this.normalizeOptionalRelationId(dto.commercialDocumentId);
+    const explicitPaymentId = this.normalizeOptionalRelationId(dto.paymentId);
+
+    const nextOpportunityId =
+      dto.opportunityId !== undefined ? explicitOpportunityId : current.opportunityId;
+    const nextPersonId = dto.personId !== undefined ? explicitPersonId : current.personId;
+    const nextDocumentId =
+      dto.commercialDocumentId !== undefined
+        ? explicitDocumentId
+        : current.commercialDocumentId;
+    const nextPaymentId = dto.paymentId !== undefined ? explicitPaymentId : current.paymentId;
+
+    let nextCompanyId = dto.companyId !== undefined ? explicitCompanyId : current.companyId;
+    const opportunity = await this.resolveOpportunityContext(nextOpportunityId, user, currentTask);
+    const person = await this.resolvePersonContext(nextPersonId, user, currentTask);
+    const document = await this.resolveCommercialDocumentContext(nextDocumentId, user);
+    const payment = await this.resolvePaymentContext(nextPaymentId, user);
+
+    if (opportunity) {
+      if (explicitCompanyId && explicitCompanyId !== opportunity.companyId) {
+        throw new BadRequestException('Task company must match the selected opportunity company.');
+      }
+
+      nextCompanyId = opportunity.companyId;
+    } else if (explicitCompanyId) {
+      const company = await this.assertCompanyAccess(explicitCompanyId, user);
+      nextCompanyId = company.id;
     }
 
-    if (dto.personId) {
-      await this.assertPersonAccess(dto.personId, user);
+    this.assertRelationConsistency({
+      companyId: nextCompanyId,
+      opportunity,
+      person,
+      document,
+      payment,
+    });
+
+    return {
+      companyId: nextCompanyId,
+      personId: nextPersonId,
+      opportunityId: nextOpportunityId,
+      commercialDocumentId: nextDocumentId,
+      paymentId: nextPaymentId,
+    };
+  }
+
+  private normalizeOptionalRelationId(value: string | null | undefined): string | null {
+    if (value === undefined || value === null) return null;
+
+    return value;
+  }
+
+  private hasRelationChanges(dto: TaskRelationDto): boolean {
+    return (
+      dto.companyId !== undefined ||
+      dto.personId !== undefined ||
+      dto.opportunityId !== undefined ||
+      dto.commercialDocumentId !== undefined ||
+      dto.paymentId !== undefined
+    );
+  }
+
+  private async resolveOpportunityContext(
+    opportunityId: string | null,
+    user: CurrentUserPayload,
+    currentTask?: TaskWithRelations,
+  ): Promise<ScopedOpportunity | null> {
+    if (!opportunityId) return null;
+
+    if (currentTask?.opportunity?.id === opportunityId) {
+      return currentTask.opportunity;
     }
 
-    if (dto.commercialDocumentId) {
-      await this.assertCommercialDocumentAccess(dto.commercialDocumentId, user);
+    return this.assertOpportunityAccess(opportunityId, user);
+  }
+
+  private async resolvePersonContext(
+    personId: string | null,
+    user: CurrentUserPayload,
+    currentTask?: TaskWithRelations,
+  ): Promise<ScopedPerson | null> {
+    if (!personId) return null;
+
+    if (currentTask?.person?.id === personId) {
+      return currentTask.person;
     }
 
-    if (dto.paymentId) {
-      await this.assertPaymentAccess(dto.paymentId, user);
+    return this.assertPersonAccess(personId, user);
+  }
+
+  private async resolveCommercialDocumentContext(
+    documentId: string | null,
+    user: CurrentUserPayload,
+  ): Promise<ScopedCommercialDocument | null> {
+    if (!documentId) return null;
+
+    return this.assertCommercialDocumentAccess(documentId, user);
+  }
+
+  private async resolvePaymentContext(
+    paymentId: string | null,
+    user: CurrentUserPayload,
+  ): Promise<ScopedPayment | null> {
+    if (!paymentId) return null;
+
+    return this.assertPaymentAccess(paymentId, user);
+  }
+
+  private assertRelationConsistency(context: {
+    companyId: string | null;
+    opportunity: ScopedOpportunity | null;
+    person: ScopedPerson | null;
+    document: ScopedCommercialDocument | null;
+    payment: ScopedPayment | null;
+  }) {
+    const { companyId, opportunity, person, document, payment } = context;
+
+    if (person && companyId && person.companyId !== companyId) {
+      throw new BadRequestException('Selected person does not belong to the task company.');
+    }
+
+    if (document) {
+      if (opportunity && document.opportunityId !== opportunity.id) {
+        throw new BadRequestException(
+          'Selected commercial document does not belong to the selected opportunity.',
+        );
+      }
+
+      if (companyId && document.opportunity.companyId !== companyId) {
+        throw new BadRequestException(
+          'Selected opportunity is not available or does not belong to the selected company.',
+        );
+      }
+    }
+
+    if (payment) {
+      if (opportunity && payment.opportunityId !== opportunity.id) {
+        throw new BadRequestException(
+          'Selected payment does not belong to the selected opportunity.',
+        );
+      }
+
+      if (companyId && payment.opportunity.companyId !== companyId) {
+        throw new BadRequestException(
+          'Selected opportunity is not available or does not belong to the selected company.',
+        );
+      }
+
+      if (
+        document &&
+        payment.commercialDocumentId &&
+        payment.commercialDocumentId !== document.id
+      ) {
+        throw new BadRequestException(
+          'Selected payment does not belong to the selected commercial document.',
+        );
+      }
     }
   }
 
-  private async assertCompanyAccess(companyId: string, user: CurrentUserPayload) {
+  private async assertCompanyAccess(
+    companyId: string,
+    user: CurrentUserPayload,
+  ): Promise<ScopedCompany> {
     const company = await this.prisma.company.findFirst({
       where: {
         AND: [
@@ -633,12 +871,14 @@ export class TasksService {
     if (!company) {
       throw new NotFoundException('Company not found');
     }
+
+    return company;
   }
 
   private async assertOpportunityAccess(
     opportunityId: string,
     user: CurrentUserPayload,
-  ) {
+  ): Promise<ScopedOpportunity> {
     const opportunity = await this.prisma.opportunity.findFirst({
       where: {
         AND: [
@@ -655,9 +895,14 @@ export class TasksService {
     if (opportunity.archivedAt) {
       throw new BadRequestException('Archived opportunities cannot be changed');
     }
+
+    return opportunity;
   }
 
-  private async assertPersonAccess(personId: string, user: CurrentUserPayload) {
+  private async assertPersonAccess(
+    personId: string,
+    user: CurrentUserPayload,
+  ): Promise<ScopedPerson> {
     const person = await this.prisma.person.findFirst({
       where: {
         id: personId,
@@ -673,12 +918,14 @@ export class TasksService {
     if (!person) {
       throw new NotFoundException('Person not found');
     }
+
+    return person;
   }
 
   private async assertCommercialDocumentAccess(
     documentId: string,
     user: CurrentUserPayload,
-  ) {
+  ): Promise<ScopedCommercialDocument> {
     const document = await this.prisma.opportunityCommercialDocument.findFirst({
       where: {
         id: documentId,
@@ -701,9 +948,14 @@ export class TasksService {
     if (document.opportunity.archivedAt) {
       throw new BadRequestException('Archived opportunities cannot be changed');
     }
+
+    return document;
   }
 
-  private async assertPaymentAccess(paymentId: string, user: CurrentUserPayload) {
+  private async assertPaymentAccess(
+    paymentId: string,
+    user: CurrentUserPayload,
+  ): Promise<ScopedPayment> {
     const payment = await this.prisma.opportunityPayment.findFirst({
       where: {
         id: paymentId,
@@ -726,6 +978,8 @@ export class TasksService {
     if (payment.opportunity.archivedAt) {
       throw new BadRequestException('Archived opportunities cannot be changed');
     }
+
+    return payment;
   }
 
   private companyScopeWhere(user: CurrentUserPayload): Prisma.CompanyWhereInput {
