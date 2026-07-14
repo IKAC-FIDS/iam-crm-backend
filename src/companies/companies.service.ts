@@ -9,6 +9,7 @@ import { AuditLogService } from '../audit-log/audit-log.service';
 import { CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { PaginatedResponse, PaginationDto } from '../common/dto/pagination.dto';
 import { getCurrentOrganizationId } from '../common/tenant/tenant-scope.util';
+import { userMatchesTeam, userTeamScopeWhere } from '../common/tenant/team-scope.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { ArchiveCompanyDto } from './dto/archive-company.dto';
 import { ChangeOwnerDto, BulkChangeOwnerDto } from './dto/change-owner.dto';
@@ -50,8 +51,8 @@ export class CompaniesService {
     if (user.role === UserRole.REP) {
       where.ownerId = user.userId;
     } else if (user.role === UserRole.MANAGER) {
-      if (user.team) {
-        where.owner = { team: user.team };
+      if (user.teamId || user.team) {
+        where.owner = userTeamScopeWhere(user);
       } else {
         where = {
           organizationId: getCurrentOrganizationId(user),
@@ -351,9 +352,11 @@ export class CompaniesService {
     }
 
     if (newOwner.role === UserRole.MANAGER) {
-      const companyTeam = company.owner?.team;
-
-      if (companyTeam && newOwner.team !== companyTeam) {
+      if (company.owner && !userMatchesTeam(newOwner, {
+        ...user,
+        teamId: company.owner.teamId,
+        team: company.owner.team,
+      })) {
         throw new BadRequestException('مدیر فروش باید در همان تیم شرکت باشد');
       }
     }
@@ -379,7 +382,7 @@ export class CompaniesService {
   async archive(id: string, dto: ArchiveCompanyDto, user: CurrentUserPayload) {
     const company = await this.prisma.company.findFirst({
       where: { id, organizationId: getCurrentOrganizationId(user) },
-      include: { owner: { select: { team: true } } },
+      include: { owner: { select: { team: true, teamId: true } } },
     });
 
     if (!company) throw new NotFoundException('شرکت پیدا نشد');
@@ -415,7 +418,7 @@ export class CompaniesService {
   async restore(id: string, user: CurrentUserPayload) {
     const company = await this.prisma.company.findFirst({
       where: { id, organizationId: getCurrentOrganizationId(user) },
-      include: { owner: { select: { team: true } } },
+      include: { owner: { select: { team: true, teamId: true } } },
     });
 
     if (!company) throw new NotFoundException('شرکت پیدا نشد');
@@ -490,11 +493,13 @@ export class CompaniesService {
 
     if (newOwner.role === UserRole.MANAGER) {
       for (const company of companies) {
-        const companyTeam = company.owner?.team;
-
-        if (companyTeam && newOwner.team !== companyTeam) {
+        if (company.owner && !userMatchesTeam(newOwner, {
+          ...user,
+          teamId: company.owner.teamId,
+          team: company.owner.team,
+        })) {
           throw new BadRequestException(
-            `شرکت ${company.legalName} در تیم ${companyTeam} است اما مدیر جدید در تیم ${newOwner.team} است`,
+            `شرکت ${company.legalName} در تیم دیگری است و مدیر جدید عضو همان تیم نیست`,
           );
         }
       }
@@ -543,15 +548,15 @@ export class CompaniesService {
   }
 
   private assertArchiveAccess(
-    company: { owner?: { team: string | null } | null },
+    company: { owner?: { team: string | null; teamId?: string | null } | null },
     user: CurrentUserPayload,
   ) {
     if (user.role === UserRole.ADMIN) return;
 
     if (
       user.role === UserRole.MANAGER &&
-      user.team &&
-      company.owner?.team === user.team
+      company.owner &&
+      userMatchesTeam(company.owner, user)
     ) {
       return;
     }
@@ -574,9 +579,7 @@ export class CompaniesService {
         throw new ForbiddenException('فقط ادمین می‌تواند مالکیت شرکت‌های بدون مالک را تغییر دهد');
       }
 
-      const companyTeam = company.owner?.team;
-
-      if (!companyTeam || companyTeam !== user.team) {
+      if (!company.owner || !userMatchesTeam(company.owner, user)) {
         throw new ForbiddenException('شما فقط می‌توانید شرکت‌های تیم خود را تغییر دهید');
       }
 

@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { UpsertCallCardDto } from './dto/upsert-call-card.dto';
 import { CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { UserRole } from '@prisma/client';
+import { userMatchesTeam } from '../common/tenant/team-scope.util';
 
 @Injectable()
 export class CallCardsService {
@@ -14,7 +15,7 @@ export class CallCardsService {
   private async validateCompanyAccess(companyId: string, user: CurrentUserPayload) {
     const company = await this.prisma.company.findUnique({
       where: { id: companyId },
-      select: { ownerId: true, owner: { select: { team: true } } },
+      select: { ownerId: true, owner: { select: { team: true, teamId: true } } },
     });
 
     if (!company) {
@@ -24,8 +25,7 @@ export class CallCardsService {
     if (user.role === UserRole.ADMIN) return;
 
     if (user.role === UserRole.MANAGER) {
-      const companyTeam = company.owner?.team;
-      if (!companyTeam || companyTeam !== user.team) {
+      if (!company.owner || !userMatchesTeam(company.owner, user)) {
         throw new ForbiddenException('شما به این شرکت دسترسی ندارید');
       }
       return;

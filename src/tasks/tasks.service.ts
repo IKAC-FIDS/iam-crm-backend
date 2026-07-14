@@ -24,6 +24,7 @@ import { FindTasksDto } from './dto/find-tasks.dto';
 import { RescheduleTaskDto } from './dto/reschedule-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { getCurrentOrganizationId } from '../common/tenant/tenant-scope.util';
+import { userMatchesTeam, userTeamScopeWhere } from '../common/tenant/team-scope.util';
 import { parseApiDate, parseApiDateRange } from '../common/dates/api-date.util';
 
 const taskInclude = {
@@ -565,24 +566,22 @@ export class TasksService {
     }
 
     if (user.role === UserRole.MANAGER) {
-      if (!user.team) {
+      if (!user.teamId && !user.team) {
         return { id: { in: [] } };
       }
 
       return {
         OR: [
-          { assignedTo: { team: user.team } },
-          { createdBy: { team: user.team } },
-          { company: { owner: { team: user.team } } },
-          { opportunity: { company: { owner: { team: user.team } } } },
-          { person: { company: { owner: { team: user.team } } } },
+          { assignedTo: userTeamScopeWhere(user) },
+          { createdBy: userTeamScopeWhere(user) },
+          { company: { owner: userTeamScopeWhere(user) } },
+          { opportunity: { company: { owner: userTeamScopeWhere(user) } } },
+          { person: { company: { owner: userTeamScopeWhere(user) } } },
           {
             commercialDocument: {
               opportunity: {
                 company: {
-                  owner: {
-                    team: user.team,
-                  },
+                  owner: userTeamScopeWhere(user),
                 },
               },
             },
@@ -591,9 +590,7 @@ export class TasksService {
             payment: {
               opportunity: {
                 company: {
-                  owner: {
-                    team: user.team,
-                  },
+                  owner: userTeamScopeWhere(user),
                 },
               },
             },
@@ -988,12 +985,8 @@ export class TasksService {
     }
 
     if (user.role === UserRole.MANAGER) {
-      return user.team
-        ? {
-            owner: {
-              team: user.team,
-            },
-          }
+      return user.teamId || user.team
+        ? { owner: userTeamScopeWhere(user) }
         : {
             id: {
               in: [],
@@ -1014,14 +1007,8 @@ export class TasksService {
     }
 
     if (user.role === UserRole.MANAGER) {
-      return user.team
-        ? {
-            company: {
-              owner: {
-                team: user.team,
-              },
-            },
-          }
+      return user.teamId || user.team
+        ? { company: { owner: userTeamScopeWhere(user) } }
         : {
             id: {
               in: [],
@@ -1066,7 +1053,7 @@ export class TasksService {
 
     if (
       user.role === UserRole.MANAGER &&
-      (!user.team || assignee.team !== user.team)
+      !userMatchesTeam(assignee, user)
     ) {
       throw new ForbiddenException('Assignee must belong to the manager team');
     }

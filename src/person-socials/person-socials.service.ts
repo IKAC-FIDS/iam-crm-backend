@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { CurrentUserPayload } from '../common/decorators/current-user.decorator';
+import { userMatchesTeam } from '../common/tenant/team-scope.util';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   CreatePersonSocialDto,
@@ -23,7 +24,7 @@ export class PersonSocialsService {
         company: {
           select: {
             ownerId: true,
-            owner: { select: { team: true } },
+            owner: { select: { team: true, teamId: true } },
           },
         },
       },
@@ -34,9 +35,7 @@ export class PersonSocialsService {
     if (user.role === UserRole.ADMIN) return;
 
     if (user.role === UserRole.MANAGER) {
-      const companyTeam = person.company.owner?.team;
-
-      if (!companyTeam || companyTeam !== user.team) {
+      if (!person.company.owner || !userMatchesTeam(person.company.owner, user)) {
         throw new ForbiddenException('شما به این مخاطب دسترسی ندارید');
       }
 

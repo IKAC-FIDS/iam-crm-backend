@@ -35,6 +35,7 @@ import { AttachmentsModule } from './attachments/attachments.module';
 import { TasksModule } from './tasks/tasks.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { OrganizationsModule } from './organizations/organizations.module';
+import { TeamsModule } from './teams/teams.module';
 
 @Module({
   imports: [
@@ -86,6 +87,7 @@ import { OrganizationsModule } from './organizations/organizations.module';
     TasksModule,
     NotificationsModule,
     OrganizationsModule,
+    TeamsModule,
   ],
   providers: [
     {

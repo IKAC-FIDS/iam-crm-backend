@@ -5,6 +5,9 @@ export interface CurrentUserPayload {
   email: string;
   role: 'ADMIN' | 'MANAGER' | 'REP' | 'BOARDS';
   team?: string | null;
+  teamId?: string | null;
+  teamCode?: string | null;
+  teamName?: string | null;
   organizationId?: string | null;
 }
 

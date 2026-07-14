@@ -19,7 +19,7 @@ export class UsersController {
   @Post()
   @Permissions('user:create')
   create(@Body() dto: CreateUserDto, @CurrentUser() actor: CurrentUserPayload) {
-    return this.usersService.create(dto, actor.userId);
+    return this.usersService.create(dto, actor);
   }
 
   // ============================================================
@@ -74,6 +74,6 @@ export class UsersController {
     @Body() dto: UpdateUserRoleDto,
     @CurrentUser() actor: CurrentUserPayload,
   ) {
-    return this.usersService.updateUserRole(id, dto, actor.userId);
+    return this.usersService.updateUserRole(id, dto, actor);
   }
 }

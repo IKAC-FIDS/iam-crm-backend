@@ -4,6 +4,8 @@ import { CurrentUserPayload } from '../common/decorators/current-user.decorator'
 import { PrismaService } from '../prisma/prisma.service';
 import { ReportFiltersDto } from './dto/report-filters.dto';
 import { parseApiDate, parseApiDateRange } from '../common/dates/api-date.util';
+import { userTeamFilterWhere, userTeamScopeWhere } from '../common/tenant/team-scope.util';
+import { getCurrentOrganizationId } from '../common/tenant/tenant-scope.util';
 
 interface StageConversion {
   fromStageId: string | null;
@@ -43,15 +45,15 @@ export class ReportsService {
   private companyWhere(filters: ReportFiltersDto, user: CurrentUserPayload): Prisma.CompanyWhereInput {
     const and: Prisma.CompanyWhereInput[] = [];
     if (filters.ownerIds?.length) and.push({ ownerId: { in: filters.ownerIds } });
-    if (filters.teams?.length) and.push({ owner: { team: { in: filters.teams } } });
+    if (filters.teams?.length) and.push({ owner: userTeamFilterWhere(filters.teams) });
     if (filters.priorities?.length) and.push({ priority: { in: filters.priorities } });
     if (filters.industries?.length) and.push({ industry: { in: filters.industries } });
     if (filters.sources?.length) and.push({ source: { in: filters.sources } });
     if (filters.companyIds?.length) and.push({ id: { in: filters.companyIds } });
 
     if (user.role === UserRole.MANAGER) {
-      if (!user.team) return { id: { in: [] } };
-      and.push({ owner: { team: user.team } });
+      if (!user.teamId && !user.team) return { id: { in: [] } };
+      and.push({ owner: userTeamScopeWhere(user) });
     } else if (user.role === UserRole.REP) {
       and.push({ ownerId: user.userId });
     }
@@ -62,7 +64,7 @@ export class ReportsService {
   private opportunityWhere(filters: ReportFiltersDto, user: CurrentUserPayload): Prisma.OpportunityWhereInput {
     const and: Prisma.OpportunityWhereInput[] = [{ archivedAt: null }, { company: { archivedAt: null } }];
     if (filters.ownerIds?.length) and.push({ ownerId: { in: filters.ownerIds } });
-    if (filters.teams?.length) and.push({ owner: { team: { in: filters.teams } } });
+    if (filters.teams?.length) and.push({ owner: userTeamFilterWhere(filters.teams) });
     if (filters.stages?.length) and.push({ OR: [
       { stageId: { in: filters.stages } },
       { stage: { code: { in: filters.stages.map((item) => item.toUpperCase()) } } },
@@ -72,7 +74,7 @@ export class ReportsService {
     if (filters.sources?.length) and.push({ source: { in: filters.sources } });
     if (filters.companyIds?.length) and.push({ companyId: { in: filters.companyIds } });
     if (user.role === UserRole.MANAGER) {
-      and.push(user.team ? { company: { owner: { team: user.team } } } : { id: { in: [] } });
+      and.push(user.teamId || user.team ? { company: { owner: userTeamScopeWhere(user) } } : { id: { in: [] } });
     } else if (user.role === UserRole.REP) {
       and.push({ OR: [{ ownerId: user.userId }, { company: { ownerId: user.userId } }] });
     }
@@ -103,11 +105,11 @@ export class ReportsService {
     if (range) and.push({ occurredAt: range });
     if (filters.userIds?.length) and.push({ userId: { in: filters.userIds } });
     if (filters.activityTypes?.length) and.push({ type: { in: filters.activityTypes } });
-    if (filters.teams?.length) and.push({ user: { team: { in: filters.teams } } });
+    if (filters.teams?.length) and.push({ user: userTeamFilterWhere(filters.teams) });
 
     if (user.role === UserRole.MANAGER) {
-      if (!user.team) return { id: { in: [] } };
-      and.push({ user: { team: user.team } });
+      if (!user.teamId && !user.team) return { id: { in: [] } };
+      and.push({ user: userTeamScopeWhere(user) });
     } else if (user.role === UserRole.REP) {
       and.push({ userId: user.userId });
     }
@@ -491,7 +493,7 @@ export class ReportsService {
   async getFilterOptions(user: CurrentUserPayload) {
     const userWhere = this.reportUserWhere({}, user);
 
-    const [users, industries, leadSources, stages] = await Promise.all([
+    const [users, teams, industries, leadSources, stages] = await Promise.all([
       this.prisma.user.findMany({
         where: userWhere,
         select: {
@@ -499,9 +501,29 @@ export class ReportsService {
           fullName: true,
           role: true,
           team: true,
+          teamId: true,
+          teamRef: {
+            select: {
+              code: true,
+              name: true,
+            },
+          },
           isActive: true,
         },
         orderBy: { fullName: 'asc' },
+      }),
+
+      this.prisma.team.findMany({
+        where: {
+          isActive: true,
+          organizationId: getCurrentOrganizationId(user),
+        },
+        select: {
+          id: true,
+          code: true,
+          name: true,
+        },
+        orderBy: { name: 'asc' },
       }),
 
       this.prisma.industry.findMany({
@@ -545,11 +567,12 @@ export class ReportsService {
       (item) => item.role === UserRole.REP || item.role === UserRole.MANAGER,
     );
 
-    const uniqueTeams = [
+    const managedTeamValues = new Set(teams.flatMap((team) => [team.id, team.code, team.name]));
+    const legacyTeams = [
       ...new Set(
         activeUsers
           .map((item) => item.team)
-          .filter((value): value is string => Boolean(value)),
+          .filter((value): value is string => value !== null && value !== '' && !managedTeamValues.has(value)),
       ),
     ].sort();
 
@@ -577,6 +600,9 @@ export class ReportsService {
         label: item.fullName,
         fullName: item.fullName,
         team: item.team,
+        teamId: item.teamId,
+        teamCode: item.teamRef?.code ?? item.team,
+        teamName: item.teamRef?.name ?? null,
         role: item.role,
       })),
 
@@ -586,13 +612,26 @@ export class ReportsService {
         label: item.fullName,
         fullName: item.fullName,
         team: item.team,
+        teamId: item.teamId,
+        teamCode: item.teamRef?.code ?? item.team,
+        teamName: item.teamRef?.name ?? null,
         role: item.role,
       })),
 
-      teams: uniqueTeams.map((team) => ({
-        value: team,
-        label: team,
-      })),
+      teams: [
+        ...teams.map((team) => ({
+          value: team.id,
+          id: team.id,
+          code: team.code,
+          label: team.name,
+          name: team.name,
+        })),
+        ...legacyTeams.map((team) => ({
+          value: team,
+          label: team,
+          legacy: true,
+        })),
+      ],
 
       industries: industries.map((item) => ({
         value: item.name,
@@ -653,10 +692,10 @@ export class ReportsService {
   private reportUserWhere(filters: ReportFiltersDto, user: CurrentUserPayload): Prisma.UserWhereInput {
     const and: Prisma.UserWhereInput[] = [];
     if (filters.userIds?.length) and.push({ id: { in: filters.userIds } });
-    if (filters.teams?.length) and.push({ team: { in: filters.teams } });
+    if (filters.teams?.length) and.push(userTeamFilterWhere(filters.teams));
     if (user.role === UserRole.MANAGER) {
-      if (!user.team) return { id: { in: [] } };
-      and.push({ team: user.team });
+      if (!user.teamId && !user.team) return { id: { in: [] } };
+      and.push(userTeamScopeWhere(user));
     } else if (user.role === UserRole.REP) {
       and.push({ id: user.userId });
     }

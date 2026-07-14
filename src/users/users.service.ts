@@ -1,13 +1,20 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
-import * as bcrypt from 'bcryptjs';
-import { PrismaService } from '../prisma/prisma.service';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma, UserRole } from '@prisma/client';
-import { CreateUserDto } from './dto/create-user.dto';
-import { UpdateUserRoleDto } from './dto/update-user-role.dto';
-import { PermissionsGuard } from '../common/guards/permissions.guard';
-import { FindUsersDto } from './dto/find-users.dto';
-import { CurrentUserPayload } from '../common/decorators/current-user.decorator';
+import * as bcrypt from 'bcryptjs';
 import { AuditLogService } from '../audit-log/audit-log.service';
+import { CurrentUserPayload } from '../common/decorators/current-user.decorator';
+import { getCurrentOrganizationId } from '../common/tenant/tenant-scope.util';
+import { userTeamScopeWhere } from '../common/tenant/team-scope.util';
+import { PrismaService } from '../prisma/prisma.service';
+import { PermissionsGuard } from '../common/guards/permissions.guard';
+import { CreateUserDto } from './dto/create-user.dto';
+import { FindUsersDto } from './dto/find-users.dto';
+import { UpdateUserRoleDto } from './dto/update-user-role.dto';
 
 const safeUserSelect = {
   id: true,
@@ -15,6 +22,15 @@ const safeUserSelect = {
   email: true,
   role: true,
   team: true,
+  teamId: true,
+  teamRef: {
+    select: {
+      id: true,
+      code: true,
+      name: true,
+      isActive: true,
+    },
+  },
   isActive: true,
   createdAt: true,
   updatedAt: true,
@@ -22,45 +38,68 @@ const safeUserSelect = {
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService, private audit: AuditLogService) {}
+  constructor(
+    private prisma: PrismaService,
+    private audit: AuditLogService,
+  ) {}
 
-  // ============================================================
-  // ۱. ایجاد کاربر جدید
-  // ============================================================
-  async create(dto: CreateUserDto, actorId?: string) {
+  async create(dto: CreateUserDto, actor?: CurrentUserPayload) {
     const passwordHash = await bcrypt.hash(dto.password, 10);
+    const teamAssignment = await this.resolveTeamAssignment(dto.teamId, dto.team, actor);
+
     const user = await this.prisma.user.create({
       data: {
         fullName: dto.fullName,
         email: dto.email,
         passwordHash,
         role: dto.role,
-        team: dto.team,
+        team: teamAssignment.team,
+        teamId: teamAssignment.teamId,
+        organizationId: actor ? getCurrentOrganizationId(actor) : undefined,
       },
+      select: safeUserSelect,
     });
-    const { passwordHash: _omit, ...safeUser } = user;
-    await this.audit.record({ actorId, entityType: 'user', entityId: user.id, action: 'user.created', after: safeUser });
-    return safeUser;
+
+    await this.audit.record({
+      actorId: actor?.userId,
+      entityType: 'user',
+      entityId: user.id,
+      action: 'user.created',
+      after: user,
+    });
+
+    return user;
   }
 
-  // ============================================================
-  // ۲. دریافت لیست کاربران
-  // ============================================================
   async findAll(query: FindUsersDto) {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const search = query.search?.trim();
-    const where: Prisma.UserWhereInput = {
-      ...(query.role && { role: query.role }),
-      ...(query.team?.trim() && { team: query.team.trim() }),
-      ...(query.isActive !== undefined && { isActive: query.isActive }),
-      ...(search && {
+    const and: Prisma.UserWhereInput[] = [];
+
+    if (query.role) and.push({ role: query.role });
+    if (query.teamId) and.push({ teamId: query.teamId });
+    if (query.team?.trim()) {
+      const team = query.team.trim();
+      and.push({
+        OR: [
+          { team },
+          { teamRef: { code: { equals: team, mode: 'insensitive' } } },
+          { teamRef: { name: { equals: team, mode: 'insensitive' } } },
+        ],
+      });
+    }
+    if (query.isActive !== undefined) and.push({ isActive: query.isActive });
+    if (search) {
+      and.push({
         OR: [
           { fullName: { contains: search, mode: 'insensitive' } },
           { email: { contains: search, mode: 'insensitive' } },
         ],
-      }),
-    };
+      });
+    }
+
+    const where: Prisma.UserWhereInput = and.length ? { AND: and } : {};
 
     const [data, total] = await Promise.all([
       this.prisma.user.findMany({
@@ -72,10 +111,19 @@ export class UsersService {
       }),
       this.prisma.user.count({ where }),
     ]);
+
     const totalPages = Math.ceil(total / limit);
+
     return {
       data,
-      meta: { total, page, limit, totalPages, hasNext: page < totalPages, hasPrevious: page > 1 },
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages,
+        hasNext: page < totalPages,
+        hasPrevious: page > 1,
+      },
     };
   }
 
@@ -83,127 +131,184 @@ export class UsersService {
     if (user.role !== UserRole.ADMIN && user.role !== UserRole.MANAGER) {
       throw new ForbiddenException('You do not have access to owner options');
     }
-    const teamScope: Prisma.UserWhereInput = user.role === UserRole.MANAGER
-      ? user.team ? { team: user.team } : { id: { in: [] } }
-      : {};
+
+    const teamScope: Prisma.UserWhereInput =
+      user.role === UserRole.MANAGER ? userTeamScopeWhere(user) : {};
+
     return this.prisma.user.findMany({
       where: {
         isActive: true,
         role: { in: [UserRole.REP, UserRole.MANAGER] },
         ...teamScope,
       },
-      select: { id: true, fullName: true, email: true, role: true, team: true, isActive: true },
+      select: safeUserSelect,
       orderBy: [{ fullName: 'asc' }, { email: 'asc' }],
     });
   }
 
-  // ============================================================
-  // ۳. دریافت یک کاربر
-  // ============================================================
   async findOne(id: string) {
     const user = await this.prisma.user.findUnique({
       where: { id },
       select: safeUserSelect,
     });
+
     if (!user) {
-      throw new NotFoundException('کاربر پیدا نشد');
+      throw new NotFoundException('User not found');
     }
+
     return user;
   }
 
-  // ============================================================
-  // ۴. غیرفعال کردن کاربر
-  // ============================================================
   async deactivate(id: string, actorId?: string) {
     const user = await this.prisma.user.findUnique({ where: { id } });
+
     if (!user) {
-      throw new NotFoundException('کاربر پیدا نشد');
+      throw new NotFoundException('User not found');
     }
+
     const updated = await this.prisma.user.update({
       where: { id },
       data: { isActive: false },
-      select: {
-        id: true,
-        fullName: true,
-        email: true,
-        role: true,
-        team: true,
-        isActive: true,
-      },
+      select: safeUserSelect,
     });
-    await this.audit.record({ actorId, entityType: 'user', entityId: id, action: 'user.deactivated', before: user, after: updated });
+
+    await this.audit.record({
+      actorId,
+      entityType: 'user',
+      entityId: id,
+      action: 'user.deactivated',
+      before: user,
+      after: updated,
+    });
+
     return updated;
   }
 
-// ============================================================
-// ✅ ۵. فعال‌سازی مجدد کاربر
-// ============================================================
-async activate(id: string, actorId?: string) {
-  const user = await this.prisma.user.findUnique({ where: { id } });
-  if (!user) {
-    throw new NotFoundException('کاربر پیدا نشد');
+  async activate(id: string, actorId?: string) {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (user.isActive) {
+      throw new BadRequestException('User is already active');
+    }
+
+    const updated = await this.prisma.user.update({
+      where: { id },
+      data: { isActive: true },
+      select: safeUserSelect,
+    });
+
+    await this.audit.record({
+      actorId,
+      entityType: 'user',
+      entityId: id,
+      action: 'user.activated',
+      before: user,
+      after: updated,
+    });
+
+    return updated;
   }
 
-  if (user.isActive) {
-    throw new BadRequestException('کاربر قبلاً فعال است');
-  }
-
-  const updated = await this.prisma.user.update({
-    where: { id },
-    data: { isActive: true },
-    select: {
-      id: true,
-      fullName: true,
-      email: true,
-      role: true,
-      team: true,
-      isActive: true,
-    },
-  });
-  await this.audit.record({ actorId, entityType: 'user', entityId: id, action: 'user.activated', before: user, after: updated });
-  return updated;
-}
-
-  // ============================================================
-  // ✅ ۶. تغییر نقش یک کاربر
-  // ============================================================
-  async updateUserRole(id: string, dto: UpdateUserRoleDto, actorId?: string) {
+  async updateUserRole(id: string, dto: UpdateUserRoleDto, actor?: CurrentUserPayload) {
     const user = await this.prisma.user.findUnique({
       where: { id },
       include: { ownedCompanies: { select: { id: true } } },
     });
 
     if (!user) {
-      throw new NotFoundException('کاربر پیدا نشد');
+      throw new NotFoundException('User not found');
     }
 
-    // اگر کاربر شرکت‌هایی دارد و نقش جدید MANAGER است، بررسی تیم
-    if (dto.role === UserRole.MANAGER && user.ownedCompanies.length > 0 && !dto.team) {
-      throw new BadRequestException('برای تبدیل به MANAGER، باید تیم مشخص شود');
+    const teamAssignment = await this.resolveTeamAssignment(
+      dto.teamId,
+      dto.team,
+      actor,
+      {
+        teamId: user.teamId,
+        team: user.team,
+      },
+    );
+
+    if (
+      dto.role === UserRole.MANAGER &&
+      user.ownedCompanies.length > 0 &&
+      !teamAssignment.teamId &&
+      !teamAssignment.team
+    ) {
+      throw new BadRequestException('A manager with owned companies must have a team');
     }
 
     const updatedUser = await this.prisma.user.update({
       where: { id },
       data: {
         role: dto.role,
-        team: dto.team ?? user.team,
+        team: teamAssignment.team,
+        teamId: teamAssignment.teamId,
       },
-      select: {
-        id: true,
-        fullName: true,
-        email: true,
-        role: true,
-        team: true,
-        isActive: true,
-      },
+      select: safeUserSelect,
     });
 
-    // پاک کردن کش دسترسی‌ها (چون نقش تغییر کرده)
     PermissionsGuard.clearCache(dto.role);
     PermissionsGuard.clearCache(user.role);
 
-    await this.audit.record({ actorId, entityType: 'user', entityId: id, action: 'user.role_changed', before: user, after: updatedUser });
+    await this.audit.record({
+      actorId: actor?.userId,
+      entityType: 'user',
+      entityId: id,
+      action: 'user.role_changed',
+      before: user,
+      after: updatedUser,
+    });
 
     return updatedUser;
+  }
+
+  private async resolveTeamAssignment(
+    teamId: string | null | undefined,
+    legacyTeam: string | undefined,
+    actor?: CurrentUserPayload,
+    current: { teamId: string | null; team: string | null } = {
+      teamId: null,
+      team: null,
+    },
+  ): Promise<{ teamId: string | null; team: string | null }> {
+    if (teamId !== undefined) {
+      if (teamId === null) {
+        return {
+          teamId: null,
+          team: legacyTeam !== undefined ? legacyTeam.trim() || null : null,
+        };
+      }
+
+      const team = await this.prisma.team.findFirst({
+        where: {
+          id: teamId,
+          isActive: true,
+          ...(actor && { organizationId: getCurrentOrganizationId(actor) }),
+        },
+      });
+
+      if (!team) {
+        throw new BadRequestException('Selected team is invalid or inactive');
+      }
+
+      return {
+        teamId: team.id,
+        team: team.code,
+      };
+    }
+
+    if (legacyTeam !== undefined) {
+      return {
+        teamId: current.teamId,
+        team: legacyTeam.trim() || null,
+      };
+    }
+
+    return current;
   }
 }

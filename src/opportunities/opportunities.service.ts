@@ -16,6 +16,7 @@ import { CreateOpportunityDto } from './dto/create-opportunity.dto';
 import { FindOpportunitiesDto } from './dto/find-opportunities.dto';
 import { UpdateOpportunityDto } from './dto/update-opportunity.dto';
 import { getCurrentOrganizationId } from '../common/tenant/tenant-scope.util';
+import { userMatchesTeam, userTeamScopeWhere } from '../common/tenant/team-scope.util';
 import { parseApiDate, parseApiDateRange } from '../common/dates/api-date.util';
 
 const opportunityInclude = {
@@ -627,10 +628,22 @@ export class OpportunitiesService {
       });
     }
 
+    if (query.teamId) {
+      and.push({
+        owner: {
+          teamId: query.teamId,
+        },
+      });
+    }
+
     if (query.team?.trim()) {
       and.push({
         owner: {
-          team: query.team.trim(),
+          OR: [
+            { team: query.team.trim() },
+            { teamRef: { code: { equals: query.team.trim(), mode: 'insensitive' } } },
+            { teamRef: { name: { equals: query.team.trim(), mode: 'insensitive' } } },
+          ],
         },
       });
     }
@@ -775,12 +788,10 @@ export class OpportunitiesService {
     }
 
     if (user.role === UserRole.MANAGER) {
-      return user.team
+      return user.teamId || user.team
         ? {
             company: {
-              owner: {
-                team: user.team,
-              },
+              owner: userTeamScopeWhere(user),
             },
           }
         : {
@@ -840,6 +851,7 @@ export class OpportunitiesService {
         owner: {
           select: {
             team: true,
+            teamId: true,
           },
         },
       },
@@ -855,8 +867,8 @@ export class OpportunitiesService {
 
     if (
       user.role === UserRole.MANAGER &&
-      user.team &&
-      company.owner?.team === user.team
+      company.owner &&
+      userMatchesTeam(company.owner, user)
     ) {
       return company;
     }
@@ -892,7 +904,7 @@ export class OpportunitiesService {
 
     if (
       user.role === UserRole.MANAGER &&
-      (!user.team || owner.team !== user.team)
+      !userMatchesTeam(owner, user)
     ) {
       throw new ForbiddenException('Owner must belong to the manager team');
     }

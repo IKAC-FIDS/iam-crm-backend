@@ -1,6 +1,6 @@
 import { Transform } from 'class-transformer';
 import { UserRole } from '@prisma/client';
-import { IsBoolean, IsEnum, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 
 export class FindUsersDto extends PaginationDto {
@@ -15,6 +15,10 @@ export class FindUsersDto extends PaginationDto {
   @IsOptional()
   @IsString()
   team?: string;
+
+  @IsOptional()
+  @IsUUID()
+  teamId?: string;
 
   @Transform(({ value }) => value === 'true' ? true : value === 'false' ? false : value)
   @IsOptional()

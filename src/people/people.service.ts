@@ -6,6 +6,7 @@ import { PaginationDto, PaginatedResponse } from '../common/dto/pagination.dto';
 import { CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { Prisma, UserRole } from '@prisma/client';
 import { FindPeopleDirectoryDto } from './dto/find-people-directory.dto';
+import { userMatchesTeam, userTeamFilterWhere, userTeamScopeWhere } from '../common/tenant/team-scope.util';
 
 @Injectable()
 export class PeopleService {
@@ -17,7 +18,7 @@ export class PeopleService {
     const and: Prisma.PersonWhereInput[] = [{ company: { archivedAt: null } }];
 
     if (user.role === UserRole.MANAGER) {
-      and.push(user.team ? { company: { owner: { team: user.team } } } : { id: { in: [] } });
+      and.push(user.teamId || user.team ? { company: { owner: userTeamScopeWhere(user) } } : { id: { in: [] } });
     } else if (user.role === UserRole.REP) {
       and.push({ company: { ownerId: user.userId } });
     } else if (user.role === UserRole.BOARDS) {
@@ -26,7 +27,7 @@ export class PeopleService {
 
     if (query.companyId) and.push({ companyId: query.companyId });
     if (query.ownerId) and.push({ company: { ownerId: query.ownerId } });
-    if (query.team?.trim()) and.push({ company: { owner: { team: query.team.trim() } } });
+    if (query.team?.trim()) and.push({ company: { owner: userTeamFilterWhere([query.team]) } });
     if (query.department?.trim()) and.push({ department: query.department.trim() });
     if (query.jobTitle?.trim()) and.push({ title: query.jobTitle.trim() });
     if (query.seniorityLevel?.trim()) and.push({ seniorityLevel: query.seniorityLevel.trim() });
@@ -72,7 +73,23 @@ export class PeopleService {
         select: {
           id: true, companyId: true, fullName: true, title: true, department: true, personaTag: true, seniorityLevel: true,
           email: true, phone: true, isPrimaryContact: true, createdAt: true, updatedAt: true,
-          company: { select: { id: true, legalName: true, brandName: true, owner: { select: { id: true, fullName: true, email: true, team: true } } } },
+          company: {
+            select: {
+              id: true,
+              legalName: true,
+              brandName: true,
+              owner: {
+                select: {
+                  id: true,
+                  fullName: true,
+                  email: true,
+                  team: true,
+                  teamId: true,
+                  teamRef: { select: { code: true, name: true } },
+                },
+              },
+            },
+          },
           contacts: {
             select: {
               id: true,
@@ -309,7 +326,7 @@ export class PeopleService {
   private async validateCompanyAccess(companyId: string, user: CurrentUserPayload) {
     const company = await this.prisma.company.findUnique({
       where: { id: companyId },
-      select: { ownerId: true, owner: { select: { team: true } } },
+      select: { ownerId: true, owner: { select: { team: true, teamId: true } } },
     });
 
     if (!company) {
@@ -321,8 +338,7 @@ export class PeopleService {
 
     // MANAGER: فقط شرکت‌های تیم خودش
     if (user.role === UserRole.MANAGER) {
-      const companyTeam = company.owner?.team;
-      if (!companyTeam || companyTeam !== user.team) {
+      if (!company.owner || !userMatchesTeam(company.owner, user)) {
         throw new ForbiddenException('شما به این شرکت دسترسی ندارید');
       }
       return;

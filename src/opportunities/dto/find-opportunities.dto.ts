@@ -7,6 +7,7 @@ export class FindOpportunitiesDto extends PaginationDto {
   @IsOptional() @IsString() search?: string;
   @IsOptional() @IsUUID() companyId?: string;
   @IsOptional() @IsUUID() ownerId?: string;
+  @IsOptional() @IsUUID() teamId?: string;
   @IsOptional() @IsString() team?: string;
   @IsOptional() @IsString() stage?: string;
   @IsOptional() @IsUUID() stageId?: string;

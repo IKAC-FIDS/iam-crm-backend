@@ -182,6 +182,31 @@ async function main() {
     },
   });
 
+  const defaultTeams = [
+    { code: 'ENTERPRISE_SALES', name: 'فروش سازمانی' },
+    { code: 'BANKING_SALES', name: 'فروش بانک‌ها' },
+    { code: 'PUBLIC_SECTOR_SALES', name: 'فروش سازمان‌های دولتی' },
+    { code: 'PARTNER_SALES', name: 'فروش از طریق شرکا' },
+  ];
+
+  for (const team of defaultTeams) {
+    await prisma.team.upsert({
+      where: { code: team.code },
+      update: {
+        name: team.name,
+        isActive: true,
+        organizationId: defaultOrganization.id,
+      },
+      create: {
+        code: team.code,
+        name: team.name,
+        organizationId: defaultOrganization.id,
+      },
+    });
+  }
+
+  console.log('✅ تیم‌های پیش‌فرض آماده شدند.');
+
   // ============================================================
   // ۲. کتابخانه Persona
   // ============================================================
@@ -768,6 +793,8 @@ async function main() {
 
     { action: 'organization:view', description: 'View current organization' },
     { action: 'organization:manage', description: 'Manage organizations' },
+    { action: 'team:view', description: 'مشاهده تیم‌ها' },
+    { action: 'team:manage', description: 'مدیریت تیم‌ها' },
 
     { action: 'company:view', description: 'مشاهده شرکت‌ها' },
     { action: 'company:create', description: 'ایجاد شرکت' },
@@ -947,6 +974,7 @@ async function main() {
     'notification:send',
 
     'organization:view',
+    'team:view',
   ];
 
   const repActions = [

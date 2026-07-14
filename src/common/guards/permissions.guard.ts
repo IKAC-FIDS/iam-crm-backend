@@ -20,6 +20,7 @@ type RequestUser = {
   email?: string;
   role?: string;
   team?: string | null;
+  teamId?: string | null;
 };
 
 @Injectable()

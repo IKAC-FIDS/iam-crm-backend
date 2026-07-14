@@ -19,6 +19,7 @@ import { CreateNotificationDto } from './dto/create-notification.dto';
 import { FindNotificationsDto } from './dto/find-notifications.dto';
 import { ReadAllNotificationsDto } from './dto/read-all-notifications.dto';
 import { getCurrentOrganizationId } from '../common/tenant/tenant-scope.util';
+import { userMatchesTeam } from '../common/tenant/team-scope.util';
 
 const notificationInclude = {
   recipient: {
@@ -497,6 +498,7 @@ export class NotificationsService {
         email: true,
         role: true,
         team: true,
+        teamId: true,
         isActive: true,
         organizationId: true,
       },
@@ -512,7 +514,7 @@ export class NotificationsService {
 
     if (user.role === UserRole.MANAGER) {
       const invalidRecipient = recipients.find(
-        (recipient) => !user.team || recipient.team !== user.team,
+        (recipient) => !userMatchesTeam(recipient, user),
       );
 
       if (invalidRecipient) {

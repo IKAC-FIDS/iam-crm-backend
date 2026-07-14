@@ -1536,6 +1536,61 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 
 ---
 
+### fix 000044 - افزودن ماژول مدیریت تیم‌ها و حذف وابستگی به تیم تایپی کاربران
+
+- مدل `Team` به Prisma اضافه شد و `User.teamId` به صورت nullable کنار `User.team` legacy نگه داشته شد؛ حذف یا تبدیل مخرب روی مقدارهای متنی قبلی انجام نشد.
+- migration جدید `20260713120000_add_managed_teams` جدول `teams`، ایندکس‌ها، کلیدهای خارجی و backfill امن از مقدارهای distinct و غیرخالی `users.team` را اضافه می‌کند و کاربران هم‌نام را به تیم ساخته‌شده وصل می‌کند.
+- ماژول `Teams` اضافه شد و APIهای مدیریت تیم، فعال/غیرفعال‌سازی، مشاهده اعضا و افزودن/حذف عضو را با permissionهای `team:view` و `team:manage` ارائه می‌کند.
+- seed اولیه تیم‌ها اضافه شد: `ENTERPRISE_SALES`، `BANKING_SALES`، `PUBLIC_SECTOR_SALES` و `PARTNER_SALES`؛ permissionهای تیم نیز seed می‌شوند و `MANAGER` فقط `team:view` می‌گیرد.
+- Create/Update کاربران همچنان `team` متنی legacy را می‌پذیرد، اما `teamId` را برای فرانت جدید ترجیح می‌دهد؛ در صورت ارسال `teamId`، فقط تیم فعال در organization فعلی قابل انتساب است و مقدار legacy `team` با `team.code` همگام می‌شود.
+- payload احراز هویت و current user با `teamId`، `teamCode` و `teamName` تکمیل شد، در حالی که `team` قبلی برای سازگاری باقی ماند.
+- visibility مدیران در کاربران، شرکت‌ها، فرصت‌ها، کارها، گزارش‌ها و resourceهای وابسته با `teamId` و fallback روی `team` legacy سازگار شد تا در دوره گذار نشتی cross-team یا قطع دسترسی ناخواسته ایجاد نشود.
+- فیلترها و گزینه‌های گزارش اکنون تیم‌های واقعی را به عنوان منبع اصلی برمی‌گردانند و مقدارهای legacy باقی‌مانده را برای سازگاری حفظ می‌کنند؛ فیلتر `teams` می‌تواند id/code/name تیم واقعی یا مقدار legacy را بپذیرد.
+- lookup group قدیمی `teams` حذف نشد و فقط به عنوان مسیر سازگاری باقی می‌ماند؛ منبع حقیقت جدید برای مدیریت تیم‌ها API تیم‌ها است.
+- فایل‌های مهم تغییرکرده/جدید:
+  - `prisma/schema.prisma`
+  - `prisma/migrations/20260713120000_add_managed_teams/migration.sql`
+  - `prisma/seed.ts`
+  - `src/teams/*`
+  - `src/common/tenant/team-scope.util.ts`
+  - `src/users/*`
+  - `src/auth/auth.service.ts`
+  - `src/auth/jwt.strategy.ts`
+  - `src/companies/companies.service.ts`
+  - `src/opportunities/*`
+  - `src/tasks/tasks.service.ts`
+  - `src/reports/reports.service.ts`
+  - `src/people/people.service.ts`
+  - `src/activities/activities.service.ts`
+  - `src/notifications/notifications.service.ts`
+- وابستگی فرانت‌اند: فرم‌های جدید باید `teamId` را برای انتساب تیم ارسال کنند؛ نمایش نام/کد تیم می‌تواند از response کاربر یا `/api/teams` گرفته شود. `team` متنی فقط برای سازگاری با کلاینت‌های قدیمی باقی مانده است.
+- migration لازم است و غیرمخرب است؛ اجرای deploy migration باید قبل از انتشار APIهای جدید انجام شود. داده‌های legacy `users.team` حذف یا پاک‌سازی نمی‌شوند.
+- وضعیت بررسی‌ها: `npx prisma validate` موفق بود؛ `npx prisma generate` موفق بود؛ `npm run build` موفق بود؛ `npm run lint` موفق بود با 10 warning موجود و 0 error.
+- تست واحد/API زنده اجرا نشد.
+
+---
+
+### fix 000045 - اصلاح مجوزهای دسترسی ماژول تیم‌ها
+
+- کنترلر `TeamsController` بازبینی شد؛ endpointهای تیم همچنان پشت `JwtAuthGuard` و `PermissionsGuard` باقی ماندند و عمومی یا bypass نشدند.
+- decoratorهای دسترسی تیم تأیید شدند:
+  - مشاهده لیست، جزئیات و اعضا با `team:view`
+  - ایجاد، ویرایش، فعال/غیرفعال‌سازی و افزودن/حذف عضو با `team:manage`
+- seed مجوزها اصلاح شد تا `team:view` با توضیح `مشاهده تیم‌ها` و `team:manage` با توضیح `مدیریت تیم‌ها` ثبت یا به‌روزرسانی شود.
+- migration داده‌ای غیرمخرب `20260714120000_fix_team_permissions` اضافه شد تا روی دیتابیس‌های موجود نیز `team:view` و `team:manage` ساخته/به‌روزرسانی شوند، هر دو مجوز به `ADMIN` داده شوند و `team:view` به `MANAGER` داده شود.
+- `REP` و `BOARDS` در این اصلاح مجوز تیم دریافت نکردند؛ بنابراین کاربران عادی بدون permission همچنان 403 می‌گیرند.
+- رفتار Auth/JWT بررسی شد: permissions در پاسخ login برای فرانت برگردانده می‌شود، اما `PermissionsGuard` مجوزها را از دیتابیس و cache نقش می‌خواند؛ بعد از migration/seed، برای نمایش درست permissionهای جدید در UI بهتر است کاربر دوباره login کند.
+- نکته cache: cache داخلی `PermissionsGuard` ده دقیقه TTL دارد؛ پس بعد از اجرای migration/seed در یک پروسه در حال اجرا، restart سرویس یا صبر تا انقضای cache می‌تواند برای رفع 403های cacheشده لازم باشد.
+- وابستگی فرانت‌اند: برای `GET /api/teams?includeInactive=true` کاربر باید `team:view` داشته باشد و برای `POST /api/teams` باید `team:manage` داشته باشد؛ ADMIN بعد از اعمال migration/seed هر دو را دارد.
+- فایل‌های مهم تغییرکرده/جدید:
+  - `prisma/seed.ts`
+  - `prisma/migrations/20260714120000_fix_team_permissions/migration.sql`
+  - `README.md`
+- وضعیت بررسی‌ها: `npx prisma validate` موفق بود؛ `npx prisma generate` موفق بود؛ `npm run lint` موفق بود با 10 warning موجود و 0 error؛ `npm run build` موفق بود.
+- هشدار غیرمسدودکننده: `npx prisma generate` پیام در دسترس بودن نسخه major جدید Prisma را نمایش داد؛ این پیام خطا نبود.
+
+---
+
 **Built with ❤️ for sales team**
 
 ---

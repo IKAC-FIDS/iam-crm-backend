@@ -13,6 +13,7 @@ import {
   UserRole,
 } from '@prisma/client';
 import { getCurrentOrganizationId } from '../common/tenant/tenant-scope.util';
+import { userTeamScopeWhere } from '../common/tenant/team-scope.util';
 import { createHash, randomUUID } from 'node:crypto';
 import { basename, extname, join } from 'node:path';
 import { AuditLogService } from '../audit-log/audit-log.service';
@@ -407,12 +408,10 @@ export class AttachmentsService {
     }
 
     if (user.role === UserRole.MANAGER) {
-      return user.team
+      return user.teamId || user.team
         ? {
             company: {
-              owner: {
-                team: user.team,
-              },
+              owner: userTeamScopeWhere(user),
             },
           }
         : {

@@ -1,4 +1,4 @@
-import { IsEmail, IsEnum, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsEnum, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
 import { UserRole } from '@prisma/client';
 
 export class CreateUserDto {
@@ -18,4 +18,7 @@ export class CreateUserDto {
   @IsOptional()
   @IsString()
   team?: string; // ← برای MANAGER و REP (اختیاری)
+  @IsOptional()
+  @IsUUID()
+  teamId?: string;
 }

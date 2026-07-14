@@ -14,6 +14,9 @@ export interface AuthUserResponse {
   email: string;
   role: UserRole;
   team: string | null;
+  teamId: string | null;
+  teamCode: string | null;
+  teamName: string | null;
   organizationId: string | null;
   permissions: string[];
 }
@@ -131,12 +134,21 @@ export class AuthService {
     });
 
     const permissions = rolePermissions.map((rp) => rp.permission.action);
+    const team = user.teamId
+      ? await this.prisma.team.findUnique({
+          where: { id: user.teamId },
+          select: { id: true, code: true, name: true },
+        })
+      : null;
 
     const payload = {
       sub: user.id,
       email: user.email,
       role: user.role,
       team: user.team,
+      teamId: team?.id ?? user.teamId,
+      teamCode: team?.code ?? user.team ?? null,
+      teamName: team?.name ?? null,
       organizationId: user.organizationId,
     };
 
@@ -149,6 +161,9 @@ export class AuthService {
         email: user.email,
         role: user.role,
         team: user.team,
+        teamId: team?.id ?? user.teamId,
+        teamCode: team?.code ?? user.team ?? null,
+        teamName: team?.name ?? null,
         organizationId: user.organizationId,
         permissions,
       },

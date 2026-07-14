@@ -9,6 +9,9 @@ interface JwtPayload {
   email?: string;
   role?: string;
   team?: string | null;
+  teamId?: string | null;
+  teamCode?: string | null;
+  teamName?: string | null;
   organizationId?: string | null;
 }
 
@@ -43,6 +46,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         email: true,
         role: true,
         team: true,
+        teamId: true,
+        teamRef: {
+          select: {
+            code: true,
+            name: true,
+          },
+        },
         organizationId: true,
         isActive: true,
       },
@@ -57,6 +67,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       email: user.email,
       role: user.role,
       team: user.team,
+      teamId: user.teamId ?? payload.teamId ?? null,
+      teamCode: user.teamRef?.code ?? payload.teamCode ?? user.team ?? null,
+      teamName: user.teamRef?.name ?? payload.teamName ?? null,
       organizationId: user.organizationId ?? payload.organizationId ?? null,
     };
   }

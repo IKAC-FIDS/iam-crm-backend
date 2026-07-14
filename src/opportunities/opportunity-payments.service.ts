@@ -11,6 +11,7 @@ import {
 } from '@prisma/client';
 import { AuditLogService } from '../audit-log/audit-log.service';
 import { CurrentUserPayload } from '../common/decorators/current-user.decorator';
+import { userTeamScopeWhere } from '../common/tenant/team-scope.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateOpportunityPaymentDto } from './dto/create-opportunity-payment.dto';
 import { FindOpportunityPaymentsDto } from './dto/find-opportunity-payments.dto';
@@ -435,8 +436,8 @@ export class OpportunityPaymentsService {
     }
 
     if (user.role === UserRole.MANAGER) {
-      return user.team
-        ? { company: { owner: { team: user.team } } }
+      return user.teamId || user.team
+        ? { company: { owner: userTeamScopeWhere(user) } }
         : { id: { in: [] } };
     }
 
