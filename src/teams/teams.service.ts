@@ -63,10 +63,11 @@ export class TeamsService {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const search = query.search?.trim();
+    const isActive = query.isActive ?? (query.includeInactive ? undefined : true);
 
     const where: Prisma.TeamWhereInput = {
       organizationId: getCurrentOrganizationId(user),
-      ...(query.isActive !== undefined && { isActive: query.isActive }),
+      ...(isActive !== undefined && { isActive }),
       ...(query.managerId && { managerId: query.managerId }),
       ...(search && {
         OR: [

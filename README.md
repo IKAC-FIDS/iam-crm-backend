@@ -1591,6 +1591,22 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 
 ---
 
+### fix 000046 - اصلاح اعتبارسنجی پارامتر includeInactive در فهرست تیم‌ها
+
+- DTO فهرست تیم‌ها اصلاح شد تا query parameter جدید `includeInactive` را بشناسد و مقدارهای boolean ارسالی به شکل string را درست parse کند.
+- مقدارهای قابل قبول برای `includeInactive`: `true`، `false`، `1` و `0`؛ مقدار نامعتبر همچنان با validation خطای 400 می‌گیرد.
+- علت 400 این بود که فرانت `includeInactive=true` می‌فرستاد اما DTO قبلی فقط `isActive` را تعریف کرده بود و در ValidationPipe سخت‌گیر، پارامتر ناشناخته رد می‌شد.
+- منطق سرویس فهرست تیم‌ها اصلاح شد: در حالت پیش‌فرض فقط تیم‌های فعال برمی‌گردند، اما `includeInactive=true` تیم‌های فعال و غیرفعال را با هم برمی‌گرداند. فیلتر صریح `isActive` همچنان پشتیبانی می‌شود.
+- فایل‌های مهم تغییرکرده:
+  - `src/teams/dto/find-teams.dto.ts`
+  - `src/teams/teams.service.ts`
+  - `README.md`
+- وابستگی فرانت‌اند: فراخوانی موجود `GET /api/teams?includeInactive=true` بدون تغییر در فرانت باید معتبر باشد.
+- Prisma generate لازم نبود و اجرا نشد؛ `npx prisma validate` موفق بود.
+- وضعیت بررسی‌ها: `npm run lint` موفق بود با 10 warning موجود و 0 error؛ `npm run build` موفق بود.
+
+---
+
 **Built with ❤️ for sales team**
 
 ---
