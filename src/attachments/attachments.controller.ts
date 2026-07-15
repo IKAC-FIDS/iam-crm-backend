@@ -73,15 +73,18 @@ export class AttachmentsController {
   ) {
     const { attachment, stream } = await this.service.getDownloadStream(id, user);
 
-    const safeFileName = attachment.originalFileName.replace(/["\\\r\n]/g, '_');
+    const safeFileName = this.safeContentDispositionFileName(
+      attachment.originalFileName,
+    );
+    const encodedFileName = encodeURIComponent(attachment.originalFileName)
+      .replace(/['()]/g, (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`)
+      .replace(/\*/g, '%2A');
 
-    response.setHeader('Content-Type', attachment.mimeType);
+    response.setHeader('Content-Type', attachment.mimeType || 'application/octet-stream');
     response.setHeader('Content-Length', String(attachment.sizeBytes));
     response.setHeader(
       'Content-Disposition',
-      `attachment; filename="${safeFileName}"; filename*=UTF-8''${encodeURIComponent(
-        safeFileName,
-      )}`,
+      `attachment; filename="${safeFileName}"; filename*=UTF-8''${encodedFileName}`,
     );
 
     return new StreamableFile(stream);
@@ -91,5 +94,14 @@ export class AttachmentsController {
   @Permissions('attachment:manage')
   remove(@Param('id') id: string, @CurrentUser() user: CurrentUserPayload) {
     return this.service.remove(id, user);
+  }
+
+  private safeContentDispositionFileName(fileName: string) {
+    const sanitized = fileName
+      .replace(/["\\\r\n]/g, '_')
+      .replace(/[^\x20-\x7E]/g, '_')
+      .trim();
+
+    return sanitized || 'attachment';
   }
 }

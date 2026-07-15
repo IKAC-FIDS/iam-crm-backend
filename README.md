@@ -1633,6 +1633,27 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 
 ---
 
+### fix 000048 - رفع خطای دانلود پیوست‌های ذخیره‌شده در MinIO
+
+- مسیر دانلود `GET /api/attachments/:id/download` بازبینی و اصلاح شد تا فایل‌های ذخیره‌شده در MinIO از طریق backend به صورت stream امن دانلود شوند.
+- دانلود اکنون bucket ذخیره‌شده روی رکورد `FileAttachment.bucket` را به storage adapter پاس می‌دهد؛ بنابراین اگر bucket آپلود با مقدار فعلی config تفاوت داشته باشد، دانلود همچنان از bucket صحیح انجام می‌شود.
+- خطاهای قابل انتظار MinIO/S3 مثل `NoSuchKey`، `NotFound`، `NoSuchBucket` یا پاسخ 404 به `NotFoundException` تبدیل می‌شوند و دیگر به عنوان 500 عمومی برنمی‌گردند.
+- خطاهای غیرمنتظره storage در سمت سرور log می‌شوند و با `ServiceUnavailableException` کنترل‌شده برمی‌گردند؛ credential یا جزئیات حساس MinIO به فرانت ارسال نمی‌شود.
+- اگر رکورد پیوست objectKey ذخیره‌شده نداشته باشد، دانلود با `BadRequestException` متوقف می‌شود تا رکوردهای legacy/link-only به اشتباه از MinIO خوانده نشوند.
+- هدر `Content-Disposition` اصلاح شد تا نام فایل‌های فارسی/دارای فاصله با fallback امن ASCII و `filename*` UTF-8 ارسال شود.
+- scope سازمانی و permissionهای موجود تغییر نکردند: رکورد پیوست همچنان با `organizationId` کاربر فعلی پیدا می‌شود و دسترسی entity مربوطه قبل از stream بررسی می‌شود.
+- فایل‌های مهم تغییرکرده:
+  - `src/attachments/attachments.controller.ts`
+  - `src/attachments/attachments.service.ts`
+  - `src/attachments/storage/attachment-storage.types.ts`
+  - `src/attachments/storage/minio-attachment-storage.service.ts`
+  - `README.md`
+- وابستگی فرانت‌اند: دانلود همچنان باید از مسیر backend یعنی `/api/attachments/:id/download` انجام شود؛ فرانت نباید از MinIO URL یا credential مستقیم استفاده کند.
+- migration لازم نبود؛ schema تغییر نکرد. `npx prisma generate` برای هماهنگی local Prisma Client اجرا شد و موفق بود.
+- وضعیت بررسی‌ها: `npx prisma validate` موفق بود؛ `npm run lint` موفق بود با 10 warning موجود و 0 error؛ `npm run build` پس از `npx prisma generate` موفق بود.
+
+---
+
 **Built with ❤️ for sales team**
 
 ---

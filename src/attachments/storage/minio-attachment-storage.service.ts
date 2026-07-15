@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
@@ -22,6 +23,7 @@ import type {
 
 @Injectable()
 export class MinioAttachmentStorageService implements AttachmentStorageService {
+  private readonly logger = new Logger(MinioAttachmentStorageService.name);
   private readonly client: S3Client;
   private readonly bucket: string;
 
@@ -68,6 +70,11 @@ export class MinioAttachmentStorageService implements AttachmentStorageService {
         }),
       );
     } catch (error) {
+      this.logger.error(
+        `Failed to upload attachment object ${objectKey} to bucket ${this.bucket}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+
       throw new ServiceUnavailableException({
         code: 'ATTACHMENT_STORAGE_UPLOAD_FAILED',
         message: 'Failed to upload attachment to object storage',
@@ -83,24 +90,39 @@ export class MinioAttachmentStorageService implements AttachmentStorageService {
     };
   }
 
-  async getStream(objectKey: string) {
+  async getStream(
+    objectKey: string,
+    _storagePath?: string | null,
+    bucket?: string | null,
+  ) {
+    const resolvedBucket = bucket || this.bucket;
+
     try {
       const response = await this.client.send(
         new GetObjectCommand({
-          Bucket: this.bucket,
+          Bucket: resolvedBucket,
           Key: objectKey,
         }),
       );
 
       if (!response.Body) {
-        throw new NotFoundException('فایل در object storage پیدا نشد');
+        throw new NotFoundException('File was not found in object storage');
       }
 
       return response.Body as Readable;
     } catch (error) {
-      if (error instanceof NoSuchKey) {
-        throw new NotFoundException('فایل در object storage پیدا نشد');
+      if (error instanceof NotFoundException) {
+        throw error;
       }
+
+      if (error instanceof NoSuchKey || this.isObjectNotFoundError(error)) {
+        throw new NotFoundException('File was not found in object storage');
+      }
+
+      this.logger.error(
+        `Failed to download attachment object ${objectKey} from bucket ${resolvedBucket}`,
+        error instanceof Error ? error.stack : String(error),
+      );
 
       throw new ServiceUnavailableException({
         code: 'ATTACHMENT_STORAGE_DOWNLOAD_FAILED',
@@ -108,6 +130,26 @@ export class MinioAttachmentStorageService implements AttachmentStorageService {
         details: this.normalizeStorageError(error),
       });
     }
+  }
+
+  private isObjectNotFoundError(error: unknown) {
+    if (!error || typeof error !== 'object') {
+      return false;
+    }
+
+    const candidate = error as {
+      name?: string;
+      Code?: string;
+      $metadata?: { httpStatusCode?: number };
+    };
+    const code = candidate.name ?? candidate.Code;
+
+    return (
+      code === 'NoSuchKey' ||
+      code === 'NotFound' ||
+      code === 'NoSuchBucket' ||
+      candidate.$metadata?.httpStatusCode === 404
+    );
   }
 
   private normalizeStorageError(error: unknown) {

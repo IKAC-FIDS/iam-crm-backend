@@ -19,5 +19,9 @@ export interface SavedAttachmentObject {
 
 export interface AttachmentStorageService {
   save(input: SaveAttachmentInput): Promise<SavedAttachmentObject>;
-  getStream(objectKey: string, storagePath?: string | null): Promise<Readable>;
+  getStream(
+    objectKey: string,
+    storagePath?: string | null,
+    bucket?: string | null,
+  ): Promise<Readable>;
 }

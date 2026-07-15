@@ -167,9 +167,16 @@ export class AttachmentsService {
       user,
     );
 
+    if (!attachment.objectKey) {
+      throw new BadRequestException(
+        'Attachment does not have a stored file available for download',
+      );
+    }
+
     const stream = await this.storage.getStream(
       attachment.objectKey,
       attachment.storagePath,
+      attachment.bucket,
     );
 
     await this.audit.record({
