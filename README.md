@@ -1607,6 +1607,32 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 
 ---
 
+### fix 000047 - افزودن بارگذاری فایل سند روی MinIO
+
+- جریان ایجاد سند تجاری تکمیل شد تا علاوه بر `fileUrl` قدیمی، امکان ارسال فایل واقعی با `multipart/form-data` وجود داشته باشد.
+- endpoint جدید اضافه شد: `POST /api/opportunities/:opportunityId/commercial-documents/upload`
+  - فیلد فایل: `file`
+  - فیلدهای metadata همان قرارداد `CreateCommercialDocumentDto` هستند، مثل `type`, `title`, `status`, `amount`, `validUntil`, `externalRef`, `notes`.
+- فایل از مسیر backend دریافت می‌شود و با همان زیرساخت موجود `AttachmentsService` در storage فعلی پروژه ذخیره می‌شود؛ اگر `ATTACHMENT_STORAGE_DRIVER=minio` باشد، ذخیره در MinIO/S3-compatible انجام می‌شود.
+- فایل آپلودشده به صورت `FileAttachment` با `entityType=COMMERCIAL_DOCUMENT` و `entityId=document.id` ثبت می‌شود؛ metadata شامل نام اصلی فایل، نام ذخیره‌شده، bucket/objectKey یا مسیر local، MIME type، اندازه، sha256، uploader و `organizationId` ذخیره می‌شود.
+- پاسخ endpoint جدید شامل داده سند و `fileAttachment` summary است. دانلود امن همچنان از مسیر موجود `GET /api/attachments/:id/download` انجام می‌شود و کلید خصوصی MinIO به فرانت داده نمی‌شود.
+- قرارداد قدیمی `fileUrl` حذف نشد و endpoint JSON قبلی برای سندهای لینک‌محور یا داده‌های قدیمی باقی ماند.
+- اعتبارسنجی فایل از مسیر موجود attachments استفاده می‌کند: محدودیت اندازه، رد فایل خالی، MIME typeهای مجاز و scope/permission سازمانی. MIME typeهای پیش‌فرض برای PDF، PNG/JPEG، Word و Excel تکمیل شدند.
+- اگر upload فایل بعد از ساخت سند شکست بخورد، سند ساخته‌شده rollback/delete می‌شود تا رکورد سند بدون فایل از endpoint آپلود باقی نماند.
+- فایل‌های مهم تغییرکرده:
+  - `src/attachments/attachments.module.ts`
+  - `src/attachments/attachments.service.ts`
+  - `src/opportunities/opportunities.module.ts`
+  - `src/opportunities/opportunity-commercial-documents.controller.ts`
+  - `src/opportunities/opportunity-commercial-documents.service.ts`
+  - `README.md`
+- وابستگی فرانت‌اند: فرم Add Document باید برای آپلود واقعی از `multipart/form-data` و فیلد `file` استفاده کند؛ آپلود مستقیم به MinIO لازم نیست و نباید انجام شود.
+- migration لازم نبود؛ schema موجود `FileAttachment` برای اتصال فایل به سند استفاده شد.
+- وضعیت بررسی‌ها: `npx prisma validate` موفق بود؛ `npx prisma generate` موفق بود؛ `npm run lint` موفق بود با 10 warning موجود و 0 error؛ `npm run build` پس از یک retry به دلیل lock موقت فایل `dist/tsconfig.tsbuildinfo` موفق بود.
+- هشدار غیرمسدودکننده: `npx prisma generate` پیام در دسترس بودن نسخه major جدید Prisma را نمایش داد؛ این پیام خطا نبود.
+
+---
+
 **Built with ❤️ for sales team**
 
 ---

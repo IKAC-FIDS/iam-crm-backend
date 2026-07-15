@@ -6,10 +6,12 @@ import {
 } from '@nestjs/common';
 import {
   CommercialDocumentStatus,
+  FileAttachmentEntityType,
   Prisma,
   UserRole,
 } from '@prisma/client';
 import { AuditLogService } from '../audit-log/audit-log.service';
+import { AttachmentsService } from '../attachments/attachments.service';
 import { CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { userTeamScopeWhere } from '../common/tenant/team-scope.util';
 import { PrismaService } from '../prisma/prisma.service';
@@ -42,6 +44,7 @@ export class OpportunityCommercialDocumentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditLogService,
+    private readonly attachments: AttachmentsService,
   ) {}
 
   async findAll(
@@ -177,6 +180,38 @@ export class OpportunityCommercialDocumentsService {
     });
 
     return document;
+  }
+
+  async createWithFile(
+    opportunityId: string,
+    dto: CreateCommercialDocumentDto,
+    file: Express.Multer.File | undefined,
+    user: CurrentUserPayload,
+  ) {
+    const document = await this.create(opportunityId, dto, user);
+
+    try {
+      const fileAttachment = await this.attachments.upload(
+        {
+          entityType: FileAttachmentEntityType.COMMERCIAL_DOCUMENT,
+          entityId: document.id,
+          description: dto.description,
+        },
+        file,
+        user,
+      );
+
+      return {
+        ...document,
+        fileAttachment,
+      };
+    } catch (error) {
+      await this.prisma.opportunityCommercialDocument.delete({
+        where: { id: document.id },
+      });
+
+      throw error;
+    }
   }
 
   async update(

@@ -24,5 +24,6 @@ import { MinioAttachmentStorageService } from './storage/minio-attachment-storag
       },
     },
   ],
+  exports: [AttachmentsService],
 })
 export class AttachmentsModule {}

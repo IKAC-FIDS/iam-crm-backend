@@ -276,7 +276,18 @@ export class AttachmentsService {
     return this.config
       .get<string>(
         'ALLOWED_ATTACHMENT_MIME_TYPES',
-        'application/pdf,image/jpeg,image/png,image/webp,text/plain,text/csv',
+        [
+          'application/pdf',
+          'image/png',
+          'image/jpeg',
+          'application/msword',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          'application/vnd.ms-excel',
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'image/webp',
+          'text/plain',
+          'text/csv',
+        ].join(','),
       )
       .split(',')
       .map((item) => item.trim())

@@ -7,8 +7,12 @@ import {
   Patch,
   Post,
   Query,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import {
   CurrentUser,
   CurrentUserPayload,
@@ -47,6 +51,25 @@ export class OpportunityCommercialDocumentsController {
     @CurrentUser() user: CurrentUserPayload,
   ) {
     return this.service.create(opportunityId, dto, user);
+  }
+
+  @Post('upload')
+  @Permissions('commercial-document:manage')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: {
+        fileSize: 25 * 1024 * 1024,
+      },
+    }),
+  )
+  createWithFile(
+    @Param('opportunityId') opportunityId: string,
+    @Body() dto: CreateCommercialDocumentDto,
+    @UploadedFile() file: Express.Multer.File,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.service.createWithFile(opportunityId, dto, file, user);
   }
 
   @Get(':documentId')
