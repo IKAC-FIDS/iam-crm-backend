@@ -43,23 +43,23 @@ The system is built with **NestJS**, **PostgreSQL**, and **Prisma**, and is opti
 
 ## ✨ Key Features
 
-* **Full sales pipeline management**: 17 stages from LEAD to DONE, with stage-change history.
-* **Pipeline configuration**: admin-managed stage labels, display order, active status, terminal status, and colors.
-* **Pipeline transition rules**: role-aware allowed transitions enforced by the backend during company stage changes.
-* **Activity lifecycle management**: edit activities, complete follow-ups, and reschedule follow-ups.
-* **Due follow-up management**: completed follow-ups are excluded from due reminders.
-* **Smart Call Card**: automatic Pain Point and Use Case suggestions based on contact persona and company industry.
-* **Advanced contact management**: multiple phone numbers, emails, and social networks per person.
-* **Advanced reporting**: report filters by users, owners, teams, stages, priorities, industries, sources, companies, dates, and activity types.
-* **Activity reports by user** and **pipeline reports by owner**.
-* **Report filter options endpoint** for frontend filter dropdowns.
-* **Bulk import from Excel**: import SAM/company lists in a single upload.
-* **Admin-managed catalogs**: industries, pain points, use cases, personas, lead sources, and grouped lookup options.
-* **Owner options for assignment**: scoped active REP/MANAGER candidates for company ownership workflows.
-* **Safe company archive/restore**: no destructive company deletion.
-* **Dynamic permission system**: role-permission matrix and assign/revoke APIs.
-* **Audit log**: persistent trace of important administrative and operational changes.
-* **High security**: JWT, rate limiting, environment validation, permission cache, password hashing, audit-log sanitization, and database indexes.
+- **Full sales pipeline management**: 17 stages from LEAD to DONE, with stage-change history.
+- **Pipeline configuration**: admin-managed stage labels, display order, active status, terminal status, and colors.
+- **Pipeline transition rules**: role-aware allowed transitions enforced by the backend during company stage changes.
+- **Activity lifecycle management**: edit activities, complete follow-ups, and reschedule follow-ups.
+- **Due follow-up management**: completed follow-ups are excluded from due reminders.
+- **Smart Call Card**: automatic Pain Point and Use Case suggestions based on contact persona and company industry.
+- **Advanced contact management**: multiple phone numbers, emails, and social networks per person.
+- **Advanced reporting**: report filters by users, owners, teams, stages, priorities, industries, sources, companies, dates, and activity types.
+- **Activity reports by user** and **pipeline reports by owner**.
+- **Report filter options endpoint** for frontend filter dropdowns.
+- **Bulk import from Excel**: import SAM/company lists in a single upload.
+- **Admin-managed catalogs**: industries, pain points, use cases, personas, lead sources, and grouped lookup options.
+- **Owner options for assignment**: scoped active REP/MANAGER candidates for company ownership workflows.
+- **Safe company archive/restore**: no destructive company deletion.
+- **Dynamic permission system**: role-permission matrix and assign/revoke APIs.
+- **Audit log**: persistent trace of important administrative and operational changes.
+- **High security**: JWT, rate limiting, environment validation, permission cache, password hashing, audit-log sanitization, and database indexes.
 
 ---
 
@@ -139,7 +139,7 @@ http://localhost:3000/api
 
 The frontend application for this backend is maintained in a separate repository:
 
-* Frontend repository: https://github.com/IKAC-FIDS/iam-crm-frontend-mui
+- Frontend repository: https://github.com/IKAC-FIDS/iam-crm-frontend-mui
 
 The frontend is built with React and MUI and communicates with this backend through the `/api` routes documented below.
 
@@ -484,34 +484,34 @@ Body: form-data → Key: file (Type: File)
 
 ### Recognized Columns in the Excel File
 
-| Persian Column Name | English Column Name |
-| ------------------- | ------------------- |
-| نام شرکت            | legalName           |
-| نام تجاری           | brandName           |
-| صنعت                | industry            |
-| وبسایت              | website             |
-| شهر                 | headOfficeCity      |
-| اولویت              | priority            |
-| نام مخاطب           | personName          |
-| سمت                 | title               |
-| ایمیل               | email               |
-| تلفن                | phone               |
-| نقش (Persona)       | personaTag          |
+| Accepted Excel Header | English Meaning | Internal Field |
+| --------------------- | --------------- | -------------- |
+| `نام شرکت`            | Company Legal Name | `legalName` |
+| `نام تجاری`           | Brand Name | `brandName` |
+| `صنعت`                | Industry | `industry` |
+| `وبسایت`              | Website | `website` |
+| `شهر`                 | Head Office City | `headOfficeCity` |
+| `اولویت`              | Priority | `priority` |
+| `نام مخاطب`           | Contact Name | `personName` |
+| `سمت`                 | Job Title | `title` |
+| `ایمیل`               | Email | `email` |
+| `تلفن`                | Phone | `phone` |
+| `نقش (Persona)`       | Persona Role | `personaTag` |
 
 ---
 
 ## 🔐 Security and Optimization
 
-* **JWT authentication** with configurable token lifetime
-* **Optional WebAuthn/Passkey authentication** for discoverable usernameless login
-* **Password hashing** before storing user credentials
-* **Rate limiting** for API protection
-* **Login throttling** if enabled in the current throttler configuration
-* **Environment validation** at startup with Joi
-* **Database indexes** on frequently queried fields
-* **Role/permission-based access control**
-* **Dynamic permission cache** for role permissions
-* **Audit-log sanitization** for sensitive fields such as password, token, secret, hash, and authorization data
+- **JWT authentication** with configurable token lifetime
+- **Optional WebAuthn/Passkey authentication** for discoverable usernameless login
+- **Password hashing** before storing user credentials
+- **Rate limiting** for API protection
+- **Login throttling** if enabled in the current throttler configuration
+- **Environment validation** at startup with Joi
+- **Database indexes** on frequently queried fields
+- **Role/permission-based access control**
+- **Dynamic permission cache** for role permissions
+- **Audit-log sanitization** for sensitive fields such as password, token, secret, hash, and authorization data
 
 WebAuthn/passkey configuration:
 
@@ -544,15 +544,15 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 
 ## 🔜 Not Built Yet / Next Phase
 
-* [ ] People Directory endpoint: `GET /api/people/directory`
-* [ ] Notification system for due follow-up reminders
-* [ ] Data export to Excel/PDF
-* [ ] Unit, integration, and E2E tests
-* [ ] Runtime Swagger UI inside the NestJS app, if required
-* [ ] Optional advanced dashboard visualizations
+- [ ] People Directory endpoint: `GET /api/people/directory`
+- [ ] Notification system for due follow-up reminders
+- [ ] Data export to Excel/PDF
+- [ ] Unit, integration, and E2E tests
+- [ ] Runtime Swagger UI inside the NestJS app, if required
+- [ ] Optional advanced dashboard visualizations
 
 ---
-## Change log
+## Changelog
 
 ### fix 000001 - Activity lifecycle backend
 
@@ -704,19 +704,19 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 - Added `REFRESH_TOKEN_EXPIRES_IN` environment setting.
 - Reduced default access-token lifetime to `15m`.
 - Added session-related permissions to seed data.
-- Important changed/new files:
-    - `prisma/schema.prisma`
-    - `src/auth/auth.service.ts`
-    - `src/auth/auth.controller.ts`
-    - `src/auth/auth.module.ts`
-    - `src/auth/refresh-token.service.ts`
-    - `src/auth/sessions.service.ts`
-    - `src/auth/sessions.controller.ts`
-    - `src/auth/sso/sso-exchange.controller.ts`
-    - `src/common/cookies/refresh-token-cookie.ts`
-    - `src/common/validators/env.validator.ts`
-    - `.env.example`
-    - `prisma/seed.ts`
+- Important changed or new files:
+  - `prisma/schema.prisma`
+  - `src/auth/auth.service.ts`
+  - `src/auth/auth.controller.ts`
+  - `src/auth/auth.module.ts`
+  - `src/auth/refresh-token.service.ts`
+  - `src/auth/sessions.service.ts`
+  - `src/auth/sessions.controller.ts`
+  - `src/auth/sso/sso-exchange.controller.ts`
+  - `src/common/cookies/refresh-token-cookie.ts`
+  - `src/common/validators/env.validator.ts`
+  - `.env.example`
+  - `prisma/seed.ts`
 
 ### fix 000020 - Add account security endpoints
 
@@ -734,7 +734,7 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 - Added successful-login metadata update.
 - Added refresh-session revocation for password changes.
 - Added support for revoking all other sessions while keeping the current session.
-- Important changed/new files:
+- Important changed or new files:
   - `prisma/schema.prisma`
   - `src/auth/account-security.controller.ts`
   - `src/auth/account-security.service.ts`
@@ -791,7 +791,7 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 - Added `AnyPermission` decorator for endpoints where one of several permissions is sufficient.
 - Kept permission cache with explicit invalidation after permission changes.
 - No Prisma schema migration was required.
-- Important changed/new files:
+- Important changed or new files:
   - `src/common/decorators/permissions.decorator.ts`
   - `src/common/guards/permissions.guard.ts`
   - `src/admin/admin-permissions.controller.ts`
@@ -814,7 +814,7 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
   - `user:passkey:view`
   - `user:passkey:manage`
 - No Prisma schema migration was required.
-- Important changed/new files:
+- Important changed or new files:
   - `src/auth/passkeys/passkeys.controller.ts`
   - `prisma/seed.ts`
 
@@ -834,7 +834,7 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
   - `Company.source`
 - Marked `company:change-stage` permission as deprecated in seed data.
 - No Prisma schema migration was required.
-- Important changed/new files:
+- Important changed or new files:
   - `src/companies/companies.controller.ts`
   - `src/companies/companies.service.ts`
   - `src/companies/dto/change-stage.dto.ts`
@@ -860,7 +860,7 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
   - legacy `industry`
   - legacy `source`
 - Added migration backfill from existing company string values to normalized references.
-- Important changed/new files:
+- Important changed or new files:
   - `prisma/schema.prisma`
   - `src/companies/dto/create-company.dto.ts`
   - `src/companies/dto/find-companies.dto.ts`
@@ -886,7 +886,7 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
   - `platformOption`
 - Added migration backfill from existing string values to lookup references.
 - No role or permission changes were required.
-- Important changed/new files:
+- Important changed or new files:
   - `prisma/schema.prisma`
   - `src/people/dto/person-contact.dto.ts`
   - `src/people/dto/person-social.dto.ts`
@@ -921,7 +921,7 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
   - authorization
   - cookie
   - credential
-- Important changed/new files:
+- Important changed or new files:
   - `prisma/schema.prisma`
   - `src/audit-log/audit-request-context.service.ts`
   - `src/audit-log/audit-request-context.middleware.ts`
@@ -956,7 +956,7 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
   - `P2003` -> `FOREIGN_KEY_CONSTRAINT_FAILED`
   - `P2025` -> `RECORD_NOT_FOUND`
 - Added `x-request-id` to CORS allowed and exposed headers.
-- Important changed/new files:
+- Important changed or new files:
   - `src/common/http/api-response.types.ts`
   - `src/common/interceptors/api-response.interceptor.ts`
   - `src/common/filters/api-exception.filter.ts`
@@ -991,7 +991,7 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
   - `APP_COMMIT_SHA`
   - `APP_BUILD_TIME`
 - Updated standardized error code mapping for `503 Service Unavailable`.
-- Important changed/new files:
+- Important changed or new files:
   - `src/health/health.module.ts`
   - `src/health/health.controller.ts`
   - `src/health/health.service.ts`
@@ -1021,7 +1021,7 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 - Configured CI test environment variables for backend startup/build validation.
 - Added PostgreSQL service container for future DB-backed tests.
 - No Prisma schema migration was required.
-- Important changed/new files:
+- Important changed or new files:
   - `package.json`
   - `package-lock.json`
   - `eslint.config.mjs`
@@ -1070,7 +1070,7 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
   - `opportunity-line-item:manage`
 - Updated opportunity detail response to include line items.
 - Added audit logs for product catalog and opportunity line item changes.
-- Important changed/new files:
+- Important changed or new files:
   - `prisma/schema.prisma`
   - `prisma/seed.ts`
   - `src/product-catalog/dto/create-product-catalog-item.dto.ts`
@@ -1140,7 +1140,7 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
   - `commercialDocuments`
   - `payments`
 - Added audit logs for document and payment changes.
-- Important changed/new files:
+- Important changed or new files:
   - `prisma/schema.prisma`
   - `prisma/seed.ts`
   - `src/opportunities/dto/create-commercial-document.dto.ts`
@@ -1230,7 +1230,7 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
   - MinIO bucket initialization service
   - API MinIO environment configuration
 - Updated `.gitignore` to exclude local stored attachments.
-- Important changed/new files:
+- Important changed or new files:
   - `package.json`
   - `package-lock.json`
   - `prisma/schema.prisma`
@@ -1324,7 +1324,7 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
   - `task:complete`
   - `task:delete`
 - Updated opportunity detail response to include task count and task list.
-- Important changed/new files:
+- Important changed or new files:
   - `prisma/schema.prisma`
   - `prisma/seed.ts`
   - `src/tasks/dto/create-task.dto.ts`
@@ -1387,7 +1387,7 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
   - task assignment notification
   - task completion notification
   - task reschedule notification
-- Important changed/new files:
+- Important changed or new files:
   - `prisma/schema.prisma`
   - `prisma/seed.ts`
   - `src/notifications/dto/create-notification.dto.ts`
@@ -1402,7 +1402,7 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 
 ---
 
-### backend fix 000038 - Add tenant/organization foundation
+### fix 000038 - Add tenant/organization foundation
 
 - Added a clean tenant foundation with `OrganizationStatus`, `Organization`, and one `organizationId` relation/index set on core tenant-owned models: `User`, `Company`, `Opportunity`, `Task`, `Notification`, `FileAttachment`, and nullable `AuditLog`.
 - Added migration `20260710203701_add_tenant_organization_foundation`.
@@ -1415,76 +1415,74 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 - Updated seed to upsert the default organization, assign seeded users to it, and grant organization view/manage permissions by role.
 - Added tenant scoping foundation to companies, opportunities, tasks, notifications, and attachments while preserving existing role/team/owner visibility rules.
 - Updated audit logging to optionally record `organizationId`.
-- Important changed/new files: `prisma/schema.prisma`, `prisma/migrations/20260710203701_add_tenant_organization_foundation/migration.sql`, `prisma/seed.ts`, `src/auth/auth.service.ts`, `src/auth/jwt.strategy.ts`, `src/common/decorators/current-user.decorator.ts`, `src/common/tenant/*`, `src/organizations/*`, `src/companies/companies.service.ts`, `src/opportunities/opportunities.service.ts`, `src/tasks/tasks.service.ts`, `src/notifications/notifications.service.ts`, `src/attachments/attachments.service.ts`, and `src/audit-log/audit-log.service.ts`.
+- Important changed or new files: `prisma/schema.prisma`, `prisma/migrations/20260710203701_add_tenant_organization_foundation/migration.sql`, `prisma/seed.ts`, `src/auth/auth.service.ts`, `src/auth/jwt.strategy.ts`, `src/common/decorators/current-user.decorator.ts`, `src/common/tenant/*`, `src/organizations/*`, `src/companies/companies.service.ts`, `src/opportunities/opportunities.service.ts`, `src/tasks/tasks.service.ts`, `src/notifications/notifications.service.ts`, `src/attachments/attachments.service.ts`, and `src/audit-log/audit-log.service.ts`.
 - Assumptions: existing `User.email @unique` remains global for now; this is only the foundation, and full tenant scoping for library/configuration models will be handled later.
 - Validation status: `npx prisma validate` passed; `npx prisma generate` passed; `npm run build` passed; `npm run lint` passed with 10 existing warnings and 0 errors; `npm run test` passed with 1 suite and 4 tests.
 
 ---
 
-### fix 000039 - اصلاح تفکیک دپارتمان، سمت سازمانی و نقش فروش در اشخاص
+### fix 000039 - Clarify department, job title, and sales persona fields for people
 
-- تفکیک معنایی فیلدهای شخص/مخاطب اصلاح شد:
-  - `department` برای دپارتمان یا واحد سازمانی.
-  - `title` برای سمت سازمانی / Job Title.
-  - `personaTag` برای نقش در فرآیند فروش / Buying Role.
-  - `seniorityLevel` برای سطح ارشدیت.
-- برای سازگاری API، نام‌های جدید و شفاف هم پشتیبانی می‌شوند: `jobTitle` به `title` و `personaRole` به `personaTag` نگاشت می‌شود.
-- پاسخ‌های People API اکنون aliasهای `jobTitle` و `personaRole` را هم کنار فیلدهای قدیمی برمی‌گردانند.
-- فیلترهای Global People Directory برای `jobTitle`, `personaRole`, و `seniorityLevel` اضافه شد.
-- گروه‌های lookup جدید `job-titles` و `persona-roles` اضافه شدند.
-- گروه‌های موجود `departments` و `seniority-levels` تکمیل شدند.
-- گروه `persona-tags` برای سازگاری با کلاینت‌های قبلی حفظ شد و با همان نقش‌های فروش seed می‌شود.
-- مقدارهای شغلی مثل `CEO`, `CIO`, `CISO`, `IT_MANAGER` و موارد مشابه دیگر به عنوان persona فروش seed نمی‌شوند؛ این‌ها در `job-titles` قرار گرفتند.
-- Persona Library به عنوان کتابخانه محتوای استراتژیک مبتنی بر الگوی سمت حفظ شد و با فیلد فرم شخص جایگزین یا ادغام نشد.
-- Migration جدید `20260712120000_separate_person_domain_lookups` lookupهای دپارتمان، سمت سازمانی، سطح ارشدیت و نقش فروش را upsert می‌کند.
-- Migration به صورت غیرمخرب، اگر `title` خالی باشد و `personaTag` مقدار شبیه سمت سازمانی داشته باشد، همان مقدار را در `title` کپی می‌کند و مقدار قدیمی `personaTag` را حذف نمی‌کند.
-- فایل‌های مهم تغییرکرده/جدید: `prisma/seed.ts`, `prisma/migrations/20260712120000_separate_person_domain_lookups/migration.sql`, `src/lookups/lookup-groups.ts`, `src/lookups/lookups.service.ts`, `src/people/dto/create-person.dto.ts`, `src/people/dto/find-people-directory.dto.ts`, `src/people/people.service.ts`, و `README.md`.
-- وابستگی فرانت‌اند: برای dropdownهای جدید از گروه‌های `departments`, `job-titles`, `persona-roles`, و `seniority-levels` استفاده شود. aliasهای `JOB_TITLES`, `POSITIONS`, `PERSONA_ROLES`, و `SENIORITY_LEVELS` هم به slugهای canonical نگاشت می‌شوند. endpoint lookup به صورت پیش‌فرض فقط گزینه‌های فعال را برمی‌گرداند.
-- وضعیت بررسی‌ها: `npx prisma validate` موفق بود؛ `npx prisma generate` موفق بود؛ `npm run build` موفق بود؛ `npm run lint` موفق بود با 10 warning غیرمسدودکننده موجود؛ `npm run test` موفق بود: 1 suite و 4 test.
-
----
-
-
-### fix 000040 - تکمیل و شفاف‌سازی فیلدهای تعریف فرصت فروش
-
-- تفاوت دامنه‌ای `Company.source` و منبع ایجاد فرصت فروش شفاف شد:
-  - `Company.source` / `sourceId` همچنان منبع ورود شرکت یا لید به CRM است.
-  - `Opportunity.sourceOptionId` / `sourceOption` منبع ایجاد همان فرصت فروش است.
-  - `Opportunity.source` به عنوان snapshot متنی سازگار با نسخه‌های قبلی حفظ شد.
-- گروه lookup جدید `opportunity-sources` اضافه شد و alias `OPPORTUNITY_SOURCES` به آن نگاشت می‌شود.
-- مقدارهای پیش‌فرض منبع ایجاد فرصت seed شدند: `CUSTOMER_REQUEST`, `DEMO_MEETING`, `DISCOVERY_MEETING`, `UPSELL`, `CROSS_SELL`, `RENEWAL`, `RFP_TENDER`, `PARTNER_REFERRAL`, `INTERNAL_REFERRAL`, `CAMPAIGN_FOLLOWUP`, و `OTHER`.
-- فیلدهای اختیاری زیر به Opportunity اضافه شدند: `sourceOptionId`, `primaryContactId`, `probability`, و `competitor`.
-- `primaryContactId` فقط مخاطبی را قبول می‌کند که متعلق به همان شرکت فرصت باشد.
-- `probability` اختیاری است و در DTO و migration به بازه 0 تا 100 محدود شد.
-- Create/Update Opportunity همچنان `source` قدیمی را می‌پذیرد؛ اگر مقدار آن با lookup منبع فرصت match شود، `sourceOptionId` هم پر می‌شود، و اگر match نشود مقدار متنی قدیمی حفظ می‌شود.
-- List/Detail Opportunity اکنون summaryهای `sourceOption` و `primaryContact` را برمی‌گردانند.
-- فیلترهای فرصت فروش تکمیل شدند: `source`, `opportunitySource`, `sourceOptionId`, `primaryContactId`, `expectedCloseFrom`, و `expectedCloseTo`.
-- Migration جدید `20260712123000_clarify_opportunity_definition_fields` ستون‌های nullable جدید، lookupهای منبع فرصت، backfill امن `sourceOptionId` از `source`، ایندکس‌ها و foreign keyها را اضافه می‌کند.
-- داده‌های قدیمی حذف یا rename نشدند. اگر `Opportunity.source` شامل مقدارهای lead-source باشد که با opportunity-source match نمی‌شوند، به صورت متن legacy حفظ می‌شود و نیاز به تصمیم/backfill دستی دارد.
-- محصولات مرتبط از مسیر موجود line item و `ProductCatalogItem` در detail فرصت نمایش داده می‌شوند؛ رابطه مستقیم Opportunity به Use Case در این fix اضافه نشد و بهبود آینده محسوب می‌شود.
-- فایل‌های مهم تغییرکرده/جدید: `prisma/schema.prisma`, `prisma/seed.ts`, `prisma/migrations/20260712123000_clarify_opportunity_definition_fields/migration.sql`, `src/lookups/lookup-groups.ts`, `src/lookups/lookups.service.ts`, `src/opportunities/dto/create-opportunity.dto.ts`, `src/opportunities/dto/update-opportunity.dto.ts`, `src/opportunities/dto/find-opportunities.dto.ts`, `src/opportunities/opportunities.service.ts`, و `README.md`.
-- وابستگی فرانت‌اند: برای dropdown منبع ایجاد فرصت از `/api/lookups/opportunity-sources` یا alias `OPPORTUNITY_SOURCES` استفاده شود. `estimatedValue` و `expectedCloseDate` همان نام‌های قبلی را حفظ کرده‌اند.
-- وضعیت بررسی‌ها: `npx prisma validate` موفق بود؛ `npx prisma generate` موفق بود؛ `npm run build` موفق بود؛ `npm run lint` موفق بود با 10 warning غیرمسدودکننده موجود؛ `npm run test` موفق بود: 1 suite و 4 test.
+- Clarified the semantic separation of person/contact fields:
+  - `department` represents the organizational department or business unit.
+  - `title` represents the organizational position or job title.
+  - `personaTag` represents the buying role within the sales process.
+  - `seniorityLevel` represents organizational seniority.
+- Added clearer API-compatible aliases: `jobTitle` maps to `title`, and `personaRole` maps to `personaTag`.
+- Updated People API responses to return the `jobTitle` and `personaRole` aliases alongside the legacy fields.
+- Added Global People Directory filters for `jobTitle`, `personaRole`, and `seniorityLevel`.
+- Added the `job-titles` and `persona-roles` lookup groups.
+- Expanded the existing `departments` and `seniority-levels` lookup groups.
+- Preserved the `persona-tags` group for backward compatibility and continued seeding it with the same buying-role values.
+- Stopped seeding job-title values such as `CEO`, `CIO`, `CISO`, and `IT_MANAGER` as sales personas; these values now belong to `job-titles`.
+- Preserved Persona Library as a strategic content library based on role patterns rather than replacing or merging it with the person form fields.
+- Added migration `20260712120000_separate_person_domain_lookups` to upsert department, job-title, seniority-level, and buying-role lookup values.
+- The migration is non-destructive: when `title` is empty and `personaTag` resembles a job title, it copies that value to `title` without removing the legacy `personaTag` value.
+- Important changed or new files: `prisma/seed.ts`, `prisma/migrations/20260712120000_separate_person_domain_lookups/migration.sql`, `src/lookups/lookup-groups.ts`, `src/lookups/lookups.service.ts`, `src/people/dto/create-person.dto.ts`, `src/people/dto/find-people-directory.dto.ts`, `src/people/people.service.ts`, and `README.md`.
+- Frontend dependency: use the `departments`, `job-titles`, `persona-roles`, and `seniority-levels` groups for the new dropdowns. The `JOB_TITLES`, `POSITIONS`, `PERSONA_ROLES`, and `SENIORITY_LEVELS` aliases also map to the canonical slugs. Lookup endpoints return active options by default.
+- Validation status: `npx prisma validate` passed; `npx prisma generate` passed; `npm run build` passed; `npm run lint` passed with 10 existing non-blocking warnings; `npm run test` passed with 1 suite and 4 tests.
 
 ---
 
+### fix 000040 - Complete and clarify opportunity definition fields
 
-### fix 000041 - استانداردسازی قرارداد تاریخ‌ها برای پشتیبانی از نمایش شمسی در فرانت
+- Clarified the domain distinction between `Company.source` and the source that created a sales opportunity:
+  - `Company.source` / `sourceId` continues to represent how the company or lead entered the CRM.
+  - `Opportunity.sourceOptionId` / `sourceOption` represents how the specific sales opportunity was created.
+  - `Opportunity.source` remains as a backward-compatible text snapshot.
+- Added the `opportunity-sources` lookup group and mapped the `OPPORTUNITY_SOURCES` alias to it.
+- Seeded default opportunity-source values: `CUSTOMER_REQUEST`, `DEMO_MEETING`, `DISCOVERY_MEETING`, `UPSELL`, `CROSS_SELL`, `RENEWAL`, `RFP_TENDER`, `PARTNER_REFERRAL`, `INTERNAL_REFERRAL`, `CAMPAIGN_FOLLOWUP`, and `OTHER`.
+- Added optional Opportunity fields: `sourceOptionId`, `primaryContactId`, `probability`, and `competitor`.
+- Restricted `primaryContactId` to contacts belonging to the same company as the opportunity.
+- Kept `probability` optional and constrained it to the 0–100 range in both the DTO and migration.
+- Opportunity create/update operations continue to accept the legacy `source` field. When its value matches an opportunity-source lookup option, `sourceOptionId` is populated; otherwise, the legacy text value is preserved.
+- Updated Opportunity list/detail responses to include `sourceOption` and `primaryContact` summaries.
+- Added Opportunity filters for `source`, `opportunitySource`, `sourceOptionId`, `primaryContactId`, `expectedCloseFrom`, and `expectedCloseTo`.
+- Added migration `20260712123000_clarify_opportunity_definition_fields` with the new nullable columns, opportunity-source lookup values, safe `sourceOptionId` backfill from `source`, indexes, and foreign keys.
+- No legacy data was deleted or renamed. When `Opportunity.source` contains a lead-source value that does not match an opportunity-source option, it remains as legacy text and requires an explicit manual decision or backfill.
+- Related products continue to appear in Opportunity detail through the existing line-item and `ProductCatalogItem` flow. A direct Opportunity-to-Use Case relation was not added in this fix and remains a future enhancement.
+- Important changed or new files: `prisma/schema.prisma`, `prisma/seed.ts`, `prisma/migrations/20260712123000_clarify_opportunity_definition_fields/migration.sql`, `src/lookups/lookup-groups.ts`, `src/lookups/lookups.service.ts`, `src/opportunities/dto/create-opportunity.dto.ts`, `src/opportunities/dto/update-opportunity.dto.ts`, `src/opportunities/dto/find-opportunities.dto.ts`, `src/opportunities/opportunities.service.ts`, and `README.md`.
+- Frontend dependency: use `/api/lookups/opportunity-sources` or the `OPPORTUNITY_SOURCES` alias for the opportunity-source dropdown. The existing `estimatedValue` and `expectedCloseDate` field names remain unchanged.
+- Validation status: `npx prisma validate` passed; `npx prisma generate` passed; `npm run build` passed; `npm run lint` passed with 10 existing non-blocking warnings; `npm run test` passed with 1 suite and 4 tests.
 
-- همه فیلدهای `DateTime` در Prisma بررسی شدند و هیچ فیلدی برای پشتیبانی از نمایش شمسی از `DateTime` به `String` تغییر نکرد.
-- قرارداد ورودی تاریخ‌ها در DTOهای فعالیت، کار، فرصت فروش، سند تجاری، پرداخت، گزارش و Audit Log به validator مشترک `IsApiDateString` منتقل شد.
-- API همچنان مقدارهای تاریخ را به صورت Gregorian/ISO 8601 یا `YYYY-MM-DD` برای تاریخ‌های business/date-only می‌پذیرد؛ رشته‌های جلالی/فارسی مثل `۱۴۰۳/۰۵/۲۰` معتبر نیستند و نباید به backend ارسال شوند.
-- مقدارهای `YYYY-MM-DD` برای persistence به UTC midnight تبدیل می‌شوند تا خطای timezone/off-by-one کاهش پیدا کند.
-- فیلترهای بازه‌ای تاریخ برای `to` date-only به صورت exclusive next-day ساخته می‌شوند؛ بنابراین `dueTo=2026-07-12` کل روز 12 جولای 2026 را پوشش می‌دهد.
-- تبدیل Jalali فقط مسئولیت فرانت‌اند است: فرانت باید تاریخ انتخاب‌شده در UI شمسی را پیش از ارسال به backend به Gregorian `YYYY-MM-DD` یا ISO date-time تبدیل کند.
-- خروجی API به رشته جلالی تبدیل نشد و مقدارهای `DateTime` همچنان به شکل استاندارد سریالایز می‌شوند.
-- Import اکسل SAM تاریخ business قابل parse نداشت و تغییری در رفتار import/export داده نشد.
-- migration لازم نبود؛ schema و نوع ستون‌های دیتابیس بدون تغییر ماندند.
-- فایل‌های مهم تغییرکرده/جدید:
+---
+
+### fix 000041 - Standardize date contracts for Jalali date display in the frontend
+
+- Reviewed all Prisma `DateTime` fields and did not convert any field from `DateTime` to `String` for Jalali date display support.
+- Moved date input validation for activity, task, opportunity, commercial document, payment, report, and audit-log DTOs to the shared `IsApiDateString` validator.
+- The API continues to accept Gregorian ISO 8601 values or `YYYY-MM-DD` for business/date-only fields. Jalali/Persian strings such as `۱۴۰۳/۰۵/۲۰` are invalid and must not be sent to the backend.
+- Normalized `YYYY-MM-DD` values to UTC midnight for persistence to reduce timezone and off-by-one errors.
+- Date-range filters with a date-only `to` value use an exclusive upper bound on the following day. For example, `dueTo=2026-07-12` covers the entire day of July 12, 2026.
+- Jalali conversion remains exclusively a frontend responsibility. The frontend must convert a date selected in a Jalali UI to Gregorian `YYYY-MM-DD` or an ISO date-time value before sending it to the backend.
+- API responses were not converted to Jalali strings; `DateTime` values continue to use standard serialization.
+- The SAM Excel import did not contain a parsable business-date field, so import/export behavior was unchanged.
+- No migration was required; the Prisma schema and database column types remained unchanged.
+- Important changed or new files:
   - `src/common/dates/api-date.util.ts`
   - `src/common/validators/api-date-string.validator.ts`
-  - `src/activities/dto/*` و `src/activities/activities.service.ts`
-  - `src/tasks/dto/*` و `src/tasks/tasks.service.ts`
+  - `src/activities/dto/*` and `src/activities/activities.service.ts`
+  - `src/tasks/dto/*` and `src/tasks/tasks.service.ts`
   - `src/opportunities/dto/*`
   - `src/opportunities/opportunities.service.ts`
   - `src/opportunities/opportunity-commercial-documents.service.ts`
@@ -1494,60 +1492,60 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
   - `src/audit-log/dto/find-audit-logs.dto.ts`
   - `src/audit-log/audit-log.service.ts`
   - `test/api-date.util.spec.ts`
-- وضعیت بررسی‌ها: `npx prisma validate` موفق بود؛ `npx prisma generate` موفق بود؛ `npm run lint` موفق بود با 10 warning غیرمسدودکننده موجود؛ `npm run test` موفق بود: 2 suite و 9 test؛ `npm run build` موفق بود.
-- هشدار غیرمسدودکننده: `npx prisma validate` پیام در دسترس بودن نسخه major جدید Prisma را نمایش داد؛ این پیام خطا نبود.
+- Validation status: `npx prisma validate` passed; `npx prisma generate` passed; `npm run lint` passed with 10 existing non-blocking warnings; `npm run test` passed with 2 suites and 9 tests; `npm run build` passed.
+- Non-blocking warning: `npx prisma validate` reported that a new Prisma major version was available; this was an informational message, not an error.
 
 ---
 
-### fix 000042 - بازبینی قرارداد تاریخ و زمان برای انتخابگر شمسی فرانت
+### fix 000042 - Review the date and time contract for the frontend Jalali date picker
 
-- DTOهای ورودی تاریخ/زمان برای activity، task، opportunity، payment، commercial document، report و audit log بازبینی شدند؛ قرارداد فعلی همچنان `IsApiDateString` و مقدار Gregorian `YYYY-MM-DD` یا ISO 8601 date-time است.
-- ذخیره‌سازی دیتابیس بدون تغییر ماند: هیچ فیلد `DateTime` به `String` تبدیل نشد و هیچ رشته Jalali/Persian در persistence اضافه نشد.
-- خروجی‌های API همچنان machine-readable هستند و تبدیل/نمایش Jalali مسئولیت فرانت‌اند باقی ماند.
-- اصلاح کمینه انجام شد: در گزارش activity، وقتی `endDate` به شکل date-only ارسال شود، فیلتر دیتابیس همچنان از upper-bound انحصاری روز بعد استفاده می‌کند، اما metadata خروجی `endDate` همان تاریخ انتخاب‌شده Gregorian را برمی‌گرداند تا فرانت با off-by-one نمایشی روبه‌رو نشود.
-- تست واحد اضافه شد تا ثابت کند `endDate=2026-07-12` در query به `lt: 2026-07-13T00:00:00.000Z` تبدیل می‌شود ولی response metadata مقدار `2026-07-12T00:00:00.000Z` را نگه می‌دارد.
-- فیلدهای date-only/business طبق convention فعلی: `expectedCloseDate`، payment `dueDate`، document `validUntil` و report range endpoints می‌توانند با `YYYY-MM-DD` ارسال شوند؛ فیلدهای true date-time مثل `reminderAt`، `paidAt`، `sentAt`، `acceptedAt`، `rejectedAt`، `signedAt` و lifecycle timestamps همچنان ISO date-time را هم می‌پذیرند.
-- فایل‌های مهم تغییرکرده:
+- Reviewed date/time input DTOs for activities, tasks, opportunities, payments, commercial documents, reports, and audit logs. The contract remains based on `IsApiDateString` and Gregorian `YYYY-MM-DD` or ISO 8601 date-time values.
+- Database persistence remained unchanged: no `DateTime` field was converted to `String`, and no Jalali/Persian string was introduced into persistence.
+- API responses remain machine-readable, and Jalali conversion/display remains a frontend responsibility.
+- Applied a minimal correction to activity reports: when `endDate` is date-only, the database filter still uses the exclusive upper bound of the following day, while response metadata returns the original selected Gregorian date to prevent frontend display off-by-one errors.
+- Added a unit test proving that `endDate=2026-07-12` becomes `lt: 2026-07-13T00:00:00.000Z` in the query while response metadata retains `2026-07-12T00:00:00.000Z`.
+- Under the current convention, business/date-only fields such as `expectedCloseDate`, payment `dueDate`, document `validUntil`, and report range endpoints accept `YYYY-MM-DD`. True date-time fields such as `reminderAt`, `paidAt`, `sentAt`, `acceptedAt`, `rejectedAt`, `signedAt`, and lifecycle timestamps also accept ISO date-time values.
+- Important changed files:
   - `src/reports/reports.service.ts`
   - `test/reports.service.spec.ts`
   - `README.md`
-- وابستگی فرانت‌اند: انتخابگر شمسی باید مقدار انتخاب‌شده را پیش از ارسال به backend به Gregorian `YYYY-MM-DD` برای date-only یا ISO 8601 برای date-time تبدیل کند؛ backend رشته Jalali مثل `1403/05/20` را نمی‌پذیرد.
-- migration لازم نبود؛ schema و نوع ستون‌های دیتابیس بدون تغییر ماندند.
-- وضعیت بررسی‌ها: `npx prisma validate` موفق بود؛ `npx prisma generate` موفق بود؛ `npm run lint` موفق بود با 10 warning موجود و 0 error؛ `npm run test` موفق بود: 3 suite و 10 test؛ `npm run build` موفق بود.
+- Frontend dependency: the Jalali date picker must convert the selected value to Gregorian `YYYY-MM-DD` for date-only fields or ISO 8601 for date-time fields before sending it to the backend. The backend does not accept Jalali strings such as `1403/05/20`.
+- No migration was required; the Prisma schema and database column types remained unchanged.
+- Validation status: `npx prisma validate` passed; `npx prisma generate` passed; `npm run lint` passed with 10 existing warnings and 0 errors; `npm run test` passed with 3 suites and 10 tests; `npm run build` passed.
 
 ---
 
-### fix 000043 - اصلاح انتساب شرکت در ایجاد کار از داخل فرصت
+### fix 000043 - Fix company assignment when creating tasks from opportunities
 
-- رفتار ایجاد و ویرایش task بازبینی شد تا وقتی `opportunityId` ارسال می‌شود، `companyId` همیشه از `opportunity.companyId` مشتق شود و مقدار ارسالی کاربر منبع حقیقت نباشد.
-- اگر در create/update همزمان `opportunityId` و `companyId` ناسازگار ارسال شوند، API با پیام روشن `Task company must match the selected opportunity company.` خطای `BadRequestException` برمی‌گرداند.
-- ایجاد task عمومی از صفحه Tasks همچنان با `companyId` مستقل پشتیبانی می‌شود و task مستقل بدون company/opportunity طبق رفتار قبلی مجاز باقی ماند.
-- اعتبارسنجی رابطه‌ها متمرکز شد: person باید با شرکت task هم‌خوان باشد؛ commercial document و payment باید با همان opportunity/company context سازگار باشند و لینک cross-company/cross-opportunity پذیرفته نمی‌شود.
-- lookupهای company، opportunity، person، commercial document و payment همچنان با scope سازمان فعلی و visibility نقش کاربر انجام می‌شوند؛ `organizationId` خود task مثل قبل از کاربر فعلی تنظیم می‌شود.
-- پاسخ‌های list/detail task همچنان context لازم برای فرانت را دارد: summary شرکت، فرصت، شخص، سند تجاری و پرداخت در `taskInclude` حفظ شد و `opportunity.archivedAt` برای منطق داخلی scope/consistency اضافه شد.
-- فایل‌های مهم تغییرکرده/جدید:
+- Reviewed task create/update behavior so that when `opportunityId` is provided, `companyId` is always derived from `opportunity.companyId` rather than treated as user-controlled source-of-truth data.
+- When create/update requests contain incompatible `opportunityId` and `companyId` values, the API returns a `BadRequestException` with the clear message `Task company must match the selected opportunity company.`
+- General task creation from the Tasks page continues to support an independent `companyId`, and standalone tasks without a company or opportunity remain valid as before.
+- Centralized relationship validation: a person must belong to the task company, and commercial documents and payments must match the same opportunity/company context. Cross-company and cross-opportunity links are rejected.
+- Company, opportunity, person, commercial-document, and payment lookups continue to enforce the current organization scope and role visibility. The task `organizationId` continues to be assigned from the current user.
+- Task list/detail responses retain the context required by the frontend: company, opportunity, person, commercial-document, and payment summaries remain in `taskInclude`, and `opportunity.archivedAt` was added for internal scope and consistency checks.
+- Important changed or new files:
   - `src/tasks/tasks.service.ts`
   - `test/tasks.service.spec.ts`
   - `README.md`
-- وابستگی فرانت‌اند: در فرم ایجاد task داخل Opportunity کافی است `opportunityId` ارسال شود؛ ارسال `companyId` اختیاری و فقط در صورت تطابق با شرکت فرصت پذیرفته می‌شود. برای task عمومی، `companyId` همچنان قابل استفاده است.
-- migration لازم نبود؛ schema و داده‌های موجود تغییر نکردند و هیچ داده‌ای حذف نشد.
-- وضعیت بررسی‌ها: `npx prisma validate` موفق بود؛ `npx prisma generate` موفق بود؛ `npm run lint` موفق بود با 10 warning موجود و 0 error؛ `npm run test` موفق بود: 4 suite و 14 test؛ `npm run build` موفق بود.
-- هشدار غیرمسدودکننده: `npx prisma validate` پیام در دسترس بودن نسخه major جدید Prisma را نمایش داد؛ این پیام خطا نبود.
+- Frontend dependency: when creating a task inside an Opportunity, sending `opportunityId` is sufficient. Sending `companyId` is optional and accepted only when it matches the opportunity company. General tasks may continue to use `companyId`.
+- No migration was required; the schema and existing data remained unchanged, and no data was deleted.
+- Validation status: `npx prisma validate` passed; `npx prisma generate` passed; `npm run lint` passed with 10 existing warnings and 0 errors; `npm run test` passed with 4 suites and 14 tests; `npm run build` passed.
+- Non-blocking warning: `npx prisma validate` reported that a new Prisma major version was available; this was an informational message, not an error.
 
 ---
 
-### fix 000044 - افزودن ماژول مدیریت تیم‌ها و حذف وابستگی به تیم تایپی کاربران
+### fix 000044 - Add managed teams and remove dependency on free-text user teams
 
-- مدل `Team` به Prisma اضافه شد و `User.teamId` به صورت nullable کنار `User.team` legacy نگه داشته شد؛ حذف یا تبدیل مخرب روی مقدارهای متنی قبلی انجام نشد.
-- migration جدید `20260713120000_add_managed_teams` جدول `teams`، ایندکس‌ها، کلیدهای خارجی و backfill امن از مقدارهای distinct و غیرخالی `users.team` را اضافه می‌کند و کاربران هم‌نام را به تیم ساخته‌شده وصل می‌کند.
-- ماژول `Teams` اضافه شد و APIهای مدیریت تیم، فعال/غیرفعال‌سازی، مشاهده اعضا و افزودن/حذف عضو را با permissionهای `team:view` و `team:manage` ارائه می‌کند.
-- seed اولیه تیم‌ها اضافه شد: `ENTERPRISE_SALES`، `BANKING_SALES`، `PUBLIC_SECTOR_SALES` و `PARTNER_SALES`؛ permissionهای تیم نیز seed می‌شوند و `MANAGER` فقط `team:view` می‌گیرد.
-- Create/Update کاربران همچنان `team` متنی legacy را می‌پذیرد، اما `teamId` را برای فرانت جدید ترجیح می‌دهد؛ در صورت ارسال `teamId`، فقط تیم فعال در organization فعلی قابل انتساب است و مقدار legacy `team` با `team.code` همگام می‌شود.
-- payload احراز هویت و current user با `teamId`، `teamCode` و `teamName` تکمیل شد، در حالی که `team` قبلی برای سازگاری باقی ماند.
-- visibility مدیران در کاربران، شرکت‌ها، فرصت‌ها، کارها، گزارش‌ها و resourceهای وابسته با `teamId` و fallback روی `team` legacy سازگار شد تا در دوره گذار نشتی cross-team یا قطع دسترسی ناخواسته ایجاد نشود.
-- فیلترها و گزینه‌های گزارش اکنون تیم‌های واقعی را به عنوان منبع اصلی برمی‌گردانند و مقدارهای legacy باقی‌مانده را برای سازگاری حفظ می‌کنند؛ فیلتر `teams` می‌تواند id/code/name تیم واقعی یا مقدار legacy را بپذیرد.
-- lookup group قدیمی `teams` حذف نشد و فقط به عنوان مسیر سازگاری باقی می‌ماند؛ منبع حقیقت جدید برای مدیریت تیم‌ها API تیم‌ها است.
-- فایل‌های مهم تغییرکرده/جدید:
+- Added the `Team` model to Prisma and kept nullable `User.teamId` alongside the legacy `User.team` field. Existing text values were not removed or destructively converted.
+- Added migration `20260713120000_add_managed_teams`, which creates the `teams` table, indexes, foreign keys, and a safe backfill from distinct non-empty `users.team` values, then links matching users to the created teams.
+- Added the `Teams` module with APIs for team management, activation/deactivation, member listing, and member assignment/removal, protected by `team:view` and `team:manage`.
+- Seeded initial teams: `ENTERPRISE_SALES`, `BANKING_SALES`, `PUBLIC_SECTOR_SALES`, and `PARTNER_SALES`. Team permissions are also seeded, and `MANAGER` receives only `team:view`.
+- User create/update operations continue to accept the legacy text `team` field but prefer `teamId` for new frontend integrations. When `teamId` is supplied, only an active team in the current organization can be assigned, and the legacy `team` value is synchronized with `team.code`.
+- Extended authentication and current-user payloads with `teamId`, `teamCode`, and `teamName`, while preserving the legacy `team` field for compatibility.
+- Updated manager visibility across users, companies, opportunities, tasks, reports, and related resources to use `teamId` with a fallback to legacy `team`, preventing cross-team leakage or unintended access loss during the transition.
+- Report filters and options now use managed teams as the primary source while retaining remaining legacy values for compatibility. The `teams` filter accepts a managed team ID, code, name, or legacy value.
+- Preserved the legacy `teams` lookup group only as a compatibility path. The Teams API is now the source of truth for team management.
+- Important changed or new files:
   - `prisma/schema.prisma`
   - `prisma/migrations/20260713120000_add_managed_teams/migration.sql`
   - `prisma/seed.ts`
@@ -1563,97 +1561,115 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
   - `src/people/people.service.ts`
   - `src/activities/activities.service.ts`
   - `src/notifications/notifications.service.ts`
-- وابستگی فرانت‌اند: فرم‌های جدید باید `teamId` را برای انتساب تیم ارسال کنند؛ نمایش نام/کد تیم می‌تواند از response کاربر یا `/api/teams` گرفته شود. `team` متنی فقط برای سازگاری با کلاینت‌های قدیمی باقی مانده است.
-- migration لازم است و غیرمخرب است؛ اجرای deploy migration باید قبل از انتشار APIهای جدید انجام شود. داده‌های legacy `users.team` حذف یا پاک‌سازی نمی‌شوند.
-- وضعیت بررسی‌ها: `npx prisma validate` موفق بود؛ `npx prisma generate` موفق بود؛ `npm run build` موفق بود؛ `npm run lint` موفق بود با 10 warning موجود و 0 error.
-- تست واحد/API زنده اجرا نشد.
+- Frontend dependency: new forms should send `teamId` for team assignment. Team names and codes can be read from user responses or `/api/teams`. The text `team` field remains only for legacy-client compatibility.
+- Migration requirement: this migration is required and non-destructive. Deploy migrations must run before releasing the new APIs. Legacy `users.team` values are not removed or cleaned up.
+- Validation status: `npx prisma validate` passed; `npx prisma generate` passed; `npm run build` passed; `npm run lint` passed with 10 existing warnings and 0 errors.
+- Unit and live API tests were not run.
 
 ---
 
-### fix 000045 - اصلاح مجوزهای دسترسی ماژول تیم‌ها
+### fix 000045 - Fix access permissions for the Teams module
 
-- کنترلر `TeamsController` بازبینی شد؛ endpointهای تیم همچنان پشت `JwtAuthGuard` و `PermissionsGuard` باقی ماندند و عمومی یا bypass نشدند.
-- decoratorهای دسترسی تیم تأیید شدند:
-  - مشاهده لیست، جزئیات و اعضا با `team:view`
-  - ایجاد، ویرایش، فعال/غیرفعال‌سازی و افزودن/حذف عضو با `team:manage`
-- seed مجوزها اصلاح شد تا `team:view` با توضیح `مشاهده تیم‌ها` و `team:manage` با توضیح `مدیریت تیم‌ها` ثبت یا به‌روزرسانی شود.
-- migration داده‌ای غیرمخرب `20260714120000_fix_team_permissions` اضافه شد تا روی دیتابیس‌های موجود نیز `team:view` و `team:manage` ساخته/به‌روزرسانی شوند، هر دو مجوز به `ADMIN` داده شوند و `team:view` به `MANAGER` داده شود.
-- `REP` و `BOARDS` در این اصلاح مجوز تیم دریافت نکردند؛ بنابراین کاربران عادی بدون permission همچنان 403 می‌گیرند.
-- رفتار Auth/JWT بررسی شد: permissions در پاسخ login برای فرانت برگردانده می‌شود، اما `PermissionsGuard` مجوزها را از دیتابیس و cache نقش می‌خواند؛ بعد از migration/seed، برای نمایش درست permissionهای جدید در UI بهتر است کاربر دوباره login کند.
-- نکته cache: cache داخلی `PermissionsGuard` ده دقیقه TTL دارد؛ پس بعد از اجرای migration/seed در یک پروسه در حال اجرا، restart سرویس یا صبر تا انقضای cache می‌تواند برای رفع 403های cacheشده لازم باشد.
-- وابستگی فرانت‌اند: برای `GET /api/teams?includeInactive=true` کاربر باید `team:view` داشته باشد و برای `POST /api/teams` باید `team:manage` داشته باشد؛ ADMIN بعد از اعمال migration/seed هر دو را دارد.
-- فایل‌های مهم تغییرکرده/جدید:
+- Reviewed `TeamsController`; all team endpoints remain protected by `JwtAuthGuard` and `PermissionsGuard` and were not made public or bypassed.
+- Verified the team access decorators:
+  - Listing teams, viewing team details, and viewing members require `team:view`.
+  - Creating, updating, activating/deactivating, and adding/removing members require `team:manage`.
+- Updated the permission seed so `team:view` and `team:manage` are created or updated with the appropriate view/manage descriptions.
+- Added non-destructive data migration `20260714120000_fix_team_permissions` to create or update `team:view` and `team:manage` in existing databases, grant both permissions to `ADMIN`, and grant `team:view` to `MANAGER`.
+- `REP` and `BOARDS` did not receive team permissions in this fix, so regular users without the required permission continue to receive HTTP 403 responses.
+- Reviewed Auth/JWT behavior: permissions are returned in the login response for the frontend, while `PermissionsGuard` reads permissions from the database-backed role cache. Users should log in again after migration/seed execution so the UI receives the new permissions.
+- Cache note: the internal `PermissionsGuard` cache has a 10-minute TTL. After running the migration/seed in an active process, restarting the service or waiting for cache expiration may be necessary to clear cached HTTP 403 results.
+- Frontend dependency: `GET /api/teams?includeInactive=true` requires `team:view`, and `POST /api/teams` requires `team:manage`. After migration/seed execution, `ADMIN` has both permissions.
+- Important changed or new files:
   - `prisma/seed.ts`
   - `prisma/migrations/20260714120000_fix_team_permissions/migration.sql`
   - `README.md`
-- وضعیت بررسی‌ها: `npx prisma validate` موفق بود؛ `npx prisma generate` موفق بود؛ `npm run lint` موفق بود با 10 warning موجود و 0 error؛ `npm run build` موفق بود.
-- هشدار غیرمسدودکننده: `npx prisma generate` پیام در دسترس بودن نسخه major جدید Prisma را نمایش داد؛ این پیام خطا نبود.
+- Validation status: `npx prisma validate` passed; `npx prisma generate` passed; `npm run lint` passed with 10 existing warnings and 0 errors; `npm run build` passed.
+- Non-blocking warning: `npx prisma generate` reported that a new Prisma major version was available; this was an informational message, not an error.
 
 ---
 
-### fix 000046 - اصلاح اعتبارسنجی پارامتر includeInactive در فهرست تیم‌ها
+### fix 000046 - Fix `includeInactive` validation in the team list
 
-- DTO فهرست تیم‌ها اصلاح شد تا query parameter جدید `includeInactive` را بشناسد و مقدارهای boolean ارسالی به شکل string را درست parse کند.
-- مقدارهای قابل قبول برای `includeInactive`: `true`، `false`، `1` و `0`؛ مقدار نامعتبر همچنان با validation خطای 400 می‌گیرد.
-- علت 400 این بود که فرانت `includeInactive=true` می‌فرستاد اما DTO قبلی فقط `isActive` را تعریف کرده بود و در ValidationPipe سخت‌گیر، پارامتر ناشناخته رد می‌شد.
-- منطق سرویس فهرست تیم‌ها اصلاح شد: در حالت پیش‌فرض فقط تیم‌های فعال برمی‌گردند، اما `includeInactive=true` تیم‌های فعال و غیرفعال را با هم برمی‌گرداند. فیلتر صریح `isActive` همچنان پشتیبانی می‌شود.
-- فایل‌های مهم تغییرکرده:
+- Updated the team-list DTO to recognize the new `includeInactive` query parameter and correctly parse boolean values submitted as strings.
+- Accepted `includeInactive` values are `true`, `false`, `1`, and `0`; invalid values continue to return an HTTP 400 validation error.
+- The HTTP 400 occurred because the frontend sent `includeInactive=true`, while the previous DTO defined only `isActive`; the strict `ValidationPipe` rejected the unknown parameter.
+- Updated team-list service behavior: active teams are returned by default, while `includeInactive=true` returns both active and inactive teams. The explicit `isActive` filter remains supported.
+- Important changed files:
   - `src/teams/dto/find-teams.dto.ts`
   - `src/teams/teams.service.ts`
   - `README.md`
-- وابستگی فرانت‌اند: فراخوانی موجود `GET /api/teams?includeInactive=true` بدون تغییر در فرانت باید معتبر باشد.
-- Prisma generate لازم نبود و اجرا نشد؛ `npx prisma validate` موفق بود.
-- وضعیت بررسی‌ها: `npm run lint` موفق بود با 10 warning موجود و 0 error؛ `npm run build` موفق بود.
+- Frontend dependency: the existing `GET /api/teams?includeInactive=true` request is now valid without frontend changes.
+- Prisma Client generation was not required and was not run; `npx prisma validate` passed.
+- Validation status: `npm run lint` passed with 10 existing warnings and 0 errors; `npm run build` passed.
 
 ---
 
-### fix 000047 - افزودن بارگذاری فایل سند روی MinIO
+### fix 000047 - Add MinIO-backed commercial document file uploads
 
-- جریان ایجاد سند تجاری تکمیل شد تا علاوه بر `fileUrl` قدیمی، امکان ارسال فایل واقعی با `multipart/form-data` وجود داشته باشد.
-- endpoint جدید اضافه شد: `POST /api/opportunities/:opportunityId/commercial-documents/upload`
-  - فیلد فایل: `file`
-  - فیلدهای metadata همان قرارداد `CreateCommercialDocumentDto` هستند، مثل `type`, `title`, `status`, `amount`, `validUntil`, `externalRef`, `notes`.
-- فایل از مسیر backend دریافت می‌شود و با همان زیرساخت موجود `AttachmentsService` در storage فعلی پروژه ذخیره می‌شود؛ اگر `ATTACHMENT_STORAGE_DRIVER=minio` باشد، ذخیره در MinIO/S3-compatible انجام می‌شود.
-- فایل آپلودشده به صورت `FileAttachment` با `entityType=COMMERCIAL_DOCUMENT` و `entityId=document.id` ثبت می‌شود؛ metadata شامل نام اصلی فایل، نام ذخیره‌شده، bucket/objectKey یا مسیر local، MIME type، اندازه، sha256، uploader و `organizationId` ذخیره می‌شود.
-- پاسخ endpoint جدید شامل داده سند و `fileAttachment` summary است. دانلود امن همچنان از مسیر موجود `GET /api/attachments/:id/download` انجام می‌شود و کلید خصوصی MinIO به فرانت داده نمی‌شود.
-- قرارداد قدیمی `fileUrl` حذف نشد و endpoint JSON قبلی برای سندهای لینک‌محور یا داده‌های قدیمی باقی ماند.
-- اعتبارسنجی فایل از مسیر موجود attachments استفاده می‌کند: محدودیت اندازه، رد فایل خالی، MIME typeهای مجاز و scope/permission سازمانی. MIME typeهای پیش‌فرض برای PDF، PNG/JPEG، Word و Excel تکمیل شدند.
-- اگر upload فایل بعد از ساخت سند شکست بخورد، سند ساخته‌شده rollback/delete می‌شود تا رکورد سند بدون فایل از endpoint آپلود باقی نماند.
-- فایل‌های مهم تغییرکرده:
+- Extended commercial-document creation to support actual file uploads through `multipart/form-data` in addition to the legacy `fileUrl` field.
+- Added endpoint: `POST /api/opportunities/:opportunityId/commercial-documents/upload`
+  - File field: `file`
+  - Metadata fields follow the existing `CreateCommercialDocumentDto` contract, including `type`, `title`, `status`, `amount`, `validUntil`, `externalRef`, and `notes`.
+- The backend receives the file and stores it through the existing `AttachmentsService` infrastructure using the project's configured storage. When `ATTACHMENT_STORAGE_DRIVER=minio`, storage uses MinIO or another S3-compatible service.
+- Registered each uploaded file as a `FileAttachment` with `entityType=COMMERCIAL_DOCUMENT` and `entityId=document.id`. Stored metadata includes the original and stored file names, bucket/object key or local path, MIME type, size, SHA-256 hash, uploader, and `organizationId`.
+- The new endpoint response includes the commercial document and a `fileAttachment` summary. Secure downloads continue through `GET /api/attachments/:id/download`; MinIO credentials are never exposed to the frontend.
+- Preserved the legacy `fileUrl` contract and the existing JSON endpoint for link-based documents and legacy data.
+- Reused attachment validation for file-size limits, empty-file rejection, allowed MIME types, organization scope, and permissions. Default MIME-type support was expanded for PDF, PNG/JPEG, Word, and Excel files.
+- If file upload fails after document creation, the newly created document is rolled back/deleted so the upload endpoint does not leave a document record without its file.
+- Important changed files:
   - `src/attachments/attachments.module.ts`
   - `src/attachments/attachments.service.ts`
   - `src/opportunities/opportunities.module.ts`
   - `src/opportunities/opportunity-commercial-documents.controller.ts`
   - `src/opportunities/opportunity-commercial-documents.service.ts`
   - `README.md`
-- وابستگی فرانت‌اند: فرم Add Document باید برای آپلود واقعی از `multipart/form-data` و فیلد `file` استفاده کند؛ آپلود مستقیم به MinIO لازم نیست و نباید انجام شود.
-- migration لازم نبود؛ schema موجود `FileAttachment` برای اتصال فایل به سند استفاده شد.
-- وضعیت بررسی‌ها: `npx prisma validate` موفق بود؛ `npx prisma generate` موفق بود؛ `npm run lint` موفق بود با 10 warning موجود و 0 error؛ `npm run build` پس از یک retry به دلیل lock موقت فایل `dist/tsconfig.tsbuildinfo` موفق بود.
-- هشدار غیرمسدودکننده: `npx prisma generate` پیام در دسترس بودن نسخه major جدید Prisma را نمایش داد؛ این پیام خطا نبود.
+- Frontend dependency: the Add Document form must use `multipart/form-data` with a `file` field for actual uploads. Direct uploads from the frontend to MinIO are neither required nor permitted.
+- No migration was required; the existing `FileAttachment` schema is used to associate files with commercial documents.
+- Validation status: `npx prisma validate` passed; `npx prisma generate` passed; `npm run lint` passed with 10 existing warnings and 0 errors; `npm run build` passed after one retry caused by a temporary lock on `dist/tsconfig.tsbuildinfo`.
+- Non-blocking warning: `npx prisma generate` reported that a new Prisma major version was available; this was an informational message, not an error.
 
 ---
 
-### fix 000048 - رفع خطای دانلود پیوست‌های ذخیره‌شده در MinIO
+### fix 000048 - Fix downloads for attachments stored in MinIO
 
-- مسیر دانلود `GET /api/attachments/:id/download` بازبینی و اصلاح شد تا فایل‌های ذخیره‌شده در MinIO از طریق backend به صورت stream امن دانلود شوند.
-- دانلود اکنون bucket ذخیره‌شده روی رکورد `FileAttachment.bucket` را به storage adapter پاس می‌دهد؛ بنابراین اگر bucket آپلود با مقدار فعلی config تفاوت داشته باشد، دانلود همچنان از bucket صحیح انجام می‌شود.
-- خطاهای قابل انتظار MinIO/S3 مثل `NoSuchKey`، `NotFound`، `NoSuchBucket` یا پاسخ 404 به `NotFoundException` تبدیل می‌شوند و دیگر به عنوان 500 عمومی برنمی‌گردند.
-- خطاهای غیرمنتظره storage در سمت سرور log می‌شوند و با `ServiceUnavailableException` کنترل‌شده برمی‌گردند؛ credential یا جزئیات حساس MinIO به فرانت ارسال نمی‌شود.
-- اگر رکورد پیوست objectKey ذخیره‌شده نداشته باشد، دانلود با `BadRequestException` متوقف می‌شود تا رکوردهای legacy/link-only به اشتباه از MinIO خوانده نشوند.
-- هدر `Content-Disposition` اصلاح شد تا نام فایل‌های فارسی/دارای فاصله با fallback امن ASCII و `filename*` UTF-8 ارسال شود.
-- scope سازمانی و permissionهای موجود تغییر نکردند: رکورد پیوست همچنان با `organizationId` کاربر فعلی پیدا می‌شود و دسترسی entity مربوطه قبل از stream بررسی می‌شود.
-- فایل‌های مهم تغییرکرده:
+- Reviewed and fixed `GET /api/attachments/:id/download` so files stored in MinIO are downloaded securely through the backend as a stream.
+- The download flow now passes the bucket stored in `FileAttachment.bucket` to the storage adapter. Downloads therefore continue to use the correct bucket even when it differs from the current configuration value.
+- Expected MinIO/S3 errors such as `NoSuchKey`, `NotFound`, `NoSuchBucket`, and HTTP 404 responses are converted to `NotFoundException` instead of returning generic HTTP 500 errors.
+- Unexpected storage errors are logged on the server and returned as controlled `ServiceUnavailableException` responses. Credentials and sensitive MinIO details are not exposed to the frontend.
+- Attachments without a stored object key are rejected with `BadRequestException`, preventing legacy or link-only records from being read incorrectly from MinIO.
+- Updated the `Content-Disposition` header to support Persian/non-ASCII file names and names containing spaces by using a safe ASCII fallback and UTF-8 `filename*` value.
+- Existing organization scope and permissions remain unchanged: attachments are still resolved using the current user's `organizationId`, and related entity access is verified before streaming.
+- Important changed files:
   - `src/attachments/attachments.controller.ts`
   - `src/attachments/attachments.service.ts`
   - `src/attachments/storage/attachment-storage.types.ts`
   - `src/attachments/storage/minio-attachment-storage.service.ts`
   - `README.md`
-- وابستگی فرانت‌اند: دانلود همچنان باید از مسیر backend یعنی `/api/attachments/:id/download` انجام شود؛ فرانت نباید از MinIO URL یا credential مستقیم استفاده کند.
-- migration لازم نبود؛ schema تغییر نکرد. `npx prisma generate` برای هماهنگی local Prisma Client اجرا شد و موفق بود.
-- وضعیت بررسی‌ها: `npx prisma validate` موفق بود؛ `npm run lint` موفق بود با 10 warning موجود و 0 error؛ `npm run build` پس از `npx prisma generate` موفق بود.
+- Frontend dependency: downloads must continue through the backend endpoint `/api/attachments/:id/download`. The frontend must not use a direct MinIO URL or credentials.
+- No migration was required; the schema was unchanged. `npx prisma generate` was run successfully to synchronize the local Prisma Client.
+- Validation status: `npx prisma validate` passed; `npm run lint` passed with 10 existing warnings and 0 errors; `npm run build` passed after `npx prisma generate`.
 
 ---
 
-**Built with ❤️ for sales team**
+### fix 000049 - اصلاح آپلود فایل سند تجاری با multipart/form-data
+
+- Updated the commercial-document upload contract for `POST /api/opportunities/:opportunityId/commercial-documents/upload` so the multipart file field remains `file`, while metadata is validated with an upload-specific DTO.
+- Fixed the likely HTTP 400 cause for browser `FormData`: optional empty strings are now normalized before validation, numeric and boolean multipart fields are parsed, and frontend aliases such as `documentType`, `issueDate`, `dueDate`, `expiresAt`, `externalUrl`, and `isSigned` are accepted for the upload endpoint.
+- Kept `fileUrl`/`externalUrl` optional for legacy/link metadata. The upload endpoint no longer depends on a file URL when a real file is submitted.
+- Added pre-create validation for the uploaded file so missing files return `Document file is required.` and unsupported MIME types return `Unsupported document file type.` before any document record is created.
+- The upload flow still uses the existing opportunity scoping, `commercial-document:manage` permission, `AttachmentsService`, and `FileAttachment`/storage integration. MinIO credentials are not exposed, and the existing secure attachment download flow remains the frontend path for retrieving uploaded files.
+- Important changed or new files:
+  - `src/opportunities/dto/upload-commercial-document.dto.ts`
+  - `src/opportunities/opportunity-commercial-documents.controller.ts`
+  - `src/opportunities/opportunity-commercial-documents.service.ts`
+  - `README.md`
+- Frontend dependency: submit `multipart/form-data` to `/api/opportunities/:opportunityId/commercial-documents/upload` with a `file` field and metadata fields such as `type` or `documentType`, `title`, `amount`, and ISO/Gregorian date strings.
+- No migration was required; the schema and existing document/link data were unchanged.
+- Validation status: `npx prisma validate` passed; `npx prisma generate` passed and was needed to refresh the stale local Prisma Client; `npm run lint` passed with 10 existing warnings and 0 errors; `npm run build` passed after generation.
+
+---
+
+**Built with ❤️ for the sales team**
 
 ---

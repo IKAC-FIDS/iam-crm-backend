@@ -24,6 +24,7 @@ import { ChangeCommercialDocumentStatusDto } from './dto/change-commercial-docum
 import { CreateCommercialDocumentDto } from './dto/create-commercial-document.dto';
 import { FindCommercialDocumentsDto } from './dto/find-commercial-documents.dto';
 import { UpdateCommercialDocumentDto } from './dto/update-commercial-document.dto';
+import { UploadCommercialDocumentDto } from './dto/upload-commercial-document.dto';
 import { OpportunityCommercialDocumentsService } from './opportunity-commercial-documents.service';
 
 @Controller('opportunities/:opportunityId/commercial-documents')
@@ -65,7 +66,7 @@ export class OpportunityCommercialDocumentsController {
   )
   createWithFile(
     @Param('opportunityId') opportunityId: string,
-    @Body() dto: CreateCommercialDocumentDto,
+    @Body() dto: UploadCommercialDocumentDto,
     @UploadedFile() file: Express.Multer.File,
     @CurrentUser() user: CurrentUserPayload,
   ) {

@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import {
   CommercialDocumentStatus,
+  CommercialDocumentType,
   FileAttachmentEntityType,
   Prisma,
   UserRole,
@@ -19,6 +20,7 @@ import { ChangeCommercialDocumentStatusDto } from './dto/change-commercial-docum
 import { CreateCommercialDocumentDto } from './dto/create-commercial-document.dto';
 import { FindCommercialDocumentsDto } from './dto/find-commercial-documents.dto';
 import { UpdateCommercialDocumentDto } from './dto/update-commercial-document.dto';
+import { UploadCommercialDocumentDto } from './dto/upload-commercial-document.dto';
 import { parseApiDate } from '../common/dates/api-date.util';
 
 const commercialDocumentInclude = {
@@ -38,6 +40,16 @@ const commercialDocumentInclude = {
     },
   },
 } satisfies Prisma.OpportunityCommercialDocumentInclude;
+
+const allowedCommercialDocumentMimeTypes = new Set([
+  'application/pdf',
+  'image/png',
+  'image/jpeg',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+]);
 
 @Injectable()
 export class OpportunityCommercialDocumentsService {
@@ -184,18 +196,21 @@ export class OpportunityCommercialDocumentsService {
 
   async createWithFile(
     opportunityId: string,
-    dto: CreateCommercialDocumentDto,
+    dto: UploadCommercialDocumentDto,
     file: Express.Multer.File | undefined,
     user: CurrentUserPayload,
   ) {
-    const document = await this.create(opportunityId, dto, user);
+    this.assertUploadFile(file);
+
+    const createDto = this.normalizeUploadDto(dto);
+    const document = await this.create(opportunityId, createDto, user);
 
     try {
       const fileAttachment = await this.attachments.upload(
         {
           entityType: FileAttachmentEntityType.COMMERCIAL_DOCUMENT,
           entityId: document.id,
-          description: dto.description,
+          description: createDto.description,
         },
         file,
         user,
@@ -448,6 +463,56 @@ export class OpportunityCommercialDocumentsService {
           : status === CommercialDocumentStatus.SIGNED
             ? now
             : undefined,
+    };
+  }
+
+  private assertUploadFile(
+    file: Express.Multer.File | undefined,
+  ): asserts file is Express.Multer.File {
+    if (!file) {
+      throw new BadRequestException('Document file is required.');
+    }
+
+    if (!allowedCommercialDocumentMimeTypes.has(file.mimetype)) {
+      throw new BadRequestException('Unsupported document file type.');
+    }
+  }
+
+  private normalizeUploadDto(
+    dto: UploadCommercialDocumentDto,
+  ): CreateCommercialDocumentDto {
+    const type = dto.type ?? dto.documentType;
+
+    if (!type || !Object.values(CommercialDocumentType).includes(type)) {
+      throw new BadRequestException('Invalid commercial document type.');
+    }
+
+    const title = (dto.title ?? dto.name)?.trim();
+
+    if (!title) {
+      throw new BadRequestException('Document title is required.');
+    }
+
+    return {
+      type,
+      status:
+        dto.status ??
+        (dto.isSigned === true ? CommercialDocumentStatus.SIGNED : undefined),
+      number: dto.number,
+      version: dto.version,
+      title,
+      description: dto.description,
+      amount: dto.amount,
+      currency: dto.currency,
+      validUntil: dto.validUntil ?? dto.expiresAt ?? dto.dueDate,
+      issuedAt: dto.issuedAt ?? dto.issueDate,
+      sentAt: dto.sentAt,
+      acceptedAt: dto.acceptedAt,
+      rejectedAt: dto.rejectedAt,
+      signedAt: dto.signedAt,
+      fileUrl: dto.fileUrl ?? dto.externalUrl,
+      externalRef: dto.externalRef,
+      notes: dto.notes,
     };
   }
 
