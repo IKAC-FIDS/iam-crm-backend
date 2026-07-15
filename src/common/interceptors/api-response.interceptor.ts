@@ -3,6 +3,7 @@ import {
   ExecutionContext,
   Injectable,
   NestInterceptor,
+  StreamableFile,
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { map, Observable } from 'rxjs';
@@ -58,6 +59,10 @@ export class ApiResponseInterceptor implements NestInterceptor<unknown, unknown>
 
     return next.handle().pipe(
       map((payload: unknown): unknown => {
+        if (payload instanceof StreamableFile) {
+          return payload;
+        }
+
         if (isAlreadyStandardResponse(payload)) {
           return payload;
         }

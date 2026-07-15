@@ -1687,6 +1687,23 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 
 ---
 
+### fix 000051 - رفع دانلود فایل‌های پیوست با عبور StreamableFile از پاسخ استاندارد
+
+- Fixed the binary download response path by making `ApiResponseInterceptor` pass through `StreamableFile` payloads unchanged.
+- Cause of the HTTP 500: the global `ApiResponseInterceptor` wrapped every payload as JSON (`{ success: true, data: payload }`), which is correct for normal APIs but breaks NestJS file streaming responses.
+- Normal JSON responses, paginated responses, and already-standard responses keep the existing standardized API envelope.
+- Updated CORS exposed headers so the frontend can read download metadata: `x-request-id`, `Content-Disposition`, `Content-Length`, and `Content-Type`.
+- Verified the attachment download controller still sets `Content-Type`, `Content-Length`, and RFC 5987-compatible `Content-Disposition`.
+- Important changed files:
+  - `src/common/interceptors/api-response.interceptor.ts`
+  - `src/main.ts`
+  - `README.md`
+- Frontend dependency: continue using `GET /api/attachments/:id/download`; the frontend can now read `Content-Disposition` to get the filename.
+- No migration was required; the schema was unchanged.
+- Validation status: `npx prisma validate` passed; `npx prisma generate` passed and was needed to refresh the stale local Prisma Client before build; `npm run lint` passed with 10 existing warnings and 0 errors; `npm run build` passed after generation.
+
+---
+
 **Built with ❤️ for the sales team**
 
 ---

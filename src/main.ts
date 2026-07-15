@@ -49,6 +49,9 @@ async function bootstrap() {
     ],
     exposedHeaders: [
       'x-request-id',
+      'Content-Disposition',
+      'Content-Length',
+      'Content-Type',
     ],
   });
 
