@@ -1704,6 +1704,23 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 
 ---
 
+### fix 000052 - اصلاح Dockerfile بک‌اند برای حذف وابستگی به Alpine apk
+
+- علت خطای build این بود که Dockerfile از `node:20-alpine` و `apk add --no-cache openssl` استفاده می‌کرد و repositoryهای Alpine در زمان build با خطای TLS/`openssl (no such package)` شکست می‌خوردند.
+- base imageهای Dockerfile از Alpine به Debian slim تغییر کردند: `node:20-bookworm-slim` برای stageهای build و runtime.
+- نصب packageهای runtime/build از `apk` به الگوی امن `apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates && rm -rf /var/lib/apt/lists/*` تغییر کرد.
+- ساختار multi-stage حفظ شد: نصب dependencyها با `npm ci` در build، اجرای `npx prisma generate`، build NestJS، و نصب dependencyهای runtime با `npm ci --omit=dev`.
+- رفتار startup فعلی حفظ شد و کانتینر همچنان قبل از اجرای برنامه `npx prisma migrate deploy` را اجرا می‌کند.
+- `.dockerignore` اضافه شد تا `node_modules`, `dist`, `.git`, logها، storage/uploads/cache/tmp و فایل‌های `.env` وارد build context نشوند و حجم context کاهش پیدا کند.
+- Prisma schema و migrationها تغییر نکردند و هیچ دستور destructive دیتابیس اجرا نشد.
+- فایل‌های مهم تغییرکرده:
+  - `Dockerfile`
+  - `.dockerignore`
+  - `README.md`
+- وضعیت بررسی‌ها: `docker compose config --services` اجرا شد؛ نتیجه سرویس‌ها `db`, `minio`, `minio-init`, `api` بود. `docker compose build --no-cache --progress=plain api` موفق شد و build context به حدود `135KB` کاهش یافت. `docker compose up -d` موفق شد. `docker compose ps` کانتینر `iam-crm-backend-api-1` را `Up` نشان داد و `docker logs --tail 120 iam-crm-backend-api-1` شروع موفق NestJS روی پورت `3000` را نشان داد.
+
+---
+
 **Built with ❤️ for the sales team**
 
 ---
