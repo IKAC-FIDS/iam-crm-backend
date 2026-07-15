@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -28,6 +29,8 @@ import {
 
 @Injectable()
 export class AttachmentsService {
+  private readonly logger = new Logger(AttachmentsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
@@ -179,20 +182,7 @@ export class AttachmentsService {
       attachment.bucket,
     );
 
-    await this.audit.record({
-      actorId: user.userId,
-      entityType: 'file-attachment',
-      entityId: attachment.id,
-      action: 'attachment.downloaded',
-      metadata: {
-        attachedToEntityType: attachment.entityType,
-        attachedToEntityId: attachment.entityId,
-        originalFileName: attachment.originalFileName,
-        storageProvider: attachment.storageProvider,
-        bucket: attachment.bucket,
-        objectKey: attachment.objectKey,
-      },
-    });
+    await this.recordDownloadAudit(attachment, user);
 
     return {
       attachment,
@@ -276,6 +266,33 @@ export class AttachmentsService {
 
     if (!file.buffer?.length) {
       throw new BadRequestException('فایل خالی است');
+    }
+  }
+
+  private async recordDownloadAudit(
+    attachment: FileAttachment,
+    user: CurrentUserPayload,
+  ) {
+    try {
+      await this.audit.record({
+        actorId: user.userId,
+        entityType: 'file-attachment',
+        entityId: attachment.id,
+        action: 'attachment.downloaded',
+        metadata: {
+          attachedToEntityType: attachment.entityType,
+          attachedToEntityId: attachment.entityId,
+          originalFileName: attachment.originalFileName,
+          storageProvider: attachment.storageProvider,
+          bucket: attachment.bucket,
+          objectKey: attachment.objectKey,
+        },
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to record download audit for attachment ${attachment.id}`,
+        error instanceof Error ? error.stack : String(error),
+      );
     }
   }
 

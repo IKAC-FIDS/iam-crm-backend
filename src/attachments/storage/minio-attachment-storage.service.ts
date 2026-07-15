@@ -12,6 +12,7 @@ import {
   NoSuchKey,
   PutObjectCommand,
   S3Client,
+  S3ServiceException,
 } from '@aws-sdk/client-s3';
 import type { Readable } from 'node:stream';
 import { posix } from 'node:path';
@@ -140,14 +141,20 @@ export class MinioAttachmentStorageService implements AttachmentStorageService {
     const candidate = error as {
       name?: string;
       Code?: string;
+      code?: string;
       $metadata?: { httpStatusCode?: number };
     };
-    const code = candidate.name ?? candidate.Code;
+    const code = candidate.name ?? candidate.Code ?? candidate.code;
 
     return (
+      error instanceof S3ServiceException &&
+        error.$metadata?.httpStatusCode === 404
+    ) || (
       code === 'NoSuchKey' ||
       code === 'NotFound' ||
       code === 'NoSuchBucket' ||
+      code === 'NotFoundError' ||
+      code === 'NoSuchObject' ||
       candidate.$metadata?.httpStatusCode === 404
     );
   }

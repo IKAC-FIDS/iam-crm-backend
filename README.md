@@ -1670,6 +1670,23 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 
 ---
 
+### fix 000050 - رفع دانلود فایل‌های پیوست از MinIO
+
+- Hardened `GET /api/attachments/:id/download` so a successful object-storage read is not turned into an HTTP 500 by a download audit-log write failure.
+- Download audit logging is now best-effort for this endpoint: failures are logged server-side, while the already-authorized file stream can still be returned to the user.
+- Expanded MinIO/S3-compatible not-found detection for download reads. Generic S3 404 responses and additional object/bucket missing error codes are now converted to `NotFoundException` instead of leaking as unexpected storage failures.
+- The download path continues to resolve the attachment in the current organization scope, validate related entity access, require a stored `objectKey`, and read using the stored `bucket` plus `objectKey`.
+- Response headers remain backend-controlled and safe for private storage: `Content-Type`, `Content-Length`, and RFC 5987-compatible `Content-Disposition` are set without exposing MinIO credentials or private object keys.
+- Important changed files:
+  - `src/attachments/attachments.service.ts`
+  - `src/attachments/storage/minio-attachment-storage.service.ts`
+  - `README.md`
+- Frontend dependency: continue downloading through `/api/attachments/:id/download`; do not use direct MinIO URLs.
+- No migration was required; the schema was unchanged.
+- Validation status: `npx prisma validate` passed; `npx prisma generate` passed and was needed to refresh the stale local Prisma Client before build; `npm run lint` passed with 10 existing warnings and 0 errors; `npm run build` passed after generation.
+
+---
+
 **Built with ❤️ for the sales team**
 
 ---
