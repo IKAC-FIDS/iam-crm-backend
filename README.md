@@ -1781,6 +1781,19 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 
 ---
 
+### fix 000057 - اصلاح ساختار سوابق تحصیلی و افزودن کتابخانه دانشگاه‌ها
+
+- مدرک تحصیلی از متن آزاد به enum اختیاری `PersonEducationDegree` با مقادیر دقیق `DIPLOMA`، `ASSOCIATE`، `BACHELOR`، `PHD` و `POSTDOC` تغییر کرد؛ مقدار Master's اضافه نشده است. endpoint سوابق تحصیلی علاوه بر enum، `degreeLabel` فارسی را برمی‌گرداند.
+- کتابخانه مدیریت‌شده `University` با نام یکتا، code اختیاری یکتا، وضعیت فعال، توضیحات و timestampها اضافه شد. endpointهای `GET /api/universities`، `GET /api/universities/:id`، `POST /api/universities`، `PATCH /api/universities/:id` و `DELETE /api/universities/:id` مطابق الگوی library موجود پیاده شدند؛ DELETE دانشگاه را غیرفعال می‌کند و فهرست عادی فقط دانشگاه‌های فعال را نشان می‌دهد.
+- فیلد متن آزاد university با `universityId` و relation اختیاری جایگزین شد. پاسخ education شامل summary دانشگاه (`id` و `name`) است و `universityNameSnapshot` برای حفظ داده تاریخی نگه داشته می‌شود؛ ایجاد/ویرایش رکورد فقط دانشگاه موجود و فعال را می‌پذیرد.
+- سال عددی با `educationDate DateTime?` و ورودی ISO/Gregorian date picker جایگزین شد. DTO جدید فقط `degree` enum، `universityId` UUID، `educationDate` معتبر و `description` را می‌پذیرد.
+- migration داده‌محور `20260716150000_refine_person_education_history_university_library` متن‌های قدیمی degree/university را در snapshotها حفظ می‌کند، degreeهای شناخته‌شده را به enum نگاشت می‌کند و year موجود را به اول ژانویه همان سال تبدیل می‌کند؛ داده قدیمی silently حذف نمی‌شود.
+- permissionهای جدید `library:university:view` و `library:university:manage` به seed اضافه شدند. view مطابق سایر libraryها به MANAGER، REP و BOARDS داده می‌شود و ADMIN طبق الگوی seed همه permissionها، از جمله manage، را دریافت می‌کند.
+- مدل‌ها/فایل‌های مهم: `University`، تغییر `PersonEducationHistory`، `prisma/schema.prisma`، migration بالا، `prisma/seed.ts`، ماژول/کنترلر/service/DTOهای `src/universities/`، DTO و service سوابق شخص، `src/people/people.service.ts`، `src/app.module.ts` و `README.md`.
+- وضعیت بررسی: `npx prisma format`، `npx prisma validate` و `npx prisma generate` موفق شدند؛ `npm run lint` با 0 خطا و 10 warning موجود موفق شد؛ `npm run build` موفق شد. `npx prisma migrate status` اجرا شد و سه migration محلی 13000، 14000 و 15000 را unapplied نشان داد، درحالی‌که migration دیتابیس `20260710203701_` در فایل‌های local نیست. به‌علت اختلاف migration history، migration اعمال و تست دستی API اجرا نشد؛ هیچ reset یا db push مخربی انجام نشد.
+
+---
+
 **Built with ❤️ for the sales team**
 
 ---

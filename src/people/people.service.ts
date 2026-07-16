@@ -185,7 +185,10 @@ export class PeopleService {
         },
         orderBy: { createdAt: 'desc' },
       },
-      educationHistory: { orderBy: [{ year: 'desc' }, { createdAt: 'desc' }] },
+      educationHistory: {
+        include: { university: { select: { id: true, name: true } } },
+        orderBy: [{ educationDate: 'desc' }, { createdAt: 'desc' }],
+      },
       },
     });
     if (!person) throw new NotFoundException('مخاطب پیدا نشد');

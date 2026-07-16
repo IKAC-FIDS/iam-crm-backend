@@ -36,6 +36,7 @@ import { TasksModule } from './tasks/tasks.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { OrganizationsModule } from './organizations/organizations.module';
 import { TeamsModule } from './teams/teams.module';
+import { UniversitiesModule } from './universities/universities.module';
 
 @Module({
   imports: [
@@ -88,6 +89,7 @@ import { TeamsModule } from './teams/teams.module';
     NotificationsModule,
     OrganizationsModule,
     TeamsModule,
+    UniversitiesModule,
   ],
   providers: [
     {

@@ -850,6 +850,8 @@ async function main() {
     { action: 'library:use-case:manage', description: 'مدیریت کاربردها' },
     { action: 'library:lead-source:view', description: 'مشاهده منابع جذب' },
     { action: 'library:lead-source:manage', description: 'مدیریت منابع جذب' },
+    { action: 'library:university:view', description: 'مشاهده دانشگاه‌ها' },
+    { action: 'library:university:manage', description: 'مدیریت دانشگاه‌ها' },
 
     { action: 'lookup:view', description: 'مشاهده گزینه‌های پایه' },
     { action: 'lookup:manage', description: 'مدیریت گزینه‌های پایه' },
@@ -946,6 +948,7 @@ async function main() {
     'library:pain-point:view',
     'library:use-case:view',
     'library:lead-source:view',
+    'library:university:view',
     'lookup:view',
     'session:view',
     'session:revoke',
@@ -1008,6 +1011,7 @@ async function main() {
     'library:pain-point:view',
     'library:use-case:view',
     'library:lead-source:view',
+    'library:university:view',
     'lookup:view',
 
     'session:view',
@@ -1045,6 +1049,7 @@ async function main() {
     'library:pain-point:view',
     'library:use-case:view',
     'library:lead-source:view',
+    'library:university:view',
     'lookup:view',
 
     'commercial-document:view',

@@ -78,6 +78,14 @@ enum CompanyLegalDocumentType {
   LATEST_CHANGES
 }
 
+enum PersonEducationDegree {
+  DIPLOMA
+  ASSOCIATE
+  BACHELOR
+  PHD
+  POSTDOC
+}
+
 enum ActivityType {
   CALL
   EMAIL
@@ -672,18 +680,36 @@ model PersonEmploymentPosition {
 }
 
 model PersonEducationHistory {
-  id          String   @id @default(uuid())
-  personId    String
-  person      Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
-  degree      String?
-  university  String?
-  year        Int?
-  description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                     String                 @id @default(uuid())
+  personId               String
+  person                 Person                 @relation(fields: [personId], references: [id], onDelete: Cascade)
+  degree                 PersonEducationDegree?
+  degreeNameSnapshot     String?
+  universityId           String?
+  university             University?            @relation(fields: [universityId], references: [id], onDelete: SetNull)
+  universityNameSnapshot String?
+  educationDate          DateTime?
+  description            String?
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime               @updatedAt
 
   @@index([personId])
+  @@index([universityId])
   @@map("person_education_history")
+}
+
+model University {
+  id               String                   @id @default(uuid())
+  name             String                   @unique
+  code             String?                  @unique
+  isActive         Boolean                  @default(true)
+  description      String?
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+  educationHistory PersonEducationHistory[]
+
+  @@index([isActive])
+  @@map("universities")
 }
 
 // ============================================================

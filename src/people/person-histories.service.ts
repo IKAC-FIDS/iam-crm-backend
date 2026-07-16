@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma, UserRole } from '@prisma/client';
+import { PersonEducationDegree, Prisma, UserRole } from '@prisma/client';
 import { CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { parseApiDate } from '../common/dates/api-date.util';
 import { getCurrentOrganizationId } from '../common/tenant/tenant-scope.util';
@@ -69,21 +69,26 @@ export class PersonHistoriesService {
 
   async findEducation(personId: string, user: CurrentUserPayload) {
     await this.assertPersonAccess(personId, user);
-    return this.prisma.personEducationHistory.findMany({ where: { personId }, orderBy: [{ year: 'desc' }, { createdAt: 'desc' }] });
+    const items = await this.prisma.personEducationHistory.findMany({ where: { personId }, include: { university: { select: { id: true, name: true } } }, orderBy: [{ educationDate: 'desc' }, { createdAt: 'desc' }] });
+    return items.map((item) => ({ ...item, degreeLabel: item.degree ? this.degreeLabel(item.degree) : null }));
   }
 
   async createEducation(personId: string, dto: CreatePersonEducationHistoryDto, user: CurrentUserPayload) {
     await this.assertPersonAccess(personId, user); this.assertMeaningfulEducation(dto);
-    return this.prisma.personEducationHistory.create({ data: { personId, degree: dto.degree?.trim() || undefined, university: dto.university?.trim() || undefined, year: dto.year, description: dto.description?.trim() || undefined } });
+    const university = dto.universityId ? await this.getActiveUniversity(dto.universityId) : null;
+    const item = await this.prisma.personEducationHistory.create({ data: { personId, degree: dto.degree, universityId: university?.id, universityNameSnapshot: university?.name, educationDate: dto.educationDate ? parseApiDate(dto.educationDate, 'educationDate') : undefined, description: dto.description?.trim() || undefined }, include: { university: { select: { id: true, name: true } } } });
+    return { ...item, degreeLabel: item.degree ? this.degreeLabel(item.degree) : null };
   }
 
   async updateEducation(personId: string, id: string, dto: UpdatePersonEducationHistoryDto, user: CurrentUserPayload) {
     await this.assertPersonAccess(personId, user);
     const current = await this.prisma.personEducationHistory.findFirst({ where: { id, personId } });
     if (!current) throw new NotFoundException('Education history not found');
-    const next = { degree: dto.degree !== undefined ? dto.degree.trim() || null : current.degree, university: dto.university !== undefined ? dto.university.trim() || null : current.university, year: dto.year !== undefined ? dto.year : current.year, description: dto.description !== undefined ? dto.description.trim() || null : current.description };
+    const university = dto.universityId !== undefined ? await this.getActiveUniversity(dto.universityId) : undefined;
+    const next = { degree: dto.degree !== undefined ? dto.degree : current.degree, universityId: university !== undefined ? university.id : current.universityId, universityNameSnapshot: university !== undefined ? university.name : current.universityNameSnapshot, educationDate: dto.educationDate !== undefined ? (dto.educationDate ? parseApiDate(dto.educationDate, 'educationDate') : null) : current.educationDate, description: dto.description !== undefined ? dto.description.trim() || null : current.description };
     this.assertMeaningfulEducation(next);
-    return this.prisma.personEducationHistory.update({ where: { id }, data: next });
+    const item = await this.prisma.personEducationHistory.update({ where: { id }, data: next, include: { university: { select: { id: true, name: true } } } });
+    return { ...item, degreeLabel: item.degree ? this.degreeLabel(item.degree) : null };
   }
 
   async removeEducation(personId: string, id: string, user: CurrentUserPayload) {
@@ -104,8 +109,18 @@ export class PersonHistoriesService {
     return { ...(title !== undefined && { title }), startDate, endDate, isCurrent, ...(dto.description !== undefined && { description: dto.description.trim() || null }) };
   }
 
-  private assertMeaningfulEducation(dto: { degree?: string | null; university?: string | null; year?: number | null; description?: string | null }) {
-    if (!dto.degree?.trim() && !dto.university?.trim() && dto.year == null && !dto.description?.trim()) throw new BadRequestException('At least one education field is required');
+  private assertMeaningfulEducation(dto: { degree?: PersonEducationDegree | null; universityId?: string | null; educationDate?: string | Date | null; description?: string | null }) {
+    if (!dto.degree && !dto.universityId && !dto.educationDate && !dto.description?.trim()) throw new BadRequestException('At least one education field is required');
+  }
+
+  private async getActiveUniversity(id: string) {
+    const university = await this.prisma.university.findFirst({ where: { id, isActive: true }, select: { id: true, name: true } });
+    if (!university) throw new BadRequestException('Selected university does not exist or is inactive');
+    return university;
+  }
+
+  private degreeLabel(degree: PersonEducationDegree) {
+    return { DIPLOMA: 'دیپلم', ASSOCIATE: 'کاردانی', BACHELOR: 'کارشناسی', PHD: 'دکتری', POSTDOC: 'پسا دکتری' }[degree];
   }
 
   private async getEmployment(personId: string, id: string) {
