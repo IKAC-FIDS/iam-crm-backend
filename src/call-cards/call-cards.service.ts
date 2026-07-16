@@ -1,43 +1,18 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpsertCallCardDto } from './dto/upsert-call-card.dto';
 import { CurrentUserPayload } from '../common/decorators/current-user.decorator';
-import { UserRole } from '@prisma/client';
-import { userMatchesTeam } from '../common/tenant/team-scope.util';
+import { CompanyAccessService } from '../companies/company-access.service';
 
 @Injectable()
 export class CallCardsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private companyAccess: CompanyAccessService) {}
 
   // ============================================================
   // متد کمکی: بررسی دسترسی به شرکت
   // ============================================================
   private async validateCompanyAccess(companyId: string, user: CurrentUserPayload) {
-    const company = await this.prisma.company.findUnique({
-      where: { id: companyId },
-      select: { ownerId: true, owner: { select: { team: true, teamId: true } } },
-    });
-
-    if (!company) {
-      throw new NotFoundException('شرکت پیدا نشد');
-    }
-
-    if (user.role === UserRole.ADMIN) return;
-
-    if (user.role === UserRole.MANAGER) {
-      if (!company.owner || !userMatchesTeam(company.owner, user)) {
-        throw new ForbiddenException('شما به این شرکت دسترسی ندارید');
-      }
-      return;
-    }
-
-    if (user.role === UserRole.REP && company.ownerId !== user.userId) {
-      throw new ForbiddenException('شما به این شرکت دسترسی ندارید');
-    }
-
-    if (user.role === UserRole.BOARDS) {
-      throw new ForbiddenException('شما دسترسی به Call Cards را ندارید');
-    }
+    await this.companyAccess.assertCompanyMutable(companyId, user);
   }
 
   // ============================================================

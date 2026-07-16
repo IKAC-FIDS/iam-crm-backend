@@ -37,6 +37,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { OrganizationsModule } from './organizations/organizations.module';
 import { TeamsModule } from './teams/teams.module';
 import { UniversitiesModule } from './universities/universities.module';
+import { CompanyAccessModule } from './companies/company-access.module';
 
 @Module({
   imports: [
@@ -58,6 +59,7 @@ import { UniversitiesModule } from './universities/universities.module';
       }),
     }),
     HealthModule,
+    CompanyAccessModule,
     PrismaModule,
     AuthModule,
     SsoModule,

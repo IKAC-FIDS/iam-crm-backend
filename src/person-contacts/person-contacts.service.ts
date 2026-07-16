@@ -1,12 +1,9 @@
 import {
   BadRequestException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
 import { CurrentUserPayload } from '../common/decorators/current-user.decorator';
-import { userMatchesTeam } from '../common/tenant/team-scope.util';
 import { getCurrentOrganizationId } from '../common/tenant/tenant-scope.util';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -19,6 +16,13 @@ export class PersonContactsService {
   constructor(private prisma: PrismaService) {}
 
   private async assertPersonMutable(personId: string, user: CurrentUserPayload) {
+    const scopedPerson = await this.prisma.person.findFirst({
+      where: { id: personId, company: { organizationId: getCurrentOrganizationId(user), archivedAt: null } },
+      select: { id: true },
+    });
+    if (!scopedPerson) throw new NotFoundException('Person not found');
+    return;
+    /* Legacy owner/team authorization removed. Permission guards now authorize mutations.
     const person = await this.prisma.person.findFirst({
       where: {
         id: personId,
@@ -53,6 +57,7 @@ export class PersonContactsService {
     if (user.role === UserRole.BOARDS) {
       throw new ForbiddenException('شما دسترسی به مخاطبین را ندارید');
     }
+    */
   }
 
   private async assertPersonReadable(

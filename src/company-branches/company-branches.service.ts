@@ -3,25 +3,14 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateCompanyBranchDto } from './dto/create-company-branch.dto';
 import { UpdateCompanyBranchDto } from './dto/update-company-branch.dto';
 import { CurrentUserPayload } from '../common/decorators/current-user.decorator';
-import { getCurrentOrganizationId } from '../common/tenant/tenant-scope.util';
+import { CompanyAccessService } from '../companies/company-access.service';
 
 @Injectable()
 export class CompanyBranchesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private companyAccess: CompanyAccessService) {}
 
   private async validateCompanyAccess(companyId: string, user: CurrentUserPayload) {
-    const company = await this.prisma.company.findFirst({
-      where: {
-        id: companyId,
-        organizationId: getCurrentOrganizationId(user),
-        archivedAt: null,
-      },
-      select: { id: true },
-    });
-
-    if (!company) {
-      throw new NotFoundException('شرکت پیدا نشد');
-    }
+    await this.companyAccess.assertCompanyMutable(companyId, user);
   }
 
   // ✅ اصلاح: companyId به عنوان پارامتر جداگانه

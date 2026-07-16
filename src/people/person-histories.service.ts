@@ -1,9 +1,8 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { PersonEducationDegree, Prisma, UserRole } from '@prisma/client';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { PersonEducationDegree, Prisma } from '@prisma/client';
 import { CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { parseApiDate } from '../common/dates/api-date.util';
 import { getCurrentOrganizationId } from '../common/tenant/tenant-scope.util';
-import { userMatchesTeam } from '../common/tenant/team-scope.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePersonEducationHistoryDto, CreatePersonEmploymentHistoryDto, CreatePersonEmploymentPositionDto, UpdatePersonEducationHistoryDto, UpdatePersonEmploymentHistoryDto, UpdatePersonEmploymentPositionDto } from './dto/person-history.dto';
 
@@ -130,12 +129,17 @@ export class PersonHistoriesService {
   }
 
   private async assertPersonMutable(personId: string, user: CurrentUserPayload) {
+    const scopedPerson = await this.prisma.person.findFirst({ where: { id: personId, company: { organizationId: getCurrentOrganizationId(user), archivedAt: null } }, select: { id: true } });
+    if (!scopedPerson) throw new NotFoundException('Person not found');
+    return;
+    /* Legacy owner/team authorization removed. Permission guards now authorize mutations.
     const person = await this.prisma.person.findFirst({ where: { id: personId, company: { organizationId: getCurrentOrganizationId(user) } }, include: { company: { select: { ownerId: true, owner: { select: { team: true, teamId: true } } } } } });
     if (!person) throw new NotFoundException('Person not found');
     if (user.role === UserRole.ADMIN) return;
     if (user.role === UserRole.MANAGER && person.company.owner && userMatchesTeam(person.company.owner, user)) return;
     if (user.role === UserRole.REP && person.company.ownerId === user.userId) return;
     throw new ForbiddenException('You do not have access to this person');
+    */
   }
 
   private async assertPersonReadable(
@@ -157,9 +161,14 @@ export class PersonHistoriesService {
   }
 
   private async assertCompanyAccess(companyId: string, user: CurrentUserPayload) {
+    const scopedCompany = await this.prisma.company.findFirst({ where: { id: companyId, organizationId: getCurrentOrganizationId(user), archivedAt: null }, select: { id: true, legalName: true } });
+    if (!scopedCompany) throw new NotFoundException('Company not found');
+    return scopedCompany;
+    /* Legacy owner/team authorization removed. Permission guards now authorize mutations.
     const company = await this.prisma.company.findFirst({ where: { id: companyId, organizationId: getCurrentOrganizationId(user) }, select: { id: true, legalName: true, ownerId: true, owner: { select: { team: true, teamId: true } } } });
     if (!company) throw new NotFoundException('Company not found');
     if (user.role === UserRole.ADMIN || (user.role === UserRole.MANAGER && company.owner && userMatchesTeam(company.owner, user)) || (user.role === UserRole.REP && company.ownerId === user.userId)) return company;
     throw new ForbiddenException('You do not have access to this company');
+    */
   }
 }

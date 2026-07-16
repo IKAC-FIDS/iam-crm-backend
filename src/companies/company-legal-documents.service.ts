@@ -3,15 +3,15 @@ import { FileAttachment, FileAttachmentEntityType, Prisma } from '@prisma/client
 import { AttachmentsService } from '../attachments/attachments.service';
 import { CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { parseApiDate } from '../common/dates/api-date.util';
-import { getCurrentOrganizationId } from '../common/tenant/tenant-scope.util';
 import { PrismaService } from '../prisma/prisma.service';
+import { CompanyAccessService } from './company-access.service';
 import { UpdateCompanyLegalDocumentDto, UploadCompanyLegalDocumentDto } from './dto/company-legal-document.dto';
 
 @Injectable()
 export class CompanyLegalDocumentsService {
   private readonly logger = new Logger(CompanyLegalDocumentsService.name);
 
-  constructor(private readonly prisma: PrismaService, private readonly attachments: AttachmentsService) {}
+  constructor(private readonly prisma: PrismaService, private readonly attachments: AttachmentsService, private readonly companyAccess: CompanyAccessService) {}
 
   async findAll(companyId: string, user: CurrentUserPayload) {
     await this.assertCompany(companyId, user);
@@ -91,11 +91,6 @@ export class CompanyLegalDocumentsService {
   }
 
   private async assertCompany(companyId: string, user: CurrentUserPayload) {
-    const company = await this.prisma.company.findFirst({ where: {
-      id: companyId,
-      organizationId: getCurrentOrganizationId(user),
-      archivedAt: null,
-    } });
-    if (!company) throw new NotFoundException('Company not found');
+    await this.companyAccess.assertCompanyMutable(companyId, user);
   }
 }

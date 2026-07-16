@@ -17,12 +17,14 @@ import { ArchiveCompanyDto } from './dto/archive-company.dto';
 import { ChangeOwnerDto, BulkChangeOwnerDto } from './dto/change-owner.dto';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
+import { CompanyAccessService } from './company-access.service';
 
 @Injectable()
 export class CompaniesService {
   constructor(
     private prisma: PrismaService,
     private audit: AuditLogService,
+    private companyAccess: CompanyAccessService,
   ) {}
 
   async findAll(
@@ -252,7 +254,7 @@ export class CompaniesService {
 
     if (!company) throw new NotFoundException('شرکت پیدا نشد');
 
-    this.assertAccess(company, user);
+    await this.companyAccess.assertCompanyMutable(id, user);
 
     const { industryId, industry, sourceId, source, parentCompanyIds, subsidiaryCompanyIds, establishmentDate, registeredCapital, ...companyData } = dto;
 
@@ -326,7 +328,7 @@ export class CompaniesService {
 
     if (!company) throw new NotFoundException('شرکت پیدا نشد');
 
-    await this.assertChangeOwnerAccess(company, user);
+    await this.companyAccess.assertCompanyMutable(id, user);
 
     const newOwner = await this.prisma.user.findUnique({
       where: { id: dto.newOwnerId },
@@ -380,7 +382,7 @@ export class CompaniesService {
 
     if (!company) throw new NotFoundException('شرکت پیدا نشد');
 
-    this.assertArchiveAccess(company, user);
+    await this.companyAccess.assertCompanyMutable(id, user);
 
     if (company.archivedAt) {
       throw new BadRequestException('شرکت قبلاً بایگانی شده است');
@@ -416,7 +418,7 @@ export class CompaniesService {
 
     if (!company) throw new NotFoundException('شرکت پیدا نشد');
 
-    this.assertArchiveAccess(company, user);
+    await this.companyAccess.assertCompanyMutable(id, user, { allowArchived: true });
 
     if (!company.archivedAt) {
       throw new BadRequestException('شرکت بایگانی نشده است');
@@ -481,7 +483,7 @@ export class CompaniesService {
     }
 
     for (const company of companies) {
-      await this.assertChangeOwnerAccess(company, user);
+      await this.companyAccess.assertCompanyMutable(company.id, user);
     }
 
     if (newOwner.role === UserRole.MANAGER) {
@@ -525,61 +527,6 @@ export class CompaniesService {
       message: `${result.count} شرکت با موفقیت به کاربر ${newOwner.fullName} اختصاص یافت`,
       updatedCount: result.count,
     };
-  }
-
-  private assertAccess(
-    company: { ownerId: string | null },
-    user: CurrentUserPayload,
-  ) {
-    if (user.role === UserRole.BOARDS) {
-      throw new ForbiddenException('شما دسترسی به شرکت‌ها را ندارید');
-    }
-
-    if (user.role === UserRole.REP && company.ownerId !== user.userId) {
-      throw new ForbiddenException('شما به این شرکت دسترسی ندارید');
-    }
-  }
-
-  private assertArchiveAccess(
-    company: { owner?: { team: string | null; teamId?: string | null } | null },
-    user: CurrentUserPayload,
-  ) {
-    if (user.role === UserRole.ADMIN) return;
-
-    if (
-      user.role === UserRole.MANAGER &&
-      company.owner &&
-      userMatchesTeam(company.owner, user)
-    ) {
-      return;
-    }
-
-    throw new ForbiddenException('شما اجازه بایگانی یا بازیابی این شرکت را ندارید');
-  }
-
-  private async assertChangeOwnerAccess(
-    company: any,
-    user: CurrentUserPayload,
-  ) {
-    if (user.role === UserRole.BOARDS) {
-      throw new ForbiddenException('شما اجازه تغییر مالکیت شرکت را ندارید');
-    }
-
-    if (user.role === UserRole.ADMIN) return;
-
-    if (user.role === UserRole.MANAGER) {
-      if (!company.ownerId) {
-        throw new ForbiddenException('فقط ادمین می‌تواند مالکیت شرکت‌های بدون مالک را تغییر دهد');
-      }
-
-      if (!company.owner || !userMatchesTeam(company.owner, user)) {
-        throw new ForbiddenException('شما فقط می‌توانید شرکت‌های تیم خود را تغییر دهید');
-      }
-
-      return;
-    }
-
-    throw new ForbiddenException('شما اجازه تغییر مالکیت شرکت‌ها را ندارید');
   }
 
   private async assertOwnerInOrganization(

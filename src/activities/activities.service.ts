@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateActivityDto } from './dto/create-activity.dto';
 import { UpdateActivityDto } from './dto/update-activity.dto';
@@ -6,48 +6,19 @@ import { CompleteActivityDto } from './dto/complete-activity.dto';
 import { RescheduleActivityDto } from './dto/reschedule-activity.dto';
 import { CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { PaginationDto, PaginatedResponse } from '../common/dto/pagination.dto';
-import { UserRole } from '@prisma/client';
 import { AuditLogService } from '../audit-log/audit-log.service';
 import { parseApiDate, parseNullableApiDate } from '../common/dates/api-date.util';
-import { userMatchesTeam } from '../common/tenant/team-scope.util';
-import { getCurrentOrganizationId } from '../common/tenant/tenant-scope.util';
+import { CompanyAccessService } from '../companies/company-access.service';
 
 @Injectable()
 export class ActivitiesService {
-  constructor(private prisma: PrismaService, private audit: AuditLogService) {}
+  constructor(private prisma: PrismaService, private audit: AuditLogService, private companyAccess: CompanyAccessService) {}
 
   // ============================================================
   // متد کمکی: بررسی دسترسی به شرکت
   // ============================================================
   private async validateCompanyAccess(companyId: string, user: CurrentUserPayload) {
-    const company = await this.prisma.company.findFirst({
-      where: {
-        id: companyId,
-        organizationId: getCurrentOrganizationId(user),
-      },
-      select: { ownerId: true, owner: { select: { team: true, teamId: true } } },
-    });
-
-    if (!company) {
-      throw new NotFoundException('شرکت پیدا نشد');
-    }
-
-    if (user.role === UserRole.ADMIN) return;
-
-    if (user.role === UserRole.MANAGER) {
-      if (!company.owner || !userMatchesTeam(company.owner, user)) {
-        throw new ForbiddenException('شما به این شرکت دسترسی ندارید');
-      }
-      return;
-    }
-
-    if (user.role === UserRole.REP && company.ownerId !== user.userId) {
-      throw new ForbiddenException('شما به این شرکت دسترسی ندارید');
-    }
-
-    if (user.role === UserRole.BOARDS) {
-      throw new ForbiddenException('شما دسترسی به فعالیت‌ها را ندارید');
-    }
+    await this.companyAccess.assertCompanyMutable(companyId, user);
   }
 
   // ============================================================
@@ -160,17 +131,7 @@ export class ActivitiesService {
     companyId: string,
     user: CurrentUserPayload,
   ): Promise<void> {
-    const company = await this.prisma.company.findFirst({
-      where: {
-        id: companyId,
-        organizationId: getCurrentOrganizationId(user),
-      },
-      select: { id: true },
-    });
-
-    if (!company) {
-      throw new NotFoundException('Company not found');
-    }
+    await this.companyAccess.assertCompanyReadable(companyId, user);
   }
 
   async updateActivity(activityId: string, dto: UpdateActivityDto, user: CurrentUserPayload) {
@@ -259,11 +220,6 @@ export class ActivitiesService {
     user: CurrentUserPayload,
     pagination: PaginationDto,
   ): Promise<PaginatedResponse<any>> {
-    // BOARDS نباید به این بخش دسترسی داشته باشد
-    if (user.role === UserRole.BOARDS) {
-      throw new ForbiddenException('شما دسترسی به فعالیت‌ها را ندارید');
-    }
-
     const page = pagination.page ?? 1;
     const limit = pagination.limit ?? 20;
     const skip = (page - 1) * limit;
