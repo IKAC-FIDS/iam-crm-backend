@@ -1821,6 +1821,30 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 
 ---
 
+### fix 000060 - قابل تنظیم کردن کوکی refresh token برای استقرار HTTP/HTTPS
+
+- علت اصلی: تنظیمات کوکی فقط از `NODE_ENV` پیروی می‌کرد. در نتیجه با `NODE_ENV=production` روی استقرار موقت HTTP/IP، کوکی `Secure` می‌شد و مرورگر آن را ذخیره نمی‌کرد؛ بنابراین login می‌توانست موفق باشد ولی refresh token flow شکست بخورد.
+- متغیرهای جدید محیطی: `REFRESH_TOKEN_COOKIE_SECURE` با مقادیر `true|false`، متغیر `REFRESH_TOKEN_COOKIE_SAME_SITE` با مقادیر `lax|strict|none` و متغیر `REFRESH_TOKEN_COOKIE_PATH` با مقدار پیش‌فرض `/api/auth`.
+- اگر متغیرهای جدید تنظیم نشده باشند، رفتار قبلی حفظ می‌شود: در production مقدارهای `secure=true` و `sameSite=none` و در سایر محیط‌ها `secure=false` و `sameSite=lax` اعمال می‌شوند.
+- نمونه استقرار موقت HTTP/IP:
+  ```env
+  REFRESH_TOKEN_COOKIE_SECURE=false
+  REFRESH_TOKEN_COOKIE_SAME_SITE=lax
+  REFRESH_TOKEN_COOKIE_PATH=/api/auth
+  ```
+- نمونه استقرار production روی HTTPS:
+  ```env
+  REFRESH_TOKEN_COOKIE_SECURE=true
+  REFRESH_TOKEN_COOKIE_SAME_SITE=none
+  REFRESH_TOKEN_COOKIE_PATH=/api/auth
+  ```
+- ترکیب `sameSite=none` و `secure=false` ناامن/ناسازگار با مرورگرهاست؛ backend برای این ترکیب warning ثبت می‌کند، چون مرورگرها برای `SameSite=None` ویژگی `Secure` را الزامی می‌دانند.
+- refresh token همچنان فقط در کوکی `HttpOnly` نگهداری می‌شود و در پاسخ JSON برگردانده نمی‌شود.
+- فایل‌های تغییرکرده: `src/common/cookies/refresh-token-cookie.ts`، `src/common/validators/env.validator.ts`، `.env.example`، `.env.docker` و `README.md`.
+- وضعیت بررسی: `npm run lint` با 0 خطا و 10 warning موجود موفق شد. اجرای اولیه `npm run build` به‌علت stale بودن Prisma Client و 124 خطای type مربوط به مدل‌ها/فیلدهای جدید ناموفق بود؛ سپس `npx prisma generate` موفق شد و اجرای مجدد `npm run build` با موفقیت پایان یافت.
+
+---
+
 **Built with ❤️ for the sales team**
 
 ---
