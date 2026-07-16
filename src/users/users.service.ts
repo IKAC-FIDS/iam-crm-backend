@@ -21,6 +21,8 @@ const safeUserSelect = {
   fullName: true,
   email: true,
   role: true,
+  roleId: true,
+  assignedRole: { select: { id: true, code: true, name: true, baseRole: true, isSystem: true, isActive: true } },
   team: true,
   teamId: true,
   teamRef: {
@@ -214,6 +216,9 @@ export class UsersService {
   }
 
   async updateUserRole(id: string, dto: UpdateUserRoleDto, actor?: CurrentUserPayload) {
+    if (!dto.role && !dto.roleId) {
+      throw new BadRequestException('role or roleId is required');
+    }
     const user = await this.prisma.user.findUnique({
       where: { id },
       include: { ownedCompanies: { select: { id: true } } },
@@ -221,6 +226,16 @@ export class UsersService {
 
     if (!user) {
       throw new NotFoundException('User not found');
+    }
+
+    const assignedRole = dto.roleId
+      ? await this.prisma.role.findFirst({ where: { id: dto.roleId, isActive: true }, include: { permissions: { include: { permission: true } } } })
+      : null;
+    if (dto.roleId && !assignedRole) throw new BadRequestException('Role does not exist or is inactive');
+    const nextBaseRole = assignedRole?.baseRole ?? dto.role ?? user.role;
+    if (actor?.userId === id && user.role === UserRole.ADMIN && assignedRole) {
+      const actions = new Set(assignedRole.permissions.map((item) => item.permission.action));
+      if (!actions.has('permission:manage') || !actions.has('role:manage')) throw new BadRequestException('You cannot remove your own RBAC management access');
     }
 
     const teamAssignment = await this.resolveTeamAssignment(
@@ -234,7 +249,7 @@ export class UsersService {
     );
 
     if (
-      dto.role === UserRole.MANAGER &&
+      nextBaseRole === UserRole.MANAGER &&
       user.ownedCompanies.length > 0 &&
       !teamAssignment.teamId &&
       !teamAssignment.team
@@ -245,14 +260,16 @@ export class UsersService {
     const updatedUser = await this.prisma.user.update({
       where: { id },
       data: {
-        role: dto.role,
+        role: nextBaseRole,
+        roleId: assignedRole?.id ?? (dto.role ? null : user.roleId),
         team: teamAssignment.team,
         teamId: teamAssignment.teamId,
       },
       select: safeUserSelect,
     });
 
-    PermissionsGuard.clearCache(dto.role);
+    PermissionsGuard.clearCache(nextBaseRole);
+    if (assignedRole) PermissionsGuard.clearCache(`role:${assignedRole.id}`);
     PermissionsGuard.clearCache(user.role);
 
     await this.audit.record({

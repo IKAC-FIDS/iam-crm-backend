@@ -1806,6 +1806,21 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 
 ---
 
+### fix 000059 - تکمیل مدیریت نقش‌ها و مجوزها
+
+- CRUD جدید permission در مسیرهای `GET/POST /api/permissions` و `GET/PATCH/DELETE /api/permissions/:id` اضافه شد. action با الگوی `module:action` normalize/validate و unique می‌شود و metadataهای name، description، group، active/system پشتیبانی می‌شوند.
+- مدل دیتابیسی `Role` و CRUD نقش‌ها در `/api/roles` اضافه شد. نقش‌های ثابت `ADMIN`، `MANAGER`، `REP` و `BOARDS` به‌عنوان system role seed/backfill می‌شوند و حذف، غیرفعال‌سازی یا تغییر base scope آنها ممنوع است. نقش custom دارای code، name، description، baseRole و وضعیت فعال است.
+- صفحه تخصیص مجوز می‌تواند از `GET /api/roles/:id/permissions` فهرست همه permissionهای فعال و assigned state را دریافت و با `PUT /api/roles/:id/permissions` آرایه `permissionIds` را اتمیک جایگزین کند.
+- permissionهای جدید `role:view` و `role:manage` seed شدند و ADMIN از `allActions` هر دو را دریافت می‌کند. `permission:view`/`permission:manage` برای مدیریت permissionها حفظ شده‌اند.
+- محافظت‌های امنیتی: system permission حذف نمی‌شود؛ permission تخصیص‌یافته حذف نمی‌شود؛ `permission:manage` و `role:manage` قابل غیرفعال‌سازی نیستند؛ ADMIN هنگام replace باید هر دو را حفظ کند؛ system role حذف/غیرفعال نمی‌شود؛ نقش دارای user حذف نمی‌شود؛ و ADMIN جاری نمی‌تواند با تخصیص role فاقد این دو permission دسترسی RBAC خودش را حذف کند.
+- سازگاری user/auth: enum قبلی `User.role` برای row/tenant scope و قرارداد `user.role` حفظ شد. `User.roleId` نقش دیتابیسی قابل‌تخصیص را نگه می‌دارد؛ `PATCH /api/users/:id/role` اکنون `roleId` را نیز می‌پذیرد و baseRole آن را روی enum سازگار اعمال می‌کند. login همچنان `role` و permissions را برمی‌گرداند و `roleId`، `roleCode` و `roleName` نیز اضافه شده‌اند. guard در صورت وجود roleId مجوزها را از نقش دیتابیسی می‌خواند.
+- seed idempotent نقش‌های system، roleId کاربران ثابت و roleId اتصال‌های RolePermission را synchronize می‌کند و permissionهای seedشده را system/active نگه می‌دارد. پس از migration/seed، کاربران باید logout/login کنند تا پاسخ login جدید را بگیرند؛ guard مجوزها را از دیتابیس نیز کنترل می‌کند.
+- migration جدید: `20260716160000_add_dynamic_role_permission_management`. migration کاربران و assignmentهای enum موجود را بدون حذف به Roleهای system متناظر backfill می‌کند.
+- فایل‌های مهم: `prisma/schema.prisma`، migration بالا، `prisma/seed.ts`، controller/service/DTO جدید RBAC در `src/admin/`، `admin-permissions.module.ts`، `permissions.guard.ts`، `auth.service.ts`، DTO/service کاربران و `README.md`.
+- وضعیت بررسی: `npx prisma format`، `npx prisma validate` و `npx prisma generate` موفق شدند؛ `npm run lint` با 0 خطا و 10 warning موجود موفق شد؛ `npm run build` موفق شد. `npx prisma migrate status` اجرا شد و migrationهای 13000 تا 16000 را unapplied و migration دیتابیس `20260710203701_` را missing locally نشان داد. به‌علت اختلاف history، migration/seed و تست دستی API اجرا نشد و هیچ reset/db push مخربی انجام نشد.
+
+---
+
 **Built with ❤️ for the sales team**
 
 ---

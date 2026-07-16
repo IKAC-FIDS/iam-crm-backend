@@ -53,6 +53,7 @@ export class PermissionsGuard implements CanActivate {
       select: {
         id: true,
         role: true,
+        roleId: true,
         isActive: true,
       },
     });
@@ -61,7 +62,9 @@ export class PermissionsGuard implements CanActivate {
       throw new ForbiddenException('حساب کاربری فعال نیست');
     }
 
-    const userPermissions = await this.getPermissionsForRole(dbUser.role);
+    const userPermissions = dbUser.roleId
+      ? await this.getPermissionsForRoleId(dbUser.roleId)
+      : await this.getPermissionsForRole(dbUser.role);
 
     const allowed =
       normalizedPolicy.mode === 'any'
@@ -119,6 +122,20 @@ export class PermissionsGuard implements CanActivate {
       cache.set(cacheKey, permissions);
     }
 
+    return new Set(permissions);
+  }
+
+  private async getPermissionsForRoleId(roleId: string): Promise<Set<string>> {
+    const cacheKey = `permissions:role:${roleId}`;
+    let permissions = cache.get<string[]>(cacheKey);
+    if (!permissions) {
+      const rows = await this.prisma.rolePermission.findMany({
+        where: { roleId, permission: { isActive: true } },
+        include: { permission: true },
+      });
+      permissions = rows.map((item) => item.permission.action);
+      cache.set(cacheKey, permissions);
+    }
     return new Set(permissions);
   }
 

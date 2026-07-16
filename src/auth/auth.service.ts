@@ -20,6 +20,9 @@ export interface AuthUserResponse {
   teamName: string | null;
   organizationId: string | null;
   permissions: string[];
+  roleId: string | null;
+  roleCode: string;
+  roleName: string;
 }
 
 export interface AuthAccessResponse {
@@ -167,12 +170,15 @@ export class AuthService {
   }
 
   async buildLoginResponse(user: User): Promise<AuthAccessResponse> {
+    const assignedRole = user.roleId
+      ? await this.prisma.role.findUnique({ where: { id: user.roleId } })
+      : null;
     const rolePermissions = await this.prisma.rolePermission.findMany({
-      where: { role: user.role },
+      where: user.roleId ? { roleId: user.roleId } : { role: user.role },
       include: { permission: true },
     });
 
-    const permissions = rolePermissions.map((rp) => rp.permission.action);
+    const permissions = rolePermissions.filter((rp) => rp.permission.isActive).map((rp) => rp.permission.action);
     const team = user.teamId
       ? await this.prisma.team.findUnique({
           where: { id: user.teamId },
@@ -205,6 +211,9 @@ export class AuthService {
         teamName: team?.name ?? null,
         organizationId: user.organizationId,
         permissions,
+        roleId: assignedRole?.id ?? null,
+        roleCode: assignedRole?.code ?? user.role,
+        roleName: assignedRole?.name ?? user.role,
       },
     };
   }

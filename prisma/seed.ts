@@ -24,12 +24,18 @@ type StageSeed = readonly [
 async function upsertPermission(permission: PermissionSeed) {
   return prisma.permission.upsert({
     where: { action: permission.action },
-    update: { description: permission.description },
-    create: permission,
+    update: { description: permission.description, isSystem: true, isActive: true },
+    create: { ...permission, isSystem: true, isActive: true },
   });
 }
 
 async function syncRolePermissions(role: UserRole, actions: string[]) {
+  const databaseRole = await prisma.role.upsert({
+    where: { code: role },
+    update: { name: role, baseRole: role, isSystem: true, isActive: true },
+    create: { code: role, name: role, baseRole: role, isSystem: true, isActive: true },
+  });
+  await prisma.user.updateMany({ where: { role, roleId: null }, data: { roleId: databaseRole.id } });
   for (const action of actions) {
     const permission = await prisma.permission.findUnique({
       where: { action },
@@ -47,9 +53,10 @@ async function syncRolePermissions(role: UserRole, actions: string[]) {
           permissionId: permission.id,
         },
       },
-      update: {},
+      update: { roleId: databaseRole.id },
       create: {
         role,
+        roleId: databaseRole.id,
         permissionId: permission.id,
       },
     });
@@ -793,6 +800,8 @@ async function main() {
 
     { action: 'permission:view', description: 'مشاهده ماتریس مجوزها' },
     { action: 'permission:manage', description: 'مدیریت مجوزهای نقش‌ها' },
+    { action: 'role:view', description: 'مشاهده نقش‌ها' },
+    { action: 'role:manage', description: 'مدیریت نقش‌ها' },
 
     { action: 'audit-log:view', description: 'مشاهده لاگ ممیزی' },
 

@@ -207,6 +207,8 @@ model User {
   email        String   @unique
   passwordHash String
   role         UserRole @default(REP)
+  roleId       String?
+  assignedRole Role?    @relation(fields: [roleId], references: [id], onDelete: SetNull)
   team         String?
   teamId       String?
   teamRef      Team?    @relation("UserPrimaryTeam", fields: [teamId], references: [id], onDelete: SetNull)
@@ -247,6 +249,7 @@ model User {
 
   @@index([organizationId])
   @@index([teamId])
+  @@index([roleId])
   @@map("users")
 }
 
@@ -1409,7 +1412,11 @@ model IndustryUseCase {
 model Permission {
   id          String   @id @default(uuid())
   action      String   @unique
+  name        String?
   description String?
+  group       String?
+  isSystem    Boolean  @default(false)
+  isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -1418,15 +1425,36 @@ model Permission {
   @@map("permissions")
 }
 
+model Role {
+  id          String           @id @default(uuid())
+  code        String           @unique
+  name        String
+  description String?
+  baseRole    UserRole         @default(REP)
+  isSystem    Boolean          @default(false)
+  isActive    Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  users       User[]
+  permissions RolePermission[]
+
+  @@index([isActive])
+  @@map("roles")
+}
+
 model RolePermission {
   id           String     @id @default(uuid())
-  role         UserRole
+  role         UserRole?
+  roleId       String?
+  assignedRole Role?      @relation(fields: [roleId], references: [id], onDelete: Cascade)
   permissionId String
   permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
   @@unique([role, permissionId])
+  @@unique([roleId, permissionId])
+  @@index([roleId])
   @@map("role_permissions")
 }
 
