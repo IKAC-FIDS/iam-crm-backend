@@ -1750,6 +1750,22 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 
 ---
 
+### fix 000055 - افزودن اطلاعات ثبتی، حقوقی و ساختار مالکیتی شرکت‌ها
+
+- فیلدهای اختیاری `registrationNumber`، `nationalId`، `economicCode` و `establishmentDate` به پروفایل شرکت اضافه شدند. ارقام فارسی/عربی ورودی‌های ثبتی و عددی به انگلیسی تبدیل می‌شوند و شناسه‌های حقوقی فقط با طول معقول اعتبارسنجی می‌شوند.
+- enum جدید `CompanyActivityStatus` با مقادیر `ACTIVE`، `INACTIVE`، `MERGED` و `UNKNOWN` اضافه شد و از stage، priority و archive فروش مستقل است.
+- سرمایه ثبتی با `Decimal(24,2)` و فرض واحد پیش‌فرض ریال ذخیره می‌شود و ورودی آن بدون تبدیل به floating point جاوااسکریپت به `Prisma.Decimal` تبدیل می‌شود. `employeeCount` عدد صحیح نامنفی و اختیاری است.
+- رابطه چندوالدی parent/subsidiary با مدل `CompanyHierarchyRelation` اضافه شد. create/update شرکت آرایه‌های اختیاری `parentCompanyIds` و `subsidiaryCompanyIds` را می‌پذیرد؛ شرکت‌های مرتبط باید در organization جاری باشند و self-link، تکرار مستقیم و رابطه معکوس مستقیم رد می‌شوند. جزئیات شرکت `parentCompanies` و `subsidiaryCompanies` را برمی‌گرداند.
+- اسناد حقوقی شرکت با نوع‌های `OFFICIAL_GAZETTE` (روزنامه رسمی) و `LATEST_CHANGES` (آخرین تغییرات) اضافه شدند. endpointها: `GET /api/companies/:companyId/legal-documents`، `POST /api/companies/:companyId/legal-documents/upload` با فیلد multipart به نام `file`، `PATCH .../:documentId` و `DELETE .../:documentId`.
+- آپلود از storage و validation موجود `AttachmentsService` استفاده می‌کند؛ مسیر، bucket و object key خام در پاسخ سند افشا نمی‌شوند و دانلود از endpoint امن موجود `GET /api/attachments/:id/download` با `attachmentId` انجام می‌شود.
+- permission جدیدی اضافه نشد: مشاهده با `company:view` و تغییر/آپلود/حذف با `company:update` محافظت می‌شود. scope سازمان و دسترسی REP/MANAGER حفظ شده است.
+- migration جدید: `20260716130000_add_company_legal_registry_hierarchy_fields`. تبدیل BigInt سرمایه به Decimal و تبدیل status متنی قبلی به enum به‌صورت non-destructive انجام می‌شود؛ statusهای ناشناخته به `UNKNOWN` نگاشت می‌شوند.
+- فایل‌های مهم تغییرکرده/جدید: `prisma/schema.prisma`، migration بالا، `src/companies/companies.service.ts`، `src/companies/companies.module.ts`، `src/companies/company-legal-documents.controller.ts`، `src/companies/company-legal-documents.service.ts`، DTOهای company/legal document، `src/attachments/attachments.service.ts` و `README.md`.
+- فرض‌ها و وابستگی‌ها: currency سرمایه ثبتی ریال است؛ فایل‌ها به تنظیمات فعلی `ATTACHMENT_STORAGE_DRIVER`، `MAX_ATTACHMENT_SIZE_BYTES` و `ALLOWED_ATTACHMENT_MIME_TYPES` وابسته‌اند؛ فیلد legacy تک‌والدی `parentCompanyId` برای سازگاری حذف نشد اما API جدید از جدول relation چندوالدی استفاده می‌کند.
+- وضعیت بررسی: `npx prisma format`، `npx prisma validate` و `npx prisma generate` موفق شدند؛ `npm run lint` با 0 خطا و 10 warning موجود موفق شد؛ `npm run build` موفق شد. `npx prisma migrate status` اجرا شد و migration جدید را unapplied نشان داد، همچنین migration دیتابیس `20260710203701_` در فایل‌های local وجود ندارد. به‌دلیل اختلاف history و نامشخص بودن ایمن‌بودن دیتابیس، migration اعمال نشد. تست دستی API نیز بدون اعمال migration اجرا نشد.
+
+---
+
 **Built with ❤️ for the sales team**
 
 ---

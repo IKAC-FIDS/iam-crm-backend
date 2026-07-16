@@ -432,6 +432,26 @@ export class AttachmentsService {
       return;
     }
 
+    if (entityType === FileAttachmentEntityType.COMPANY_LEGAL_DOCUMENT) {
+      const document = await this.prisma.companyLegalDocument.findFirst({
+        where: {
+          id: entityId,
+          company: {
+            organizationId: getCurrentOrganizationId(user),
+            ...(user.role === UserRole.REP
+              ? { ownerId: user.userId }
+              : user.role === UserRole.MANAGER
+                ? { owner: userTeamScopeWhere(user) }
+                : {}),
+          },
+        },
+      });
+      if (!document || user.role === UserRole.BOARDS) {
+        throw new NotFoundException('Company legal document not found');
+      }
+      return;
+    }
+
     throw new BadRequestException('Unsupported attachment entity type');
   }
 

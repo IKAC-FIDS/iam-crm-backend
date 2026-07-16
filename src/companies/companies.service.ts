@@ -9,6 +9,7 @@ import { AuditLogService } from '../audit-log/audit-log.service';
 import { CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { PaginatedResponse, PaginationDto } from '../common/dto/pagination.dto';
 import { getCurrentOrganizationId } from '../common/tenant/tenant-scope.util';
+import { parseApiDate } from '../common/dates/api-date.util';
 import { userMatchesTeam, userTeamScopeWhere } from '../common/tenant/team-scope.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { ArchiveCompanyDto } from './dto/archive-company.dto';
@@ -196,6 +197,9 @@ export class CompaniesService {
           },
           orderBy: { updatedAt: 'desc' },
         },
+        parentRelations: { include: { parentCompany: true } },
+        subsidiaryRelations: { include: { subsidiaryCompany: true } },
+        legalDocuments: { orderBy: { createdAt: 'desc' } },
       },
     });
 
@@ -203,7 +207,7 @@ export class CompaniesService {
 
     this.assertAccess(company, user);
 
-    return company;
+    return this.withHierarchy(company);
   }
 
   async create(dto: CreateCompanyDto, user: CurrentUserPayload) {
@@ -211,7 +215,7 @@ export class CompaniesService {
       throw new ForbiddenException('شما اجازه ایجاد شرکت را ندارید');
     }
 
-    const { industryId, industry, sourceId, source, ...companyData } = dto;
+    const { industryId, industry, sourceId, source, parentCompanyIds, subsidiaryCompanyIds, establishmentDate, registeredCapital, ...companyData } = dto;
 
     const normalizedRefs = await this.resolveCompanyReferences({
       industryId,
@@ -225,21 +229,19 @@ export class CompaniesService {
       await this.assertOwnerInOrganization(dto.ownerId, user);
     }
 
-    const company = await this.prisma.company.create({
-      data: {
-        ...companyData,
-        industryId: normalizedRefs.industryId,
-        industry: normalizedRefs.industryName,
-        sourceId: normalizedRefs.sourceId,
-        source: normalizedRefs.sourceCode,
-        ownerId: dto.ownerId ?? user.userId,
-        organizationId: getCurrentOrganizationId(user),
-      },
-      include: {
-        owner: { select: { id: true, fullName: true, team: true } },
-        industryRef: true,
-        sourceRef: true,
-      },
+    const organizationId = getCurrentOrganizationId(user);
+    await this.validateRelatedCompanies([...new Set([...(parentCompanyIds ?? []), ...(subsidiaryCompanyIds ?? [])])], organizationId);
+    const company = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.company.create({ data: {
+          ...companyData,
+          establishmentDate: establishmentDate ? parseApiDate(establishmentDate, 'establishmentDate') : undefined,
+          registeredCapital: registeredCapital !== undefined ? new Prisma.Decimal(registeredCapital) : undefined,
+          industryId: normalizedRefs.industryId, industry: normalizedRefs.industryName,
+          sourceId: normalizedRefs.sourceId, source: normalizedRefs.sourceCode,
+          ownerId: dto.ownerId ?? user.userId, organizationId,
+        } });
+      await this.replaceHierarchy(tx, created.id, parentCompanyIds ?? [], subsidiaryCompanyIds ?? []);
+      return tx.company.findUniqueOrThrow({ where: { id: created.id }, include: this.companySummaryInclude() });
     });
 
     await this.audit.record({
@@ -251,7 +253,7 @@ export class CompaniesService {
       after: company,
     });
 
-    return company;
+    return this.withHierarchy(company);
   }
 
   async update(id: string, dto: UpdateCompanyDto, user: CurrentUserPayload) {
@@ -267,11 +269,13 @@ export class CompaniesService {
 
     this.assertAccess(company, user);
 
-    const { industryId, industry, sourceId, source, ...companyData } = dto;
+    const { industryId, industry, sourceId, source, parentCompanyIds, subsidiaryCompanyIds, establishmentDate, registeredCapital, ...companyData } = dto;
 
     const updateData: Prisma.CompanyUncheckedUpdateInput = {
       ...companyData,
     };
+    if (establishmentDate !== undefined) updateData.establishmentDate = establishmentDate ? parseApiDate(establishmentDate, 'establishmentDate') : null;
+    if (registeredCapital !== undefined) updateData.registeredCapital = new Prisma.Decimal(registeredCapital);
 
     if (industryId !== undefined || industry !== undefined) {
       const normalizedIndustry = await this.resolveIndustryReference(
@@ -294,14 +298,18 @@ export class CompaniesService {
       updateData.source = normalizedSource.sourceCode;
     }
 
-    const updated = await this.prisma.company.update({
-      where: { id },
-      data: updateData,
-      include: {
-        owner: { select: { id: true, fullName: true, team: true } },
-        industryRef: true,
-        sourceRef: true,
-      },
+    const organizationId = getCurrentOrganizationId(user);
+    const relationIds = [...new Set([...(parentCompanyIds ?? []), ...(subsidiaryCompanyIds ?? [])])];
+    if (relationIds.includes(id)) throw new BadRequestException('A company cannot be related to itself');
+    await this.validateRelatedCompanies(relationIds, organizationId);
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await tx.company.update({ where: { id }, data: updateData });
+      if (parentCompanyIds !== undefined || subsidiaryCompanyIds !== undefined) {
+        const currentParents = parentCompanyIds ?? (await tx.companyHierarchyRelation.findMany({ where: { subsidiaryCompanyId: id }, select: { parentCompanyId: true } })).map((item) => item.parentCompanyId);
+        const currentSubsidiaries = subsidiaryCompanyIds ?? (await tx.companyHierarchyRelation.findMany({ where: { parentCompanyId: id }, select: { subsidiaryCompanyId: true } })).map((item) => item.subsidiaryCompanyId);
+        await this.replaceHierarchy(tx, id, currentParents, currentSubsidiaries);
+      }
+      return tx.company.findUniqueOrThrow({ where: { id }, include: this.companySummaryInclude() });
     });
 
     await this.audit.record({
@@ -314,7 +322,7 @@ export class CompaniesService {
       after: updated,
     });
 
-    return updated;
+    return this.withHierarchy(updated);
   }
 
   async changeOwner(
@@ -759,5 +767,67 @@ export class CompaniesService {
       sourceId: null,
       sourceCode: null,
     };
+  }
+
+  private companySummaryInclude() {
+    return {
+      owner: { select: { id: true, fullName: true, team: true } },
+      industryRef: true,
+      sourceRef: true,
+      parentRelations: { include: { parentCompany: true } },
+      subsidiaryRelations: { include: { subsidiaryCompany: true } },
+    } as const;
+  }
+
+  private withHierarchy<T extends { parentRelations?: Array<{ parentCompany: unknown }>; subsidiaryRelations?: Array<{ subsidiaryCompany: unknown }> }>(company: T) {
+    return {
+      ...company,
+      parentCompanies: company.parentRelations?.map((item) => item.parentCompany) ?? [],
+      subsidiaryCompanies: company.subsidiaryRelations?.map((item) => item.subsidiaryCompany) ?? [],
+    };
+  }
+
+  private async validateRelatedCompanies(ids: string[], organizationId: string) {
+    if (!ids.length) return;
+    const count = await this.prisma.company.count({ where: { id: { in: ids }, organizationId } });
+    if (count !== ids.length) {
+      throw new BadRequestException('All related companies must exist in the current organization');
+    }
+  }
+
+  private async replaceHierarchy(
+    tx: Prisma.TransactionClient,
+    companyId: string,
+    parentCompanyIds: string[],
+    subsidiaryCompanyIds: string[],
+  ) {
+    const parents = [...new Set(parentCompanyIds)];
+    const subsidiaries = [...new Set(subsidiaryCompanyIds)];
+    if (parents.includes(companyId) || subsidiaries.includes(companyId)) {
+      throw new BadRequestException('A company cannot be related to itself');
+    }
+    const overlap = parents.find((id) => subsidiaries.includes(id));
+    if (overlap) throw new BadRequestException('A company cannot be both parent and subsidiary directly');
+
+    const reverse = await tx.companyHierarchyRelation.findFirst({
+      where: {
+        OR: [
+          { parentCompanyId: companyId, subsidiaryCompanyId: { in: parents } },
+          { parentCompanyId: { in: subsidiaries }, subsidiaryCompanyId: companyId },
+        ],
+      },
+    });
+    if (reverse) throw new BadRequestException('Reverse company hierarchy relation already exists');
+
+    await tx.companyHierarchyRelation.deleteMany({
+      where: { OR: [{ parentCompanyId: companyId }, { subsidiaryCompanyId: companyId }] },
+    });
+    await tx.companyHierarchyRelation.createMany({
+      data: [
+        ...parents.map((parentCompanyId) => ({ parentCompanyId, subsidiaryCompanyId: companyId })),
+        ...subsidiaries.map((subsidiaryCompanyId) => ({ parentCompanyId: companyId, subsidiaryCompanyId })),
+      ],
+      skipDuplicates: true,
+    });
   }
 }

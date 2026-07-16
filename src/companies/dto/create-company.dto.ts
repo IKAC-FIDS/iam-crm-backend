@@ -1,5 +1,14 @@
-import { IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
-import { CompanyOwnership, Priority } from '@prisma/client';
+import { Transform } from 'class-transformer';
+import { ArrayUnique, IsArray, IsEnum, IsInt, IsOptional, IsString, IsUUID, Matches, MaxLength, Min } from 'class-validator';
+import { CompanyActivityStatus, CompanyOwnership, Priority } from '@prisma/client';
+import { IsApiDateString } from '../../common/validators/api-date-string.validator';
+
+const normalizeDigits = (value: unknown) =>
+  typeof value === 'string'
+    ? value.replace(/[۰-۹]/g, (d) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d))).replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d))).trim()
+    : value;
+const optionalInteger = ({ value }: { value: unknown }) => value === '' || value == null ? undefined : Number(normalizeDigits(value));
+const optionalText = ({ value }: { value: unknown }) => value === '' || value == null ? undefined : normalizeDigits(value);
 
 export class CreateCompanyDto {
   @IsString()
@@ -54,4 +63,31 @@ export class CreateCompanyDto {
   @IsOptional()
   @IsString()
   source?: string;
+
+  @IsOptional() @Transform(optionalText) @IsString() @MaxLength(50)
+  registrationNumber?: string;
+
+  @IsOptional() @Transform(optionalText) @IsString() @MaxLength(50)
+  nationalId?: string;
+
+  @IsOptional() @Transform(optionalText) @IsString() @MaxLength(50)
+  economicCode?: string;
+
+  @IsOptional() @Transform(optionalText) @IsApiDateString()
+  establishmentDate?: string;
+
+  @IsOptional() @IsEnum(CompanyActivityStatus)
+  activityStatus?: CompanyActivityStatus;
+
+  @IsOptional() @Transform(optionalText) @IsString() @Matches(/^\d+(\.\d{1,2})?$/) @MaxLength(27)
+  registeredCapital?: string;
+
+  @IsOptional() @Transform(optionalInteger) @IsInt() @Min(0)
+  employeeCount?: number;
+
+  @IsOptional() @IsArray() @ArrayUnique() @IsUUID('4', { each: true })
+  parentCompanyIds?: string[];
+
+  @IsOptional() @IsArray() @ArrayUnique() @IsUUID('4', { each: true })
+  subsidiaryCompanyIds?: string[];
 }

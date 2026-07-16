@@ -2,11 +2,14 @@ import { Module } from '@nestjs/common';
 import { CompaniesService } from './companies.service';
 import { CompaniesController } from './companies.controller';
 import { PipelineConfigModule } from '../admin/pipeline/pipeline-config.module';
+import { AttachmentsModule } from '../attachments/attachments.module';
+import { CompanyLegalDocumentsController } from './company-legal-documents.controller';
+import { CompanyLegalDocumentsService } from './company-legal-documents.service';
 
 @Module({
-  imports: [PipelineConfigModule],
-  providers: [CompaniesService],
-  controllers: [CompaniesController],
+  imports: [PipelineConfigModule, AttachmentsModule],
+  providers: [CompaniesService, CompanyLegalDocumentsService],
+  controllers: [CompaniesController, CompanyLegalDocumentsController],
   exports: [CompaniesService],
 })
 export class CompaniesModule {}

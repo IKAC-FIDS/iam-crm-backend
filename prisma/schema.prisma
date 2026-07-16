@@ -66,6 +66,18 @@ enum CompanyOwnership {
   HOLDING
 }
 
+enum CompanyActivityStatus {
+  ACTIVE
+  INACTIVE
+  MERGED
+  UNKNOWN
+}
+
+enum CompanyLegalDocumentType {
+  OFFICIAL_GAZETTE
+  LATEST_CHANGES
+}
+
 enum ActivityType {
   CALL
   EMAIL
@@ -126,6 +138,7 @@ enum FileAttachmentEntityType {
   OPPORTUNITY
   COMMERCIAL_DOCUMENT
   PAYMENT
+  COMPANY_LEGAL_DOCUMENT
 }
 
 enum AttachmentStorageProvider {
@@ -423,17 +436,19 @@ model Company {
   id       String @id @default(uuid())
   leadCode String @unique @default(uuid())
 
-  legalName      String
-  brandName      String?
-  registrationNo String?
-  nationalId     String?
-  economicCode   String?
-  foundedYear    Int?
-  companyType    String?
-  ownership      CompanyOwnership?
-  activityStatus String?
-  activityGroup  String?
-  marketSize     String?
+  legalName          String
+  brandName          String?
+  registrationNo     String?
+  registrationNumber String?
+  nationalId         String?
+  economicCode       String?
+  establishmentDate  DateTime?
+  foundedYear        Int?
+  companyType        String?
+  ownership          CompanyOwnership?
+  activityStatus     CompanyActivityStatus @default(UNKNOWN)
+  activityGroup      String?
+  marketSize         String?
 
   industryId  String?
   industryRef Industry? @relation("CompanyIndustry", fields: [industryId], references: [id], onDelete: SetNull)
@@ -441,9 +456,11 @@ model Company {
   // Deprecated compatibility snapshot. New writes should resolve from Industry.
   industry String?
 
-  parentCompanyId String?
-  parentCompany   Company?  @relation("CompanyHierarchy", fields: [parentCompanyId], references: [id])
-  subsidiaries    Company[] @relation("CompanyHierarchy")
+  parentCompanyId     String?
+  parentCompany       Company?                   @relation("CompanyHierarchy", fields: [parentCompanyId], references: [id])
+  subsidiaries        Company[]                  @relation("CompanyHierarchy")
+  parentRelations     CompanyHierarchyRelation[] @relation("CompanyHierarchyParent")
+  subsidiaryRelations CompanyHierarchyRelation[] @relation("CompanyHierarchySubsidiary")
 
   website            String?
   publicEmail        String?
@@ -453,7 +470,7 @@ model Company {
   postalCode         String?
   centralPhone       String?
 
-  registeredCapital BigInt?
+  registeredCapital Decimal? @db.Decimal(24, 2)
   employeeCount     Int?
   annualRevenue     BigInt?
 
@@ -489,6 +506,7 @@ model Company {
   stageHistory   PipelineStageHistory[]
   opportunities  Opportunity[]
   tasks          Task[]
+  legalDocuments CompanyLegalDocument[]
 
   organizationId String       @default("00000000-0000-4000-8000-000000000001")
   organization   Organization @relation(fields: [organizationId], references: [id])
@@ -507,6 +525,37 @@ model Company {
   @@index([organizationId])
   @@index([organizationId, ownerId])
   @@map("companies")
+}
+
+model CompanyHierarchyRelation {
+  id                  String   @id @default(uuid())
+  parentCompanyId     String
+  subsidiaryCompanyId String
+  parentCompany       Company  @relation("CompanyHierarchyParent", fields: [parentCompanyId], references: [id], onDelete: Cascade)
+  subsidiaryCompany   Company  @relation("CompanyHierarchySubsidiary", fields: [subsidiaryCompanyId], references: [id], onDelete: Cascade)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([parentCompanyId, subsidiaryCompanyId])
+  @@index([subsidiaryCompanyId])
+  @@map("company_hierarchy_relations")
+}
+
+model CompanyLegalDocument {
+  id           String                   @id @default(uuid())
+  companyId    String
+  company      Company                  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  type         CompanyLegalDocumentType
+  title        String
+  description  String?
+  documentDate DateTime?
+  attachmentId String?                  @unique
+  createdById  String?
+  createdAt    DateTime                 @default(now())
+  updatedAt    DateTime                 @updatedAt
+
+  @@index([companyId, type])
+  @@map("company_legal_documents")
 }
 
 // ============================================================
