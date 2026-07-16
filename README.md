@@ -1794,6 +1794,18 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 
 ---
 
+### fix 000058 - اصلاح permissionهای کتابخانه دانشگاه‌ها
+
+- علت HTTP 403 برای ADMIN ناسازگاری permission موجود در seed/database و JWT بود: مقدار قدیمی `university:view` در token وجود داشت، اما controller مطابق convention کتابخانه‌ها `library:university:view` را نیاز داشت.
+- permissionهای canonical دانشگاه به‌صورت صریح و مشترک در seed تثبیت شدند: `library:university:view` و `library:university:manage`. از `university:view` و `university:manage` در endpointهای دانشگاه استفاده نمی‌شود.
+- endpointهای `GET /api/universities` و `GET /api/universities/:id` با `library:university:view` و عملیات create/update/delete(deactivate) با `library:university:manage` محافظت می‌شوند.
+- ADMIN همچنان از `allActions` هر دو permission را دریافت می‌کند. MANAGER، REP و BOARDS مطابق policy سایر کتابخانه‌های industry/lead-source/pain-point/use-case/persona فقط permission مشاهده را دریافت می‌کنند؛ مدیریت مخصوص ADMIN است.
+- فایل‌های متاثر: `prisma/seed.ts` و `README.md`. decoratorهای `src/universities/universities.controller.ts` بررسی شدند و از قبل با نام canonical صحیح بودند.
+- برای اعمال اصلاح روی دیتابیس باید seed دوباره اجرا شود: `npm run seed`. چون permissions در پاسخ login/JWT قرار می‌گیرند، پس از seed کاربر باید logout و دوباره login کند تا token جدید شامل `library:university:view` و `library:university:manage` باشد.
+- وضعیت بررسی: `npm run lint` با 0 خطا و 10 warning موجود موفق شد. اجرای اولیه build به‌دلیل stale بودن Prisma Client ناموفق بود؛ `npx prisma generate` موفق شد و اجرای مجدد `npm run build` موفق بود. seed روی دیتابیس اجرا نشد.
+
+---
+
 **Built with ❤️ for the sales team**
 
 ---

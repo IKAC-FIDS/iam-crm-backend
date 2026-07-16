@@ -1,4 +1,9 @@
 import { PrismaClient, UserRole } from '@prisma/client';
+
+const UNIVERSITY_LIBRARY_PERMISSIONS = {
+  view: 'library:university:view',
+  manage: 'library:university:manage',
+} as const;
 import * as bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
@@ -850,8 +855,8 @@ async function main() {
     { action: 'library:use-case:manage', description: 'مدیریت کاربردها' },
     { action: 'library:lead-source:view', description: 'مشاهده منابع جذب' },
     { action: 'library:lead-source:manage', description: 'مدیریت منابع جذب' },
-    { action: 'library:university:view', description: 'مشاهده دانشگاه‌ها' },
-    { action: 'library:university:manage', description: 'مدیریت دانشگاه‌ها' },
+    { action: UNIVERSITY_LIBRARY_PERMISSIONS.view, description: 'مشاهده دانشگاه‌ها' },
+    { action: UNIVERSITY_LIBRARY_PERMISSIONS.manage, description: 'مدیریت دانشگاه‌ها' },
 
     { action: 'lookup:view', description: 'مشاهده گزینه‌های پایه' },
     { action: 'lookup:manage', description: 'مدیریت گزینه‌های پایه' },
@@ -948,7 +953,7 @@ async function main() {
     'library:pain-point:view',
     'library:use-case:view',
     'library:lead-source:view',
-    'library:university:view',
+    UNIVERSITY_LIBRARY_PERMISSIONS.view,
     'lookup:view',
     'session:view',
     'session:revoke',
@@ -1011,7 +1016,7 @@ async function main() {
     'library:pain-point:view',
     'library:use-case:view',
     'library:lead-source:view',
-    'library:university:view',
+    UNIVERSITY_LIBRARY_PERMISSIONS.view,
     'lookup:view',
 
     'session:view',
@@ -1049,7 +1054,7 @@ async function main() {
     'library:pain-point:view',
     'library:use-case:view',
     'library:lead-source:view',
-    'library:university:view',
+    UNIVERSITY_LIBRARY_PERMISSIONS.view,
     'lookup:view',
 
     'commercial-document:view',
