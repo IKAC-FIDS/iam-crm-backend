@@ -7,6 +7,7 @@ import {
 import { UserRole } from '@prisma/client';
 import { CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { userMatchesTeam } from '../common/tenant/team-scope.util';
+import { getCurrentOrganizationId } from '../common/tenant/tenant-scope.util';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   CreatePersonContactDto,
@@ -17,9 +18,12 @@ import {
 export class PersonContactsService {
   constructor(private prisma: PrismaService) {}
 
-  private async validatePersonAccess(personId: string, user: CurrentUserPayload) {
-    const person = await this.prisma.person.findUnique({
-      where: { id: personId },
+  private async assertPersonMutable(personId: string, user: CurrentUserPayload) {
+    const person = await this.prisma.person.findFirst({
+      where: {
+        id: personId,
+        company: { organizationId: getCurrentOrganizationId(user) },
+      },
       include: {
         company: {
           select: {
@@ -51,12 +55,30 @@ export class PersonContactsService {
     }
   }
 
+  private async assertPersonReadable(
+    personId: string,
+    user: CurrentUserPayload,
+  ): Promise<void> {
+    const person = await this.prisma.person.findFirst({
+      where: {
+        id: personId,
+        company: {
+          organizationId: getCurrentOrganizationId(user),
+          archivedAt: null,
+        },
+      },
+      select: { id: true },
+    });
+
+    if (!person) throw new NotFoundException('Person not found');
+  }
+
   async create(
     personId: string,
     dto: CreatePersonContactDto,
     user: CurrentUserPayload,
   ) {
-    await this.validatePersonAccess(personId, user);
+    await this.assertPersonMutable(personId, user);
 
     const normalizedType = await this.resolveContactTypeReference(
       dto.typeOptionId,
@@ -100,7 +122,7 @@ export class PersonContactsService {
   }
 
   async findByPerson(personId: string, user: CurrentUserPayload) {
-    await this.validatePersonAccess(personId, user);
+    await this.assertPersonReadable(personId, user);
 
     return this.prisma.personContact.findMany({
       where: { personId },
@@ -126,7 +148,7 @@ export class PersonContactsService {
 
     if (!contact) throw new NotFoundException('اطلاعات تماس پیدا نشد');
 
-    await this.validatePersonAccess(contact.personId, user);
+    await this.assertPersonReadable(contact.personId, user);
 
     return contact;
   }
@@ -146,7 +168,7 @@ export class PersonContactsService {
 
     if (!contact) throw new NotFoundException('اطلاعات تماس پیدا نشد');
 
-    await this.validatePersonAccess(contact.personId, user);
+    await this.assertPersonMutable(contact.personId, user);
 
     const updateData: {
       typeOptionId?: string | null;
@@ -230,7 +252,7 @@ export class PersonContactsService {
 
     if (!contact) throw new NotFoundException('اطلاعات تماس پیدا نشد');
 
-    await this.validatePersonAccess(contact.personId, user);
+    await this.assertPersonMutable(contact.personId, user);
 
     return this.prisma.personContact.delete({
       where: { id },

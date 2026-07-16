@@ -14,12 +14,12 @@ export class PersonHistoriesService {
   constructor(private readonly prisma: PrismaService) {}
 
   async findEmployment(personId: string, user: CurrentUserPayload) {
-    await this.assertPersonAccess(personId, user);
+    await this.assertPersonReadable(personId, user);
     return this.prisma.personEmploymentHistory.findMany({ where: { personId }, include: employmentInclude, orderBy: { createdAt: 'desc' } });
   }
 
   async createEmployment(personId: string, dto: CreatePersonEmploymentHistoryDto, user: CurrentUserPayload) {
-    await this.assertPersonAccess(personId, user);
+    await this.assertPersonMutable(personId, user);
     const company = await this.assertCompanyAccess(dto.companyId, user);
     const duplicate = await this.prisma.personEmploymentHistory.findUnique({ where: { personId_companyId: { personId, companyId: dto.companyId } } });
     if (duplicate) throw new BadRequestException('Employment history already exists for this company');
@@ -27,7 +27,7 @@ export class PersonHistoriesService {
   }
 
   async updateEmployment(personId: string, id: string, dto: UpdatePersonEmploymentHistoryDto, user: CurrentUserPayload) {
-    await this.assertPersonAccess(personId, user);
+    await this.assertPersonMutable(personId, user);
     const current = await this.getEmployment(personId, id);
     let companyNameSnapshot: string | undefined;
     if (dto.companyId !== undefined) {
@@ -42,18 +42,18 @@ export class PersonHistoriesService {
   }
 
   async removeEmployment(personId: string, id: string, user: CurrentUserPayload) {
-    await this.assertPersonAccess(personId, user); await this.getEmployment(personId, id);
+    await this.assertPersonMutable(personId, user); await this.getEmployment(personId, id);
     return this.prisma.personEmploymentHistory.delete({ where: { id } });
   }
 
   async createPosition(personId: string, employmentId: string, dto: CreatePersonEmploymentPositionDto, user: CurrentUserPayload) {
-    await this.assertPersonAccess(personId, user); await this.getEmployment(personId, employmentId);
+    await this.assertPersonMutable(personId, user); await this.getEmployment(personId, employmentId);
     const data = this.positionData(dto, true);
     return this.prisma.personEmploymentPosition.create({ data: { employmentHistoryId: employmentId, ...data, title: data.title! } });
   }
 
   async updatePosition(personId: string, employmentId: string, positionId: string, dto: UpdatePersonEmploymentPositionDto, user: CurrentUserPayload) {
-    await this.assertPersonAccess(personId, user); await this.getEmployment(personId, employmentId);
+    await this.assertPersonMutable(personId, user); await this.getEmployment(personId, employmentId);
     const current = await this.prisma.personEmploymentPosition.findFirst({ where: { id: positionId, employmentHistoryId: employmentId } });
     if (!current) throw new NotFoundException('Employment position not found');
     const data = this.positionData(dto, false, current);
@@ -61,27 +61,27 @@ export class PersonHistoriesService {
   }
 
   async removePosition(personId: string, employmentId: string, positionId: string, user: CurrentUserPayload) {
-    await this.assertPersonAccess(personId, user); await this.getEmployment(personId, employmentId);
+    await this.assertPersonMutable(personId, user); await this.getEmployment(personId, employmentId);
     const result = await this.prisma.personEmploymentPosition.deleteMany({ where: { id: positionId, employmentHistoryId: employmentId } });
     if (!result.count) throw new NotFoundException('Employment position not found');
     return { id: positionId, deleted: true };
   }
 
   async findEducation(personId: string, user: CurrentUserPayload) {
-    await this.assertPersonAccess(personId, user);
+    await this.assertPersonReadable(personId, user);
     const items = await this.prisma.personEducationHistory.findMany({ where: { personId }, include: { university: { select: { id: true, name: true } } }, orderBy: [{ educationDate: 'desc' }, { createdAt: 'desc' }] });
     return items.map((item) => ({ ...item, degreeLabel: item.degree ? this.degreeLabel(item.degree) : null }));
   }
 
   async createEducation(personId: string, dto: CreatePersonEducationHistoryDto, user: CurrentUserPayload) {
-    await this.assertPersonAccess(personId, user); this.assertMeaningfulEducation(dto);
+    await this.assertPersonMutable(personId, user); this.assertMeaningfulEducation(dto);
     const university = dto.universityId ? await this.getActiveUniversity(dto.universityId) : null;
     const item = await this.prisma.personEducationHistory.create({ data: { personId, degree: dto.degree, universityId: university?.id, universityNameSnapshot: university?.name, educationDate: dto.educationDate ? parseApiDate(dto.educationDate, 'educationDate') : undefined, description: dto.description?.trim() || undefined }, include: { university: { select: { id: true, name: true } } } });
     return { ...item, degreeLabel: item.degree ? this.degreeLabel(item.degree) : null };
   }
 
   async updateEducation(personId: string, id: string, dto: UpdatePersonEducationHistoryDto, user: CurrentUserPayload) {
-    await this.assertPersonAccess(personId, user);
+    await this.assertPersonMutable(personId, user);
     const current = await this.prisma.personEducationHistory.findFirst({ where: { id, personId } });
     if (!current) throw new NotFoundException('Education history not found');
     const university = dto.universityId !== undefined ? await this.getActiveUniversity(dto.universityId) : undefined;
@@ -92,7 +92,7 @@ export class PersonHistoriesService {
   }
 
   async removeEducation(personId: string, id: string, user: CurrentUserPayload) {
-    await this.assertPersonAccess(personId, user);
+    await this.assertPersonMutable(personId, user);
     const result = await this.prisma.personEducationHistory.deleteMany({ where: { id, personId } });
     if (!result.count) throw new NotFoundException('Education history not found');
     return { id, deleted: true };
@@ -129,13 +129,31 @@ export class PersonHistoriesService {
     return item;
   }
 
-  private async assertPersonAccess(personId: string, user: CurrentUserPayload) {
+  private async assertPersonMutable(personId: string, user: CurrentUserPayload) {
     const person = await this.prisma.person.findFirst({ where: { id: personId, company: { organizationId: getCurrentOrganizationId(user) } }, include: { company: { select: { ownerId: true, owner: { select: { team: true, teamId: true } } } } } });
     if (!person) throw new NotFoundException('Person not found');
     if (user.role === UserRole.ADMIN) return;
     if (user.role === UserRole.MANAGER && person.company.owner && userMatchesTeam(person.company.owner, user)) return;
     if (user.role === UserRole.REP && person.company.ownerId === user.userId) return;
     throw new ForbiddenException('You do not have access to this person');
+  }
+
+  private async assertPersonReadable(
+    personId: string,
+    user: CurrentUserPayload,
+  ): Promise<void> {
+    const person = await this.prisma.person.findFirst({
+      where: {
+        id: personId,
+        company: {
+          organizationId: getCurrentOrganizationId(user),
+          archivedAt: null,
+        },
+      },
+      select: { id: true },
+    });
+
+    if (!person) throw new NotFoundException('Person not found');
   }
 
   private async assertCompanyAccess(companyId: string, user: CurrentUserPayload) {

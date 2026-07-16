@@ -7,6 +7,7 @@ import {
 import { UserRole } from '@prisma/client';
 import { CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { userMatchesTeam } from '../common/tenant/team-scope.util';
+import { getCurrentOrganizationId } from '../common/tenant/tenant-scope.util';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   CreatePersonSocialDto,
@@ -17,9 +18,12 @@ import {
 export class PersonSocialsService {
   constructor(private prisma: PrismaService) {}
 
-  private async validatePersonAccess(personId: string, user: CurrentUserPayload) {
-    const person = await this.prisma.person.findUnique({
-      where: { id: personId },
+  private async assertPersonMutable(personId: string, user: CurrentUserPayload) {
+    const person = await this.prisma.person.findFirst({
+      where: {
+        id: personId,
+        company: { organizationId: getCurrentOrganizationId(user) },
+      },
       include: {
         company: {
           select: {
@@ -51,12 +55,30 @@ export class PersonSocialsService {
     }
   }
 
+  private async assertPersonReadable(
+    personId: string,
+    user: CurrentUserPayload,
+  ): Promise<void> {
+    const person = await this.prisma.person.findFirst({
+      where: {
+        id: personId,
+        company: {
+          organizationId: getCurrentOrganizationId(user),
+          archivedAt: null,
+        },
+      },
+      select: { id: true },
+    });
+
+    if (!person) throw new NotFoundException('Person not found');
+  }
+
   async create(
     personId: string,
     dto: CreatePersonSocialDto,
     user: CurrentUserPayload,
   ) {
-    await this.validatePersonAccess(personId, user);
+    await this.assertPersonMutable(personId, user);
 
     const normalizedPlatform = await this.resolveSocialPlatformReference(
       dto.platformOptionId,
@@ -100,7 +122,7 @@ export class PersonSocialsService {
   }
 
   async findByPerson(personId: string, user: CurrentUserPayload) {
-    await this.validatePersonAccess(personId, user);
+    await this.assertPersonReadable(personId, user);
 
     return this.prisma.personSocial.findMany({
       where: { personId },
@@ -126,7 +148,7 @@ export class PersonSocialsService {
 
     if (!social) throw new NotFoundException('شبکه اجتماعی پیدا نشد');
 
-    await this.validatePersonAccess(social.personId, user);
+    await this.assertPersonReadable(social.personId, user);
 
     return social;
   }
@@ -146,7 +168,7 @@ export class PersonSocialsService {
 
     if (!social) throw new NotFoundException('شبکه اجتماعی پیدا نشد');
 
-    await this.validatePersonAccess(social.personId, user);
+    await this.assertPersonMutable(social.personId, user);
 
     const updateData: {
       platformOptionId?: string | null;
@@ -234,7 +256,7 @@ export class PersonSocialsService {
 
     if (!social) throw new NotFoundException('شبکه اجتماعی پیدا نشد');
 
-    await this.validatePersonAccess(social.personId, user);
+    await this.assertPersonMutable(social.personId, user);
 
     return this.prisma.personSocial.delete({
       where: { id },

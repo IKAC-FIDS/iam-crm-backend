@@ -59,7 +59,7 @@ export class PersonSocialsController {
   }
 
   @Delete(':id')
-  @Permissions('person:delete')
+  @Permissions('person:update')
   remove(
     @Param('id') id: string,
     @CurrentUser() user: CurrentUserPayload,

@@ -1861,6 +1861,19 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 
 ---
 
+### fix 000062 - اصلاح visibility زیرموجودیت‌های مخاطب
+
+- علت اصلی خطای 403 این بود که serviceهای contacts، socials، employment history و education history پس از اصلاح visibility اصلی CRM همچنان از بررسی قدیمی نقش/مالک شرکت/تیم برای مسیرهای read استفاده می‌کردند.
+- endpointهای `GET /api/people/:personId/contacts`، `GET /api/people/:personId/socials`، `GET /api/people/:personId/employment-history` و `GET /api/people/:personId/education-history` اکنون با `person:view` و بررسی تعلق مخاطب به organization جاری قابل خواندن هستند و به owner شرکت یا تیم کاربر وابسته نیستند.
+- GET تکی contact/social و detail/list مخاطب نیز همان مرزبندی organization را رعایت می‌کنند؛ شرکت archived در مسیرهای read قابل استفاده نیست و رکورد organization دیگر با پاسخ not found پنهان می‌ماند.
+- دسترسی read و mutation به helperهای جداگانه `assertPersonReadable` و `assertPersonMutable` تفکیک شد. مسیرهای POST/PATCH/DELETE مربوط به contacts، socials، employment history، positionها و education history همچنان بررسی سخت‌گیرانه قبلی نقش/مالک/تیم را نگه می‌دارند.
+- همه mutationهای زیرموجودیت مخاطب در controller با permission `person:update` محافظت می‌شوند؛ این fix به کاربر فاقد این permission امکان ایجاد، ویرایش یا حذف نمی‌دهد.
+- فایل‌های تغییرکرده: `src/person-contacts/person-contacts.service.ts`، `src/person-contacts/person-contacts.controller.ts`، `src/person-socials/person-socials.service.ts`، `src/person-socials/person-socials.controller.ts`، `src/people/person-histories.service.ts`، `src/people/people.service.ts` و `README.md`.
+- چک‌لیست دستی: خواندن چهار endpoint بالا با REP دارای `person:view` برای شرکت ساخته‌شده توسط ADMIN؛ بارگذاری detail بدون request قرمز؛ رد دسترسی organization دیگر؛ رد کاربر فاقد `person:view` در GET و رد کاربر فاقد `person:update` در mutationها.
+- وضعیت بررسی: `npm run lint` با 0 خطا و 10 warning موجود موفق شد. `npm run build` اجرا شد اما به‌علت stale بودن Prisma Client با 124 خطای type مربوط به مدل‌ها/فیلدهای از قبل موجود مانند Role، Team، University و person history ناموفق بود؛ این خطاها مانع تأیید build شدند.
+
+---
+
 **Built with ❤️ for the sales team**
 
 ---

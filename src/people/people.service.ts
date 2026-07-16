@@ -375,6 +375,7 @@ export class PeopleService {
       where: {
         id: companyId,
         organizationId: getCurrentOrganizationId(user),
+        archivedAt: null,
       },
       select: { id: true },
     });
