@@ -1766,6 +1766,21 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 
 ---
 
+### fix 000056 - افزودن سوابق شغلی و تحصیلی برای افراد
+
+- سوابق شغلی شرکت‌محور برای هر شخص اضافه شد؛ هر رکورد به یک Company موجود در organization جاری متصل است، نام شرکت را به‌صورت snapshot نگه می‌دارد و برای هر person/company فقط یک رکورد مجاز است.
+- هر سابقه شغلی چند سمت با `title`، `startDate`، `endDate`، `isCurrent` و `description` دارد. عنوان خالی رد می‌شود، تاریخ پایان نمی‌تواند قبل از شروع باشد و سمت جاری تاریخ پایان ندارد. این قواعد هم در service و هم با constraint غیرمخرب دیتابیس محافظت می‌شوند.
+- سوابق تحصیلی چندگانه با `degree`، `university`، `year` و `description` اضافه شد. حداقل یک فیلد معنادار لازم است و سال اختیاری پس از تبدیل ارقام فارسی/عربی، در بازه معقول 1000 تا 3000 اعتبارسنجی می‌شود.
+- endpointهای employment: `GET/POST /api/people/:personId/employment-history`، `PATCH/DELETE /api/people/:personId/employment-history/:employmentId` و endpointهای nested ایجاد/ویرایش/حذف زیر `.../:employmentId/positions`.
+- endpointهای education: `GET/POST /api/people/:personId/education-history` و `PATCH/DELETE /api/people/:personId/education-history/:educationId`.
+- پاسخ detail شخص اکنون `employmentHistory` همراه summary شرکت و `positions` و همچنین `educationHistory` را شامل می‌شود؛ APIها و نام فیلدهای قبلی Person تغییر نکردند.
+- مدل‌های جدید: `PersonEmploymentHistory`، `PersonEmploymentPosition` و `PersonEducationHistory`. migration جدید: `20260716140000_add_person_employment_education_history`.
+- permission جدیدی اضافه نشد: مشاهده با `person:view` و ایجاد/ویرایش/حذف با `person:update` انجام می‌شود. scope دسترسی ADMIN/MANAGER/REP و منع دسترسی BOARDS مطابق الگوی فعلی people حفظ شده است.
+- فایل‌های مهم تغییرکرده/جدید: `prisma/schema.prisma`، migration بالا، `src/people/person-histories.controller.ts`، `src/people/person-histories.service.ts`، `src/people/dto/person-history.dto.ts`، `src/people/people.module.ts`، `src/people/people.service.ts` و `README.md`.
+- وضعیت بررسی: `npx prisma format`، `npx prisma validate` و `npx prisma generate` موفق شدند؛ `npm run lint` با 0 خطا و 10 warning موجود موفق شد؛ `npm run build` پس از اصلاح یک خطای type محلی موفق شد. `npx prisma migrate status` اجرا شد و دو migration محلی `20260716130000_add_company_legal_registry_hierarchy_fields` و `20260716140000_add_person_employment_education_history` را unapplied نشان داد، درحالی‌که migration دیتابیس `20260710203701_` در فایل‌های local وجود ندارد. به‌علت اختلاف migration history، هیچ migration اعمال نشد و تست دستی API اجرا نشد؛ هیچ reset/db push مخربی انجام نشد.
+
+---
+
 **Built with ❤️ for the sales team**
 
 ---

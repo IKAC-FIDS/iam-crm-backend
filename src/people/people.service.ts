@@ -178,6 +178,14 @@ export class PeopleService {
       company: true,
       contacts: true,  // ← اضافه شد
       socials: true,   // ← اضافه شد
+      employmentHistory: {
+        include: {
+          company: { select: { id: true, legalName: true, brandName: true } },
+          positions: { orderBy: [{ isCurrent: 'desc' }, { startDate: 'desc' }] },
+        },
+        orderBy: { createdAt: 'desc' },
+      },
+      educationHistory: { orderBy: [{ year: 'desc' }, { createdAt: 'desc' }] },
       },
     });
     if (!person) throw new NotFoundException('مخاطب پیدا نشد');

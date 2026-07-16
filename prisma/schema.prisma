@@ -498,15 +498,16 @@ model Company {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  branches       CompanyBranch[]
-  socialChannels CompanySocialChannel[]
-  people         Person[]
-  activities     Activity[]
-  callCard       CallCard?
-  stageHistory   PipelineStageHistory[]
-  opportunities  Opportunity[]
-  tasks          Task[]
-  legalDocuments CompanyLegalDocument[]
+  branches                CompanyBranch[]
+  socialChannels          CompanySocialChannel[]
+  people                  Person[]
+  activities              Activity[]
+  callCard                CallCard?
+  stageHistory            PipelineStageHistory[]
+  opportunities           Opportunity[]
+  tasks                   Task[]
+  legalDocuments          CompanyLegalDocument[]
+  personEmploymentHistory PersonEmploymentHistory[]
 
   organizationId String       @default("00000000-0000-4000-8000-000000000001")
   organization   Organization @relation(fields: [organizationId], references: [id])
@@ -622,9 +623,11 @@ model Person {
   email       String?
   phone       String?
 
-  contacts PersonContact[]
-  socials  PersonSocial[]
-  tasks    Task[]
+  contacts          PersonContact[]
+  socials           PersonSocial[]
+  tasks             Task[]
+  employmentHistory PersonEmploymentHistory[]
+  educationHistory  PersonEducationHistory[]
 
   activities           Activity[]
   primaryOpportunities Opportunity[] @relation("OpportunityPrimaryContact")
@@ -633,6 +636,54 @@ model Person {
   @@index([personaTag])
   @@index([isPrimaryContact])
   @@map("people")
+}
+
+model PersonEmploymentHistory {
+  id                  String                     @id @default(uuid())
+  personId            String
+  person              Person                     @relation(fields: [personId], references: [id], onDelete: Cascade)
+  companyId           String
+  company             Company                    @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  companyNameSnapshot String?
+  description         String?
+  positions           PersonEmploymentPosition[]
+  createdAt           DateTime                   @default(now())
+  updatedAt           DateTime                   @updatedAt
+
+  @@unique([personId, companyId])
+  @@index([companyId])
+  @@map("person_employment_history")
+}
+
+model PersonEmploymentPosition {
+  id                  String                  @id @default(uuid())
+  employmentHistoryId String
+  employmentHistory   PersonEmploymentHistory @relation(fields: [employmentHistoryId], references: [id], onDelete: Cascade)
+  title               String
+  startDate           DateTime?
+  endDate             DateTime?
+  isCurrent           Boolean                 @default(false)
+  description         String?
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+
+  @@index([employmentHistoryId])
+  @@map("person_employment_positions")
+}
+
+model PersonEducationHistory {
+  id          String   @id @default(uuid())
+  personId    String
+  person      Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  degree      String?
+  university  String?
+  year        Int?
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([personId])
+  @@map("person_education_history")
 }
 
 // ============================================================
