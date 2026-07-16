@@ -1845,6 +1845,22 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 
 ---
 
+### fix 000061 - اصلاح visibility رکوردهای CRM و افزودن فیلتر مال من / همه
+
+- علت اصلی دیده‌نشدن رکوردها، نبود permission نبود؛ read visibility در serviceها به نقش، مالک رکورد و تیم مالک گره خورده بود. به همین دلیل شرکتی که ADMIN ایجاد می‌کرد به‌صورت خودکار مالک ADMIN می‌شد و کاربران فروش/REP با وجود `company:view` آن را نمی‌دیدند.
+- فهرست و جزئیات شرکت برای کاربران دارای `company:view` اکنون در محدوده همان organization قابل مشاهده است و محدودیت پنهان REP/MANAGER/BOARDS بر اساس مالک یا تیم از مسیرهای read حذف شد.
+- ایجاد شرکت دیگر creator را به‌صورت خودکار owner نمی‌کند؛ `ownerId` فقط در صورت ارسال و اعتبارسنجی‌شدن ثبت می‌شود و در غیر این صورت `null` است. actor عملیات همچنان از `user.userId` در audit ثبت می‌شود.
+- فهرست و جزئیات opportunity برای کاربران دارای `opportunity:view` اکنون به‌صورت پیش‌فرض organization-wide است. ایجاد opportunity زیر شرکت هم دیگر به مالکیت شرکت توسط کاربر وابسته نیست؛ اگر `ownerId` ارسال نشود، مالک پیش‌فرض opportunity کاربر جاری است.
+- فیلتر `ownershipScope=all|mine|team|unassigned` به API فهرست شرکت‌ها، opportunityها و گزارش‌ها اضافه شد. مقدار پیش‌فرض `all` است؛ فیلترهای قبلی مانند `ownerId`، `teamId`، stage، priority، source، archive، company و search بدون تغییر نام حفظ شدند.
+- محدودیت‌های mutation باز نشده‌اند: update/delete/archive/change-owner/change-stage همچنان از بررسی‌های سخت‌گیرانه قبلی استفاده می‌کنند. این fix visibility مسیرهای read را تغییر می‌دهد، نه مجوز ویرایش را.
+- ماژول‌های مشابه بررسی شدند: people و activity در مسیرهای read مربوط به شرکت organization-wide شدند و tenant check صریح گرفتند؛ report/pipeline data دیگر scope پنهان owner/team ندارد و scope انتخابی را اعمال می‌کند. taskها به‌دلیل ماهیت assignment/private همچنان scope کاربر/تیم خود را حفظ می‌کنند. child resourceهای opportunity و اسناد حقوقی شرکت نیز چون helper مشترک آن‌ها هم read و هم mutation را محافظت می‌کند، بدون حذف کورکورانه محدودیت mutation باقی ماندند.
+- هیچ migration یا تغییر schema انجام نشد و داده‌های مالکیت فعلی نیز به‌صورت خودکار پاک یا بازنویسی نشدند.
+- فایل‌های اصلی تغییرکرده: `src/common/dto/ownership-scope.dto.ts`، DTO/controller/service شرکت‌ها، DTO/controller/service opportunityها، `src/reports/`، `src/people/people.service.ts`، `src/activities/activities.service.ts` و `README.md`.
+- چک‌لیست بررسی دستی: ایجاد شرکت بدون `ownerId` توسط ADMIN و مشاهده list/detail با REP؛ بررسی scopeهای `all`، `mine` و `unassigned`؛ مشاهده opportunity ادمین با REP در scope پیش‌فرض/all و محدودشدن mine؛ بررسی نمایش pipeline/report؛ تأیید عدم مشاهده رکورد organization دیگر و رد کاربران فاقد permission؛ و تأیید باقی‌ماندن محدودیت mutationها.
+- وضعیت بررسی: `npm run lint` با 0 خطا و 10 warning موجود موفق شد. `npm run build` اجرا شد اما به‌علت stale بودن Prisma Client با 124 خطای type مربوط به مدل‌ها/فیلدهای از قبل موجود مانند Role، Team و University ناموفق بود. چون این fix هیچ تغییر schema ندارد و دستور کار اجرای `prisma generate` را فقط هنگام تغییر schema مجاز کرده است، `npx prisma generate` و `npx prisma migrate status` اجرا نشدند.
+
+---
+
 **Built with ❤️ for the sales team**
 
 ---

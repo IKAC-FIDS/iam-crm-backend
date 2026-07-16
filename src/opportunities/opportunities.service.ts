@@ -18,6 +18,7 @@ import { UpdateOpportunityDto } from './dto/update-opportunity.dto';
 import { getCurrentOrganizationId } from '../common/tenant/tenant-scope.util';
 import { userMatchesTeam, userTeamScopeWhere } from '../common/tenant/team-scope.util';
 import { parseApiDate, parseApiDateRange } from '../common/dates/api-date.util';
+import { OwnershipScope } from '../common/dto/ownership-scope.dto';
 
 const opportunityInclude = {
   company: {
@@ -169,7 +170,6 @@ export class OpportunitiesService {
         AND: [
           { id },
           { organizationId: getCurrentOrganizationId(user) },
-          this.scopeWhere(user),
         ],
       },
       include: {
@@ -302,7 +302,7 @@ export class OpportunitiesService {
   async create(dto: CreateOpportunityDto, user: CurrentUserPayload) {
     const company = await this.getCompanyInScope(dto.companyId, user);
     const stage = await this.resolveStage(dto.stageId, dto.stage);
-    const ownerId = dto.ownerId ?? company.ownerId;
+    const ownerId = dto.ownerId ?? user.userId;
     const source = await this.resolveOpportunitySource(
       dto.sourceOptionId,
       dto.opportunitySource,
@@ -608,7 +608,7 @@ export class OpportunitiesService {
       {
         organizationId: getCurrentOrganizationId(user),
       },
-      this.scopeWhere(user),
+      this.readOwnershipScopeWhere(query.ownershipScope, user),
       {
         company: {
           archivedAt: null,
@@ -782,7 +782,28 @@ export class OpportunitiesService {
     };
   }
 
-  private scopeWhere(user: CurrentUserPayload): Prisma.OpportunityWhereInput {
+  private readOwnershipScopeWhere(
+    scope: OwnershipScope | undefined,
+    user: CurrentUserPayload,
+  ): Prisma.OpportunityWhereInput {
+    switch (scope ?? OwnershipScope.ALL) {
+      case OwnershipScope.MINE:
+        return {
+          OR: [
+            { ownerId: user.userId },
+            { company: { ownerId: user.userId } },
+          ],
+        };
+      case OwnershipScope.TEAM:
+        return { owner: userTeamScopeWhere(user) };
+      case OwnershipScope.UNASSIGNED:
+        return { ownerId: null };
+      default:
+        return {};
+    }
+  }
+
+  private mutationScopeWhere(user: CurrentUserPayload): Prisma.OpportunityWhereInput {
     if (user.role === UserRole.ADMIN || user.role === UserRole.BOARDS) {
       return {};
     }
@@ -825,7 +846,7 @@ export class OpportunitiesService {
         AND: [
           { id },
           { organizationId: getCurrentOrganizationId(user) },
-          this.scopeWhere(user),
+          this.mutationScopeWhere(user),
         ],
       },
       include: opportunityInclude,
@@ -861,23 +882,7 @@ export class OpportunitiesService {
       throw new NotFoundException('Company not found');
     }
 
-    if (user.role === UserRole.ADMIN) {
-      return company;
-    }
-
-    if (
-      user.role === UserRole.MANAGER &&
-      company.owner &&
-      userMatchesTeam(company.owner, user)
-    ) {
-      return company;
-    }
-
-    if (user.role === UserRole.REP && company.ownerId === user.userId) {
-      return company;
-    }
-
-    throw new ForbiddenException('You do not have access to this company');
+    return company;
   }
 
   private async validateOwner(ownerId: string, user: CurrentUserPayload) {

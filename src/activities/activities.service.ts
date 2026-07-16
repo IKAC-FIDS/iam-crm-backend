@@ -10,6 +10,7 @@ import { UserRole } from '@prisma/client';
 import { AuditLogService } from '../audit-log/audit-log.service';
 import { parseApiDate, parseNullableApiDate } from '../common/dates/api-date.util';
 import { userMatchesTeam } from '../common/tenant/team-scope.util';
+import { getCurrentOrganizationId } from '../common/tenant/tenant-scope.util';
 
 @Injectable()
 export class ActivitiesService {
@@ -19,8 +20,11 @@ export class ActivitiesService {
   // متد کمکی: بررسی دسترسی به شرکت
   // ============================================================
   private async validateCompanyAccess(companyId: string, user: CurrentUserPayload) {
-    const company = await this.prisma.company.findUnique({
-      where: { id: companyId },
+    const company = await this.prisma.company.findFirst({
+      where: {
+        id: companyId,
+        organizationId: getCurrentOrganizationId(user),
+      },
       select: { ownerId: true, owner: { select: { team: true, teamId: true } } },
     });
 
@@ -92,7 +96,7 @@ export class ActivitiesService {
       throw new BadRequestException('شناسه شرکت الزامی است');
     }
 
-    await this.validateCompanyAccess(companyId, user);
+    await this.assertCompanyReadable(companyId, user);
 
     const page = pagination.page ?? 1;
     const limit = pagination.limit ?? 20;
@@ -150,6 +154,23 @@ export class ActivitiesService {
     });
     await this.audit.record({ actorId: user.userId, entityType: 'activity', entityId: activity.id, action: 'activity.created', after: activity });
     return activity;
+  }
+
+  private async assertCompanyReadable(
+    companyId: string,
+    user: CurrentUserPayload,
+  ): Promise<void> {
+    const company = await this.prisma.company.findFirst({
+      where: {
+        id: companyId,
+        organizationId: getCurrentOrganizationId(user),
+      },
+      select: { id: true },
+    });
+
+    if (!company) {
+      throw new NotFoundException('Company not found');
+    }
   }
 
   async updateActivity(activityId: string, dto: UpdateActivityDto, user: CurrentUserPayload) {

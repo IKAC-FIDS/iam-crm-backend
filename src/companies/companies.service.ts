@@ -8,6 +8,7 @@ import { LegacyPipelineStage, Priority, Prisma, UserRole } from '@prisma/client'
 import { AuditLogService } from '../audit-log/audit-log.service';
 import { CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { PaginatedResponse, PaginationDto } from '../common/dto/pagination.dto';
+import { OwnershipScope } from '../common/dto/ownership-scope.dto';
 import { getCurrentOrganizationId } from '../common/tenant/tenant-scope.util';
 import { parseApiDate } from '../common/dates/api-date.util';
 import { userMatchesTeam, userTeamScopeWhere } from '../common/tenant/team-scope.util';
@@ -37,6 +38,7 @@ export class CompaniesService {
       withoutOwner?: boolean;
       search?: string;
       ownerId?: string;
+      ownershipScope?: OwnershipScope;
       includeArchived?: boolean;
       archivedOnly?: boolean;
     },
@@ -45,29 +47,20 @@ export class CompaniesService {
     const limit = pagination.limit ?? 20;
     const skip = (page - 1) * limit;
 
-    let where: Prisma.CompanyWhereInput = {
+    const where: Prisma.CompanyWhereInput = {
       organizationId: getCurrentOrganizationId(user),
     };
 
-    if (user.role === UserRole.REP) {
+    const ownershipScope = filters?.ownershipScope ?? OwnershipScope.ALL;
+    if (ownershipScope === OwnershipScope.MINE) {
       where.ownerId = user.userId;
-    } else if (user.role === UserRole.MANAGER) {
-      if (user.teamId || user.team) {
-        where.owner = userTeamScopeWhere(user);
-      } else {
-        where = {
-          organizationId: getCurrentOrganizationId(user),
-          id: { in: [] },
-        };
-      }
-    } else if (user.role === UserRole.BOARDS) {
-      where = {
-        organizationId: getCurrentOrganizationId(user),
-        id: { in: [] },
-      };
+    } else if (ownershipScope === OwnershipScope.TEAM) {
+      where.owner = userTeamScopeWhere(user);
+    } else if (ownershipScope === OwnershipScope.UNASSIGNED) {
+      where.ownerId = null;
     }
 
-    if (filters?.withoutOwner && user.role !== UserRole.REP) {
+    if (filters?.withoutOwner) {
       where.ownerId = null;
     }
 
@@ -98,9 +91,7 @@ export class CompaniesService {
     }
 
     if (filters?.ownerId) {
-      if (user.role === UserRole.ADMIN || user.role === UserRole.MANAGER) {
-        where.ownerId = filters.ownerId;
-      }
+      where.ownerId = filters.ownerId;
     }
 
     if (filters?.search?.trim()) {
@@ -174,10 +165,6 @@ export class CompaniesService {
   }
 
   async findOne(id: string, user: CurrentUserPayload) {
-    if (user.role === UserRole.BOARDS) {
-      throw new ForbiddenException('شما دسترسی به شرکت‌ها را ندارید');
-    }
-
     const company = await this.prisma.company.findFirst({
       where: { id, organizationId: getCurrentOrganizationId(user) },
       include: {
@@ -204,8 +191,6 @@ export class CompaniesService {
     });
 
     if (!company) throw new NotFoundException('شرکت پیدا نشد');
-
-    this.assertAccess(company, user);
 
     return this.withHierarchy(company);
   }
@@ -238,7 +223,7 @@ export class CompaniesService {
           registeredCapital: registeredCapital !== undefined ? new Prisma.Decimal(registeredCapital) : undefined,
           industryId: normalizedRefs.industryId, industry: normalizedRefs.industryName,
           sourceId: normalizedRefs.sourceId, source: normalizedRefs.sourceCode,
-          ownerId: dto.ownerId ?? user.userId, organizationId,
+          ownerId: dto.ownerId ?? null, organizationId,
         } });
       await this.replaceHierarchy(tx, created.id, parentCompanyIds ?? [], subsidiaryCompanyIds ?? []);
       return tx.company.findUniqueOrThrow({ where: { id: created.id }, include: this.companySummaryInclude() });

@@ -44,6 +44,7 @@ export class CompaniesController {
       withoutOwner: query.withoutOwner === 'true',
       search: query.search,
       ownerId: query.ownerId,
+      ownershipScope: query.ownershipScope,
       includeArchived: query.includeArchived === 'true',
       archivedOnly: query.archivedOnly === 'true',
     });

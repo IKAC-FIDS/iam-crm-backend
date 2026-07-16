@@ -6,6 +6,7 @@ import { ReportFiltersDto } from './dto/report-filters.dto';
 import { parseApiDate, parseApiDateRange } from '../common/dates/api-date.util';
 import { userTeamFilterWhere, userTeamScopeWhere } from '../common/tenant/team-scope.util';
 import { getCurrentOrganizationId } from '../common/tenant/tenant-scope.util';
+import { OwnershipScope } from '../common/dto/ownership-scope.dto';
 
 interface StageConversion {
   fromStageId: string | null;
@@ -43,7 +44,9 @@ export class ReportsService {
   }
 
   private companyWhere(filters: ReportFiltersDto, user: CurrentUserPayload): Prisma.CompanyWhereInput {
-    const and: Prisma.CompanyWhereInput[] = [];
+    const and: Prisma.CompanyWhereInput[] = [
+      { organizationId: getCurrentOrganizationId(user) },
+    ];
     if (filters.ownerIds?.length) and.push({ ownerId: { in: filters.ownerIds } });
     if (filters.teams?.length) and.push({ owner: userTeamFilterWhere(filters.teams) });
     if (filters.priorities?.length) and.push({ priority: { in: filters.priorities } });
@@ -51,18 +54,17 @@ export class ReportsService {
     if (filters.sources?.length) and.push({ source: { in: filters.sources } });
     if (filters.companyIds?.length) and.push({ id: { in: filters.companyIds } });
 
-    if (user.role === UserRole.MANAGER) {
-      if (!user.teamId && !user.team) return { id: { in: [] } };
-      and.push({ owner: userTeamScopeWhere(user) });
-    } else if (user.role === UserRole.REP) {
-      and.push({ ownerId: user.userId });
-    }
+    and.push(this.companyOwnershipScopeWhere(filters.ownershipScope, user));
 
     return and.length ? { AND: and } : {};
   }
 
   private opportunityWhere(filters: ReportFiltersDto, user: CurrentUserPayload): Prisma.OpportunityWhereInput {
-    const and: Prisma.OpportunityWhereInput[] = [{ archivedAt: null }, { company: { archivedAt: null } }];
+    const and: Prisma.OpportunityWhereInput[] = [
+      { organizationId: getCurrentOrganizationId(user) },
+      { archivedAt: null },
+      { company: { archivedAt: null } },
+    ];
     if (filters.ownerIds?.length) and.push({ ownerId: { in: filters.ownerIds } });
     if (filters.teams?.length) and.push({ owner: userTeamFilterWhere(filters.teams) });
     if (filters.stages?.length) and.push({ OR: [
@@ -73,11 +75,7 @@ export class ReportsService {
     if (filters.industries?.length) and.push({ company: { industry: { in: filters.industries } } });
     if (filters.sources?.length) and.push({ source: { in: filters.sources } });
     if (filters.companyIds?.length) and.push({ companyId: { in: filters.companyIds } });
-    if (user.role === UserRole.MANAGER) {
-      and.push(user.teamId || user.team ? { company: { owner: userTeamScopeWhere(user) } } : { id: { in: [] } });
-    } else if (user.role === UserRole.REP) {
-      and.push({ OR: [{ ownerId: user.userId }, { company: { ownerId: user.userId } }] });
-    }
+    and.push(this.opportunityOwnershipScopeWhere(filters.ownershipScope, user));
     return { AND: and };
   }
 
@@ -107,13 +105,39 @@ export class ReportsService {
     if (filters.activityTypes?.length) and.push({ type: { in: filters.activityTypes } });
     if (filters.teams?.length) and.push({ user: userTeamFilterWhere(filters.teams) });
 
-    if (user.role === UserRole.MANAGER) {
-      if (!user.teamId && !user.team) return { id: { in: [] } };
-      and.push({ user: userTeamScopeWhere(user) });
-    } else if (user.role === UserRole.REP) {
-      and.push({ userId: user.userId });
-    }
     return { AND: and };
+  }
+
+  private companyOwnershipScopeWhere(
+    scope: OwnershipScope | undefined,
+    user: CurrentUserPayload,
+  ): Prisma.CompanyWhereInput {
+    switch (scope ?? OwnershipScope.ALL) {
+      case OwnershipScope.MINE:
+        return { ownerId: user.userId };
+      case OwnershipScope.TEAM:
+        return { owner: userTeamScopeWhere(user) };
+      case OwnershipScope.UNASSIGNED:
+        return { ownerId: null };
+      default:
+        return {};
+    }
+  }
+
+  private opportunityOwnershipScopeWhere(
+    scope: OwnershipScope | undefined,
+    user: CurrentUserPayload,
+  ): Prisma.OpportunityWhereInput {
+    switch (scope ?? OwnershipScope.ALL) {
+      case OwnershipScope.MINE:
+        return { OR: [{ ownerId: user.userId }, { company: { ownerId: user.userId } }] };
+      case OwnershipScope.TEAM:
+        return { owner: userTeamScopeWhere(user) };
+      case OwnershipScope.UNASSIGNED:
+        return { ownerId: null };
+      default:
+        return {};
+    }
   }
 
   async getConversionRates(filters: ReportFiltersDto, user: CurrentUserPayload) {
@@ -690,15 +714,11 @@ export class ReportsService {
   }
 
   private reportUserWhere(filters: ReportFiltersDto, user: CurrentUserPayload): Prisma.UserWhereInput {
-    const and: Prisma.UserWhereInput[] = [];
+    const and: Prisma.UserWhereInput[] = [
+      { organizationId: getCurrentOrganizationId(user) },
+    ];
     if (filters.userIds?.length) and.push({ id: { in: filters.userIds } });
     if (filters.teams?.length) and.push(userTeamFilterWhere(filters.teams));
-    if (user.role === UserRole.MANAGER) {
-      if (!user.teamId && !user.team) return { id: { in: [] } };
-      and.push(userTeamScopeWhere(user));
-    } else if (user.role === UserRole.REP) {
-      and.push({ id: user.userId });
-    }
     return and.length ? { AND: and } : {};
   }
 

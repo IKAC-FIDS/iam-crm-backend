@@ -2,8 +2,10 @@ import { Priority } from '@prisma/client';
 import { IsBooleanString, IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 import { IsApiDateString } from '../../common/validators/api-date-string.validator';
+import { OwnershipScope } from '../../common/dto/ownership-scope.dto';
 
 export class FindOpportunitiesDto extends PaginationDto {
+  @IsOptional() @IsEnum(OwnershipScope) ownershipScope?: OwnershipScope;
   @IsOptional() @IsString() search?: string;
   @IsOptional() @IsUUID() companyId?: string;
   @IsOptional() @IsUUID() ownerId?: string;

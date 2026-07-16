@@ -6,7 +6,8 @@ import { PaginationDto, PaginatedResponse } from '../common/dto/pagination.dto';
 import { CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { Prisma, UserRole } from '@prisma/client';
 import { FindPeopleDirectoryDto } from './dto/find-people-directory.dto';
-import { userMatchesTeam, userTeamFilterWhere, userTeamScopeWhere } from '../common/tenant/team-scope.util';
+import { userMatchesTeam, userTeamFilterWhere } from '../common/tenant/team-scope.util';
+import { getCurrentOrganizationId } from '../common/tenant/tenant-scope.util';
 
 @Injectable()
 export class PeopleService {
@@ -15,15 +16,12 @@ export class PeopleService {
   async findDirectory(query: FindPeopleDirectoryDto, user: CurrentUserPayload): Promise<PaginatedResponse<any>> {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
-    const and: Prisma.PersonWhereInput[] = [{ company: { archivedAt: null } }];
-
-    if (user.role === UserRole.MANAGER) {
-      and.push(user.teamId || user.team ? { company: { owner: userTeamScopeWhere(user) } } : { id: { in: [] } });
-    } else if (user.role === UserRole.REP) {
-      and.push({ company: { ownerId: user.userId } });
-    } else if (user.role === UserRole.BOARDS) {
-      throw new ForbiddenException('شما دسترسی به فهرست مخاطبین را ندارید');
-    }
+    const and: Prisma.PersonWhereInput[] = [{
+      company: {
+        organizationId: getCurrentOrganizationId(user),
+        archivedAt: null,
+      },
+    }];
 
     if (query.companyId) and.push({ companyId: query.companyId });
     if (query.ownerId) and.push({ company: { ownerId: query.ownerId } });
@@ -138,7 +136,7 @@ export class PeopleService {
       throw new BadRequestException('شناسه شرکت الزامی است');
     }
 
-    await this.validateCompanyAccess(companyId, user);
+    await this.assertCompanyReadable(companyId, user);
 
     const page = pagination.page ?? 1;
     const limit = pagination.limit ?? 20;
@@ -193,7 +191,7 @@ export class PeopleService {
     });
     if (!person) throw new NotFoundException('مخاطب پیدا نشد');
 
-    await this.validateCompanyAccess(person.companyId, user);
+    await this.assertCompanyReadable(person.companyId, user);
     return this.withDomainAliases(person);
   }
 
@@ -335,8 +333,11 @@ export class PeopleService {
   // متد کمکی: بررسی دسترسی به شرکت
   // ============================================================
   private async validateCompanyAccess(companyId: string, user: CurrentUserPayload) {
-    const company = await this.prisma.company.findUnique({
-      where: { id: companyId },
+    const company = await this.prisma.company.findFirst({
+      where: {
+        id: companyId,
+        organizationId: getCurrentOrganizationId(user),
+      },
       select: { ownerId: true, owner: { select: { team: true, teamId: true } } },
     });
 
@@ -363,6 +364,23 @@ export class PeopleService {
     // BOARDS: دسترسی به مخاطبین ندارد
     if (user.role === UserRole.BOARDS) {
       throw new ForbiddenException('شما دسترسی به مخاطبین را ندارید');
+    }
+  }
+
+  private async assertCompanyReadable(
+    companyId: string,
+    user: CurrentUserPayload,
+  ): Promise<void> {
+    const company = await this.prisma.company.findFirst({
+      where: {
+        id: companyId,
+        organizationId: getCurrentOrganizationId(user),
+      },
+      select: { id: true },
+    });
+
+    if (!company) {
+      throw new NotFoundException('Company not found');
     }
   }
 private async resolveContactTypeReference(
