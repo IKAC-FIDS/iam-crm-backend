@@ -1,4 +1,4 @@
-import { ValidationPipe } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import cookieParser from 'cookie-parser';
@@ -20,6 +20,7 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const config = app.get(ConfigService);
   const httpAdapter = app.getHttpAdapter().getInstance();
+  const corsLogger = new Logger('Cors');
 
   httpAdapter.set('trust proxy', 1);
 
@@ -46,6 +47,46 @@ async function bootstrap() {
   const allowedOrigins = parseCorsOrigins(
     config.get<string>('CORS_ORIGINS', 'http://localhost:5173'),
   );
+  const corsCredentials = config.get<boolean>('CORS_CREDENTIALS', true);
+
+  if (corsCredentials && allowedOrigins.includes('*')) {
+    throw new Error(
+      'CORS_ORIGINS must not contain "*" when CORS_CREDENTIALS is enabled',
+    );
+  }
+
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    const origin = req.header('origin');
+
+    if (!origin || allowedOrigins.includes(origin)) {
+      next();
+      return;
+    }
+
+    const requestId = (req as Request & { requestId?: string }).requestId ?? null;
+    const context = {
+      requestId,
+      origin,
+      method: req.method,
+      url: req.originalUrl || req.url,
+      allowedOriginsCount: allowedOrigins.length,
+      allowedOrigins,
+    };
+
+    corsLogger.warn('CORS origin rejected', JSON.stringify(context));
+    res.status(403).json({
+      success: false,
+      error: {
+        code: 'CORS_ORIGIN_REJECTED',
+        message: 'Request origin is not allowed',
+      },
+      requestId,
+      timestamp: new Date().toISOString(),
+      path: req.originalUrl || req.url,
+      method: req.method,
+      statusCode: 403,
+    });
+  });
 
   app.enableCors({
     origin(origin, callback) {
@@ -54,9 +95,9 @@ async function bootstrap() {
         return;
       }
 
-      callback(new Error('Not allowed by CORS'), false);
+      callback(new Error('Request origin is not allowed'), false);
     },
-    credentials: config.get<boolean>('CORS_CREDENTIALS', true),
+    credentials: corsCredentials,
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
     allowedHeaders: [
       'Content-Type',

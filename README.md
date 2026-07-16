@@ -1736,6 +1736,20 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 
 ---
 
+### fix 000054 - اصلاح مستندسازی و لاگ CORS برای استقرار فرانت production
+
+- علت اصلی خطای login مرورگر این بود که Origin فرانت production یعنی `http://89.42.199.159:8080` در allowlist متغیر `CORS_ORIGINS` بک‌اند وجود نداشت.
+- تنظیم لازم برای محیط production: `CORS_ORIGINS=http://localhost:5173,http://89.42.199.159:8080` و `CORS_CREDENTIALS=true`.
+- درخواست curl بدون هدر `Origin` ممکن است موفق شود، درحالی‌که مرورگر همان endpoint را به‌دلیل اعمال CORS با خطا مواجه می‌کند؛ بنابراین تست production باید هدر Origin واقعی فرانت را نیز ارسال کند.
+- رد شدن Origin اکنون با status 403 و کد `CORS_ORIGIN_REJECTED` پاسخ داده می‌شود و در لاگ سرور Origin ردشده، `requestId`، مسیر درخواست و تعداد/فهرست Originهای مجاز ثبت می‌شود. stack trace به client ارسال نمی‌شود.
+- استفاده از `*` همراه `CORS_CREDENTIALS=true` مجاز نیست و باعث توقف امن startup می‌شود؛ CORS، Helmet و validation فعال باقی مانده‌اند.
+- مقدار Docker اصلاح شد و تعریف تکراری و متناقض `CORS_CREDENTIALS` از `.env.docker` حذف شد. URL هر فرانت production باید صریحاً در `CORS_ORIGINS` فایل env مورد استفاده Docker قرار گیرد.
+- فایل‌های تغییرکرده: `src/main.ts`، `.env.example`، `.env.docker` و `README.md`.
+- پس از تغییر env، بازسازی کانتینر بدون build با این دستور انجام می‌شود: `docker compose up -d --force-recreate api`.
+- نتیجه بررسی: `npm run lint` با 0 خطا و 10 warning موجود موفق شد. اجرای اولیه `npm run build` به‌دلیل stale بودن Prisma Client با خطاهای type مربوط به مدل Team ناموفق بود؛ پس از اجرای موفق `npx prisma generate`، اجرای مجدد `npm run build` موفق شد.
+
+---
+
 **Built with ❤️ for the sales team**
 
 ---
