@@ -438,15 +438,11 @@ export class AttachmentsService {
           id: entityId,
           company: {
             organizationId: getCurrentOrganizationId(user),
-            ...(user.role === UserRole.REP
-              ? { ownerId: user.userId }
-              : user.role === UserRole.MANAGER
-                ? { owner: userTeamScopeWhere(user) }
-                : {}),
+            archivedAt: null,
           },
         },
       });
-      if (!document || user.role === UserRole.BOARDS) {
+      if (!document) {
         throw new NotFoundException('Company legal document not found');
       }
       return;

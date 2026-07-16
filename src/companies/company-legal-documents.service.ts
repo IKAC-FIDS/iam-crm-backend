@@ -1,15 +1,16 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { FileAttachmentEntityType, Prisma, UserRole } from '@prisma/client';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { FileAttachment, FileAttachmentEntityType, Prisma } from '@prisma/client';
 import { AttachmentsService } from '../attachments/attachments.service';
 import { CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { parseApiDate } from '../common/dates/api-date.util';
 import { getCurrentOrganizationId } from '../common/tenant/tenant-scope.util';
-import { userTeamScopeWhere } from '../common/tenant/team-scope.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateCompanyLegalDocumentDto, UploadCompanyLegalDocumentDto } from './dto/company-legal-document.dto';
 
 @Injectable()
 export class CompanyLegalDocumentsService {
+  private readonly logger = new Logger(CompanyLegalDocumentsService.name);
+
   constructor(private readonly prisma: PrismaService, private readonly attachments: AttachmentsService) {}
 
   async findAll(companyId: string, user: CurrentUserPayload) {
@@ -17,7 +18,7 @@ export class CompanyLegalDocumentsService {
     return this.prisma.companyLegalDocument.findMany({ where: { companyId }, orderBy: { createdAt: 'desc' } });
   }
 
-  async upload(companyId: string, dto: UploadCompanyLegalDocumentDto, file: Express.Multer.File | undefined, user: CurrentUserPayload) {
+  async upload(companyId: string, dto: UploadCompanyLegalDocumentDto, file: Express.Multer.File | undefined, user: CurrentUserPayload, requestId: string | null = null) {
     await this.assertCompany(companyId, user);
     if (!file) throw new BadRequestException('Legal document file is required');
     const title = dto.title?.trim();
@@ -28,8 +29,9 @@ export class CompanyLegalDocumentsService {
       documentDate: dto.documentDate ? parseApiDate(dto.documentDate, 'documentDate') : undefined,
       createdById: user.userId,
     } });
+    let attachment: FileAttachment | undefined;
     try {
-      const attachment = await this.attachments.upload({ entityType: FileAttachmentEntityType.COMPANY_LEGAL_DOCUMENT, entityId: document.id, description: dto.description }, file, user);
+      attachment = await this.attachments.upload({ entityType: FileAttachmentEntityType.COMPANY_LEGAL_DOCUMENT, entityId: document.id, description: dto.description }, file, user);
       const updated = await this.prisma.companyLegalDocument.update({ where: { id: document.id }, data: { attachmentId: attachment.id } });
       return {
         ...updated,
@@ -42,7 +44,23 @@ export class CompanyLegalDocumentsService {
         },
       };
     } catch (error) {
-      await this.prisma.companyLegalDocument.delete({ where: { id: document.id } });
+      this.logger.error(
+        `Legal document upload failed companyId=${companyId} documentId=${document.id} requestId=${requestId ?? 'none'}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+
+      if (attachment) {
+        try {
+          await this.attachments.remove(attachment.id, user);
+        } catch (cleanupError) {
+          this.logger.error(
+            `Legal document attachment cleanup failed attachmentId=${attachment.id} requestId=${requestId ?? 'none'}`,
+            cleanupError instanceof Error ? cleanupError.stack : String(cleanupError),
+          );
+        }
+      }
+
+      await this.prisma.companyLegalDocument.deleteMany({ where: { id: document.id } });
       throw error;
     }
   }
@@ -76,8 +94,7 @@ export class CompanyLegalDocumentsService {
     const company = await this.prisma.company.findFirst({ where: {
       id: companyId,
       organizationId: getCurrentOrganizationId(user),
-      ...(user.role === UserRole.REP ? { ownerId: user.userId } : {}),
-      ...(user.role === UserRole.MANAGER ? { owner: userTeamScopeWhere(user) } : {}),
+      archivedAt: null,
     } });
     if (!company) throw new NotFoundException('Company not found');
   }

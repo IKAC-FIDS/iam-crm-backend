@@ -6,21 +6,23 @@ import {
   Param,
   Patch,
   Post,
-  Query,
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { PermissionsGuard } from '../common/guards/permissions.guard';
+import { Permissions } from '../common/decorators/permissions.decorator';
 import { CurrentUser, CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { CompanyBranchesService } from './company-branches.service';
 import { CreateCompanyBranchDto } from './dto/create-company-branch.dto';
 import { UpdateCompanyBranchDto } from './dto/update-company-branch.dto';
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('companies/:companyId/branches')
 export class CompanyBranchesController {
   constructor(private branchesService: CompanyBranchesService) {}
 
 @Post()
+@Permissions('branch:manage')
 create(
   @Param('companyId') companyId: string,
   @Body() dto: CreateCompanyBranchDto,
@@ -30,6 +32,7 @@ create(
 }
 
   @Get()
+  @Permissions('company:view')
   findAll(
     @Param('companyId') companyId: string,
     @CurrentUser() user: CurrentUserPayload,
@@ -38,6 +41,7 @@ create(
   }
 
   @Get(':id')
+  @Permissions('company:view')
   findOne(
     @Param('id') id: string,
     @CurrentUser() user: CurrentUserPayload,
@@ -46,6 +50,7 @@ create(
   }
 
   @Patch(':id')
+  @Permissions('branch:manage')
   update(
     @Param('id') id: string,
     @Body() dto: UpdateCompanyBranchDto,
@@ -55,6 +60,7 @@ create(
   }
 
   @Delete(':id')
+  @Permissions('branch:manage')
   remove(
     @Param('id') id: string,
     @CurrentUser() user: CurrentUserPayload,

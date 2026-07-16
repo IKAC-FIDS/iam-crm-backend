@@ -1874,6 +1874,20 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 
 ---
 
+### fix 000063 - اصلاح دسترسی زیرموجودیت‌های شرکت برای شعب و اسناد حقوقی
+
+- علت اصلی خطای 403 این بود که serviceهای branch و legal document و همچنین مسیر attachment مربوط به سند حقوقی، بعد از organization-wide شدن visibility شرکت همچنان scope پنهان owner/team را اعمال می‌کردند.
+- endpointهای شعب اکنون company را فقط با `organizationId` جاری و وضعیت non-archived اعتبارسنجی می‌کنند. `POST/PATCH/DELETE /api/companies/:companyId/branches` با permission موجود `branch:manage` و GETهای شعب با `company:view` محافظت می‌شوند؛ `PermissionsGuard` که قبلاً در controller شعب وجود نداشت اضافه شد.
+- endpointهای `GET /api/companies/:companyId/legal-documents` و `POST /api/companies/:companyId/legal-documents/upload` و PATCH/DELETE سند حقوقی نیز بدون شرط مالک/تیم، company را در organization جاری بررسی می‌کنند. permissionهای موجود حفظ شدند: read با `company:view` و upload/update/delete با `company:update`.
+- بررسی داخلی `AttachmentsService` برای `COMPANY_LEGAL_DOCUMENT` نیز organization-scoped و non-archived شد تا REP دارای permission هنگام ذخیره فایل دوباره با owner scope رد نشود.
+- upload موفق همان رکورد legal document ایجادشده را همراه metadata فایل (`id`، نام اصلی، MIME type، اندازه و زمان ایجاد) برمی‌گرداند و `companyId` روی رکورد سند حفظ می‌شود. خطای storage/attachment/link باعث success کاذب نمی‌شود: خطا دوباره throw می‌شود، رکورد سند rollback می‌شود، attachment ساخته‌شده تا حد ممکن cleanup می‌شود و failure همراه `requestId`، `companyId` و `documentId` لاگ می‌شود؛ exception filter نیز پاسخ non-2xx استاندارد را ثبت/ارسال می‌کند.
+- هیچ permission یا schema جدیدی اضافه نشد و کاربران فاقد `branch:manage` یا `company:update` همچنان توسط guard رد می‌شوند؛ company متعلق به organization دیگر یا archived نیز قابل استفاده نیست.
+- فایل‌های تغییرکرده: `src/company-branches/company-branches.controller.ts`، `src/company-branches/company-branches.service.ts`، `src/companies/company-legal-documents.controller.ts`، `src/companies/company-legal-documents.service.ts`، `src/attachments/attachments.service.ts` و `README.md`.
+- چک‌لیست دستی: ایجاد/list/update/delete شعب با REP غیرمالک دارای permission؛ upload و list سند حقوقی و بررسی metadata؛ رد کاربر فاقد permission؛ رد company بین‌سازمانی؛ و اطمینان از پاسخ non-2xx و log در خطای storage/DB.
+- وضعیت بررسی: `npm run lint` با 0 خطا و 9 warning موجود موفق شد. `npm run build` اجرا شد اما به‌علت stale بودن Prisma Client با 124 خطای type مربوط به مدل‌ها/فیلدهای از قبل موجود مانند Role، Team، University و CompanyLegalDocument ناموفق بود؛ بنابراین build تأیید نشد.
+
+---
+
 **Built with ❤️ for the sales team**
 
 ---

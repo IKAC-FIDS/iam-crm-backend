@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { CurrentUser, CurrentUserPayload } from '../common/decorators/current-user.decorator';
@@ -7,6 +7,8 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { CompanyLegalDocumentsService } from './company-legal-documents.service';
 import { UpdateCompanyLegalDocumentDto, UploadCompanyLegalDocumentDto } from './dto/company-legal-document.dto';
+import type { Request } from 'express';
+import { getRequestId } from '../common/logging/http-log-context';
 
 @Controller('companies/:companyId/legal-documents')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
@@ -20,8 +22,8 @@ export class CompanyLegalDocumentsController {
 
   @Post('upload') @Permissions('company:update')
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } }))
-  upload(@Param('companyId') companyId: string, @Body() dto: UploadCompanyLegalDocumentDto, @UploadedFile() file: Express.Multer.File, @CurrentUser() user: CurrentUserPayload) {
-    return this.service.upload(companyId, dto, file, user);
+  upload(@Param('companyId') companyId: string, @Body() dto: UploadCompanyLegalDocumentDto, @UploadedFile() file: Express.Multer.File, @CurrentUser() user: CurrentUserPayload, @Req() req: Request) {
+    return this.service.upload(companyId, dto, file, user, getRequestId(req));
   }
 
   @Patch(':documentId') @Permissions('company:update')
