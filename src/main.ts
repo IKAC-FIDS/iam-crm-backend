@@ -2,7 +2,9 @@ import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import cookieParser from 'cookie-parser';
+import type { NextFunction, Request, Response } from 'express';
 import helmet from 'helmet';
+import { randomUUID } from 'node:crypto';
 import { AppModule } from './app.module';
 import { ApiExceptionFilter } from './common/filters/api-exception.filter';
 import { ApiResponseInterceptor } from './common/interceptors/api-response.interceptor';
@@ -17,6 +19,20 @@ function parseCorsOrigins(value?: string): string[] {
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const config = app.get(ConfigService);
+  const httpAdapter = app.getHttpAdapter().getInstance();
+
+  httpAdapter.set('trust proxy', 1);
+
+  // Run before CORS and all Nest route middleware so even bootstrap-level
+  // failures have a correlation id available to the global exception filter.
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    const suppliedRequestId = req.header('x-request-id')?.trim();
+    const requestId = suppliedRequestId || randomUUID();
+
+    (req as Request & { requestId?: string }).requestId = requestId;
+    res.setHeader('x-request-id', requestId);
+    next();
+  });
 
   app.use(cookieParser());
 

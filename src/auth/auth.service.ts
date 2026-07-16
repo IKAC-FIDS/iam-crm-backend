@@ -1,9 +1,10 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { User, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import type { Request } from 'express';
+import { buildHttpLogContext } from '../common/logging/http-log-context';
 import { PrismaService } from '../prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenService } from './refresh-token.service';
@@ -36,6 +37,8 @@ export interface AuthSessionLoginResponse extends AuthAccessResponse {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
@@ -44,15 +47,36 @@ export class AuthService {
   ) {}
 
   async login(dto: LoginDto, req?: Request): Promise<AuthSessionLoginResponse> {
+    this.logger.log(
+      'Login attempt received',
+      JSON.stringify(this.buildAuthLogContext(dto.email, req)),
+    );
+
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email },
     });
 
+    this.logger.log(
+      'Login user lookup completed',
+      JSON.stringify({
+        ...this.buildAuthLogContext(dto.email, req),
+        found: Boolean(user),
+      }),
+    );
+
     if (!user || !user.isActive) {
+      this.logger.warn(
+        user ? 'Login rejected: user is inactive' : 'Login rejected: user not found',
+        JSON.stringify(this.buildAuthLogContext(dto.email, req)),
+      );
       throw new UnauthorizedException('ایمیل یا رمز عبور نادرست است');
     }
 
     if (user.lockedUntil && user.lockedUntil > new Date()) {
+      this.logger.warn(
+        'Login rejected: user account is locked',
+        JSON.stringify(this.buildAuthLogContext(dto.email, req)),
+      );
       throw new UnauthorizedException(
         'حساب کاربری موقتاً قفل شده است. لطفاً بعداً دوباره تلاش کنید',
       );
@@ -64,9 +88,18 @@ export class AuthService {
     );
 
     if (!passwordValid) {
+      this.logger.warn(
+        'Login password verification failed',
+        JSON.stringify(this.buildAuthLogContext(dto.email, req)),
+      );
       await this.recordFailedLogin(user.id, user.failedLoginAttempts);
       throw new UnauthorizedException('ایمیل یا رمز عبور نادرست است');
     }
+
+    this.logger.log(
+      'Login password verification succeeded',
+      JSON.stringify(this.buildAuthLogContext(dto.email, req)),
+    );
 
     await this.recordSuccessfulLogin(user.id, req);
 
@@ -114,17 +147,23 @@ export class AuthService {
     user: User,
     req?: Request,
   ): Promise<AuthSessionLoginResponse> {
-    const accessResponse = await this.buildLoginResponse(user);
+    const context = this.buildAuthLogContext(user.email, req);
+    this.logger.log('Login token generation started', JSON.stringify(context));
 
-    const refreshSession = await this.refreshTokenService.createSession(
-      user.id,
-      req,
-    );
+    try {
+      const accessResponse = await this.buildLoginResponse(user);
+      const refreshSession = await this.refreshTokenService.createSession(
+        user.id,
+        req,
+      );
 
-    return {
-      ...accessResponse,
-      ...refreshSession,
-    };
+      this.logger.log('Login token generation succeeded', JSON.stringify(context));
+      return { ...accessResponse, ...refreshSession };
+    } catch (error) {
+      const stack = error instanceof Error ? error.stack : undefined;
+      this.logger.error('Login token generation failed', stack, JSON.stringify(context));
+      throw error;
+    }
   }
 
   async buildLoginResponse(user: User): Promise<AuthAccessResponse> {
@@ -232,5 +271,19 @@ export class AuthService {
     }
 
     return req?.ip || req?.socket?.remoteAddress || null;
+  }
+
+  private buildAuthLogContext(email: string, req?: Request) {
+    if (!req) {
+      return { email, requestId: null, origin: null, userAgent: null };
+    }
+
+    const context = buildHttpLogContext(req);
+    return {
+      email,
+      requestId: context.requestId,
+      origin: context.origin,
+      userAgent: context.userAgent,
+    };
   }
 }

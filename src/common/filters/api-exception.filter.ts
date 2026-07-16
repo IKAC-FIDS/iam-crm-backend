@@ -4,10 +4,16 @@ import {
   ExceptionFilter,
   HttpException,
   HttpStatus,
+  Logger,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import type { Request, Response } from 'express';
+import type { Response } from 'express';
 import { ApiErrorResponse } from '../http/api-response.types';
+import {
+  RequestWithRequestId,
+  buildHttpLogContext,
+  getRequestId,
+} from '../logging/http-log-context';
 
 type NestErrorResponse =
   | string
@@ -18,29 +24,6 @@ type NestErrorResponse =
       code?: string;
       details?: unknown;
     };
-
-function getResponseRequestId(
-  response: Response,
-  request: Request,
-): string | null {
-  const responseHeader = response.getHeader('x-request-id');
-
-  if (Array.isArray(responseHeader)) {
-    return String(responseHeader[0] ?? '').trim() || null;
-  }
-
-  if (responseHeader !== undefined) {
-    return String(responseHeader).trim() || null;
-  }
-
-  const requestHeader = request.headers['x-request-id'];
-
-  if (Array.isArray(requestHeader)) {
-    return requestHeader[0]?.trim() || null;
-  }
-
-  return requestHeader?.trim() || null;
-}
 
 function normalizeMessage(message: unknown): string {
   if (Array.isArray(message)) {
@@ -114,12 +97,15 @@ function isMulterError(
 
 @Catch()
 export class ApiExceptionFilter implements ExceptionFilter {
+  private readonly logger = new Logger(ApiExceptionFilter.name);
+
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
-    const request = ctx.getRequest<Request>();
+    const request = ctx.getRequest<RequestWithRequestId>();
     const response = ctx.getResponse<Response>();
 
     const normalized = this.normalizeException(exception);
+    const requestId = getRequestId(request, response);
 
     const body: ApiErrorResponse = {
       success: false,
@@ -130,14 +116,60 @@ export class ApiExceptionFilter implements ExceptionFilter {
           details: normalized.details,
         }),
       },
-      requestId: getResponseRequestId(response, request),
+      requestId,
       timestamp: new Date().toISOString(),
       path: request.originalUrl || request.url,
       method: request.method,
       statusCode: normalized.statusCode,
     };
 
+    this.logException(exception, request, response, normalized, requestId);
+
     response.status(normalized.statusCode).json(body);
+  }
+
+  private logException(
+    exception: unknown,
+    request: RequestWithRequestId,
+    response: Response,
+    normalized: {
+      statusCode: number;
+      code: string;
+      message: string;
+      details?: unknown;
+    },
+    requestId: string | null,
+  ) {
+    const error =
+      exception instanceof Error
+        ? {
+            name: exception.name,
+            message: exception.message,
+            stack: exception.stack,
+          }
+        : {
+            name: 'NonErrorException',
+            message: String(exception),
+            stack: null,
+          };
+
+    const context = {
+      ...buildHttpLogContext(request, response),
+      requestId,
+      statusCode: normalized.statusCode,
+      errorCode: normalized.code,
+      errorMessage: normalized.message,
+      exception: error,
+    };
+
+    const message = `${request.method} ${request.originalUrl || request.url} failed ${normalized.statusCode} requestId=${requestId ?? 'none'}`;
+
+    if (normalized.statusCode >= 500) {
+      this.logger.error(message, error.stack, JSON.stringify(context));
+      return;
+    }
+
+    this.logger.warn(message, JSON.stringify(context));
   }
 
   private normalizeException(exception: unknown): {

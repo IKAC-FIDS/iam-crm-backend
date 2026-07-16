@@ -3,6 +3,7 @@ import {
   Controller,
   HttpCode,
   HttpStatus,
+  Logger,
   Post,
   Req,
   Res,
@@ -11,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
+import { buildHttpLogContext } from '../common/logging/http-log-context';
 import { CurrentUser, CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import {
@@ -23,6 +25,8 @@ import { LoginDto } from './dto/login.dto';
 
 @Controller('auth')
 export class AuthController {
+  private readonly logger = new Logger(AuthController.name);
+
   constructor(private readonly authService: AuthService) {}
 
   @Post('login')
@@ -39,6 +43,16 @@ export class AuthController {
       res,
       result.refreshToken,
       result.refreshTokenMaxAgeMs,
+    );
+
+    const context = buildHttpLogContext(req, res);
+    this.logger.log(
+      'Login refresh cookie set',
+      JSON.stringify({
+        requestId: context.requestId,
+        origin: context.origin,
+        userAgent: context.userAgent,
+      }),
     );
 
     return this.authService.toPublicAuthResponse(result);

@@ -1721,6 +1721,21 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 
 ---
 
+### fix 000053 - افزودن لاگ تشخیصی امن برای خطاهای 500 بک‌اند
+
+- لاگ سراسری درخواست‌های HTTP به stdout/stderr اضافه شد؛ شامل `requestId`، متد، URL و route، status code، مدت اجرا، IP، هدرهای proxy/browser و body/query/params پاک‌سازی‌شده است.
+- فیلتر سراسری خطا بدون تغییر قرارداد پاسخ API توسعه یافت تا نام، پیام و stack trace استثنا را فقط در لاگ سرور همراه context امن درخواست ثبت کند؛ stack trace به client برگردانده نمی‌شود.
+- مراحل login شامل دریافت درخواست، نتیجه جست‌وجوی کاربر، رد کاربر غیرفعال/قفل‌شده، نتیجه بررسی رمز، شروع/موفقیت/شکست ساخت token و تنظیم refresh cookie لاگ می‌شوند؛ مقدار password، hash، token و cookie ثبت نمی‌شود.
+- تولید `requestId` پیش از CORS و route middleware انجام می‌شود؛ `x-request-id` ورودی استفاده و در نبود آن `crypto.randomUUID()` تولید و در header پاسخ قرار می‌گیرد.
+- redaction بازگشتی برای passwordها، tokenها، authorization/cookie، secretها، JWT/API key/private key و ساختارهای nested، array و circular اضافه شد.
+- برای IP واقعی پشت Nginx، Express `trust proxy` با مقدار `1` فعال شد.
+- فایل‌های تغییرکرده یا جدید مهم: `src/main.ts`، `src/audit-log/audit-log.module.ts`، `src/audit-log/audit-request-context.middleware.ts`، فایل‌های `src/common/logging/`، `src/common/filters/api-exception.filter.ts`، `src/auth/auth.controller.ts`، `src/auth/auth.service.ts` و `README.md`.
+- مشاهده لاگ زنده: `docker logs -f iam-crm-backend-api-1`
+- نتیجه بررسی: `npm run lint` با 0 خطا و 10 warning موجود موفق شد. build نخست به‌دلیل stale بودن Prisma Client ناموفق بود؛ `npx prisma generate` موفق شد، retry اول build به‌علت lock موقت `dist` با `EBUSY` متوقف شد و retry بعدی `npm run build` موفق بود.
+- Docker: سرویس‌های `db`، `minio`، `minio-init` و `api` شناسایی شدند و `docker compose up -d --build api` با موفقیت image را build و کانتینر API را recreate کرد. تست مستقیم login پس از deploy پاسخ 200 گرفت و لاگ امن با requestId و password برابر `[REDACTED]` ثبت شد. تست آدرس frontend/Nginx پاسخ 500 گرفت اما هیچ درخواست متناظری در لاگ backend ثبت نشد؛ بنابراین در این محیط خطای proxy پیش از رسیدن درخواست به backend رخ می‌دهد و بررسی تنظیمات Nginx/frontend لازم است.
+
+---
+
 **Built with ❤️ for the sales team**
 
 ---
