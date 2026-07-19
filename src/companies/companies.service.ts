@@ -18,6 +18,17 @@ import { ChangeOwnerDto, BulkChangeOwnerDto } from './dto/change-owner.dto';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import { CompanyAccessService } from './company-access.service';
+import { FindCompanyOptionsDto } from './dto/find-company-options.dto';
+
+const companyOptionSelect = {
+  id: true,
+  legalName: true,
+  brandName: true,
+  nationalId: true,
+  registrationNumber: true,
+  economicCode: true,
+  parentCompanyId: true,
+} satisfies Prisma.CompanySelect;
 
 @Injectable()
 export class CompaniesService {
@@ -26,6 +37,76 @@ export class CompaniesService {
     private audit: AuditLogService,
     private companyAccess: CompanyAccessService,
   ) {}
+
+  async findOptions(
+    user: CurrentUserPayload,
+    query: FindCompanyOptionsDto,
+  ): Promise<PaginatedResponse<Prisma.CompanyGetPayload<{ select: typeof companyOptionSelect }>>> {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 25;
+    const search = query.search?.trim();
+    const where: Prisma.CompanyWhereInput = {
+      organizationId: getCurrentOrganizationId(user),
+      ...(!query.includeArchived && { archivedAt: null }),
+      ...(query.excludeId && { id: { not: query.excludeId } }),
+    };
+
+    if (query.selectedId) {
+      where.id = query.excludeId
+        ? { equals: query.selectedId, not: query.excludeId }
+        : query.selectedId;
+    } else if (search) {
+      where.OR = [
+        { legalName: { contains: search, mode: 'insensitive' } },
+        { brandName: { contains: search, mode: 'insensitive' } },
+        { nationalId: { contains: search, mode: 'insensitive' } },
+        { registrationNumber: { contains: search, mode: 'insensitive' } },
+        { economicCode: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    const [data, total] = await Promise.all([
+      this.prisma.company.findMany({
+        where,
+        select: companyOptionSelect,
+        orderBy: [
+          { brandName: 'asc' },
+          { legalName: 'asc' },
+          { createdAt: 'desc' },
+          { id: 'asc' },
+        ],
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.company.count({ where }),
+    ]);
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages,
+        hasNext: page < totalPages,
+        hasPrevious: page > 1,
+      },
+    };
+  }
+
+  async findOption(id: string, user: CurrentUserPayload) {
+    const company = await this.prisma.company.findFirst({
+      where: {
+        id,
+        organizationId: getCurrentOrganizationId(user),
+      },
+      select: companyOptionSelect,
+    });
+
+    if (!company) throw new NotFoundException('Company not found');
+    return company;
+  }
 
   async findAll(
     user: CurrentUserPayload,
@@ -721,9 +802,15 @@ export class CompaniesService {
 
   private async validateRelatedCompanies(ids: string[], organizationId: string) {
     if (!ids.length) return;
-    const count = await this.prisma.company.count({ where: { id: { in: ids }, organizationId } });
-    if (count !== ids.length) {
+    const companies = await this.prisma.company.findMany({
+      where: { id: { in: ids }, organizationId },
+      select: { id: true, archivedAt: true },
+    });
+    if (companies.length !== ids.length) {
       throw new BadRequestException('All related companies must exist in the current organization');
+    }
+    if (companies.some((company) => company.archivedAt)) {
+      throw new BadRequestException('Archived companies cannot be used in company hierarchy');
     }
   }
 
@@ -740,6 +827,8 @@ export class CompaniesService {
     }
     const overlap = parents.find((id) => subsidiaries.includes(id));
     if (overlap) throw new BadRequestException('A company cannot be both parent and subsidiary directly');
+
+    await this.assertHierarchyAcyclic(tx, companyId, parents, subsidiaries);
 
     const reverse = await tx.companyHierarchyRelation.findFirst({
       where: {
@@ -761,5 +850,54 @@ export class CompaniesService {
       ],
       skipDuplicates: true,
     });
+  }
+
+  private async assertHierarchyAcyclic(
+    tx: Prisma.TransactionClient,
+    companyId: string,
+    parents: string[],
+    subsidiaries: string[],
+  ) {
+    const relations = await tx.companyHierarchyRelation.findMany({
+      where: {
+        parentCompany: { organizationId: (await tx.company.findUniqueOrThrow({
+          where: { id: companyId },
+          select: { organizationId: true },
+        })).organizationId },
+      },
+      select: { parentCompanyId: true, subsidiaryCompanyId: true },
+    });
+    const graph = new Map<string, Set<string>>();
+    const addEdge = (parent: string, child: string) => {
+      const children = graph.get(parent) ?? new Set<string>();
+      children.add(child);
+      graph.set(parent, children);
+    };
+    for (const relation of relations) {
+      if (relation.parentCompanyId !== companyId && relation.subsidiaryCompanyId !== companyId) {
+        addEdge(relation.parentCompanyId, relation.subsidiaryCompanyId);
+      }
+    }
+    const reaches = (start: string, target: string) => {
+      const pending = [start];
+      const visited = new Set<string>();
+      while (pending.length) {
+        const current = pending.pop()!;
+        if (current === target) return true;
+        if (visited.has(current)) continue;
+        visited.add(current);
+        pending.push(...(graph.get(current) ?? []));
+      }
+      return false;
+    };
+    for (const [parent, child] of [
+      ...parents.map((parent) => [parent, companyId] as const),
+      ...subsidiaries.map((subsidiary) => [companyId, subsidiary] as const),
+    ]) {
+      if (reaches(child, parent)) {
+        throw new BadRequestException('Company hierarchy cannot contain a cycle');
+      }
+      addEdge(parent, child);
+    }
   }
 }

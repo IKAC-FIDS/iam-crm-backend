@@ -4,6 +4,7 @@ import {
   Get,
   GoneException,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -22,6 +23,7 @@ import { UpdateCompanyDto } from './dto/update-company.dto';
 import { ChangeOwnerDto, BulkChangeOwnerDto } from './dto/change-owner.dto';
 import { FindCompaniesDto } from './dto/find-companies.dto';
 import { ArchiveCompanyDto } from './dto/archive-company.dto';
+import { FindCompanyOptionsDto } from './dto/find-company-options.dto';
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('companies')
@@ -48,6 +50,24 @@ export class CompaniesController {
       includeArchived: query.includeArchived === 'true',
       archivedOnly: query.archivedOnly === 'true',
     });
+  }
+
+  @Get('options')
+  @Permissions('company:view')
+  findOptions(
+    @CurrentUser() user: CurrentUserPayload,
+    @Query() query: FindCompanyOptionsDto,
+  ) {
+    return this.companiesService.findOptions(user, query);
+  }
+
+  @Get('options/:id')
+  @Permissions('company:view')
+  findOption(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.companiesService.findOption(id, user);
   }
 
   @Get(':id')

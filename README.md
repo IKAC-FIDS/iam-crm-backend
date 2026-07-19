@@ -309,6 +309,8 @@ Company list filters:
 
 ```http
 GET /api/companies?page=&limit=&stage=&priority=&search=&ownerId=&withoutOwner=&includeArchived=&archivedOnly=
+GET /api/companies/options?search=&page=&limit=&excludeId=&selectedId=&includeArchived=
+GET /api/companies/options/:id
 ```
 
 ### People
@@ -1898,6 +1900,20 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 - فایل‌های اصلی: `src/app.module.ts`، helper/module دسترسی شرکت و سرویس‌های companies/legal-documents، branches، social-channels، call-cards، activities، people و person subresources.
 - بررسی‌ها: `npm run lint` موفق با هشدارهای از قبل موجود؛ `npm run build` موفق. schema تغییر نکرد و migration لازم نبود؛ فقط `npx prisma generate` برای همگام‌سازی client اجرا شد.
 - بررسی دستی ADMIN/REP انجام نشد، چون credential و محیط API اجرایی در دسترس نبود.
+
+---
+
+### fix 000065 - جستجوی سمت سرور و صفحه‌بندی گزینه‌های شرکت
+
+- علت اصلی این بود که selectorهای فرانت‌اند فقط صفحه نخست و در عمل ۱۰ شرکت اول را دریافت می‌کردند؛ جستجوی سمت کاربر نیز نمی‌توانست شرکتی خارج از آن صفحه را پیدا کند. endpoint عمومی فهرست شرکت‌ها به‌دلیل response شامل relationهای owner، industry و source و قرارداد مورد استفاده صفحه شرکت‌ها تغییر نکرد.
+- endpoint سبک `GET /api/companies/options` با permission موجود `company:view` اضافه شد. پارامترها عبارت‌اند از `search`، `page`، `limit`، `excludeId`، `selectedId` و `includeArchived`. مقدار پیش‌فرض `page=1` و `limit=25` و سقف `limit=50` است؛ پاسخ از قالب موجود `data/meta` شامل total، totalPages، hasNext و hasPrevious استفاده می‌کند و هیچ relation سنگینی بارگذاری نمی‌شود.
+- جستجو پس از trim شدن مستقیماً در دیتابیس و به‌صورت case-insensitive روی `legalName`، `brandName`، `nationalId`، `registrationNumber` و فیلد موجود `economicCode` انجام می‌شود. ترتیب نتیجه deterministic و بر اساس brandName، legalName، createdAt و id است.
+- همه queryها با `organizationId` کاربر جاری محدود می‌شوند و هیچ owner/team scope پنهانی ندارند. شرکت‌های archived به‌صورت پیش‌فرض حذف می‌شوند و فقط با `includeArchived=true`، مطابق رفتار مجاز فعلی فهرست شرکت‌ها، قابل دریافت‌اند. `excludeId` در backend اعمال می‌شود.
+- hydration مقدار انتخاب‌شده هم با `selectedId` در endpoint فهرست و هم با `GET /api/companies/options/:id` و همان فیلدهای سبک پشتیبانی می‌شود. lookup مستقل از صفحه جستجو است، organization را enforce می‌کند و برای شرکت organization دیگر 404 می‌دهد.
+- اعتبارسنجی hierarchy چندوالدی موجود تقویت شد: self-parent/self-subsidiary، رابطه با شرکت organization دیگر، parent/subsidiary بایگانی‌شده و هر چرخه مستقیم یا چندسطحی رد می‌شود. تشخیص چرخه پیش از جایگزینی relationها روی graph سازمان جاری انجام می‌شود و داده معتبر موجود به‌صورت مخرب تغییر نمی‌کند.
+- فایل‌های اصلی جدید/تغییرکرده: `src/companies/dto/find-company-options.dto.ts`، `src/companies/companies.controller.ts`، `src/companies/companies.service.ts`، `test/companies.service.spec.ts` و `README.md`.
+- schema تغییر نکرد و migration لازم نیست. `npx prisma generate` برای همگام‌سازی Prisma Client قدیمی workspace با schema موجود اجرا و موفق شد؛ هیچ `db push`، reset یا دستور مخرب دیتابیس اجرا نشد.
+- نتایج بررسی: `npm run lint` موفق با ۰ خطا و ۹ warning از قبل موجود در فایل‌های نامرتبط؛ `npm run build` پس از generate موفق؛ تست متمرکز ۱ suite و ۱۶ تست موفق؛ مجموعه کامل `npm test -- --runInBand` شامل ۵ suite و ۳۰ تست موفق. هشدار non-blocking فقط همان ۹ warning lint موجود است.
 
 ---
 
