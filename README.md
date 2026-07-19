@@ -284,6 +284,7 @@ The permission system is designed to be **dynamic** and manageable from the admi
 | `PATCH` | `/api/users/:id/deactivate` | Deactivate user                                 |
 | `PATCH` | `/api/users/:id/activate`   | Activate user                                   |
 | `GET`   | `/api/users/owner-options`  | Get scoped active REP/MANAGER owner candidates  |
+| `GET`   | `/api/users/owner-options/v2` | Paginated, searchable owner candidates with explicit team filtering and selected-value hydration |
 
 User list filters, if enabled:
 
@@ -1914,6 +1915,22 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 - فایل‌های اصلی جدید/تغییرکرده: `src/companies/dto/find-company-options.dto.ts`، `src/companies/companies.controller.ts`، `src/companies/companies.service.ts`، `test/companies.service.spec.ts` و `README.md`.
 - schema تغییر نکرد و migration لازم نیست. `npx prisma generate` برای همگام‌سازی Prisma Client قدیمی workspace با schema موجود اجرا و موفق شد؛ هیچ `db push`، reset یا دستور مخرب دیتابیس اجرا نشد.
 - نتایج بررسی: `npm run lint` موفق با ۰ خطا و ۹ warning از قبل موجود در فایل‌های نامرتبط؛ `npm run build` پس از generate موفق؛ تست متمرکز ۱ suite و ۱۶ تست موفق؛ مجموعه کامل `npm test -- --runInBand` شامل ۵ suite و ۳۰ تست موفق. هشدار non-blocking فقط همان ۹ warning lint موجود است.
+
+---
+
+### fix 000066 - اصلاح دسترسی و محدوده سازمانی گزینه‌های مالک
+
+- علت اصلی 403 این بود که controller پس از کنترل permission `company:assign-owner` در `PermissionsGuard`، دوباره در `UsersService.getOwnerOptions` نقش پایه caller را فقط به ADMIN/MANAGER محدود می‌کرد. این شرط تکراری باعث ردشدن REP یا custom role دارای permission معتبر می‌شد و حذف شد؛ اکنون منبع authorization فقط احراز هویت، `company:assign-owner` و scope سازمان است و کاربر فاقد permission همچنان در guard پاسخ 403 می‌گیرد.
+- نقش caller از نقش owner قابل انتخاب جدا شد. caller با هر base role دارای permission می‌تواند endpoint را بخواند، اما گزینه‌های قابل تخصیص طبق business rule موجود فقط کاربران active با نقش پایه REP یا MANAGER هستند؛ ADMIN، BOARDS و کاربران inactive برگردانده نمی‌شوند.
+- endpoint سازگار `GET /api/users/owner-options` برای جلوگیری از شکستن consumerهای فعلی همچنان array سبک برمی‌گرداند، اما اکنون با `organizationId` کاربر جاری محدود است و هیچ فیلتر پنهان role/team caller ندارد. response فقط شامل `id`، `fullName`، `email`، `role`، `roleId`، `teamId`، `team` و خلاصه `teamRef` است.
+- endpoint جدید `GET /api/users/owner-options/v2` با همان permission اضافه شد. پارامترها `search`، `page`، `limit`، `teamId` و `selectedId` هستند؛ مقدار پیش‌فرض `page=1` و `limit=25` و سقف limit برابر 50 است. جستجو روی `fullName` و `email` به‌صورت case-insensitive در دیتابیس انجام می‌شود و پاسخ استاندارد `data/meta` شامل total، totalPages، hasNext و hasPrevious است.
+- `selectedId` مقدار انتخاب‌شده خارج از صفحه نخست را با همان scope سازمانی hydrate می‌کند. `teamId` فقط یک فیلتر صریح است و پیش از استفاده باید به team فعال همان organization اشاره کند؛ MANAGER یا custom role بدون ارسال این پارامتر به تیم خودش محدود نمی‌شود.
+- audit tenant isolation روی `UsersService` انجام شد: `findAll`، `findOne`، `deactivate`، `activate` و `updateUserRole` اکنون actor را از controller می‌گیرند و target را با `getCurrentOrganizationId(actor)` محدود می‌کنند. target سازمان دیگر با 404 پنهان می‌ماند و audit mutationها نیز organizationId را ثبت می‌کند. create از قبل organization actor را اعمال می‌کرد.
+- وابستگی frontend: consumerهای فعلی endpoint array بدون تغییر کار می‌کنند؛ برای search/pagination و hydration باید به `/api/users/owner-options/v2` مهاجرت کنند و گزینه‌ها را از `response.data` و metadata را از `response.meta` بخوانند. frontend repository در این workspace وجود ندارد و تغییری در آن انجام نشد.
+- فایل‌های اصلی جدید/تغییرکرده: `src/users/dto/find-owner-options.dto.ts`، `src/users/users.controller.ts`، `src/users/users.service.ts`، `test/users-owner-options.service.spec.ts` و `README.md`.
+- Prisma schema تغییر نکرد و migration لازم نیست. `npx prisma generate` فقط برای همگام‌سازی client موجود workspace اجرا و موفق شد؛ هیچ reset یا `db push` اجرا نشد.
+- نتایج بررسی: تست متمرکز owner options شامل ۱ suite و ۱۶ تست موفق؛ مجموعه کامل `npm test -- --runInBand` شامل ۶ suite و ۴۶ تست موفق؛ `npm run lint` موفق با ۰ خطا و ۹ warning از قبل موجود در فایل‌های نامرتبط؛ `npm run build` موفق.
+- محدودیت non-blocking: verification دستی با credential واقعی REP و frontend انجام نشد؛ پوشش خودکار service/guard از Prisma mock استفاده می‌کند.
 
 ---
 

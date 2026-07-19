@@ -7,6 +7,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserRoleDto } from './dto/update-user-role.dto';
 import { FindUsersDto } from './dto/find-users.dto';
 import { CurrentUser, CurrentUserPayload } from '../common/decorators/current-user.decorator';
+import { FindOwnerOptionsDto } from './dto/find-owner-options.dto';
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('users')
@@ -27,8 +28,8 @@ export class UsersController {
   // ============================================================
   @Get()
   @Permissions('user:view')
-  findAll(@Query() query: FindUsersDto) {
-    return this.usersService.findAll(query);
+  findAll(@Query() query: FindUsersDto, @CurrentUser() actor: CurrentUserPayload) {
+    return this.usersService.findAll(query, actor);
   }
 
   @Get('owner-options')
@@ -37,13 +38,22 @@ export class UsersController {
     return this.usersService.getOwnerOptions(user);
   }
 
+  @Get('owner-options/v2')
+  @Permissions('company:assign-owner')
+  findOwnerOptions(
+    @Query() query: FindOwnerOptionsDto,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.usersService.findOwnerOptions(user, query);
+  }
+
   // ============================================================
   // ۳. دریافت یک کاربر
   // ============================================================
   @Get(':id')
   @Permissions('user:view')
-  findOne(@Param('id') id: string) {
-    return this.usersService.findOne(id);
+  findOne(@Param('id') id: string, @CurrentUser() actor: CurrentUserPayload) {
+    return this.usersService.findOne(id, actor);
   }
 
   // ============================================================
@@ -52,7 +62,7 @@ export class UsersController {
   @Patch(':id/deactivate')
   @Permissions('user:deactivate')
   deactivate(@Param('id') id: string, @CurrentUser() actor: CurrentUserPayload) {
-    return this.usersService.deactivate(id, actor.userId);
+    return this.usersService.deactivate(id, actor);
   }
 
   // ============================================================
@@ -61,7 +71,7 @@ export class UsersController {
   @Patch(':id/activate')
   @Permissions('user:activate')
   activate(@Param('id') id: string, @CurrentUser() actor: CurrentUserPayload) {
-    return this.usersService.activate(id, actor.userId);
+    return this.usersService.activate(id, actor);
   }
 
   // ============================================================

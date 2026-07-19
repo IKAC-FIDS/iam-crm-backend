@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -9,12 +8,12 @@ import * as bcrypt from 'bcryptjs';
 import { AuditLogService } from '../audit-log/audit-log.service';
 import { CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { getCurrentOrganizationId } from '../common/tenant/tenant-scope.util';
-import { userTeamScopeWhere } from '../common/tenant/team-scope.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { CreateUserDto } from './dto/create-user.dto';
 import { FindUsersDto } from './dto/find-users.dto';
 import { UpdateUserRoleDto } from './dto/update-user-role.dto';
+import { FindOwnerOptionsDto } from './dto/find-owner-options.dto';
 
 const safeUserSelect = {
   id: true,
@@ -36,6 +35,17 @@ const safeUserSelect = {
   isActive: true,
   createdAt: true,
   updatedAt: true,
+} satisfies Prisma.UserSelect;
+
+const ownerOptionSelect = {
+  id: true,
+  fullName: true,
+  email: true,
+  role: true,
+  roleId: true,
+  teamId: true,
+  team: true,
+  teamRef: { select: { id: true, code: true, name: true } },
 } satisfies Prisma.UserSelect;
 
 @Injectable()
@@ -73,11 +83,13 @@ export class UsersService {
     return user;
   }
 
-  async findAll(query: FindUsersDto) {
+  async findAll(query: FindUsersDto, actor: CurrentUserPayload) {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const search = query.search?.trim();
-    const and: Prisma.UserWhereInput[] = [];
+    const and: Prisma.UserWhereInput[] = [
+      { organizationId: getCurrentOrganizationId(actor) },
+    ];
 
     if (query.role) and.push({ role: query.role });
     if (query.teamId) and.push({ teamId: query.teamId });
@@ -130,27 +142,73 @@ export class UsersService {
   }
 
   getOwnerOptions(user: CurrentUserPayload) {
-    if (user.role !== UserRole.ADMIN && user.role !== UserRole.MANAGER) {
-      throw new ForbiddenException('You do not have access to owner options');
-    }
-
-    const teamScope: Prisma.UserWhereInput =
-      user.role === UserRole.MANAGER ? userTeamScopeWhere(user) : {};
-
     return this.prisma.user.findMany({
       where: {
+        organizationId: getCurrentOrganizationId(user),
         isActive: true,
         role: { in: [UserRole.REP, UserRole.MANAGER] },
-        ...teamScope,
       },
-      select: safeUserSelect,
+      select: ownerOptionSelect,
       orderBy: [{ fullName: 'asc' }, { email: 'asc' }],
     });
   }
 
-  async findOne(id: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id },
+  async findOwnerOptions(user: CurrentUserPayload, query: FindOwnerOptionsDto) {
+    const organizationId = getCurrentOrganizationId(user);
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 25;
+    const search = query.search?.trim();
+
+    if (query.teamId) {
+      const team = await this.prisma.team.findFirst({
+        where: { id: query.teamId, organizationId, isActive: true },
+        select: { id: true },
+      });
+      if (!team) throw new NotFoundException('Team not found');
+    }
+
+    const where: Prisma.UserWhereInput = {
+      organizationId,
+      isActive: true,
+      role: { in: [UserRole.REP, UserRole.MANAGER] },
+      ...(query.teamId && { teamId: query.teamId }),
+    };
+    if (query.selectedId) {
+      where.id = query.selectedId;
+    } else if (search) {
+      where.OR = [
+        { fullName: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    const [data, total] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        select: ownerOptionSelect,
+        orderBy: [{ fullName: 'asc' }, { email: 'asc' }, { id: 'asc' }],
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.user.count({ where }),
+    ]);
+    const totalPages = Math.ceil(total / limit);
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages,
+        hasNext: page < totalPages,
+        hasPrevious: page > 1,
+      },
+    };
+  }
+
+  async findOne(id: string, actor: CurrentUserPayload) {
+    const user = await this.prisma.user.findFirst({
+      where: { id, organizationId: getCurrentOrganizationId(actor) },
       select: safeUserSelect,
     });
 
@@ -161,8 +219,9 @@ export class UsersService {
     return user;
   }
 
-  async deactivate(id: string, actorId?: string) {
-    const user = await this.prisma.user.findUnique({ where: { id } });
+  async deactivate(id: string, actor: CurrentUserPayload) {
+    const organizationId = getCurrentOrganizationId(actor);
+    const user = await this.prisma.user.findFirst({ where: { id, organizationId } });
 
     if (!user) {
       throw new NotFoundException('User not found');
@@ -175,7 +234,8 @@ export class UsersService {
     });
 
     await this.audit.record({
-      actorId,
+      actorId: actor.userId,
+      organizationId,
       entityType: 'user',
       entityId: id,
       action: 'user.deactivated',
@@ -186,8 +246,9 @@ export class UsersService {
     return updated;
   }
 
-  async activate(id: string, actorId?: string) {
-    const user = await this.prisma.user.findUnique({ where: { id } });
+  async activate(id: string, actor: CurrentUserPayload) {
+    const organizationId = getCurrentOrganizationId(actor);
+    const user = await this.prisma.user.findFirst({ where: { id, organizationId } });
 
     if (!user) {
       throw new NotFoundException('User not found');
@@ -204,7 +265,8 @@ export class UsersService {
     });
 
     await this.audit.record({
-      actorId,
+      actorId: actor.userId,
+      organizationId,
       entityType: 'user',
       entityId: id,
       action: 'user.activated',
@@ -219,8 +281,9 @@ export class UsersService {
     if (!dto.role && !dto.roleId) {
       throw new BadRequestException('role or roleId is required');
     }
-    const user = await this.prisma.user.findUnique({
-      where: { id },
+    const organizationId = actor ? getCurrentOrganizationId(actor) : undefined;
+    const user = await this.prisma.user.findFirst({
+      where: { id, ...(organizationId && { organizationId }) },
       include: { ownedCompanies: { select: { id: true } } },
     });
 
@@ -274,6 +337,7 @@ export class UsersService {
 
     await this.audit.record({
       actorId: actor?.userId,
+      organizationId,
       entityType: 'user',
       entityId: id,
       action: 'user.role_changed',
