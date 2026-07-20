@@ -1,13 +1,14 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
-import { Permissions } from '../common/decorators/permissions.decorator';
+import { AnyPermission, Permissions } from '../common/decorators/permissions.decorator';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserRoleDto } from './dto/update-user-role.dto';
 import { FindUsersDto } from './dto/find-users.dto';
 import { CurrentUser, CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { FindOwnerOptionsDto } from './dto/find-owner-options.dto';
+import { FindAssigneeOptionsDto } from './dto/find-assignee-options.dto';
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('users')
@@ -45,6 +46,12 @@ export class UsersController {
     @CurrentUser() user: CurrentUserPayload,
   ) {
     return this.usersService.findOwnerOptions(user, query);
+  }
+
+  @Get('assignee-options')
+  @AnyPermission('meeting:create', 'meeting:update')
+  findAssigneeOptions(@Query() query: FindAssigneeOptionsDto, @CurrentUser() user: CurrentUserPayload) {
+    return this.usersService.findAssigneeOptions(user, query);
   }
 
   // ============================================================

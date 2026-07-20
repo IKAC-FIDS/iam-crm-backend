@@ -1918,6 +1918,19 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 
 ---
 
+### fix 000067 - افزودن ماژول جلسات و یادآوری جلسه
+
+- جلسه به‌عنوان موجودیت مستقل `Meeting` با چرخه وضعیت `SCHEDULED`، `COMPLETED` و `CANCELLED` اضافه شد؛ `ActivityType.MEETING` همچنان فقط برای سوابق فعالیت‌ها باقی می‌ماند.
+- ارتباط الزامی با شرکت، ارتباط اختیاری با فرصت فروش، مسئولان داخلی رابطه‌ای و مخاطبان خارجی از نوع `Person` پیاده‌سازی شد. تمام اعتبارسنجی‌ها و عملیات با محدوده سازمان انجام می‌شوند.
+- APIهای سراسری ایجاد، فهرست صفحه‌بندی‌شده و فیلترشونده، جزئیات، ویرایش، تکمیل و لغو زیر `/api/meetings` اضافه شدند. فیلترهای شرکت و فرصت همان API سراسری را استفاده می‌کنند.
+- endpoint سبک `GET /api/users/assignee-options` با جست‌وجو و صفحه‌بندی برای کاربران فعال سازمان اضافه شد و مجوز آن به‌صورت any-of برای `meeting:create` و `meeting:update` است.
+- `reminderAt` با اعلان داخلی `MEETING_REMINDER` و مرجع `MEETING` یکپارچه شد. پردازش دقیقه‌ای با advisory lock تراکنشی PostgreSQL، گیرندگان deduplicate شده و ثبت اتمیک اعلان‌ها و `reminderSentAt` انجام می‌شود.
+- مجوزهای `meeting:view`، `meeting:create`، `meeting:update`، `meeting:complete` و `meeting:cancel` به seed اضافه شدند؛ ADMIN همه، MANAGER و REP همه مجوزهای عملیاتی، و BOARDS فقط مشاهده را دریافت می‌کنند. حذف سخت پیاده‌سازی نشده است.
+- migration: `20260720120000_add_meetings` (در پایگاه محلی هنوز اعمال نشده؛ `migrate status` همچنین یک migration پایگاه با نام `20260710203701_` را گزارش کرد که در فایل‌های محلی وجود ندارد).
+- فایل‌های مهم: `prisma/schema.prisma`، migration جدید، `prisma/seed.ts`، `src/meetings/*`، endpoint گزینه‌های مسئول در `src/users/*` و ثبت ماژول/scheduler در `src/app.module.ts`.
+- بررسی‌ها: `npx prisma generate` موفق؛ lint موفق با ۹ warning از قبل موجود و بدون error؛ build موفق؛ تمام ۷ suite و ۵۱ test موفق.
+- محدودیت: migration به دلیل اختلاف تاریخچه migration پایگاه محلی اعمال نشد و باید قبل از deploy اختلاف migration گمشده بررسی شود. ارسال اعلان فقط in-app است و پردازش هر نوبت حداکثر ۱۰۰ جلسه را claim می‌کند.
+
 ### fix 000066 - اصلاح دسترسی و محدوده سازمانی گزینه‌های مالک
 
 - علت اصلی 403 این بود که controller پس از کنترل permission `company:assign-owner` در `PermissionsGuard`، دوباره در `UsersService.getOwnerOptions` نقش پایه caller را فقط به ADMIN/MANAGER محدود می‌کرد. این شرط تکراری باعث ردشدن REP یا custom role دارای permission معتبر می‌شد و حذف شد؛ اکنون منبع authorization فقط احراز هویت، `company:assign-owner` و scope سازمان است و کاربر فاقد permission همچنان در guard پاسخ 403 می‌گیرد.

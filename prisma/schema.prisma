@@ -161,6 +161,18 @@ enum TaskStatus {
   CANCELLED
 }
 
+enum MeetingStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
+enum MeetingMode {
+  IN_PERSON
+  ONLINE
+  HYBRID
+}
+
 enum NotificationType {
   SYSTEM
   TASK_CREATED
@@ -172,6 +184,7 @@ enum NotificationType {
   COMMERCIAL_DOCUMENT_UPDATED
   PAYMENT_UPDATED
   ATTACHMENT_UPLOADED
+  MEETING_REMINDER
 }
 
 enum NotificationPriority {
@@ -189,6 +202,7 @@ enum NotificationEntityType {
   COMMERCIAL_DOCUMENT
   PAYMENT
   ATTACHMENT
+  MEETING
 }
 
 enum OrganizationStatus {
@@ -242,6 +256,13 @@ model User {
   assignedTasks  Task[] @relation("TaskAssignedTo")
   createdTasks   Task[] @relation("TaskCreatedBy")
   completedTasks Task[] @relation("TaskCompletedBy")
+
+  organizedMeetings      Meeting[]         @relation("MeetingOrganizer")
+  createdMeetings        Meeting[]         @relation("MeetingCreatedBy")
+  completedMeetings      Meeting[]         @relation("MeetingCompletedBy")
+  cancelledMeetings      Meeting[]         @relation("MeetingCancelledBy")
+  meetingAssignments     MeetingAssignee[] @relation("MeetingAssignedUser")
+  meetingAssignmentsMade MeetingAssignee[] @relation("MeetingAssignedBy")
 
   notifications       Notification[] @relation("NotificationRecipient")
   notificationActions Notification[] @relation("NotificationActor")
@@ -302,6 +323,7 @@ model Organization {
   notifications   Notification[]
   fileAttachments FileAttachment[]
   auditLogs       AuditLog[]
+  meetings        Meeting[]
 
   @@index([status])
   @@index([createdAt])
@@ -519,6 +541,7 @@ model Company {
   tasks                   Task[]
   legalDocuments          CompanyLegalDocument[]
   personEmploymentHistory PersonEmploymentHistory[]
+  meetings                Meeting[]
 
   organizationId String       @default("00000000-0000-4000-8000-000000000001")
   organization   Organization @relation(fields: [organizationId], references: [id])
@@ -634,11 +657,12 @@ model Person {
   email       String?
   phone       String?
 
-  contacts          PersonContact[]
-  socials           PersonSocial[]
-  tasks             Task[]
-  employmentHistory PersonEmploymentHistory[]
-  educationHistory  PersonEducationHistory[]
+  contacts           PersonContact[]
+  socials            PersonSocial[]
+  tasks              Task[]
+  employmentHistory  PersonEmploymentHistory[]
+  educationHistory   PersonEducationHistory[]
+  meetingAttendances MeetingAttendee[]
 
   activities           Activity[]
   primaryOpportunities Opportunity[] @relation("OpportunityPrimaryContact")
@@ -859,6 +883,7 @@ model Opportunity {
   commercialDocuments OpportunityCommercialDocument[]
   payments            OpportunityPayment[]
   tasks               Task[]
+  meetings            Meeting[]
   organizationId      String                          @default("00000000-0000-4000-8000-000000000001")
   organization        Organization                    @relation(fields: [organizationId], references: [id])
 
@@ -1097,6 +1122,77 @@ model Task {
   @@index([organizationId])
   @@index([organizationId, assignedToId, status, dueAt])
   @@map("tasks")
+}
+
+model Meeting {
+  id                 String            @id @default(uuid())
+  organizationId     String
+  organization       Organization      @relation(fields: [organizationId], references: [id])
+  companyId          String
+  company            Company           @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  opportunityId      String?
+  opportunity        Opportunity?      @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+  title              String
+  agenda             String?
+  description        String?
+  mode               MeetingMode
+  location           String?
+  meetingUrl         String?
+  startAt            DateTime
+  endAt              DateTime
+  reminderAt         DateTime?
+  reminderSentAt     DateTime?
+  status             MeetingStatus     @default(SCHEDULED)
+  organizerId        String
+  organizer          User              @relation("MeetingOrganizer", fields: [organizerId], references: [id], onDelete: Restrict)
+  createdById        String
+  createdBy          User              @relation("MeetingCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  completedAt        DateTime?
+  completedById      String?
+  completedBy        User?             @relation("MeetingCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
+  completionNote     String?
+  cancelledAt        DateTime?
+  cancelledById      String?
+  cancelledBy        User?             @relation("MeetingCancelledBy", fields: [cancelledById], references: [id], onDelete: SetNull)
+  cancellationReason String?
+  assignees          MeetingAssignee[]
+  attendees          MeetingAttendee[]
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  @@index([organizationId, startAt])
+  @@index([companyId, startAt])
+  @@index([opportunityId, startAt])
+  @@index([organizerId, startAt])
+  @@index([status, startAt])
+  @@index([reminderAt, reminderSentAt, status])
+  @@map("meetings")
+}
+
+model MeetingAssignee {
+  meetingId    String
+  meeting      Meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User     @relation("MeetingAssignedUser", fields: [userId], references: [id], onDelete: Cascade)
+  assignedById String?
+  assignedBy   User?    @relation("MeetingAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
+  createdAt    DateTime @default(now())
+
+  @@id([meetingId, userId])
+  @@index([userId])
+  @@map("meeting_assignees")
+}
+
+model MeetingAttendee {
+  meetingId String
+  meeting   Meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  personId  String
+  person    Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([meetingId, personId])
+  @@index([personId])
+  @@map("meeting_attendees")
 }
 
 model Notification {

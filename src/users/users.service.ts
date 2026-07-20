@@ -14,6 +14,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { FindUsersDto } from './dto/find-users.dto';
 import { UpdateUserRoleDto } from './dto/update-user-role.dto';
 import { FindOwnerOptionsDto } from './dto/find-owner-options.dto';
+import { FindAssigneeOptionsDto } from './dto/find-assignee-options.dto';
 
 const safeUserSelect = {
   id: true,
@@ -204,6 +205,15 @@ export class UsersService {
         hasPrevious: page > 1,
       },
     };
+  }
+
+  async findAssigneeOptions(user: CurrentUserPayload, query: FindAssigneeOptionsDto) {
+    const page = query.page ?? 1, limit = query.limit ?? 25, search = query.search?.trim();
+    const where: Prisma.UserWhereInput = { organizationId: getCurrentOrganizationId(user), isActive: true,
+      ...(query.selectedId ? { id: query.selectedId } : search ? { OR: [{ fullName: { contains: search, mode: 'insensitive' } }, { email: { contains: search, mode: 'insensitive' } }] } : {}) };
+    const [data, total] = await Promise.all([this.prisma.user.findMany({ where, select: ownerOptionSelect, orderBy: [{ fullName: 'asc' }, { email: 'asc' }], skip: (page - 1) * limit, take: limit }), this.prisma.user.count({ where })]);
+    const totalPages = Math.ceil(total / limit);
+    return { data, meta: { total, page, limit, totalPages, hasNext: page < totalPages, hasPrevious: page > 1 } };
   }
 
   async findOne(id: string, actor: CurrentUserPayload) {

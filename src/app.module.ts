@@ -38,6 +38,8 @@ import { OrganizationsModule } from './organizations/organizations.module';
 import { TeamsModule } from './teams/teams.module';
 import { UniversitiesModule } from './universities/universities.module';
 import { CompanyAccessModule } from './companies/company-access.module';
+import { ScheduleModule } from '@nestjs/schedule';
+import { MeetingsModule } from './meetings/meetings.module';
 
 @Module({
   imports: [
@@ -58,6 +60,7 @@ import { CompanyAccessModule } from './companies/company-access.module';
         ],
       }),
     }),
+    ScheduleModule.forRoot(),
     HealthModule,
     CompanyAccessModule,
     PrismaModule,
@@ -92,6 +95,7 @@ import { CompanyAccessModule } from './companies/company-access.module';
     OrganizationsModule,
     TeamsModule,
     UniversitiesModule,
+    MeetingsModule,
   ],
   providers: [
     {
