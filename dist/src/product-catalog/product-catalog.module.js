@@ -10,14 +10,24 @@ exports.ProductCatalogModule = void 0;
 const common_1 = require("@nestjs/common");
 const product_catalog_controller_1 = require("./product-catalog.controller");
 const product_catalog_service_1 = require("./product-catalog.service");
+const product_pricing_service_1 = require("./product-pricing.service");
+const product_price_history_service_1 = require("./product-price-history.service");
 let ProductCatalogModule = class ProductCatalogModule {
 };
 exports.ProductCatalogModule = ProductCatalogModule;
 exports.ProductCatalogModule = ProductCatalogModule = __decorate([
     (0, common_1.Module)({
         controllers: [product_catalog_controller_1.ProductCatalogController],
-        providers: [product_catalog_service_1.ProductCatalogService],
-        exports: [product_catalog_service_1.ProductCatalogService],
+        providers: [
+            product_catalog_service_1.ProductCatalogService,
+            product_pricing_service_1.ProductPricingService,
+            product_price_history_service_1.ProductPriceHistoryService,
+        ],
+        exports: [
+            product_catalog_service_1.ProductCatalogService,
+            product_pricing_service_1.ProductPricingService,
+            product_price_history_service_1.ProductPriceHistoryService,
+        ],
     })
 ], ProductCatalogModule);
 //# sourceMappingURL=product-catalog.module.js.map

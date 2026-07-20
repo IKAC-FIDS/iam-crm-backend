@@ -3,17 +3,26 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
-} from '@nestjs/common';
-import { PricingCurrency, Prisma } from '@prisma/client';
-import { AuditLogService } from '../audit-log/audit-log.service';
-import { CurrentUserPayload } from '../common/decorators/current-user.decorator';
-import { PrismaService } from '../prisma/prisma.service';
-import { CreateProductCatalogItemDto } from './dto/create-product-catalog-item.dto';
-import { FindProductCatalogItemsDto } from './dto/find-product-catalog-items.dto';
-import { UpdateProductCatalogItemDto } from './dto/update-product-catalog-item.dto';
-import { ProductPricingService } from './product-pricing.service';
+} from "@nestjs/common";
+import {
+  PricingCurrency,
+  Prisma,
+  ProductPriceHistoryReason,
+} from "@prisma/client";
+import { AuditLogService } from "../audit-log/audit-log.service";
+import { CurrentUserPayload } from "../common/decorators/current-user.decorator";
+import { PrismaService } from "../prisma/prisma.service";
+import { CreateProductCatalogItemDto } from "./dto/create-product-catalog-item.dto";
+import { FindProductCatalogItemsDto } from "./dto/find-product-catalog-items.dto";
+import { UpdateProductCatalogItemDto } from "./dto/update-product-catalog-item.dto";
+import { ProductPricingService } from "./product-pricing.service";
+import { ProductPriceHistoryService } from "./product-price-history.service";
 
-const productInclude = { calculatedExchangeRate: { select: { id: true, rate: true, validFrom: true, validTo: true } } } satisfies Prisma.ProductCatalogItemInclude;
+const productInclude = {
+  calculatedExchangeRate: {
+    select: { id: true, rate: true, validFrom: true, validTo: true },
+  },
+} satisfies Prisma.ProductCatalogItemInclude;
 
 @Injectable()
 export class ProductCatalogService {
@@ -21,6 +30,7 @@ export class ProductCatalogService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditLogService,
     private readonly pricing: ProductPricingService,
+    private readonly history: ProductPriceHistoryService,
   ) {}
 
   async findAll(query: FindProductCatalogItemsDto) {
@@ -30,13 +40,13 @@ export class ProductCatalogService {
     const where: Prisma.ProductCatalogItemWhereInput = {};
 
     if (query.active !== undefined) {
-      where.isActive = query.active === 'true';
+      where.isActive = query.active === "true";
     }
 
     if (query.category?.trim()) {
       where.category = {
         equals: query.category.trim(),
-        mode: 'insensitive',
+        mode: "insensitive",
       };
     }
 
@@ -44,10 +54,10 @@ export class ProductCatalogService {
       const search = query.search.trim();
 
       where.OR = [
-        { code: { contains: search, mode: 'insensitive' } },
-        { name: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } },
-        { category: { contains: search, mode: 'insensitive' } },
+        { code: { contains: search, mode: "insensitive" } },
+        { name: { contains: search, mode: "insensitive" } },
+        { description: { contains: search, mode: "insensitive" } },
+        { category: { contains: search, mode: "insensitive" } },
       ];
     }
 
@@ -55,7 +65,7 @@ export class ProductCatalogService {
       this.prisma.productCatalogItem.findMany({
         where,
         include: productInclude,
-        orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+        orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
         skip: (page - 1) * limit,
         take: limit,
       }),
@@ -84,7 +94,7 @@ export class ProductCatalogService {
     });
 
     if (!item) {
-      throw new NotFoundException('محصول یا سرویس پیدا نشد');
+      throw new NotFoundException("محصول یا سرویس پیدا نشد");
     }
 
     return item;
@@ -98,10 +108,11 @@ export class ProductCatalogService {
     });
 
     if (existing) {
-      throw new ConflictException('کد محصول یا سرویس قبلاً ثبت شده است');
+      throw new ConflictException("کد محصول یا سرویس قبلاً ثبت شده است");
     }
 
-    const compatibilityPrice = dto.inPersonInputPrice ?? dto.defaultUnitPrice ?? '0';
+    const compatibilityPrice =
+      dto.inPersonInputPrice ?? dto.defaultUnitPrice ?? "0";
     const prices = await this.pricing.calculate({
       pricingCurrency: dto.pricingCurrency ?? PricingCurrency.IRR,
       inPersonInputPrice: compatibilityPrice,
@@ -109,26 +120,39 @@ export class ProductCatalogService {
       inPersonProfitPercent: dto.inPersonProfitPercent,
       digikalaProfitPercent: dto.digikalaProfitPercent,
     });
-    const item = await this.prisma.productCatalogItem.create({
-      data: {
-        code,
-        name: dto.name.trim(),
-        description: dto.description?.trim() || undefined,
-        category: dto.category?.trim() || undefined,
-        unit: dto.unit?.trim() || undefined,
-        ...prices,
-        defaultUnitPrice: prices.inPersonPriceIrr,
-        currency: 'IRR',
-        isActive: dto.isActive ?? true,
-        sortOrder: dto.sortOrder ?? 0,
-      }, include: productInclude,
+    const item = await this.prisma.$transaction(async (tx) => {
+      const createdAt = new Date();
+      const created = await tx.productCatalogItem.create({
+        data: {
+          code,
+          name: dto.name.trim(),
+          description: dto.description?.trim() || undefined,
+          category: dto.category?.trim() || undefined,
+          unit: dto.unit?.trim() || undefined,
+          ...prices,
+          defaultUnitPrice: prices.inPersonPriceIrr,
+          currency: "IRR",
+          isActive: dto.isActive ?? true,
+          sortOrder: dto.sortOrder ?? 0,
+        },
+        include: productInclude,
+      });
+      await this.history.append(
+        tx,
+        created.id,
+        created,
+        ProductPriceHistoryReason.PRODUCT_CREATED,
+        createdAt,
+        user.userId,
+      );
+      return created;
     });
 
     await this.audit.record({
       actorId: user.userId,
-      entityType: 'product-catalog-item',
+      entityType: "product-catalog-item",
       entityId: item.id,
-      action: 'product.created',
+      action: "product.created",
       after: item,
     });
 
@@ -155,7 +179,7 @@ export class ProductCatalogService {
       });
 
       if (duplicate) {
-        throw new ConflictException('کد محصول یا سرویس قبلاً ثبت شده است');
+        throw new ConflictException("کد محصول یا سرویس قبلاً ثبت شده است");
       }
 
       data.code = code;
@@ -165,7 +189,7 @@ export class ProductCatalogService {
       const name = dto.name.trim();
 
       if (!name) {
-        throw new BadRequestException('نام محصول یا سرویس الزامی است');
+        throw new BadRequestException("نام محصول یا سرویس الزامی است");
       }
 
       data.name = name;
@@ -183,18 +207,43 @@ export class ProductCatalogService {
       data.unit = dto.unit?.trim() || null;
     }
 
-    const pricingChanged = dto.pricingCurrency !== undefined || dto.inPersonInputPrice !== undefined || dto.digikalaInputPrice !== undefined || dto.inPersonProfitPercent !== undefined || dto.digikalaProfitPercent !== undefined || dto.defaultUnitPrice !== undefined;
+    const pricingChanged =
+      dto.pricingCurrency !== undefined ||
+      dto.inPersonInputPrice !== undefined ||
+      dto.digikalaInputPrice !== undefined ||
+      dto.inPersonProfitPercent !== undefined ||
+      dto.digikalaProfitPercent !== undefined ||
+      dto.defaultUnitPrice !== undefined;
     if (pricingChanged) {
       const nextCurrency = dto.pricingCurrency ?? current.pricingCurrency;
       const compatibilityPrice = dto.defaultUnitPrice;
       const prices = await this.pricing.calculate({
         pricingCurrency: nextCurrency,
-        inPersonInputPrice: dto.inPersonInputPrice ?? compatibilityPrice ?? current.inPersonInputPrice,
-        digikalaInputPrice: dto.digikalaInputPrice ?? compatibilityPrice ?? current.digikalaInputPrice,
-        inPersonProfitPercent: dto.inPersonProfitPercent !== undefined ? dto.inPersonProfitPercent : nextCurrency === PricingCurrency.IRR ? null : current.inPersonProfitPercent,
-        digikalaProfitPercent: dto.digikalaProfitPercent !== undefined ? dto.digikalaProfitPercent : nextCurrency === PricingCurrency.IRR ? null : current.digikalaProfitPercent,
+        inPersonInputPrice:
+          dto.inPersonInputPrice ??
+          compatibilityPrice ??
+          current.inPersonInputPrice,
+        digikalaInputPrice:
+          dto.digikalaInputPrice ??
+          compatibilityPrice ??
+          current.digikalaInputPrice,
+        inPersonProfitPercent:
+          dto.inPersonProfitPercent !== undefined
+            ? dto.inPersonProfitPercent
+            : nextCurrency === PricingCurrency.IRR
+              ? null
+              : current.inPersonProfitPercent,
+        digikalaProfitPercent:
+          dto.digikalaProfitPercent !== undefined
+            ? dto.digikalaProfitPercent
+            : nextCurrency === PricingCurrency.IRR
+              ? null
+              : current.digikalaProfitPercent,
       });
-      Object.assign(data, prices, { defaultUnitPrice: prices.inPersonPriceIrr, currency: 'IRR' });
+      Object.assign(data, prices, {
+        defaultUnitPrice: prices.inPersonPriceIrr,
+        currency: "IRR",
+      });
     }
 
     if (dto.isActive !== undefined) {
@@ -205,17 +254,38 @@ export class ProductCatalogService {
       data.sortOrder = dto.sortOrder;
     }
 
-    const updated = await this.prisma.productCatalogItem.update({
-      where: { id },
-      data,
-      include: productInclude,
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw<Array<{ lockResult: string | null }>>(Prisma.sql`
+        SELECT CAST(pg_advisory_xact_lock(hashtext(${id})) AS TEXT) AS "lockResult"
+      `);
+      const locked = await tx.productCatalogItem.findUnique({
+        where: { id },
+        include: productInclude,
+      });
+      if (!locked) throw new NotFoundException("Product not found");
+      const next = await tx.productCatalogItem.update({
+        where: { id },
+        data,
+        include: productInclude,
+      });
+      if (pricingChanged && this.pricingDiffers(locked, next)) {
+        await this.history.append(
+          tx,
+          id,
+          next,
+          ProductPriceHistoryReason.PRODUCT_UPDATED,
+          new Date(),
+          user.userId,
+        );
+      }
+      return next;
     });
 
     await this.audit.record({
       actorId: user.userId,
-      entityType: 'product-catalog-item',
+      entityType: "product-catalog-item",
       entityId: id,
-      action: 'product.updated',
+      action: "product.updated",
       before: current,
       after: updated,
     });
@@ -233,9 +303,9 @@ export class ProductCatalogService {
 
     await this.audit.record({
       actorId: user.userId,
-      entityType: 'product-catalog-item',
+      entityType: "product-catalog-item",
       entityId: id,
-      action: 'product.activated',
+      action: "product.activated",
       before: current,
       after: updated,
     });
@@ -253,9 +323,9 @@ export class ProductCatalogService {
 
     await this.audit.record({
       actorId: user.userId,
-      entityType: 'product-catalog-item',
+      entityType: "product-catalog-item",
       entityId: id,
-      action: 'product.deactivated',
+      action: "product.deactivated",
       before: current,
       after: updated,
     });
@@ -267,9 +337,30 @@ export class ProductCatalogService {
     const normalized = code.trim().toUpperCase();
 
     if (!normalized) {
-      throw new BadRequestException('کد محصول یا سرویس الزامی است');
+      throw new BadRequestException("کد محصول یا سرویس الزامی است");
     }
 
     return normalized;
+  }
+
+  private pricingDiffers(a: Record<string, any>, b: Record<string, any>) {
+    const fields = [
+      "pricingCurrency",
+      "inPersonInputPrice",
+      "digikalaInputPrice",
+      "inPersonProfitPercent",
+      "digikalaProfitPercent",
+      "inPersonPriceIrr",
+      "digikalaPriceIrr",
+      "calculatedExchangeRateId",
+    ];
+    return fields.some((field) => {
+      const left = a[field],
+        right = b[field];
+      if (left == null || right == null) return left !== right;
+      return left instanceof Prisma.Decimal || right instanceof Prisma.Decimal
+        ? !new Prisma.Decimal(left).equals(right)
+        : left !== right;
+    });
   }
 }

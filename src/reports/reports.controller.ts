@@ -10,6 +10,7 @@ import { ReportFiltersDto } from "./dto/report-filters.dto";
 import { AdvancedReportFiltersDto } from "./dto/advanced-report-filters.dto";
 import { AdvancedReportsService } from "./advanced-reports.service";
 import { ReportsService } from "./reports.service";
+import { CommercialReportsService } from "./commercial-reports.service";
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @Permissions("report:view")
@@ -18,7 +19,29 @@ export class ReportsController {
   constructor(
     private reportsService: ReportsService,
     private advancedReportsService: AdvancedReportsService,
+    private commercialReportsService: CommercialReportsService,
   ) {}
+
+  @Get("financial/collections")
+  getFinancialCollections(
+    @Query() filters: AdvancedReportFiltersDto,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.commercialReportsService.financial(filters, user);
+  }
+
+  @Get("products/performance")
+  getProductPerformance(
+    @Query() filters: AdvancedReportFiltersDto,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.commercialReportsService.products(filters, user);
+  }
+
+  @Get("exchange-rates/impact")
+  getExchangeRateImpact(@Query() filters: AdvancedReportFiltersDto) {
+    return this.commercialReportsService.exchangeImpact(filters);
+  }
 
   @Get("opportunities/forecast")
   getOpportunityForecast(

@@ -12,13 +12,21 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.CreateOpportunityLineItemDto = void 0;
 const class_validator_1 = require("class-validator");
 const class_transformer_1 = require("class-transformer");
+const client_1 = require("@prisma/client");
+const class_validator_2 = require("class-validator");
 class CreateOpportunityLineItemDto {
 }
 exports.CreateOpportunityLineItemDto = CreateOpportunityLineItemDto;
 __decorate([
+    (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsUUID)(),
-    __metadata("design:type", String)
+    __metadata("design:type", Object)
 ], CreateOpportunityLineItemDto.prototype, "productId", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_2.IsEnum)(client_1.SalesChannel),
+    __metadata("design:type", String)
+], CreateOpportunityLineItemDto.prototype, "salesChannel", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),

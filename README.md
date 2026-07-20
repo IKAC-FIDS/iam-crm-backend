@@ -1474,7 +1474,7 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 
 - Reviewed all Prisma `DateTime` fields and did not convert any field from `DateTime` to `String` for Jalali date display support.
 - Moved date input validation for activity, task, opportunity, commercial document, payment, report, and audit-log DTOs to the shared `IsApiDateString` validator.
-- The API continues to accept Gregorian ISO 8601 values or `YYYY-MM-DD` for business/date-only fields. Jalali/Persian strings such as `۱۴۰۳/۰۵/۲۰` are invalid and must not be sent to the backend.
+- The API continues to accept Gregorian ISO 8601 values or `YYYY-MM-DD` for business/date-only fields. Jalali date strings such as `1403/05/20` are invalid and must not be sent to the backend.
 - Normalized `YYYY-MM-DD` values to UTC midnight for persistence to reduce timezone and off-by-one errors.
 - Date-range filters with a date-only `to` value use an exclusive upper bound on the following day. For example, `dueTo=2026-07-12` covers the entire day of July 12, 2026.
 - Jalali conversion remains exclusively a frontend responsibility. The frontend must convert a date selected in a Jalali UI to Gregorian `YYYY-MM-DD` or an ISO date-time value before sending it to the backend.
@@ -1655,7 +1655,7 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 
 ---
 
-### fix 000049 - اصلاح آپلود فایل سند تجاری با multipart/form-data
+### fix 000049 - Correct commercial document upload with multipart/form-data
 
 - Updated the commercial-document upload contract for `POST /api/opportunities/:opportunityId/commercial-documents/upload` so the multipart file field remains `file`, while metadata is validated with an upload-specific DTO.
 - Fixed the likely HTTP 400 cause for browser `FormData`: optional empty strings are now normalized before validation, numeric and boolean multipart fields are parsed, and frontend aliases such as `documentType`, `issueDate`, `dueDate`, `expiresAt`, `externalUrl`, and `isSigned` are accepted for the upload endpoint.
@@ -1673,7 +1673,7 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 
 ---
 
-### fix 000050 - رفع دانلود فایل‌های پیوست از MinIO
+### fix 000050 - Fix attachment downloads from MinIO
 
 - Hardened `GET /api/attachments/:id/download` so a successful object-storage read is not turned into an HTTP 500 by a download audit-log write failure.
 - Download audit logging is now best-effort for this endpoint: failures are logged server-side, while the already-authorized file stream can still be returned to the user.
@@ -1690,306 +1690,319 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 
 ---
 
-### fix 000051 - رفع دانلود فایل‌های پیوست با عبور StreamableFile از پاسخ استاندارد
+### fix 000051 - Allow StreamableFile to bypass the standardized response envelope
 
 - Fixed the binary download response path by making `ApiResponseInterceptor` pass through `StreamableFile` payloads unchanged.
-- Cause of the HTTP 500: the global `ApiResponseInterceptor` wrapped every payload as JSON (`{ success: true, data: payload }`), which is correct for normal APIs but breaks NestJS file streaming responses.
+- Cause of the HTTP 500: the global `ApiResponseInterceptor` wrapped every payload as JSON (`{ success: true, data: payload }`), which is correct for normal APIs but breaks NestJS file-streaming responses.
 - Normal JSON responses, paginated responses, and already-standard responses keep the existing standardized API envelope.
 - Updated CORS exposed headers so the frontend can read download metadata: `x-request-id`, `Content-Disposition`, `Content-Length`, and `Content-Type`.
-- Verified the attachment download controller still sets `Content-Type`, `Content-Length`, and RFC 5987-compatible `Content-Disposition`.
+- Verified that the attachment download controller still sets `Content-Type`, `Content-Length`, and RFC 5987-compatible `Content-Disposition`.
 - Important changed files:
   - `src/common/interceptors/api-response.interceptor.ts`
   - `src/main.ts`
   - `README.md`
-- Frontend dependency: continue using `GET /api/attachments/:id/download`; the frontend can now read `Content-Disposition` to get the filename.
+- Frontend dependency: continue using `GET /api/attachments/:id/download`; the frontend can now read `Content-Disposition` to obtain the filename.
 - No migration was required; the schema was unchanged.
 - Validation status: `npx prisma validate` passed; `npx prisma generate` passed and was needed to refresh the stale local Prisma Client before build; `npm run lint` passed with 10 existing warnings and 0 errors; `npm run build` passed after generation.
 
 ---
 
-### fix 000052 - اصلاح Dockerfile بک‌اند برای حذف وابستگی به Alpine apk
+### fix 000052 - Replace the Alpine apk dependency in the backend Dockerfile
 
-- علت خطای build این بود که Dockerfile از `node:20-alpine` و `apk add --no-cache openssl` استفاده می‌کرد و repositoryهای Alpine در زمان build با خطای TLS/`openssl (no such package)` شکست می‌خوردند.
-- base imageهای Dockerfile از Alpine به Debian slim تغییر کردند: `node:20-bookworm-slim` برای stageهای build و runtime.
-- نصب packageهای runtime/build از `apk` به الگوی امن `apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates && rm -rf /var/lib/apt/lists/*` تغییر کرد.
-- ساختار multi-stage حفظ شد: نصب dependencyها با `npm ci` در build، اجرای `npx prisma generate`، build NestJS، و نصب dependencyهای runtime با `npm ci --omit=dev`.
-- رفتار startup فعلی حفظ شد و کانتینر همچنان قبل از اجرای برنامه `npx prisma migrate deploy` را اجرا می‌کند.
-- `.dockerignore` اضافه شد تا `node_modules`, `dist`, `.git`, logها، storage/uploads/cache/tmp و فایل‌های `.env` وارد build context نشوند و حجم context کاهش پیدا کند.
-- Prisma schema و migrationها تغییر نکردند و هیچ دستور destructive دیتابیس اجرا نشد.
-- فایل‌های مهم تغییرکرده:
+- The build failure was caused by the Dockerfile using `node:20-alpine` and `apk add --no-cache openssl`, while Alpine repositories failed during the build with TLS and `openssl (no such package)` errors.
+- Changed the Dockerfile base images from Alpine to Debian slim: `node:20-bookworm-slim` is now used for both the build and runtime stages.
+- Replaced `apk` package installation with the safer pattern `apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates && rm -rf /var/lib/apt/lists/*`.
+- Preserved the multi-stage structure: dependencies are installed with `npm ci` in the build stage, followed by `npx prisma generate`, the NestJS build, and runtime dependency installation with `npm ci --omit=dev`.
+- Preserved the existing startup behavior; the container still runs `npx prisma migrate deploy` before starting the application.
+- Added `.dockerignore` to exclude `node_modules`, `dist`, `.git`, logs, storage/uploads/cache/tmp directories, and `.env` files from the build context.
+- No Prisma schema or migration changes were made, and no destructive database command was executed.
+- Important changed files:
   - `Dockerfile`
   - `.dockerignore`
   - `README.md`
-- وضعیت بررسی‌ها: `docker compose config --services` اجرا شد؛ نتیجه سرویس‌ها `db`, `minio`, `minio-init`, `api` بود. `docker compose build --no-cache --progress=plain api` موفق شد و build context به حدود `135KB` کاهش یافت. `docker compose up -d` موفق شد. `docker compose ps` کانتینر `iam-crm-backend-api-1` را `Up` نشان داد و `docker logs --tail 120 iam-crm-backend-api-1` شروع موفق NestJS روی پورت `3000` را نشان داد.
+- Validation status: `docker compose config --services` returned `db`, `minio`, `minio-init`, and `api`; `docker compose build --no-cache --progress=plain api` passed and reduced the build context to approximately `135KB`; `docker compose up -d` passed; `docker compose ps` showed `iam-crm-backend-api-1` as `Up`; and `docker logs --tail 120 iam-crm-backend-api-1` confirmed that NestJS started successfully on port `3000`.
 
 ---
 
-### fix 000053 - افزودن لاگ تشخیصی امن برای خطاهای 500 بک‌اند
+### fix 000053 - Add secure diagnostic logging for backend HTTP 500 errors
 
-- لاگ سراسری درخواست‌های HTTP به stdout/stderr اضافه شد؛ شامل `requestId`، متد، URL و route، status code، مدت اجرا، IP، هدرهای proxy/browser و body/query/params پاک‌سازی‌شده است.
-- فیلتر سراسری خطا بدون تغییر قرارداد پاسخ API توسعه یافت تا نام، پیام و stack trace استثنا را فقط در لاگ سرور همراه context امن درخواست ثبت کند؛ stack trace به client برگردانده نمی‌شود.
-- مراحل login شامل دریافت درخواست، نتیجه جست‌وجوی کاربر، رد کاربر غیرفعال/قفل‌شده، نتیجه بررسی رمز، شروع/موفقیت/شکست ساخت token و تنظیم refresh cookie لاگ می‌شوند؛ مقدار password، hash، token و cookie ثبت نمی‌شود.
-- تولید `requestId` پیش از CORS و route middleware انجام می‌شود؛ `x-request-id` ورودی استفاده و در نبود آن `crypto.randomUUID()` تولید و در header پاسخ قرار می‌گیرد.
-- redaction بازگشتی برای passwordها، tokenها، authorization/cookie، secretها، JWT/API key/private key و ساختارهای nested، array و circular اضافه شد.
-- برای IP واقعی پشت Nginx، Express `trust proxy` با مقدار `1` فعال شد.
-- فایل‌های تغییرکرده یا جدید مهم: `src/main.ts`، `src/audit-log/audit-log.module.ts`، `src/audit-log/audit-request-context.middleware.ts`، فایل‌های `src/common/logging/`، `src/common/filters/api-exception.filter.ts`، `src/auth/auth.controller.ts`، `src/auth/auth.service.ts` و `README.md`.
-- مشاهده لاگ زنده: `docker logs -f iam-crm-backend-api-1`
-- نتیجه بررسی: `npm run lint` با 0 خطا و 10 warning موجود موفق شد. build نخست به‌دلیل stale بودن Prisma Client ناموفق بود؛ `npx prisma generate` موفق شد، retry اول build به‌علت lock موقت `dist` با `EBUSY` متوقف شد و retry بعدی `npm run build` موفق بود.
-- Docker: سرویس‌های `db`، `minio`، `minio-init` و `api` شناسایی شدند و `docker compose up -d --build api` با موفقیت image را build و کانتینر API را recreate کرد. تست مستقیم login پس از deploy پاسخ 200 گرفت و لاگ امن با requestId و password برابر `[REDACTED]` ثبت شد. تست آدرس frontend/Nginx پاسخ 500 گرفت اما هیچ درخواست متناظری در لاگ backend ثبت نشد؛ بنابراین در این محیط خطای proxy پیش از رسیدن درخواست به backend رخ می‌دهد و بررسی تنظیمات Nginx/frontend لازم است.
-
----
-
-### fix 000054 - اصلاح مستندسازی و لاگ CORS برای استقرار فرانت production
-
-- علت اصلی خطای login مرورگر این بود که Origin فرانت production یعنی `http://89.42.199.159:8080` در allowlist متغیر `CORS_ORIGINS` بک‌اند وجود نداشت.
-- تنظیم لازم برای محیط production: `CORS_ORIGINS=http://localhost:5173,http://89.42.199.159:8080` و `CORS_CREDENTIALS=true`.
-- درخواست curl بدون هدر `Origin` ممکن است موفق شود، درحالی‌که مرورگر همان endpoint را به‌دلیل اعمال CORS با خطا مواجه می‌کند؛ بنابراین تست production باید هدر Origin واقعی فرانت را نیز ارسال کند.
-- رد شدن Origin اکنون با status 403 و کد `CORS_ORIGIN_REJECTED` پاسخ داده می‌شود و در لاگ سرور Origin ردشده، `requestId`، مسیر درخواست و تعداد/فهرست Originهای مجاز ثبت می‌شود. stack trace به client ارسال نمی‌شود.
-- استفاده از `*` همراه `CORS_CREDENTIALS=true` مجاز نیست و باعث توقف امن startup می‌شود؛ CORS، Helmet و validation فعال باقی مانده‌اند.
-- مقدار Docker اصلاح شد و تعریف تکراری و متناقض `CORS_CREDENTIALS` از `.env.docker` حذف شد. URL هر فرانت production باید صریحاً در `CORS_ORIGINS` فایل env مورد استفاده Docker قرار گیرد.
-- فایل‌های تغییرکرده: `src/main.ts`، `.env.example`، `.env.docker` و `README.md`.
-- پس از تغییر env، بازسازی کانتینر بدون build با این دستور انجام می‌شود: `docker compose up -d --force-recreate api`.
-- نتیجه بررسی: `npm run lint` با 0 خطا و 10 warning موجود موفق شد. اجرای اولیه `npm run build` به‌دلیل stale بودن Prisma Client با خطاهای type مربوط به مدل Team ناموفق بود؛ پس از اجرای موفق `npx prisma generate`، اجرای مجدد `npm run build` موفق شد.
+- Added global HTTP request logging to stdout/stderr, including `requestId`, method, URL and route, status code, duration, IP address, proxy/browser headers, and sanitized body/query/params data.
+- Extended the global exception filter without changing the API response contract. Exception name, message, and stack trace are logged only on the server together with safe request context; stack traces are never returned to clients.
+- Added login-stage logging for request receipt, user lookup result, inactive/locked-user rejection, password-verification result, token creation start/success/failure, and refresh-cookie configuration. Passwords, hashes, tokens, and cookies are never logged.
+- Moved `requestId` generation ahead of CORS and route middleware. An incoming `x-request-id` is reused; otherwise, `crypto.randomUUID()` generates one and the value is returned in the response header.
+- Added recursive redaction for passwords, tokens, authorization/cookie values, secrets, JWTs, API keys, private keys, and nested, array, or circular structures.
+- Enabled Express `trust proxy` with a value of `1` so the real client IP can be resolved behind Nginx.
+- Important changed or new files: `src/main.ts`, `src/audit-log/audit-log.module.ts`, `src/audit-log/audit-request-context.middleware.ts`, files under `src/common/logging/`, `src/common/filters/api-exception.filter.ts`, `src/auth/auth.controller.ts`, `src/auth/auth.service.ts`, and `README.md`.
+- Live log command: `docker logs -f iam-crm-backend-api-1`.
+- Validation status: `npm run lint` passed with 0 errors and 10 existing warnings. The first build failed because the Prisma Client was stale; `npx prisma generate` passed, the first build retry stopped because of a temporary `dist` lock with `EBUSY`, and a later `npm run build` retry passed.
+- Docker validation: the `db`, `minio`, `minio-init`, and `api` services were detected, and `docker compose up -d --build api` successfully built the image and recreated the API container. A direct login test after deployment returned HTTP 200 and produced a safe log entry containing the request ID and `[REDACTED]` for the password. Testing through the frontend/Nginx address returned HTTP 500, but no matching request appeared in backend logs; therefore, the proxy error occurred before reaching the backend in that environment and requires frontend/Nginx configuration review.
 
 ---
 
-### fix 000055 - افزودن اطلاعات ثبتی، حقوقی و ساختار مالکیتی شرکت‌ها
+### fix 000054 - Correct CORS documentation and logging for production frontend deployment
 
-- فیلدهای اختیاری `registrationNumber`، `nationalId`، `economicCode` و `establishmentDate` به پروفایل شرکت اضافه شدند. ارقام فارسی/عربی ورودی‌های ثبتی و عددی به انگلیسی تبدیل می‌شوند و شناسه‌های حقوقی فقط با طول معقول اعتبارسنجی می‌شوند.
-- enum جدید `CompanyActivityStatus` با مقادیر `ACTIVE`، `INACTIVE`، `MERGED` و `UNKNOWN` اضافه شد و از stage، priority و archive فروش مستقل است.
-- سرمایه ثبتی با `Decimal(24,2)` و فرض واحد پیش‌فرض ریال ذخیره می‌شود و ورودی آن بدون تبدیل به floating point جاوااسکریپت به `Prisma.Decimal` تبدیل می‌شود. `employeeCount` عدد صحیح نامنفی و اختیاری است.
-- رابطه چندوالدی parent/subsidiary با مدل `CompanyHierarchyRelation` اضافه شد. create/update شرکت آرایه‌های اختیاری `parentCompanyIds` و `subsidiaryCompanyIds` را می‌پذیرد؛ شرکت‌های مرتبط باید در organization جاری باشند و self-link، تکرار مستقیم و رابطه معکوس مستقیم رد می‌شوند. جزئیات شرکت `parentCompanies` و `subsidiaryCompanies` را برمی‌گرداند.
-- اسناد حقوقی شرکت با نوع‌های `OFFICIAL_GAZETTE` (روزنامه رسمی) و `LATEST_CHANGES` (آخرین تغییرات) اضافه شدند. endpointها: `GET /api/companies/:companyId/legal-documents`، `POST /api/companies/:companyId/legal-documents/upload` با فیلد multipart به نام `file`، `PATCH .../:documentId` و `DELETE .../:documentId`.
-- آپلود از storage و validation موجود `AttachmentsService` استفاده می‌کند؛ مسیر، bucket و object key خام در پاسخ سند افشا نمی‌شوند و دانلود از endpoint امن موجود `GET /api/attachments/:id/download` با `attachmentId` انجام می‌شود.
-- permission جدیدی اضافه نشد: مشاهده با `company:view` و تغییر/آپلود/حذف با `company:update` محافظت می‌شود. scope سازمان و دسترسی REP/MANAGER حفظ شده است.
-- migration جدید: `20260716130000_add_company_legal_registry_hierarchy_fields`. تبدیل BigInt سرمایه به Decimal و تبدیل status متنی قبلی به enum به‌صورت non-destructive انجام می‌شود؛ statusهای ناشناخته به `UNKNOWN` نگاشت می‌شوند.
-- فایل‌های مهم تغییرکرده/جدید: `prisma/schema.prisma`، migration بالا، `src/companies/companies.service.ts`، `src/companies/companies.module.ts`، `src/companies/company-legal-documents.controller.ts`، `src/companies/company-legal-documents.service.ts`، DTOهای company/legal document، `src/attachments/attachments.service.ts` و `README.md`.
-- فرض‌ها و وابستگی‌ها: currency سرمایه ثبتی ریال است؛ فایل‌ها به تنظیمات فعلی `ATTACHMENT_STORAGE_DRIVER`، `MAX_ATTACHMENT_SIZE_BYTES` و `ALLOWED_ATTACHMENT_MIME_TYPES` وابسته‌اند؛ فیلد legacy تک‌والدی `parentCompanyId` برای سازگاری حذف نشد اما API جدید از جدول relation چندوالدی استفاده می‌کند.
-- وضعیت بررسی: `npx prisma format`، `npx prisma validate` و `npx prisma generate` موفق شدند؛ `npm run lint` با 0 خطا و 10 warning موجود موفق شد؛ `npm run build` موفق شد. `npx prisma migrate status` اجرا شد و migration جدید را unapplied نشان داد، همچنین migration دیتابیس `20260710203701_` در فایل‌های local وجود ندارد. به‌دلیل اختلاف history و نامشخص بودن ایمن‌بودن دیتابیس، migration اعمال نشد. تست دستی API نیز بدون اعمال migration اجرا نشد.
+- The browser login failure was caused by the production frontend origin, `http://89.42.199.159:8080`, being absent from the backend `CORS_ORIGINS` allowlist.
+- Required production configuration: `CORS_ORIGINS=http://localhost:5173,http://89.42.199.159:8080` and `CORS_CREDENTIALS=true`.
+- A curl request without an `Origin` header may succeed while a browser request to the same endpoint fails because CORS is enforced. Production tests must therefore include the actual frontend Origin header.
+- Rejected origins now return HTTP 403 with code `CORS_ORIGIN_REJECTED`. Server logs record the rejected origin, `requestId`, request path, and the count/list of allowed origins. Stack traces are not sent to the client.
+- Using `*` together with `CORS_CREDENTIALS=true` is prohibited and causes a safe startup failure. CORS, Helmet, and environment validation remain enabled.
+- Corrected the Docker environment configuration and removed the duplicate, conflicting `CORS_CREDENTIALS` definition from `.env.docker`. Every production frontend URL must be explicitly listed in `CORS_ORIGINS` in the environment file used by Docker.
+- Important changed files: `src/main.ts`, `.env.example`, `.env.docker`, and `README.md`.
+- After changing the environment file, recreate the API container without rebuilding by running `docker compose up -d --force-recreate api`.
+- Validation status: `npm run lint` passed with 0 errors and 10 existing warnings. The initial `npm run build` failed because a stale Prisma Client caused type errors related to the Team model; after `npx prisma generate` passed, the subsequent `npm run build` passed.
 
 ---
 
-### fix 000056 - افزودن سوابق شغلی و تحصیلی برای افراد
+### fix 000055 - Add company registration, legal, and ownership-structure data
 
-- سوابق شغلی شرکت‌محور برای هر شخص اضافه شد؛ هر رکورد به یک Company موجود در organization جاری متصل است، نام شرکت را به‌صورت snapshot نگه می‌دارد و برای هر person/company فقط یک رکورد مجاز است.
-- هر سابقه شغلی چند سمت با `title`، `startDate`، `endDate`، `isCurrent` و `description` دارد. عنوان خالی رد می‌شود، تاریخ پایان نمی‌تواند قبل از شروع باشد و سمت جاری تاریخ پایان ندارد. این قواعد هم در service و هم با constraint غیرمخرب دیتابیس محافظت می‌شوند.
-- سوابق تحصیلی چندگانه با `degree`، `university`، `year` و `description` اضافه شد. حداقل یک فیلد معنادار لازم است و سال اختیاری پس از تبدیل ارقام فارسی/عربی، در بازه معقول 1000 تا 3000 اعتبارسنجی می‌شود.
-- endpointهای employment: `GET/POST /api/people/:personId/employment-history`، `PATCH/DELETE /api/people/:personId/employment-history/:employmentId` و endpointهای nested ایجاد/ویرایش/حذف زیر `.../:employmentId/positions`.
-- endpointهای education: `GET/POST /api/people/:personId/education-history` و `PATCH/DELETE /api/people/:personId/education-history/:educationId`.
-- پاسخ detail شخص اکنون `employmentHistory` همراه summary شرکت و `positions` و همچنین `educationHistory` را شامل می‌شود؛ APIها و نام فیلدهای قبلی Person تغییر نکردند.
-- مدل‌های جدید: `PersonEmploymentHistory`، `PersonEmploymentPosition` و `PersonEducationHistory`. migration جدید: `20260716140000_add_person_employment_education_history`.
-- permission جدیدی اضافه نشد: مشاهده با `person:view` و ایجاد/ویرایش/حذف با `person:update` انجام می‌شود. scope دسترسی ADMIN/MANAGER/REP و منع دسترسی BOARDS مطابق الگوی فعلی people حفظ شده است.
-- فایل‌های مهم تغییرکرده/جدید: `prisma/schema.prisma`، migration بالا، `src/people/person-histories.controller.ts`، `src/people/person-histories.service.ts`، `src/people/dto/person-history.dto.ts`، `src/people/people.module.ts`، `src/people/people.service.ts` و `README.md`.
-- وضعیت بررسی: `npx prisma format`، `npx prisma validate` و `npx prisma generate` موفق شدند؛ `npm run lint` با 0 خطا و 10 warning موجود موفق شد؛ `npm run build` پس از اصلاح یک خطای type محلی موفق شد. `npx prisma migrate status` اجرا شد و دو migration محلی `20260716130000_add_company_legal_registry_hierarchy_fields` و `20260716140000_add_person_employment_education_history` را unapplied نشان داد، درحالی‌که migration دیتابیس `20260710203701_` در فایل‌های local وجود ندارد. به‌علت اختلاف migration history، هیچ migration اعمال نشد و تست دستی API اجرا نشد؛ هیچ reset/db push مخربی انجام نشد.
-
----
-
-### fix 000057 - اصلاح ساختار سوابق تحصیلی و افزودن کتابخانه دانشگاه‌ها
-
-- مدرک تحصیلی از متن آزاد به enum اختیاری `PersonEducationDegree` با مقادیر دقیق `DIPLOMA`، `ASSOCIATE`، `BACHELOR`، `PHD` و `POSTDOC` تغییر کرد؛ مقدار Master's اضافه نشده است. endpoint سوابق تحصیلی علاوه بر enum، `degreeLabel` فارسی را برمی‌گرداند.
-- کتابخانه مدیریت‌شده `University` با نام یکتا، code اختیاری یکتا، وضعیت فعال، توضیحات و timestampها اضافه شد. endpointهای `GET /api/universities`، `GET /api/universities/:id`، `POST /api/universities`، `PATCH /api/universities/:id` و `DELETE /api/universities/:id` مطابق الگوی library موجود پیاده شدند؛ DELETE دانشگاه را غیرفعال می‌کند و فهرست عادی فقط دانشگاه‌های فعال را نشان می‌دهد.
-- فیلد متن آزاد university با `universityId` و relation اختیاری جایگزین شد. پاسخ education شامل summary دانشگاه (`id` و `name`) است و `universityNameSnapshot` برای حفظ داده تاریخی نگه داشته می‌شود؛ ایجاد/ویرایش رکورد فقط دانشگاه موجود و فعال را می‌پذیرد.
-- سال عددی با `educationDate DateTime?` و ورودی ISO/Gregorian date picker جایگزین شد. DTO جدید فقط `degree` enum، `universityId` UUID، `educationDate` معتبر و `description` را می‌پذیرد.
-- migration داده‌محور `20260716150000_refine_person_education_history_university_library` متن‌های قدیمی degree/university را در snapshotها حفظ می‌کند، degreeهای شناخته‌شده را به enum نگاشت می‌کند و year موجود را به اول ژانویه همان سال تبدیل می‌کند؛ داده قدیمی silently حذف نمی‌شود.
-- permissionهای جدید `library:university:view` و `library:university:manage` به seed اضافه شدند. view مطابق سایر libraryها به MANAGER، REP و BOARDS داده می‌شود و ADMIN طبق الگوی seed همه permissionها، از جمله manage، را دریافت می‌کند.
-- مدل‌ها/فایل‌های مهم: `University`، تغییر `PersonEducationHistory`، `prisma/schema.prisma`، migration بالا، `prisma/seed.ts`، ماژول/کنترلر/service/DTOهای `src/universities/`، DTO و service سوابق شخص، `src/people/people.service.ts`، `src/app.module.ts` و `README.md`.
-- وضعیت بررسی: `npx prisma format`، `npx prisma validate` و `npx prisma generate` موفق شدند؛ `npm run lint` با 0 خطا و 10 warning موجود موفق شد؛ `npm run build` موفق شد. `npx prisma migrate status` اجرا شد و سه migration محلی 13000، 14000 و 15000 را unapplied نشان داد، درحالی‌که migration دیتابیس `20260710203701_` در فایل‌های local نیست. به‌علت اختلاف migration history، migration اعمال و تست دستی API اجرا نشد؛ هیچ reset یا db push مخربی انجام نشد.
+- Added optional `registrationNumber`, `nationalId`, `economicCode`, and `establishmentDate` fields to company profiles. Persian and Arabic digits in registration and numeric inputs are normalized to English digits, and legal identifiers are validated only for reasonable length.
+- Added the `CompanyActivityStatus` enum with `ACTIVE`, `INACTIVE`, `MERGED`, and `UNKNOWN`. It is independent from sales stage, priority, and archive state.
+- Registered capital is stored as `Decimal(24,2)` with IRR as the default assumed currency, and input is converted directly to `Prisma.Decimal` without passing through JavaScript floating-point values. `employeeCount` is an optional non-negative integer.
+- Added multi-parent and multi-subsidiary relationships through `CompanyHierarchyRelation`. Company create/update APIs accept optional `parentCompanyIds` and `subsidiaryCompanyIds` arrays. Related companies must belong to the current organization; self-links, direct duplicates, and direct inverse relationships are rejected. Company details return `parentCompanies` and `subsidiaryCompanies`.
+- Added company legal-document types `OFFICIAL_GAZETTE` and `LATEST_CHANGES`. Endpoints include `GET /api/companies/:companyId/legal-documents`, `POST /api/companies/:companyId/legal-documents/upload` with multipart field `file`, `PATCH .../:documentId`, and `DELETE .../:documentId`.
+- Uploads reuse the existing `AttachmentsService` storage and validation logic. Raw path, bucket, and object-key values are not exposed in legal-document responses; downloads use the existing secure `GET /api/attachments/:id/download` endpoint through `attachmentId`.
+- No new permission was introduced: viewing requires `company:view`, while update/upload/delete operations require `company:update`. Existing organization scope and REP/MANAGER access rules remain in effect.
+- Added migration `20260716130000_add_company_legal_registry_hierarchy_fields`. BigInt capital values are converted to Decimal and previous text activity statuses are converted to the enum non-destructively; unknown statuses map to `UNKNOWN`.
+- Important changed or new files: `prisma/schema.prisma`, the migration above, `src/companies/companies.service.ts`, `src/companies/companies.module.ts`, `src/companies/company-legal-documents.controller.ts`, `src/companies/company-legal-documents.service.ts`, company/legal-document DTOs, `src/attachments/attachments.service.ts`, and `README.md`.
+- Assumptions and dependencies: registered capital uses IRR; files depend on the current `ATTACHMENT_STORAGE_DRIVER`, `MAX_ATTACHMENT_SIZE_BYTES`, and `ALLOWED_ATTACHMENT_MIME_TYPES` settings; the legacy single-value `parentCompanyId` field remains for compatibility, while the new API uses the multi-value relation table.
+- Validation status: `npx prisma format`, `npx prisma validate`, and `npx prisma generate` passed; `npm run lint` passed with 0 errors and 10 existing warnings; `npm run build` passed. `npx prisma migrate status` showed the new migration as unapplied and reported that database migration `20260710203701_` is missing from local files. Because migration history was inconsistent and database safety was uncertain, the migration was not applied. Manual API testing was also not performed without the migration.
 
 ---
 
-### fix 000058 - اصلاح permissionهای کتابخانه دانشگاه‌ها
+### fix 000056 - Add employment and education history for people
 
-- علت HTTP 403 برای ADMIN ناسازگاری permission موجود در seed/database و JWT بود: مقدار قدیمی `university:view` در token وجود داشت، اما controller مطابق convention کتابخانه‌ها `library:university:view` را نیاز داشت.
-- permissionهای canonical دانشگاه به‌صورت صریح و مشترک در seed تثبیت شدند: `library:university:view` و `library:university:manage`. از `university:view` و `university:manage` در endpointهای دانشگاه استفاده نمی‌شود.
-- endpointهای `GET /api/universities` و `GET /api/universities/:id` با `library:university:view` و عملیات create/update/delete(deactivate) با `library:university:manage` محافظت می‌شوند.
-- ADMIN همچنان از `allActions` هر دو permission را دریافت می‌کند. MANAGER، REP و BOARDS مطابق policy سایر کتابخانه‌های industry/lead-source/pain-point/use-case/persona فقط permission مشاهده را دریافت می‌کنند؛ مدیریت مخصوص ADMIN است.
-- فایل‌های متاثر: `prisma/seed.ts` و `README.md`. decoratorهای `src/universities/universities.controller.ts` بررسی شدند و از قبل با نام canonical صحیح بودند.
-- برای اعمال اصلاح روی دیتابیس باید seed دوباره اجرا شود: `npm run seed`. چون permissions در پاسخ login/JWT قرار می‌گیرند، پس از seed کاربر باید logout و دوباره login کند تا token جدید شامل `library:university:view` و `library:university:manage` باشد.
-- وضعیت بررسی: `npm run lint` با 0 خطا و 10 warning موجود موفق شد. اجرای اولیه build به‌دلیل stale بودن Prisma Client ناموفق بود؛ `npx prisma generate` موفق شد و اجرای مجدد `npm run build` موفق بود. seed روی دیتابیس اجرا نشد.
-
----
-
-### fix 000059 - تکمیل مدیریت نقش‌ها و مجوزها
-
-- CRUD جدید permission در مسیرهای `GET/POST /api/permissions` و `GET/PATCH/DELETE /api/permissions/:id` اضافه شد. action با الگوی `module:action` normalize/validate و unique می‌شود و metadataهای name، description، group، active/system پشتیبانی می‌شوند.
-- مدل دیتابیسی `Role` و CRUD نقش‌ها در `/api/roles` اضافه شد. نقش‌های ثابت `ADMIN`، `MANAGER`، `REP` و `BOARDS` به‌عنوان system role seed/backfill می‌شوند و حذف، غیرفعال‌سازی یا تغییر base scope آنها ممنوع است. نقش custom دارای code، name، description، baseRole و وضعیت فعال است.
-- صفحه تخصیص مجوز می‌تواند از `GET /api/roles/:id/permissions` فهرست همه permissionهای فعال و assigned state را دریافت و با `PUT /api/roles/:id/permissions` آرایه `permissionIds` را اتمیک جایگزین کند.
-- permissionهای جدید `role:view` و `role:manage` seed شدند و ADMIN از `allActions` هر دو را دریافت می‌کند. `permission:view`/`permission:manage` برای مدیریت permissionها حفظ شده‌اند.
-- محافظت‌های امنیتی: system permission حذف نمی‌شود؛ permission تخصیص‌یافته حذف نمی‌شود؛ `permission:manage` و `role:manage` قابل غیرفعال‌سازی نیستند؛ ADMIN هنگام replace باید هر دو را حفظ کند؛ system role حذف/غیرفعال نمی‌شود؛ نقش دارای user حذف نمی‌شود؛ و ADMIN جاری نمی‌تواند با تخصیص role فاقد این دو permission دسترسی RBAC خودش را حذف کند.
-- سازگاری user/auth: enum قبلی `User.role` برای row/tenant scope و قرارداد `user.role` حفظ شد. `User.roleId` نقش دیتابیسی قابل‌تخصیص را نگه می‌دارد؛ `PATCH /api/users/:id/role` اکنون `roleId` را نیز می‌پذیرد و baseRole آن را روی enum سازگار اعمال می‌کند. login همچنان `role` و permissions را برمی‌گرداند و `roleId`، `roleCode` و `roleName` نیز اضافه شده‌اند. guard در صورت وجود roleId مجوزها را از نقش دیتابیسی می‌خواند.
-- seed idempotent نقش‌های system، roleId کاربران ثابت و roleId اتصال‌های RolePermission را synchronize می‌کند و permissionهای seedشده را system/active نگه می‌دارد. پس از migration/seed، کاربران باید logout/login کنند تا پاسخ login جدید را بگیرند؛ guard مجوزها را از دیتابیس نیز کنترل می‌کند.
-- migration جدید: `20260716160000_add_dynamic_role_permission_management`. migration کاربران و assignmentهای enum موجود را بدون حذف به Roleهای system متناظر backfill می‌کند.
-- فایل‌های مهم: `prisma/schema.prisma`، migration بالا، `prisma/seed.ts`، controller/service/DTO جدید RBAC در `src/admin/`، `admin-permissions.module.ts`، `permissions.guard.ts`، `auth.service.ts`، DTO/service کاربران و `README.md`.
-- وضعیت بررسی: `npx prisma format`، `npx prisma validate` و `npx prisma generate` موفق شدند؛ `npm run lint` با 0 خطا و 10 warning موجود موفق شد؛ `npm run build` موفق شد. `npx prisma migrate status` اجرا شد و migrationهای 13000 تا 16000 را unapplied و migration دیتابیس `20260710203701_` را missing locally نشان داد. به‌علت اختلاف history، migration/seed و تست دستی API اجرا نشد و هیچ reset/db push مخربی انجام نشد.
+- Added company-based employment history for each person. Each record links to an existing Company in the current organization, stores a company-name snapshot, and allows only one record per person/company pair.
+- Each employment record supports multiple positions with `title`, `startDate`, `endDate`, `isCurrent`, and `description`. Empty titles are rejected, an end date cannot precede the start date, and current positions cannot have an end date. These rules are enforced in the service and by a non-destructive database constraint.
+- Added multiple education-history records with `degree`, `university`, `year`, and `description`. At least one meaningful field is required, and the optional year is normalized from Persian/Arabic digits and validated within the reasonable range 1000–3000.
+- Employment endpoints: `GET/POST /api/people/:personId/employment-history`, `PATCH/DELETE /api/people/:personId/employment-history/:employmentId`, and nested create/update/delete endpoints under `.../:employmentId/positions`.
+- Education endpoints: `GET/POST /api/people/:personId/education-history` and `PATCH/DELETE /api/people/:personId/education-history/:educationId`.
+- Person-detail responses now include `employmentHistory` with company summaries and `positions`, as well as `educationHistory`. Existing Person API fields and names were not changed.
+- Added `PersonEmploymentHistory`, `PersonEmploymentPosition`, and `PersonEducationHistory` models and migration `20260716140000_add_person_employment_education_history`.
+- No new permission was introduced: viewing requires `person:view`, while create/update/delete operations require `person:update`. Existing ADMIN/MANAGER/REP access scope and BOARDS restrictions follow the current People policy.
+- Important changed or new files: `prisma/schema.prisma`, the migration above, `src/people/person-histories.controller.ts`, `src/people/person-histories.service.ts`, `src/people/dto/person-history.dto.ts`, `src/people/people.module.ts`, `src/people/people.service.ts`, and `README.md`.
+- Validation status: `npx prisma format`, `npx prisma validate`, and `npx prisma generate` passed; `npm run lint` passed with 0 errors and 10 existing warnings; `npm run build` passed after correcting one local type error. `npx prisma migrate status` showed the local `20260716130000_add_company_legal_registry_hierarchy_fields` and `20260716140000_add_person_employment_education_history` migrations as unapplied, while database migration `20260710203701_` is missing from local files. Because migration history was inconsistent, no migration or manual API test was run, and no destructive reset or `db push` was executed.
 
 ---
 
-### fix 000060 - قابل تنظیم کردن کوکی refresh token برای استقرار HTTP/HTTPS
+### fix 000057 - Refine education history and add the university library
 
-- علت اصلی: تنظیمات کوکی فقط از `NODE_ENV` پیروی می‌کرد. در نتیجه با `NODE_ENV=production` روی استقرار موقت HTTP/IP، کوکی `Secure` می‌شد و مرورگر آن را ذخیره نمی‌کرد؛ بنابراین login می‌توانست موفق باشد ولی refresh token flow شکست بخورد.
-- متغیرهای جدید محیطی: `REFRESH_TOKEN_COOKIE_SECURE` با مقادیر `true|false`، متغیر `REFRESH_TOKEN_COOKIE_SAME_SITE` با مقادیر `lax|strict|none` و متغیر `REFRESH_TOKEN_COOKIE_PATH` با مقدار پیش‌فرض `/api/auth`.
-- اگر متغیرهای جدید تنظیم نشده باشند، رفتار قبلی حفظ می‌شود: در production مقدارهای `secure=true` و `sameSite=none` و در سایر محیط‌ها `secure=false` و `sameSite=lax` اعمال می‌شوند.
-- نمونه استقرار موقت HTTP/IP:
+- Changed education degree from free text to the optional `PersonEducationDegree` enum with exactly `DIPLOMA`, `ASSOCIATE`, `BACHELOR`, `PHD`, and `POSTDOC`; a Master's value was not added. Education-history endpoints also return a Persian `degreeLabel` alongside the enum.
+- Added the managed `University` library with a unique name, optional unique code, active status, description, and timestamps. Implemented `GET /api/universities`, `GET /api/universities/:id`, `POST /api/universities`, `PATCH /api/universities/:id`, and `DELETE /api/universities/:id` following existing library conventions. DELETE deactivates a university, and normal lists return only active universities.
+- Replaced the free-text university field with `universityId` and an optional relation. Education responses include a university summary (`id` and `name`) and retain `universityNameSnapshot` for historical data. Create/update operations accept only existing, active universities.
+- Replaced the numeric year with optional `educationDate DateTime?` and an ISO/Gregorian date input. The new DTO accepts only the `degree` enum, `universityId` UUID, valid `educationDate`, and `description`.
+- Added data-aware migration `20260716150000_refine_person_education_history_university_library`. It preserves legacy degree/university text in snapshots, maps recognized degree values to the enum, and converts an existing year to January 1 of that year. Legacy data is not silently deleted.
+- Added `library:university:view` and `library:university:manage` permissions to the seed. MANAGER, REP, and BOARDS receive view permission in line with other libraries, while ADMIN receives all seeded permissions, including manage.
+- Important models/files: `University`, the updated `PersonEducationHistory`, `prisma/schema.prisma`, the migration above, `prisma/seed.ts`, modules/controllers/services/DTOs under `src/universities/`, person-history DTOs and services, `src/people/people.service.ts`, `src/app.module.ts`, and `README.md`.
+- Validation status: `npx prisma format`, `npx prisma validate`, and `npx prisma generate` passed; `npm run lint` passed with 0 errors and 10 existing warnings; `npm run build` passed. `npx prisma migrate status` reported local migrations 13000, 14000, and 15000 as unapplied, while database migration `20260710203701_` has no matching local file. Because migration history was inconsistent, the migration and manual API tests were not run, and no destructive reset or `db push` was executed.
+
+---
+
+### fix 000058 - Correct university-library permissions
+
+- The ADMIN HTTP 403 issue was caused by a mismatch between permissions present in the seed/database and the JWT: the token contained legacy `university:view`, while the controller correctly required the library-convention permission `library:university:view`.
+- Standardized the canonical university permissions in the seed as `library:university:view` and `library:university:manage`. University endpoints do not use `university:view` or `university:manage`.
+- `GET /api/universities` and `GET /api/universities/:id` require `library:university:view`; create/update/delete (deactivate) operations require `library:university:manage`.
+- ADMIN continues to receive both permissions through `allActions`. MANAGER, REP, and BOARDS receive view permission, matching the policy for industry, lead-source, pain-point, use-case, and persona libraries; management remains ADMIN-only.
+- Affected files: `prisma/seed.ts` and `README.md`. Decorators in `src/universities/universities.controller.ts` were reviewed and already used the correct canonical names.
+- Database action: rerun the seed with `npm run seed`. Because permissions are included in login responses/JWTs, users must log out and log back in after seeding so the new token contains `library:university:view` and `library:university:manage`.
+- Validation status: `npm run lint` passed with 0 errors and 10 existing warnings. The initial build failed because the Prisma Client was stale; `npx prisma generate` passed, and the subsequent `npm run build` passed. The seed was not run against the database.
+
+---
+
+### fix 000059 - Complete role and permission management
+
+- Added permission CRUD through `GET/POST /api/permissions` and `GET/PATCH/DELETE /api/permissions/:id`. Permission actions are normalized, validated, and made unique using the `module:action` pattern, with support for name, description, group, active, and system metadata.
+- Added the database-backed `Role` model and role CRUD under `/api/roles`. The fixed `ADMIN`, `MANAGER`, `REP`, and `BOARDS` roles are seeded/backfilled as system roles and cannot be deleted, deactivated, or assigned a different base scope. Custom roles support code, name, description, `baseRole`, and active status.
+- Permission-assignment screens can retrieve all active permissions and assigned state through `GET /api/roles/:id/permissions` and atomically replace the `permissionIds` array through `PUT /api/roles/:id/permissions`.
+- Seeded `role:view` and `role:manage`; ADMIN receives both through `allActions`. Existing `permission:view` and `permission:manage` continue to govern permission administration.
+- Security protections: system permissions cannot be deleted; assigned permissions cannot be deleted; `permission:manage` and `role:manage` cannot be deactivated; ADMIN must retain both during replacement; system roles cannot be deleted or deactivated; roles assigned to users cannot be deleted; and the current ADMIN cannot remove their own RBAC access by assigning a role that lacks these two permissions.
+- User/auth compatibility: the existing `User.role` enum remains the source for row/tenant scope and the `user.role` contract. `User.roleId` stores the assignable database role. `PATCH /api/users/:id/role` now also accepts `roleId` and applies that role's `baseRole` to the compatible enum. Login continues to return `role` and permissions and now also returns `roleId`, `roleCode`, and `roleName`. When `roleId` exists, the guard reads permissions from the database-backed role.
+- The idempotent seed synchronizes system roles, `roleId` for predefined users, and `roleId` links in RolePermission records, while keeping seeded permissions system-owned and active. After migration/seed, users must log out and log back in to receive the new login response; the guard also checks permissions from the database.
+- Added migration `20260716160000_add_dynamic_role_permission_management`, which backfills existing users and enum-based assignments into corresponding system Role records without deletion.
+- Important files: `prisma/schema.prisma`, the migration above, `prisma/seed.ts`, new RBAC controllers/services/DTOs under `src/admin/`, `admin-permissions.module.ts`, `permissions.guard.ts`, `auth.service.ts`, user DTOs/services, and `README.md`.
+- Validation status: `npx prisma format`, `npx prisma validate`, and `npx prisma generate` passed; `npm run lint` passed with 0 errors and 10 existing warnings; `npm run build` passed. `npx prisma migrate status` reported migrations 13000 through 16000 as unapplied and database migration `20260710203701_` as missing locally. Because migration history was inconsistent, migration/seed and manual API tests were not run, and no destructive reset or `db push` was executed.
+
+---
+
+### fix 000060 - Make the refresh-token cookie configurable for HTTP and HTTPS deployments
+
+- Root cause: cookie behavior depended only on `NODE_ENV`. With `NODE_ENV=production` on a temporary HTTP/IP deployment, the cookie became `Secure`, so the browser did not store it. Login could therefore succeed while the refresh-token flow failed.
+- Added `REFRESH_TOKEN_COOKIE_SECURE` with `true|false`, `REFRESH_TOKEN_COOKIE_SAME_SITE` with `lax|strict|none`, and `REFRESH_TOKEN_COOKIE_PATH` with the default `/api/auth`.
+- When the new variables are unset, existing behavior is preserved: production uses `secure=true` and `sameSite=none`; other environments use `secure=false` and `sameSite=lax`.
+- Temporary HTTP/IP deployment example:
   ```env
   REFRESH_TOKEN_COOKIE_SECURE=false
   REFRESH_TOKEN_COOKIE_SAME_SITE=lax
   REFRESH_TOKEN_COOKIE_PATH=/api/auth
   ```
-- نمونه استقرار production روی HTTPS:
+- HTTPS production deployment example:
   ```env
   REFRESH_TOKEN_COOKIE_SECURE=true
   REFRESH_TOKEN_COOKIE_SAME_SITE=none
   REFRESH_TOKEN_COOKIE_PATH=/api/auth
   ```
-- ترکیب `sameSite=none` و `secure=false` ناامن/ناسازگار با مرورگرهاست؛ backend برای این ترکیب warning ثبت می‌کند، چون مرورگرها برای `SameSite=None` ویژگی `Secure` را الزامی می‌دانند.
-- refresh token همچنان فقط در کوکی `HttpOnly` نگهداری می‌شود و در پاسخ JSON برگردانده نمی‌شود.
-- فایل‌های تغییرکرده: `src/common/cookies/refresh-token-cookie.ts`، `src/common/validators/env.validator.ts`، `.env.example`، `.env.docker` و `README.md`.
-- وضعیت بررسی: `npm run lint` با 0 خطا و 10 warning موجود موفق شد. اجرای اولیه `npm run build` به‌علت stale بودن Prisma Client و 124 خطای type مربوط به مدل‌ها/فیلدهای جدید ناموفق بود؛ سپس `npx prisma generate` موفق شد و اجرای مجدد `npm run build` با موفقیت پایان یافت.
+- The combination `sameSite=none` with `secure=false` is insecure and incompatible with modern browsers. The backend logs a warning for this combination because browsers require `Secure` for `SameSite=None`.
+- Refresh tokens remain stored only in an `HttpOnly` cookie and are never returned in JSON responses.
+- Important changed files: `src/common/cookies/refresh-token-cookie.ts`, `src/common/validators/env.validator.ts`, `.env.example`, `.env.docker`, and `README.md`.
+- Validation status: `npm run lint` passed with 0 errors and 10 existing warnings. The initial `npm run build` failed because the stale Prisma Client caused 124 type errors for newer models/fields; `npx prisma generate` then passed, and the subsequent `npm run build` passed.
 
 ---
 
-### fix 000061 - اصلاح visibility رکوردهای CRM و افزودن فیلتر مال من / همه
+### fix 000061 - Correct CRM record visibility and add Mine/All filters
 
-- علت اصلی دیده‌نشدن رکوردها، نبود permission نبود؛ read visibility در serviceها به نقش، مالک رکورد و تیم مالک گره خورده بود. به همین دلیل شرکتی که ADMIN ایجاد می‌کرد به‌صورت خودکار مالک ADMIN می‌شد و کاربران فروش/REP با وجود `company:view` آن را نمی‌دیدند.
-- فهرست و جزئیات شرکت برای کاربران دارای `company:view` اکنون در محدوده همان organization قابل مشاهده است و محدودیت پنهان REP/MANAGER/BOARDS بر اساس مالک یا تیم از مسیرهای read حذف شد.
-- ایجاد شرکت دیگر creator را به‌صورت خودکار owner نمی‌کند؛ `ownerId` فقط در صورت ارسال و اعتبارسنجی‌شدن ثبت می‌شود و در غیر این صورت `null` است. actor عملیات همچنان از `user.userId` در audit ثبت می‌شود.
-- فهرست و جزئیات opportunity برای کاربران دارای `opportunity:view` اکنون به‌صورت پیش‌فرض organization-wide است. ایجاد opportunity زیر شرکت هم دیگر به مالکیت شرکت توسط کاربر وابسته نیست؛ اگر `ownerId` ارسال نشود، مالک پیش‌فرض opportunity کاربر جاری است.
-- فیلتر `ownershipScope=all|mine|team|unassigned` به API فهرست شرکت‌ها، opportunityها و گزارش‌ها اضافه شد. مقدار پیش‌فرض `all` است؛ فیلترهای قبلی مانند `ownerId`، `teamId`، stage، priority، source، archive، company و search بدون تغییر نام حفظ شدند.
-- محدودیت‌های mutation باز نشده‌اند: update/delete/archive/change-owner/change-stage همچنان از بررسی‌های سخت‌گیرانه قبلی استفاده می‌کنند. این fix visibility مسیرهای read را تغییر می‌دهد، نه مجوز ویرایش را.
-- ماژول‌های مشابه بررسی شدند: people و activity در مسیرهای read مربوط به شرکت organization-wide شدند و tenant check صریح گرفتند؛ report/pipeline data دیگر scope پنهان owner/team ندارد و scope انتخابی را اعمال می‌کند. taskها به‌دلیل ماهیت assignment/private همچنان scope کاربر/تیم خود را حفظ می‌کنند. child resourceهای opportunity و اسناد حقوقی شرکت نیز چون helper مشترک آن‌ها هم read و هم mutation را محافظت می‌کند، بدون حذف کورکورانه محدودیت mutation باقی ماندند.
-- هیچ migration یا تغییر schema انجام نشد و داده‌های مالکیت فعلی نیز به‌صورت خودکار پاک یا بازنویسی نشدند.
-- فایل‌های اصلی تغییرکرده: `src/common/dto/ownership-scope.dto.ts`، DTO/controller/service شرکت‌ها، DTO/controller/service opportunityها، `src/reports/`، `src/people/people.service.ts`، `src/activities/activities.service.ts` و `README.md`.
-- چک‌لیست بررسی دستی: ایجاد شرکت بدون `ownerId` توسط ADMIN و مشاهده list/detail با REP؛ بررسی scopeهای `all`، `mine` و `unassigned`؛ مشاهده opportunity ادمین با REP در scope پیش‌فرض/all و محدودشدن mine؛ بررسی نمایش pipeline/report؛ تأیید عدم مشاهده رکورد organization دیگر و رد کاربران فاقد permission؛ و تأیید باقی‌ماندن محدودیت mutationها.
-- وضعیت بررسی: `npm run lint` با 0 خطا و 10 warning موجود موفق شد. `npm run build` اجرا شد اما به‌علت stale بودن Prisma Client با 124 خطای type مربوط به مدل‌ها/فیلدهای از قبل موجود مانند Role، Team و University ناموفق بود. چون این fix هیچ تغییر schema ندارد و دستور کار اجرای `prisma generate` را فقط هنگام تغییر schema مجاز کرده است، `npx prisma generate` و `npx prisma migrate status` اجرا نشدند.
-
----
-
-### fix 000062 - اصلاح visibility زیرموجودیت‌های مخاطب
-
-- علت اصلی خطای 403 این بود که serviceهای contacts، socials، employment history و education history پس از اصلاح visibility اصلی CRM همچنان از بررسی قدیمی نقش/مالک شرکت/تیم برای مسیرهای read استفاده می‌کردند.
-- endpointهای `GET /api/people/:personId/contacts`، `GET /api/people/:personId/socials`، `GET /api/people/:personId/employment-history` و `GET /api/people/:personId/education-history` اکنون با `person:view` و بررسی تعلق مخاطب به organization جاری قابل خواندن هستند و به owner شرکت یا تیم کاربر وابسته نیستند.
-- GET تکی contact/social و detail/list مخاطب نیز همان مرزبندی organization را رعایت می‌کنند؛ شرکت archived در مسیرهای read قابل استفاده نیست و رکورد organization دیگر با پاسخ not found پنهان می‌ماند.
-- دسترسی read و mutation به helperهای جداگانه `assertPersonReadable` و `assertPersonMutable` تفکیک شد. مسیرهای POST/PATCH/DELETE مربوط به contacts، socials، employment history، positionها و education history همچنان بررسی سخت‌گیرانه قبلی نقش/مالک/تیم را نگه می‌دارند.
-- همه mutationهای زیرموجودیت مخاطب در controller با permission `person:update` محافظت می‌شوند؛ این fix به کاربر فاقد این permission امکان ایجاد، ویرایش یا حذف نمی‌دهد.
-- فایل‌های تغییرکرده: `src/person-contacts/person-contacts.service.ts`، `src/person-contacts/person-contacts.controller.ts`، `src/person-socials/person-socials.service.ts`، `src/person-socials/person-socials.controller.ts`، `src/people/person-histories.service.ts`، `src/people/people.service.ts` و `README.md`.
-- چک‌لیست دستی: خواندن چهار endpoint بالا با REP دارای `person:view` برای شرکت ساخته‌شده توسط ADMIN؛ بارگذاری detail بدون request قرمز؛ رد دسترسی organization دیگر؛ رد کاربر فاقد `person:view` در GET و رد کاربر فاقد `person:update` در mutationها.
-- وضعیت بررسی: `npm run lint` با 0 خطا و 10 warning موجود موفق شد. `npm run build` اجرا شد اما به‌علت stale بودن Prisma Client با 124 خطای type مربوط به مدل‌ها/فیلدهای از قبل موجود مانند Role، Team، University و person history ناموفق بود؛ این خطاها مانع تأیید build شدند.
+- The missing-record issue was not caused by absent permissions; read visibility in services was tied to role, record ownership, and the owner's team. As a result, a company created by ADMIN was automatically owned by ADMIN and remained invisible to sales users/REP even when they had `company:view`.
+- Company lists and details are now visible organization-wide to users with `company:view`. Hidden REP/MANAGER/BOARDS owner/team restrictions were removed from read paths.
+- Company creation no longer assigns the creator as owner automatically. `ownerId` is stored only when provided and validated; otherwise, it remains `null`. The actor is still recorded from `user.userId` in audit events.
+- Opportunity lists and details are now organization-wide by default for users with `opportunity:view`. Creating an opportunity under a company no longer requires the user to own that company; when `ownerId` is omitted, the current user remains the default opportunity owner.
+- Added `ownershipScope=all|mine|team|unassigned` to company-list, opportunity-list, and report APIs. The default is `all`. Existing filters such as `ownerId`, `teamId`, stage, priority, source, archive state, company, and search retain their names.
+- Mutation restrictions were not relaxed: update/delete/archive/change-owner/change-stage operations continue to use previous strict checks. This fix changes read visibility, not edit authorization.
+- Similar modules were reviewed: People and Activity reads tied to companies became organization-wide with explicit tenant checks; report/pipeline data no longer applies hidden owner/team scope and instead uses the selected scope. Tasks retain user/team scope because they are assignment/private records. Opportunity child resources and company legal documents keep mutation restrictions because their shared helpers protect both read and mutation paths.
+- No migration or schema change was made, and existing ownership data was not automatically cleared or rewritten.
+- Important changed files: `src/common/dto/ownership-scope.dto.ts`, company DTOs/controllers/services, opportunity DTOs/controllers/services, `src/reports/`, `src/people/people.service.ts`, `src/activities/activities.service.ts`, and `README.md`.
+- Manual verification checklist: create a company without `ownerId` as ADMIN and view its list/detail as REP; verify `all`, `mine`, and `unassigned`; view an ADMIN-owned opportunity as REP in default/all scope and confirm mine scope is restricted; verify pipeline/report visibility; confirm records from another organization remain hidden and users without permission are rejected; and confirm mutation restrictions remain active.
+- Validation status: `npm run lint` passed with 0 errors and 10 existing warnings. `npm run build` failed because the Prisma Client was stale, producing 124 type errors for existing models/fields such as Role, Team, and University. Because this fix did not change the schema and the task permitted `prisma generate` only for schema changes, neither `npx prisma generate` nor `npx prisma migrate status` was run.
 
 ---
 
-### fix 000063 - اصلاح دسترسی زیرموجودیت‌های شرکت برای شعب و اسناد حقوقی
+### fix 000062 - Correct visibility for person subresources
 
-- علت اصلی خطای 403 این بود که serviceهای branch و legal document و همچنین مسیر attachment مربوط به سند حقوقی، بعد از organization-wide شدن visibility شرکت همچنان scope پنهان owner/team را اعمال می‌کردند.
-- endpointهای شعب اکنون company را فقط با `organizationId` جاری و وضعیت non-archived اعتبارسنجی می‌کنند. `POST/PATCH/DELETE /api/companies/:companyId/branches` با permission موجود `branch:manage` و GETهای شعب با `company:view` محافظت می‌شوند؛ `PermissionsGuard` که قبلاً در controller شعب وجود نداشت اضافه شد.
-- endpointهای `GET /api/companies/:companyId/legal-documents` و `POST /api/companies/:companyId/legal-documents/upload` و PATCH/DELETE سند حقوقی نیز بدون شرط مالک/تیم، company را در organization جاری بررسی می‌کنند. permissionهای موجود حفظ شدند: read با `company:view` و upload/update/delete با `company:update`.
-- بررسی داخلی `AttachmentsService` برای `COMPANY_LEGAL_DOCUMENT` نیز organization-scoped و non-archived شد تا REP دارای permission هنگام ذخیره فایل دوباره با owner scope رد نشود.
-- upload موفق همان رکورد legal document ایجادشده را همراه metadata فایل (`id`، نام اصلی، MIME type، اندازه و زمان ایجاد) برمی‌گرداند و `companyId` روی رکورد سند حفظ می‌شود. خطای storage/attachment/link باعث success کاذب نمی‌شود: خطا دوباره throw می‌شود، رکورد سند rollback می‌شود، attachment ساخته‌شده تا حد ممکن cleanup می‌شود و failure همراه `requestId`، `companyId` و `documentId` لاگ می‌شود؛ exception filter نیز پاسخ non-2xx استاندارد را ثبت/ارسال می‌کند.
-- هیچ permission یا schema جدیدی اضافه نشد و کاربران فاقد `branch:manage` یا `company:update` همچنان توسط guard رد می‌شوند؛ company متعلق به organization دیگر یا archived نیز قابل استفاده نیست.
-- فایل‌های تغییرکرده: `src/company-branches/company-branches.controller.ts`، `src/company-branches/company-branches.service.ts`، `src/companies/company-legal-documents.controller.ts`، `src/companies/company-legal-documents.service.ts`، `src/attachments/attachments.service.ts` و `README.md`.
-- چک‌لیست دستی: ایجاد/list/update/delete شعب با REP غیرمالک دارای permission؛ upload و list سند حقوقی و بررسی metadata؛ رد کاربر فاقد permission؛ رد company بین‌سازمانی؛ و اطمینان از پاسخ non-2xx و log در خطای storage/DB.
-- وضعیت بررسی: `npm run lint` با 0 خطا و 9 warning موجود موفق شد. `npm run build` اجرا شد اما به‌علت stale بودن Prisma Client با 124 خطای type مربوط به مدل‌ها/فیلدهای از قبل موجود مانند Role، Team، University و CompanyLegalDocument ناموفق بود؛ بنابراین build تأیید نشد.
-
----
-### fix 000064 - اصلاح دسترسی زیرموجودیت‌های شرکت برای شعب و اسناد حقوقی یکپارچه‌سازی دسترسی عملیات شرکت بر اساس مجوز و سازمان
-
-- علت اصلی خطای 403 باقی‌ماندن کنترل‌های قدیمی مالک/تیم در mutationهای شرکت و زیرمنابع بود؛ این کنترل‌ها کاربر غیرمالک دارای مجوز را مسدود می‌کردند.
-- دسترسی در `CompanyAccessService` متمرکز شد: وجود شرکت، سازمان جاری و وضعیت بایگانی بررسی می‌شود و مالک/تیم مجوز پنهان نیست.
-- شعب، شبکه‌های اجتماعی شرکت، Call Card، اسناد حقوقی، فعالیت‌ها، اشخاص و زیرمنابع تماس/شبکه اجتماعی/سوابق شغلی و تحصیلی، ویرایش/اولویت شرکت و ایجاد فرصت فروش پوشش داده شدند.
-- تغییر مالک، بایگانی و بازیابی همچنان با مجوز صریح محافظت می‌شوند؛ مالک جدید نیز باید در همان سازمان باشد.
-- `JwtAuthGuard`، `PermissionsGuard` و جداسازی سازمانی حفظ شده‌اند؛ نداشتن مجوز همچنان 403 و شرکت سازمان دیگر 404 می‌دهد.
-- خطای آپلود/ثبت سند حقوقی لاگ می‌شود، رکورد ناقص پاک می‌شود و پاسخ غیر 2xx برمی‌گردد؛ موفقیت، سند ساخته‌شده را برمی‌گرداند.
-- فایل‌های اصلی: `src/app.module.ts`، helper/module دسترسی شرکت و سرویس‌های companies/legal-documents، branches، social-channels، call-cards، activities، people و person subresources.
-- بررسی‌ها: `npm run lint` موفق با هشدارهای از قبل موجود؛ `npm run build` موفق. schema تغییر نکرد و migration لازم نبود؛ فقط `npx prisma generate` برای همگام‌سازی client اجرا شد.
-- بررسی دستی ADMIN/REP انجام نشد، چون credential و محیط API اجرایی در دسترس نبود.
+- The HTTP 403 issue was caused by contact, social, employment-history, and education-history services still applying legacy role/company-owner/team checks to read paths after the core CRM visibility change.
+- `GET /api/people/:personId/contacts`, `GET /api/people/:personId/socials`, `GET /api/people/:personId/employment-history`, and `GET /api/people/:personId/education-history` are now readable with `person:view` when the person belongs to the current organization, independent of the company owner or the user's team.
+- Single contact/social reads and person detail/list endpoints enforce the same organization boundary. Archived companies cannot be used for these read paths, and records from another organization are hidden with a not-found response.
+- Split read and mutation checks into `assertPersonReadable` and `assertPersonMutable`. POST/PATCH/DELETE operations for contacts, socials, employment history, positions, and education history retain the previous strict role/owner/team rules.
+- All person-subresource mutation endpoints are protected by `person:update`; this fix does not allow users without that permission to create, update, or delete records.
+- Important changed files: `src/person-contacts/person-contacts.service.ts`, `src/person-contacts/person-contacts.controller.ts`, `src/person-socials/person-socials.service.ts`, `src/person-socials/person-socials.controller.ts`, `src/people/person-histories.service.ts`, `src/people/people.service.ts`, and `README.md`.
+- Manual verification checklist: read the four endpoints above as a REP with `person:view` for a company created by ADMIN; load details without failed requests; confirm cross-organization access is rejected; confirm users without `person:view` are rejected for GET requests; and confirm users without `person:update` are rejected for mutations.
+- Validation status: `npm run lint` passed with 0 errors and 10 existing warnings. `npm run build` failed because the Prisma Client was stale, producing 124 type errors related to existing models/fields such as Role, Team, University, and person-history models; these errors prevented build verification.
 
 ---
 
-### fix 000065 - جستجوی سمت سرور و صفحه‌بندی گزینه‌های شرکت
+### fix 000063 - Correct company subresource access for branches and legal documents
 
-- علت اصلی این بود که selectorهای فرانت‌اند فقط صفحه نخست و در عمل ۱۰ شرکت اول را دریافت می‌کردند؛ جستجوی سمت کاربر نیز نمی‌توانست شرکتی خارج از آن صفحه را پیدا کند. endpoint عمومی فهرست شرکت‌ها به‌دلیل response شامل relationهای owner، industry و source و قرارداد مورد استفاده صفحه شرکت‌ها تغییر نکرد.
-- endpoint سبک `GET /api/companies/options` با permission موجود `company:view` اضافه شد. پارامترها عبارت‌اند از `search`، `page`، `limit`، `excludeId`، `selectedId` و `includeArchived`. مقدار پیش‌فرض `page=1` و `limit=25` و سقف `limit=50` است؛ پاسخ از قالب موجود `data/meta` شامل total، totalPages، hasNext و hasPrevious استفاده می‌کند و هیچ relation سنگینی بارگذاری نمی‌شود.
-- جستجو پس از trim شدن مستقیماً در دیتابیس و به‌صورت case-insensitive روی `legalName`، `brandName`، `nationalId`، `registrationNumber` و فیلد موجود `economicCode` انجام می‌شود. ترتیب نتیجه deterministic و بر اساس brandName، legalName، createdAt و id است.
-- همه queryها با `organizationId` کاربر جاری محدود می‌شوند و هیچ owner/team scope پنهانی ندارند. شرکت‌های archived به‌صورت پیش‌فرض حذف می‌شوند و فقط با `includeArchived=true`، مطابق رفتار مجاز فعلی فهرست شرکت‌ها، قابل دریافت‌اند. `excludeId` در backend اعمال می‌شود.
-- hydration مقدار انتخاب‌شده هم با `selectedId` در endpoint فهرست و هم با `GET /api/companies/options/:id` و همان فیلدهای سبک پشتیبانی می‌شود. lookup مستقل از صفحه جستجو است، organization را enforce می‌کند و برای شرکت organization دیگر 404 می‌دهد.
-- اعتبارسنجی hierarchy چندوالدی موجود تقویت شد: self-parent/self-subsidiary، رابطه با شرکت organization دیگر، parent/subsidiary بایگانی‌شده و هر چرخه مستقیم یا چندسطحی رد می‌شود. تشخیص چرخه پیش از جایگزینی relationها روی graph سازمان جاری انجام می‌شود و داده معتبر موجود به‌صورت مخرب تغییر نمی‌کند.
-- فایل‌های اصلی جدید/تغییرکرده: `src/companies/dto/find-company-options.dto.ts`، `src/companies/companies.controller.ts`، `src/companies/companies.service.ts`، `test/companies.service.spec.ts` و `README.md`.
-- schema تغییر نکرد و migration لازم نیست. `npx prisma generate` برای همگام‌سازی Prisma Client قدیمی workspace با schema موجود اجرا و موفق شد؛ هیچ `db push`، reset یا دستور مخرب دیتابیس اجرا نشد.
-- نتایج بررسی: `npm run lint` موفق با ۰ خطا و ۹ warning از قبل موجود در فایل‌های نامرتبط؛ `npm run build` پس از generate موفق؛ تست متمرکز ۱ suite و ۱۶ تست موفق؛ مجموعه کامل `npm test -- --runInBand` شامل ۵ suite و ۳۰ تست موفق. هشدار non-blocking فقط همان ۹ warning lint موجود است.
+- The HTTP 403 issue was caused by branch and legal-document services, plus the attachment path for legal documents, continuing to apply hidden owner/team scope after company visibility became organization-wide.
+- Branch endpoints now validate companies only by current `organizationId` and non-archived status. `POST/PATCH/DELETE /api/companies/:companyId/branches` require the existing `branch:manage` permission; branch GET endpoints require `company:view`. Added the `PermissionsGuard`, which was previously missing from the branch controller.
+- `GET /api/companies/:companyId/legal-documents`, `POST /api/companies/:companyId/legal-documents/upload`, and legal-document PATCH/DELETE operations now validate the company in the current organization without an owner/team condition. Existing permissions remain unchanged: `company:view` for reads and `company:update` for upload/update/delete.
+- Internal `AttachmentsService` checks for `COMPANY_LEGAL_DOCUMENT` are now organization-scoped and reject archived companies, preventing a permitted REP from being denied again by owner scope during file persistence.
+- A successful upload returns the created legal-document record together with file metadata (`id`, original filename, MIME type, size, and creation time), while preserving `companyId` on the document record. Storage/attachment/link failures cannot produce false success: the error is rethrown, the document record is rolled back, any created attachment is cleaned up when possible, and the failure is logged with `requestId`, `companyId`, and `documentId`; the exception filter records and returns a standardized non-2xx response.
+- No new permission or schema was introduced. Users without `branch:manage` or `company:update` remain blocked by the guard, and archived or cross-organization companies cannot be used.
+- Important changed files: `src/company-branches/company-branches.controller.ts`, `src/company-branches/company-branches.service.ts`, `src/companies/company-legal-documents.controller.ts`, `src/companies/company-legal-documents.service.ts`, `src/attachments/attachments.service.ts`, and `README.md`.
+- Manual verification checklist: create/list/update/delete branches as a non-owner REP with permission; upload and list a legal document and verify metadata; reject users without permission; reject cross-organization companies; and confirm non-2xx responses plus logging when storage/database operations fail.
+- Validation status: `npm run lint` passed with 0 errors and 9 existing warnings. `npm run build` failed because the Prisma Client was stale, producing 124 type errors related to existing models/fields such as Role, Team, University, and CompanyLegalDocument; the build could not be confirmed.
 
 ---
 
-### fix 000071 - گزارش‌های پیشرفته فروش، عملیات و داشبورد مدیریتی
+### fix 000064 - Centralize company-operation access by permission and organization
 
-- endpointهای دارای مجوز `report:view` شامل `GET /api/dashboard/summary`، `GET /api/reports/opportunities/forecast`، `GET /api/reports/opportunities/aging`، `GET /api/reports/meetings/performance` و `GET /api/reports/tasks/performance` اضافه شدند. همه queryها با `organizationId` محدود می‌شوند و فیلترهای شرکت، مالک/مسئول، تیم، وضعیت و بازه زمانی را حفظ می‌کنند.
-- forecast فقط فرصت‌های فعال را بر مبنای `expectedCloseDate` گزارش می‌کند و جمع مبلغ اسمی و weighted را با `Prisma.Decimal`، به تفکیک ماه، stage و مالک برمی‌گرداند. aging سن کل و سن stage جاری، bucketهای ثابت، فرصت‌های overdue و صفحه‌بندی deterministic را با projection سبک شرکت/مالک محاسبه می‌کند.
-- گزارش جلسات شاخص‌های completed/cancelled/past-scheduled، نرخ completion/execution/cancellation، مدت برنامه‌ریزی‌شده، تفکیک وضعیت/mode/organizer و trend روزانه برای بازه‌های حداکثر ۳۱ روز و هفتگی برای بازه‌های بلندتر را ارائه می‌دهد. گزارش کارها snapshot جاری open/overdue/due-today/next-seven-days و جریان created/completed/cancelled/due/on-time/late را جدا نگه می‌دارد.
-- مرز «امروز» و بازه‌های تقویمی با timezone سازمان محاسبه می‌شوند و روزهای DST نیز با midnight محلی بعدی بسته می‌شوند. داشبورد به‌صورت پیش‌فرض ۳۰ روز کامل تقویمی، snapshot جاری، performance دوره، forecast نودروزه و فهرست‌های attention محدود به ۵ رکورد را ترکیب می‌کند.
-- فایل‌های مهم: `src/common/dates/timezone-boundary.util.ts`، `src/reports/advanced-reports.service.ts`، `src/reports/dto/advanced-report-filters.dto.ts`، controller/module گزارش‌ها، `src/dashboard/*`، `src/app.module.ts`، `test/advanced-reports.service.spec.ts` و خروجی build متناظر در `dist`.
-- بررسی‌ها: سه suite مرتبط گزارش با ۸ test موفق؛ lint بدون error و با همان ۹ warning از قبل موجود؛ build موفق. `prisma generate` فقط برای همگام‌سازی client قدیمی workspace با schema موجود اجرا شد.
-- schema پایگاه داده تغییر نکرد، migration جدیدی ایجاد نشد و هیچ دستور مخرب یا seed گسترده‌ای اجرا نشد.
+- The remaining HTTP 403 errors were caused by legacy owner/team checks in company mutations and subresources, which blocked permitted non-owner users.
+- Centralized access in `CompanyAccessService`: company existence, current organization, and archive state are checked, while owner/team membership is no longer treated as an implicit permission.
+- Covered branches, company social channels, Call Cards, legal documents, activities, people and their contact/social/employment/education subresources, company edit/priority changes, and opportunity creation.
+- Owner changes, archive, and restore operations remain protected by explicit permissions; a new owner must also belong to the same organization.
+- Preserved `JwtAuthGuard`, `PermissionsGuard`, and organization isolation. Missing permissions still produce HTTP 403, while a company from another organization remains hidden with HTTP 404.
+- Legal-document upload/persistence failures are logged, incomplete records are removed, and a non-2xx response is returned; successful requests return the created document.
+- Important files: `src/app.module.ts`, the company-access helper/module, and services for companies/legal documents, branches, social channels, Call Cards, activities, people, and person subresources.
+- Validation status: `npm run lint` passed with pre-existing warnings; `npm run build` passed. The schema was unchanged and no migration was required; only `npx prisma generate` was run to synchronize the client.
+- Manual ADMIN/REP verification was not performed because credentials and a runnable API environment were unavailable.
 
-### fix 000070 - اصلاح معنای تاریخ و شمارش دقیق فرصت فعال و کار عقب‌افتاده در گزارش‌ها
+---
 
-- پارامتر اختیاری `activeOnly=true|false` به فهرست فرصت‌ها اضافه شد. مقدار true فقط فرصت غیرآرشیوی با stage غیرنهایی و `terminalType=null` را برمی‌گرداند، تمام فیلترهای سازمان/مالک/تیم/شرکت و صفحه‌بندی را حفظ می‌کند و ترکیب آن با `archivedOnly=true` با خطای روشن رد می‌شود.
-- پارامتر اختیاری `overdueOnly=true|false` به فهرست کارها اضافه شد. predicate دقیق سمت پایگاه شامل `dueAt < now` و status یکی از `TODO`/`IN_PROGRESS` است؛ status نهایی ناسازگار رد و `meta.total` مستقیماً از count پایگاه محاسبه می‌شود.
-- مبنای تاریخ `pipeline-summary` و `pipeline/by-owner` برابر `opportunity.createdAt`، مبنای `conversion-rates` برابر `opportunityStageHistory.changedAt`، مبنای نمونه stage-duration زمان خروج `changedAt` و مبنای هر دو گزارش فعالیت `activity.occurredAt` شد. بدون تاریخ، همه تاریخچه موجود لحاظ می‌شود و قرارداد inclusive تاریخ روزانه حفظ شده است.
-- conversion اکنون denominator و تعداد برد را از opportunityهای distinct دارای transition واجد شرایط در دوره می‌گیرد؛ aliasهای سازگاری موجود حذف یا تغییرنام داده نشدند. duration ورود قبل از شروع دوره را حفظ می‌کند و فقط sample را بر اساس زمان خروج فیلتر می‌کند.
-- `companyIds` و `ownershipScope` از helperهای سازمان/مالک/تیم موجود در همه مسیرهای opportunity و activity عبور می‌کنند؛ scope فعالیت همچنان از visibility شرکت جدا از فیلتر actor/team است. `filter-options` بدون فهرست نامحدود شرکت باقی ماند و endpoint صفحه‌بندی‌شده company options موجود تغییری نکرد.
-- فایل‌های مهم: DTO و service فرصت‌ها، DTO و service کارها، `src/reports/reports.service.ts`، تست‌های `opportunity-task-list-filters` و `reports-correctness`، خروجی build متناظر در `dist` و `README.md`.
-- بررسی‌ها: ۱۳ suite و ۷۵ test موفق؛ lint بدون error و با ۹ warning از قبل موجود؛ build موفق.
-- این fix هیچ تغییر schema یا migration ندارد. فرض حفظ‌شده: گزارش‌ها مطابق رفتار قبلی فرصت‌ها و شرکت‌های آرشیوی را از scope گزارش حذف می‌کنند.
+### fix 000065 - Add server-side search and pagination for company options
 
-### fix 000069 - اصلاح خطای P2010 در قفل تراکنشی نرخ ارز
+- The root issue was that frontend selectors loaded only the first page—effectively the first 10 companies—so client-side search could not find companies outside that page. The general company-list endpoint was not changed because its response includes owner, industry, and source relations and is part of the Companies page contract.
+- Added the lightweight `GET /api/companies/options` endpoint with the existing `company:view` permission. Parameters are `search`, `page`, `limit`, `excludeId`, `selectedId`, and `includeArchived`. Defaults are `page=1` and `limit=25`, with a maximum `limit=50`. The response uses the existing `data/meta` envelope with total, totalPages, hasNext, and hasPrevious and does not load heavy relations.
+- After trimming, search runs directly in the database and is case-insensitive across `legalName`, `brandName`, `nationalId`, `registrationNumber`, and existing `economicCode`. Results are deterministically ordered by brandName, legalName, createdAt, and id.
+- All queries are restricted by the current user's `organizationId` and apply no hidden owner/team scope. Archived companies are excluded by default and are returned only with `includeArchived=true`, consistent with currently permitted company-list behavior. `excludeId` is enforced by the backend.
+- Selected-value hydration is supported through `selectedId` on the list endpoint and through `GET /api/companies/options/:id` using the same lightweight fields. The independent lookup is not tied to the search page, enforces organization scope, and returns HTTP 404 for a company from another organization.
+- Strengthened existing multi-parent hierarchy validation: self-parent/self-subsidiary links, cross-organization relationships, archived parent/subsidiary companies, and direct or multi-level cycles are rejected. Cycle detection runs over the current organization's graph before relations are replaced and does not destructively alter existing valid data.
+- Important changed or new files: `src/companies/dto/find-company-options.dto.ts`, `src/companies/companies.controller.ts`, `src/companies/companies.service.ts`, `test/companies.service.spec.ts`, and `README.md`.
+- The schema was unchanged and no migration was required. `npx prisma generate` was run successfully to synchronize the workspace's stale Prisma Client with the existing schema; no `db push`, reset, or destructive database command was run.
+- Validation status: `npm run lint` passed with 0 errors and 9 pre-existing warnings in unrelated files; `npm run build` passed after generation; the focused test suite passed with 1 suite and 16 tests; the complete `npm test -- --runInBand` run passed with 5 suites and 30 tests. The only non-blocking warning is the existing set of 9 lint warnings.
 
-- علت خطای `Prisma P2010: Failed to deserialize column of type 'void'` در `POST /api/admin/exchange-rates`، بازگرداندن مستقیم نتیجه `void` تابع PostgreSQL به نام `pg_advisory_xact_lock` بود.
-- قفل advisory تراکنشی و ترتیب کامل تراکنش حفظ شد، اما نتیجه تابع با `CAST(... AS TEXT) AS "lockResult"` به نوع قابل deserialize برای Prisma تبدیل شد؛ از APIهای unsafe استفاده نشده است.
-- تست regression، cast و alias غیر-void، اجرای قفل پیش از خواندن نرخ فعال، بستن دوره قبلی، ایجاد نرخ جدید، انتخاب صرفاً محصولات USD، محاسبه مجدد و عدم ثبت audit هنگام شکست تراکنش را پوشش می‌دهد.
-- فایل‌های تغییرکرده: `src/admin/exchange-rates/exchange-rates.service.ts`، `test/exchange-rates.service.spec.ts`، خروجی build متناظر در `dist/src/admin/exchange-rates/exchange-rates.service.js` و source map، و `README.md`.
-- این hotfix هیچ تغییری در Prisma schema یا پایگاه داده ندارد و migration جدیدی نیاز ندارد.
-- بررسی‌ها: دو suite مرتبط exchange-rate با ۶ test موفق؛ lint بدون error و با ۹ warning از قبل موجود؛ build موفق.
+---
 
-### fix 000068 - قیمت‌گذاری چندارزی و چندکاناله محصولات و تاریخچه نرخ ارز
+### fix 000066 - Correct owner-option permissions and organization scoping
 
-- قیمت مستقل فروش حضوری و دیجی‌کالا با ورودی `IRR` یا `USD` به کاتالوگ محصول اضافه شد. محاسبات USD با `Prisma.Decimal` و گردکردن قطعی `ROUND_HALF_UP` تا ریال کامل در backend انجام می‌شوند.
-- فیلدهای سازگاری `defaultUnitPrice` و `currency` حفظ شدند و در هر ایجاد، ویرایش یا محاسبه مجدد به‌ترتیب با قیمت نهایی حضوری و `IRR` همگام می‌شوند. ایجاد line item فرصت نیز صراحتاً قیمت نهایی حضوری IRR را به‌عنوان قیمت پیش‌فرض snapshot می‌کند.
-- مدل append-only نرخ `USD` به `IRR` با بازه‌های `validFrom`/`validTo` و endpointهای `GET /api/admin/exchange-rates/current`، `GET /api/admin/exchange-rates` و `POST /api/admin/exchange-rates` اضافه شد.
-- ثبت نرخ جدید در یک تراکنش و زیر advisory lock انجام می‌شود: نرخ فعال قبلی بسته، نرخ جدید ایجاد و تمام محصولات USD دوباره محاسبه می‌شوند. محصولات IRR و snapshotهای line item، سند تجاری و پرداخت تغییر نمی‌کنند.
-- migration تولید-safe و افزایشی `20260720160000_add_multi_channel_product_pricing` همه محصولات موجود را بدون حذف به IRR backfill می‌کند؛ دو قیمت ورودی و نهایی از `defaultUnitPrice` گرفته شده، profit و rate reference خالی می‌مانند. SQL بازبینی شد و شامل `DROP TABLE`، `TRUNCATE` یا `DELETE` نیست.
-- مجوزهای `exchange-rate:view` و `exchange-rate:manage` در migration به‌صورت idempotent ایجاد و فقط به نقش سیستمی ADMIN اضافه می‌شوند؛ seed نیز برای محیط‌های جدید به‌روزرسانی شد و مجوز نقش‌های سفارشی overwrite نمی‌شود.
-- فایل‌های مهم: `prisma/schema.prisma`، migration جدید، `prisma/seed.ts`، `src/product-catalog/*`، `src/admin/exchange-rates/*`، `src/opportunities/opportunity-line-items.service.ts`، `src/app.module.ts` و تست‌های pricing/rate/permission.
-- بررسی‌ها: `prisma format`، `prisma validate` و `prisma generate` موفق؛ lint بدون error و با ۹ warning از قبل موجود؛ build موفق؛ ۱۱ suite و ۶۳ test موفق.
-- وضعیت migration پایگاه محلی: migrationهای `20260720120000_add_meetings` و `20260720160000_add_multi_channel_product_pricing` هنوز اعمال نشده‌اند و migration ثبت‌شده `20260710203701_` در پایگاه، فایل متناظر محلی ندارد؛ بنابراین migration اجرا نشد. فرض نسخه اول این است که نرخ ارز یک مرجع سراسری و فقط USD/IRR است.
+- The HTTP 403 root cause was duplicate authorization: after `PermissionsGuard` verified `company:assign-owner`, `UsersService.getOwnerOptions` again limited callers to base roles ADMIN/MANAGER. That redundant check rejected REP or custom roles with valid permission and was removed. Authorization now depends only on authentication, `company:assign-owner`, and organization scope; callers without permission still receive HTTP 403 from the guard.
+- Separated the caller role from the selectable owner role. A caller with any base role and the required permission may read the endpoint, while existing business rules still return only active users whose base role is REP or MANAGER. ADMIN, BOARDS, and inactive users are excluded.
+- Preserved compatibility for `GET /api/users/owner-options`, which still returns a lightweight array for existing consumers. It is now restricted by the current user's `organizationId` and applies no hidden caller-role/team filter. Responses include only `id`, `fullName`, `email`, `role`, `roleId`, `teamId`, `team`, and a `teamRef` summary.
+- Added `GET /api/users/owner-options/v2` with the same permission. Parameters are `search`, `page`, `limit`, `teamId`, and `selectedId`; defaults are `page=1` and `limit=25`, with maximum `limit=50`. Search is case-insensitive in the database over `fullName` and `email`. The standard `data/meta` response includes total, totalPages, hasNext, and hasPrevious.
+- `selectedId` hydrates a selected value outside the first page under the same organization scope. `teamId` is an explicit filter and must reference an active team in the same organization before use; MANAGER or custom roles are not implicitly limited to their own team when the parameter is omitted.
+- Audited tenant isolation in `UsersService`: `findAll`, `findOne`, `deactivate`, `activate`, and `updateUserRole` now receive the actor from the controller and restrict targets through `getCurrentOrganizationId(actor)`. Cross-organization targets remain hidden with HTTP 404, and mutation audit logs record `organizationId`. Create already used the actor's organization.
+- Frontend dependency: existing consumers of the array endpoint continue to work unchanged. Search, pagination, and hydration consumers should migrate to `/api/users/owner-options/v2`, read options from `response.data`, and read pagination metadata from `response.meta`. The frontend repository was not present in this workspace and was not modified.
+- Important changed or new files: `src/users/dto/find-owner-options.dto.ts`, `src/users/users.controller.ts`, `src/users/users.service.ts`, `test/users-owner-options.service.spec.ts`, and `README.md`.
+- The Prisma schema was unchanged and no migration is required. `npx prisma generate` was run only to synchronize the existing workspace client and passed; no reset or `db push` was run.
+- Validation status: the focused owner-options suite passed with 1 suite and 16 tests; the full `npm test -- --runInBand` run passed with 6 suites and 46 tests; `npm run lint` passed with 0 errors and 9 pre-existing warnings in unrelated files; `npm run build` passed.
+- Non-blocking limitation: manual verification with real REP credentials and the frontend was not performed; automated service/guard coverage uses Prisma mocks.
 
-### fix 000067 - افزودن ماژول جلسات و یادآوری جلسه
+---
 
-- جلسه به‌عنوان موجودیت مستقل `Meeting` با چرخه وضعیت `SCHEDULED`، `COMPLETED` و `CANCELLED` اضافه شد؛ `ActivityType.MEETING` همچنان فقط برای سوابق فعالیت‌ها باقی می‌ماند.
-- ارتباط الزامی با شرکت، ارتباط اختیاری با فرصت فروش، مسئولان داخلی رابطه‌ای و مخاطبان خارجی از نوع `Person` پیاده‌سازی شد. تمام اعتبارسنجی‌ها و عملیات با محدوده سازمان انجام می‌شوند.
-- APIهای سراسری ایجاد، فهرست صفحه‌بندی‌شده و فیلترشونده، جزئیات، ویرایش، تکمیل و لغو زیر `/api/meetings` اضافه شدند. فیلترهای شرکت و فرصت همان API سراسری را استفاده می‌کنند.
-- endpoint سبک `GET /api/users/assignee-options` با جست‌وجو و صفحه‌بندی برای کاربران فعال سازمان اضافه شد و مجوز آن به‌صورت any-of برای `meeting:create` و `meeting:update` است.
-- `reminderAt` با اعلان داخلی `MEETING_REMINDER` و مرجع `MEETING` یکپارچه شد. پردازش دقیقه‌ای با advisory lock تراکنشی PostgreSQL، گیرندگان deduplicate شده و ثبت اتمیک اعلان‌ها و `reminderSentAt` انجام می‌شود.
-- مجوزهای `meeting:view`، `meeting:create`، `meeting:update`، `meeting:complete` و `meeting:cancel` به seed اضافه شدند؛ ADMIN همه، MANAGER و REP همه مجوزهای عملیاتی، و BOARDS فقط مشاهده را دریافت می‌کنند. حذف سخت پیاده‌سازی نشده است.
-- migration: `20260720120000_add_meetings` (در پایگاه محلی هنوز اعمال نشده؛ `migrate status` همچنین یک migration پایگاه با نام `20260710203701_` را گزارش کرد که در فایل‌های محلی وجود ندارد).
-- فایل‌های مهم: `prisma/schema.prisma`، migration جدید، `prisma/seed.ts`، `src/meetings/*`، endpoint گزینه‌های مسئول در `src/users/*` و ثبت ماژول/scheduler در `src/app.module.ts`.
-- بررسی‌ها: `npx prisma generate` موفق؛ lint موفق با ۹ warning از قبل موجود و بدون error؛ build موفق؛ تمام ۷ suite و ۵۱ test موفق.
-- محدودیت: migration به دلیل اختلاف تاریخچه migration پایگاه محلی اعمال نشد و باید قبل از deploy اختلاف migration گمشده بررسی شود. ارسال اعلان فقط in-app است و پردازش هر نوبت حداکثر ۱۰۰ جلسه را claim می‌کند.
+### fix 000067 - Add the meeting module and meeting reminders
 
-### fix 000066 - اصلاح دسترسی و محدوده سازمانی گزینه‌های مالک
+- Added Meeting as an independent entity with `SCHEDULED`, `COMPLETED`, and `CANCELLED` lifecycle states. `ActivityType.MEETING` remains only for activity-history records.
+- Implemented a required company relation, optional opportunity relation, relational internal assignees, and external attendees of type `Person`. All validation and operations enforce organization scope.
+- Added global create, paginated/filterable list, detail, update, complete, and cancel APIs under `/api/meetings`. Company and opportunity filters use the same global API.
+- Added the lightweight `GET /api/users/assignee-options` endpoint with search and pagination for active users in the organization. Access uses an any-of permission rule for `meeting:create` or `meeting:update`.
+- Integrated `reminderAt` with internal `MEETING_REMINDER` notifications and the `MEETING` entity reference. Minute-based processing uses a PostgreSQL transaction-level advisory lock, deduplicated recipients, and atomic notification plus `reminderSentAt` persistence.
+- Added `meeting:view`, `meeting:create`, `meeting:update`, `meeting:complete`, and `meeting:cancel` to the seed. ADMIN receives all; MANAGER and REP receive all operational permissions; BOARDS receives view only. Hard deletion is not implemented.
+- Migration: `20260720120000_add_meetings`. It has not been applied to the local database. `migrate status` also reported database migration `20260710203701_`, which has no matching local migration file.
+- Important files: `prisma/schema.prisma`, the new migration, `prisma/seed.ts`, `src/meetings/*`, assignee-option endpoints under `src/users/*`, and module/scheduler registration in `src/app.module.ts`.
+- Validation status: `npx prisma generate` passed; lint passed with 9 pre-existing warnings and no errors; build passed; all 7 suites and 51 tests passed.
+- Limitation: the migration was not applied because of the local database migration-history mismatch, which must be investigated before deployment. Notifications are in-app only, and each processing run claims at most 100 meetings.
 
-- علت اصلی 403 این بود که controller پس از کنترل permission `company:assign-owner` در `PermissionsGuard`، دوباره در `UsersService.getOwnerOptions` نقش پایه caller را فقط به ADMIN/MANAGER محدود می‌کرد. این شرط تکراری باعث ردشدن REP یا custom role دارای permission معتبر می‌شد و حذف شد؛ اکنون منبع authorization فقط احراز هویت، `company:assign-owner` و scope سازمان است و کاربر فاقد permission همچنان در guard پاسخ 403 می‌گیرد.
-- نقش caller از نقش owner قابل انتخاب جدا شد. caller با هر base role دارای permission می‌تواند endpoint را بخواند، اما گزینه‌های قابل تخصیص طبق business rule موجود فقط کاربران active با نقش پایه REP یا MANAGER هستند؛ ADMIN، BOARDS و کاربران inactive برگردانده نمی‌شوند.
-- endpoint سازگار `GET /api/users/owner-options` برای جلوگیری از شکستن consumerهای فعلی همچنان array سبک برمی‌گرداند، اما اکنون با `organizationId` کاربر جاری محدود است و هیچ فیلتر پنهان role/team caller ندارد. response فقط شامل `id`، `fullName`، `email`، `role`، `roleId`، `teamId`، `team` و خلاصه `teamRef` است.
-- endpoint جدید `GET /api/users/owner-options/v2` با همان permission اضافه شد. پارامترها `search`، `page`، `limit`، `teamId` و `selectedId` هستند؛ مقدار پیش‌فرض `page=1` و `limit=25` و سقف limit برابر 50 است. جستجو روی `fullName` و `email` به‌صورت case-insensitive در دیتابیس انجام می‌شود و پاسخ استاندارد `data/meta` شامل total، totalPages، hasNext و hasPrevious است.
-- `selectedId` مقدار انتخاب‌شده خارج از صفحه نخست را با همان scope سازمانی hydrate می‌کند. `teamId` فقط یک فیلتر صریح است و پیش از استفاده باید به team فعال همان organization اشاره کند؛ MANAGER یا custom role بدون ارسال این پارامتر به تیم خودش محدود نمی‌شود.
-- audit tenant isolation روی `UsersService` انجام شد: `findAll`، `findOne`، `deactivate`، `activate` و `updateUserRole` اکنون actor را از controller می‌گیرند و target را با `getCurrentOrganizationId(actor)` محدود می‌کنند. target سازمان دیگر با 404 پنهان می‌ماند و audit mutationها نیز organizationId را ثبت می‌کند. create از قبل organization actor را اعمال می‌کرد.
-- وابستگی frontend: consumerهای فعلی endpoint array بدون تغییر کار می‌کنند؛ برای search/pagination و hydration باید به `/api/users/owner-options/v2` مهاجرت کنند و گزینه‌ها را از `response.data` و metadata را از `response.meta` بخوانند. frontend repository در این workspace وجود ندارد و تغییری در آن انجام نشد.
-- فایل‌های اصلی جدید/تغییرکرده: `src/users/dto/find-owner-options.dto.ts`، `src/users/users.controller.ts`، `src/users/users.service.ts`، `test/users-owner-options.service.spec.ts` و `README.md`.
-- Prisma schema تغییر نکرد و migration لازم نیست. `npx prisma generate` فقط برای همگام‌سازی client موجود workspace اجرا و موفق شد؛ هیچ reset یا `db push` اجرا نشد.
-- نتایج بررسی: تست متمرکز owner options شامل ۱ suite و ۱۶ تست موفق؛ مجموعه کامل `npm test -- --runInBand` شامل ۶ suite و ۴۶ تست موفق؛ `npm run lint` موفق با ۰ خطا و ۹ warning از قبل موجود در فایل‌های نامرتبط؛ `npm run build` موفق.
-- محدودیت non-blocking: verification دستی با credential واقعی REP و frontend انجام نشد؛ پوشش خودکار service/guard از Prisma mock استفاده می‌کند.
+### fix 000068 - Add multi-currency, multi-channel product pricing and exchange-rate history
+
+- Added independent in-person and Digikala selling prices to the product catalog, with `IRR` or `USD` input. USD calculations are performed in the backend with `Prisma.Decimal` and deterministic `ROUND_HALF_UP` rounding to whole rials.
+- Preserved compatibility fields `defaultUnitPrice` and `currency`, synchronizing them on every create, update, or recalculation with the final in-person price and `IRR`, respectively. Opportunity line-item creation explicitly snapshots the final in-person IRR price as the default.
+- Added an append-only USD-to-IRR rate model with `validFrom`/`validTo` periods and endpoints `GET /api/admin/exchange-rates/current`, `GET /api/admin/exchange-rates`, and `POST /api/admin/exchange-rates`.
+- A new rate is recorded in one transaction under an advisory lock: the previous active rate is closed, the new rate is created, and all USD products are recalculated. IRR products and line-item, commercial-document, and payment snapshots remain unchanged.
+- Added production-safe, additive migration `20260720160000_add_multi_channel_product_pricing`. It backfills every existing product to IRR without deletion; both input and final prices are copied from `defaultUnitPrice`, while profit and rate-reference fields remain empty. The SQL was reviewed and contains no `DROP TABLE`, `TRUNCATE`, or `DELETE`.
+- The migration creates `exchange-rate:view` and `exchange-rate:manage` idempotently and assigns them only to the system ADMIN role. The seed was also updated for new environments and does not overwrite custom-role permissions.
+- Important files: `prisma/schema.prisma`, the new migration, `prisma/seed.ts`, `src/product-catalog/*`, `src/admin/exchange-rates/*`, `src/opportunities/opportunity-line-items.service.ts`, `src/app.module.ts`, and pricing/rate/permission tests.
+- Validation status: `prisma format`, `prisma validate`, and `prisma generate` passed; lint passed with no errors and 9 pre-existing warnings; build passed; 11 suites and 63 tests passed.
+- Local migration status: `20260720120000_add_meetings` and `20260720160000_add_multi_channel_product_pricing` remain unapplied, while database migration `20260710203701_` has no matching local file; therefore, migrations were not run. Version-one assumption: the exchange rate is a global reference and only USD/IRR is supported.
+
+### fix 000069 - Fix the Prisma P2010 error in the exchange-rate transaction lock
+
+- The `Prisma P2010: Failed to deserialize column of type 'void'` error in `POST /api/admin/exchange-rates` was caused by returning the PostgreSQL `pg_advisory_xact_lock` function's `void` result directly.
+- Preserved the transaction-level advisory lock and complete transaction ordering, but converted the function result to a Prisma-deserializable type with `CAST(... AS TEXT) AS "lockResult"`. No unsafe APIs were introduced.
+- Regression tests cover the cast and non-void alias, lock execution before reading the active rate, closing the previous period, creating the new rate, selecting only USD products, recalculation, and omission of audit logging when the transaction fails.
+- Important changed files: `src/admin/exchange-rates/exchange-rates.service.ts`, `test/exchange-rates.service.spec.ts`, corresponding build output at `dist/src/admin/exchange-rates/exchange-rates.service.js` and its source map, and `README.md`.
+- This hotfix changes neither the Prisma schema nor the database and requires no migration.
+- Validation status: two exchange-rate-related suites passed with 6 tests; lint passed with no errors and 9 pre-existing warnings; build passed.
+
+### fix 000070 - Correct report date semantics and exact active-opportunity and overdue-task counts
+
+- Added optional `activeOnly=true|false` to opportunity lists. When true, it returns only non-archived opportunities whose stage is non-terminal and has `terminalType=null`, while preserving all organization/owner/team/company filters and pagination. Combining it with `archivedOnly=true` is rejected with a clear error.
+- Added optional `overdueOnly=true|false` to task lists. The database predicate is exactly `dueAt < now` with status in `TODO`/`IN_PROGRESS`; incompatible terminal statuses are rejected, and `meta.total` is calculated directly from the database count.
+- Date basis is now `opportunity.createdAt` for `pipeline-summary` and `pipeline/by-owner`, `opportunityStageHistory.changedAt` for `conversion-rates`, stage-exit `changedAt` for stage-duration samples, and `activity.occurredAt` for both activity reports. Without dates, all available history is included, while existing inclusive day-range behavior remains.
+- Conversion denominators and win counts now use distinct opportunities with qualifying transitions during the period; compatibility aliases were not removed or renamed. Stage duration preserves entries that occurred before the period start and filters samples only by exit time.
+- `companyIds` and `ownershipScope` pass through existing organization/owner/team helpers in all opportunity and activity paths. Activity visibility remains company-scoped separately from actor/team filters. `filter-options` still avoids an unbounded company list, and the existing paginated company-options endpoint was not changed.
+- Important files: opportunity DTOs/services, task DTOs/services, `src/reports/reports.service.ts`, `opportunity-task-list-filters` and `reports-correctness` tests, corresponding build output under `dist`, and `README.md`.
+- Validation status: 13 suites and 75 tests passed; lint passed with no errors and 9 pre-existing warnings; build passed.
+- This fix has no schema or migration change. Preserved assumption: reports continue to exclude archived opportunities and companies, matching previous behavior.
+
+### fix 000071 - Add advanced sales and operations reports and a management dashboard
+
+- Added `report:view`-protected endpoints: `GET /api/dashboard/summary`, `GET /api/reports/opportunities/forecast`, `GET /api/reports/opportunities/aging`, `GET /api/reports/meetings/performance`, and `GET /api/reports/tasks/performance`. All queries are restricted by `organizationId` and preserve company, owner/assignee, team, status, and date-range filters.
+- Forecast reports include only active opportunities based on `expectedCloseDate` and return nominal and weighted totals using `Prisma.Decimal`, broken down by month, stage, and owner. Aging reports calculate total age, current-stage age, fixed buckets, overdue opportunities, and deterministic pagination using lightweight company/owner projections.
+- Meeting reports provide completed/cancelled/past-scheduled metrics, completion/execution/cancellation rates, scheduled duration, breakdowns by status/mode/organizer, and daily trends for ranges up to 31 days or weekly trends for longer periods. Task reports separate current open/overdue/due-today/next-seven-days snapshots from created/completed/cancelled/due/on-time/late period flow.
+- Calendar-day and “today” boundaries are calculated in the organization's timezone, including DST days closed at the next local midnight. By default, the dashboard combines 30 complete calendar days, current snapshots, period performance, a 90-day forecast, and attention lists limited to 5 records.
+- Important files: `src/common/dates/timezone-boundary.util.ts`, `src/reports/advanced-reports.service.ts`, `src/reports/dto/advanced-report-filters.dto.ts`, report controller/module files, `src/dashboard/*`, `src/app.module.ts`, `test/advanced-reports.service.spec.ts`, and corresponding build output under `dist`.
+- Validation status: three report-related suites passed with 8 tests; lint passed with no errors and the same 9 pre-existing warnings; build passed. `prisma generate` was run only to synchronize the workspace's stale client with the existing schema.
+- The database schema was unchanged, no migration was created, and no destructive command or broad seed operation was run.
+
+### fix 000072 - Add sales channels, product price history, and financial/commercial reports
+
+- Added the additive migration `20260720210000_add_sales_channels_product_price_history`, introducing the `SalesChannel` and `ProductPriceHistoryReason` enums, an append-only price-history table, catalog channel/price snapshots, and a price-history reference. A PostgreSQL partial unique index allows only one open history record per product.
+- The backfill does not fabricate historical sales or prices: existing line items are marked `LEGACY_UNKNOWN`, `catalogUnitPriceIrrSnapshot` is copied directly from `unitPrice`, the history reference remains `null`, and all other monetary values remain unchanged. Each product receives only one `MIGRATION_BASELINE` record based on its current state at the migration execution timestamp; records are not backdated.
+- Line-item writes default an omitted sales channel to `IN_PERSON` for backward compatibility. `IN_PERSON` and `DIGIKALA` snapshot the relevant channel price and open history record while preserving the negotiated price. `OTHER` requires an explicit price, and `LEGACY_UNKNOWN` is rejected for new writes. Non-price updates preserve the existing snapshot.
+- Product creation atomically creates a `PRODUCT_CREATED` history record. Effective price changes create a `PRODUCT_UPDATED` record under an advisory lock. The exchange-rate transaction and lock introduced in fix 000069 are preserved, and every affected USD product receives an `EXCHANGE_RATE_CHANGED` record with a rate snapshot. IRR products and existing line items remain unchanged.
+- Added `GET /api/product-catalog/:id/price-history`, protected by `product:view`, and the `GET /api/reports/financial/collections`, `GET /api/reports/products/performance`, and `GET /api/reports/exchange-rates/impact` endpoints, protected by `report:view`. The Dashboard also receives the new `finance`, `catalog`, and `salesChannels` sections without changing its previous response contract.
+- Important changed or new files include the Prisma schema and migration, product catalog and price-history modules, line-item DTOs and service, exchange-rate service, commercial reports, dashboard, tests, and the corresponding `dist` output.
+- Validation status: `prisma format`, `prisma validate`, and `prisma generate` passed; 6 focused suites with 19 tests passed; the full 18-suite test run with 89 tests passed; lint passed with no errors and 9 pre-existing warnings; build passed.
+- Assumption: because the payment model does not store separate paid and outstanding amounts, a `PARTIAL` payment row's amount is treated as the authoritative receivable amount. When no previous history exists, no synthetic prior impact is created and the delta remains `null`. The migration was not applied to the database, and no seed or destructive command was run.
 
 ---
 
 **Built with ❤️ for the sales team**
 
 ---
-

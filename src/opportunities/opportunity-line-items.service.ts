@@ -3,14 +3,14 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
-} from '@nestjs/common';
-import { Prisma, UserRole } from '@prisma/client';
-import { AuditLogService } from '../audit-log/audit-log.service';
-import { CurrentUserPayload } from '../common/decorators/current-user.decorator';
-import { userTeamScopeWhere } from '../common/tenant/team-scope.util';
-import { PrismaService } from '../prisma/prisma.service';
-import { CreateOpportunityLineItemDto } from './dto/create-opportunity-line-item.dto';
-import { UpdateOpportunityLineItemDto } from './dto/update-opportunity-line-item.dto';
+} from "@nestjs/common";
+import { Prisma, SalesChannel, UserRole } from "@prisma/client";
+import { AuditLogService } from "../audit-log/audit-log.service";
+import { CurrentUserPayload } from "../common/decorators/current-user.decorator";
+import { userTeamScopeWhere } from "../common/tenant/team-scope.util";
+import { PrismaService } from "../prisma/prisma.service";
+import { CreateOpportunityLineItemDto } from "./dto/create-opportunity-line-item.dto";
+import { UpdateOpportunityLineItemDto } from "./dto/update-opportunity-line-item.dto";
 
 const lineItemInclude = {
   product: {
@@ -22,9 +22,13 @@ const lineItemInclude = {
       unit: true,
       defaultUnitPrice: true,
       inPersonPriceIrr: true,
+      digikalaPriceIrr: true,
       currency: true,
       isActive: true,
     },
+  },
+  productPriceHistory: {
+    select: { id: true, reason: true, validFrom: true, validTo: true },
   },
 } satisfies Prisma.OpportunityLineItemInclude;
 
@@ -41,7 +45,7 @@ export class OpportunityLineItemsService {
     return this.prisma.opportunityLineItem.findMany({
       where: { opportunityId },
       include: lineItemInclude,
-      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
     });
   }
 
@@ -61,7 +65,7 @@ export class OpportunityLineItemsService {
     });
 
     if (!item) {
-      throw new NotFoundException('آیتم فرصت فروش پیدا نشد');
+      throw new NotFoundException("آیتم فرصت فروش پیدا نشد");
     }
 
     return item;
@@ -72,20 +76,41 @@ export class OpportunityLineItemsService {
     dto: CreateOpportunityLineItemDto,
     user: CurrentUserPayload,
   ) {
-    const opportunity = await this.getOpportunityForMutation(opportunityId, user);
-    const product = await this.getActiveProduct(dto.productId);
+    const opportunity = await this.getOpportunityForMutation(
+      opportunityId,
+      user,
+    );
+    const product = dto.productId
+      ? await this.getActiveProduct(dto.productId)
+      : null;
+    const salesChannel = this.writeChannel(dto.salesChannel, Boolean(product));
+    const priceSnapshot = await this.resolveCatalogSnapshot(
+      product,
+      salesChannel,
+    );
 
-    const quantity = this.toPositiveDecimal(dto.quantity, 'quantity');
+    const quantity = this.toPositiveDecimal(dto.quantity, "quantity");
     const unitPrice =
       dto.unitPrice !== undefined
-        ? this.toNonNegativeDecimal(dto.unitPrice, 'unitPrice')
-        : new Prisma.Decimal(product.inPersonPriceIrr);
+        ? this.toNonNegativeDecimal(dto.unitPrice, "unitPrice")
+        : (priceSnapshot.catalogPrice ?? new Prisma.Decimal(0));
+    if (!product && dto.unitPrice === undefined)
+      throw new BadRequestException(
+        "unitPrice is required when productId is not supplied",
+      );
+    if (salesChannel === SalesChannel.OTHER && dto.unitPrice === undefined)
+      throw new BadRequestException(
+        "unitPrice is required for OTHER sales channel",
+      );
 
     const discountAmount = this.toNonNegativeDecimal(
       dto.discountAmount ?? 0,
-      'discountAmount',
+      "discountAmount",
     );
-    const taxAmount = this.toNonNegativeDecimal(dto.taxAmount ?? 0, 'taxAmount');
+    const taxAmount = this.toNonNegativeDecimal(
+      dto.taxAmount ?? 0,
+      "taxAmount",
+    );
     const lineTotal = this.calculateLineTotal(
       quantity,
       unitPrice,
@@ -96,9 +121,13 @@ export class OpportunityLineItemsService {
     const item = await this.prisma.opportunityLineItem.create({
       data: {
         opportunityId: opportunity.id,
-        productId: product.id,
-        productCodeSnapshot: product.code,
-        productNameSnapshot: product.name,
+        productId: product?.id ?? null,
+        productCodeSnapshot: product?.code ?? "CUSTOM",
+        productNameSnapshot:
+          product?.name ?? dto.description?.trim() ?? "Custom item",
+        salesChannel,
+        catalogUnitPriceIrrSnapshot: priceSnapshot.catalogPrice,
+        productPriceHistoryId: priceSnapshot.historyId,
         description: dto.description?.trim() || undefined,
         quantity,
         unitPrice,
@@ -114,9 +143,9 @@ export class OpportunityLineItemsService {
 
     await this.audit.record({
       actorId: user.userId,
-      entityType: 'opportunity-line-item',
+      entityType: "opportunity-line-item",
       entityId: item.id,
-      action: 'opportunity.line_item_created',
+      action: "opportunity.line_item_created",
       after: item,
       metadata: {
         opportunityId: opportunity.id,
@@ -132,7 +161,10 @@ export class OpportunityLineItemsService {
     dto: UpdateOpportunityLineItemDto,
     user: CurrentUserPayload,
   ) {
-    const opportunity = await this.getOpportunityForMutation(opportunityId, user);
+    const opportunity = await this.getOpportunityForMutation(
+      opportunityId,
+      user,
+    );
 
     const current = await this.prisma.opportunityLineItem.findFirst({
       where: {
@@ -143,39 +175,84 @@ export class OpportunityLineItemsService {
     });
 
     if (!current) {
-      throw new NotFoundException('آیتم فرصت فروش پیدا نشد');
+      throw new NotFoundException("آیتم فرصت فروش پیدا نشد");
     }
 
     let productId = current.productId;
     let productCodeSnapshot = current.productCodeSnapshot;
     let productNameSnapshot = current.productNameSnapshot;
+    let salesChannel = current.salesChannel;
+    let catalogUnitPriceIrrSnapshot = current.catalogUnitPriceIrrSnapshot;
+    let productPriceHistoryId = current.productPriceHistoryId;
+    let selectedProduct = current.product;
 
     if (dto.productId !== undefined) {
-      const product = await this.getActiveProduct(dto.productId);
-
-      productId = product.id;
-      productCodeSnapshot = product.code;
-      productNameSnapshot = product.name;
+      selectedProduct = dto.productId
+        ? await this.getActiveProduct(dto.productId)
+        : null;
+      productId = selectedProduct?.id ?? null;
+      productCodeSnapshot = selectedProduct?.code ?? "CUSTOM";
+      productNameSnapshot =
+        selectedProduct?.name ??
+        dto.description?.trim() ??
+        current.productNameSnapshot;
+    }
+    if (dto.salesChannel === SalesChannel.LEGACY_UNKNOWN)
+      throw new BadRequestException(
+        "LEGACY_UNKNOWN cannot be selected for writes",
+      );
+    const pricingSelectionChanged =
+      dto.productId !== undefined || dto.salesChannel !== undefined;
+    if (pricingSelectionChanged) {
+      salesChannel = this.writeChannel(
+        dto.salesChannel ??
+          (selectedProduct ? SalesChannel.IN_PERSON : SalesChannel.OTHER),
+        Boolean(selectedProduct),
+      );
+      const snapshot = await this.resolveCatalogSnapshot(
+        selectedProduct,
+        salesChannel,
+      );
+      catalogUnitPriceIrrSnapshot = snapshot.catalogPrice;
+      productPriceHistoryId = snapshot.historyId;
     }
 
     const quantity =
       dto.quantity !== undefined
-        ? this.toPositiveDecimal(dto.quantity, 'quantity')
+        ? this.toPositiveDecimal(dto.quantity, "quantity")
         : new Prisma.Decimal(current.quantity);
 
     const unitPrice =
       dto.unitPrice !== undefined
-        ? this.toNonNegativeDecimal(dto.unitPrice, 'unitPrice')
-        : new Prisma.Decimal(current.unitPrice);
+        ? this.toNonNegativeDecimal(dto.unitPrice, "unitPrice")
+        : pricingSelectionChanged && catalogUnitPriceIrrSnapshot
+          ? new Prisma.Decimal(catalogUnitPriceIrrSnapshot)
+          : new Prisma.Decimal(current.unitPrice);
+    if (
+      !selectedProduct &&
+      dto.unitPrice === undefined &&
+      pricingSelectionChanged
+    )
+      throw new BadRequestException(
+        "unitPrice is required when productId is not supplied",
+      );
+    if (
+      salesChannel === SalesChannel.OTHER &&
+      dto.unitPrice === undefined &&
+      pricingSelectionChanged
+    )
+      throw new BadRequestException(
+        "unitPrice is required for OTHER sales channel",
+      );
 
     const discountAmount =
       dto.discountAmount !== undefined
-        ? this.toNonNegativeDecimal(dto.discountAmount, 'discountAmount')
+        ? this.toNonNegativeDecimal(dto.discountAmount, "discountAmount")
         : new Prisma.Decimal(current.discountAmount);
 
     const taxAmount =
       dto.taxAmount !== undefined
-        ? this.toNonNegativeDecimal(dto.taxAmount, 'taxAmount')
+        ? this.toNonNegativeDecimal(dto.taxAmount, "taxAmount")
         : new Prisma.Decimal(current.taxAmount);
 
     const lineTotal = this.calculateLineTotal(
@@ -194,6 +271,9 @@ export class OpportunityLineItemsService {
       discountAmount,
       taxAmount,
       lineTotal,
+      salesChannel,
+      catalogUnitPriceIrrSnapshot,
+      productPriceHistoryId,
     };
 
     if (dto.description !== undefined) {
@@ -214,9 +294,9 @@ export class OpportunityLineItemsService {
 
     await this.audit.record({
       actorId: user.userId,
-      entityType: 'opportunity-line-item',
+      entityType: "opportunity-line-item",
       entityId: lineItemId,
-      action: 'opportunity.line_item_updated',
+      action: "opportunity.line_item_updated",
       before: current,
       after: updated,
       metadata: {
@@ -232,7 +312,10 @@ export class OpportunityLineItemsService {
     lineItemId: string,
     user: CurrentUserPayload,
   ) {
-    const opportunity = await this.getOpportunityForMutation(opportunityId, user);
+    const opportunity = await this.getOpportunityForMutation(
+      opportunityId,
+      user,
+    );
 
     const current = await this.prisma.opportunityLineItem.findFirst({
       where: {
@@ -242,7 +325,7 @@ export class OpportunityLineItemsService {
     });
 
     if (!current) {
-      throw new NotFoundException('آیتم فرصت فروش پیدا نشد');
+      throw new NotFoundException("آیتم فرصت فروش پیدا نشد");
     }
 
     const deleted = await this.prisma.opportunityLineItem.delete({
@@ -253,9 +336,9 @@ export class OpportunityLineItemsService {
 
     await this.audit.record({
       actorId: user.userId,
-      entityType: 'opportunity-line-item',
+      entityType: "opportunity-line-item",
       entityId: lineItemId,
-      action: 'opportunity.line_item_deleted',
+      action: "opportunity.line_item_deleted",
       before: current,
       metadata: {
         opportunityId: opportunity.id,
@@ -271,10 +354,7 @@ export class OpportunityLineItemsService {
   ) {
     const opportunity = await this.prisma.opportunity.findFirst({
       where: {
-        AND: [
-          { id: opportunityId },
-          this.opportunityScopeWhere(user),
-        ],
+        AND: [{ id: opportunityId }, this.opportunityScopeWhere(user)],
       },
       include: {
         company: {
@@ -291,7 +371,7 @@ export class OpportunityLineItemsService {
     });
 
     if (!opportunity) {
-      throw new NotFoundException('Opportunity not found');
+      throw new NotFoundException("Opportunity not found");
     }
 
     return opportunity;
@@ -302,13 +382,13 @@ export class OpportunityLineItemsService {
     user: CurrentUserPayload,
   ) {
     if (user.role === UserRole.BOARDS) {
-      throw new ForbiddenException('Opportunity is read-only for this role');
+      throw new ForbiddenException("Opportunity is read-only for this role");
     }
 
     const opportunity = await this.getOpportunityForView(opportunityId, user);
 
     if (opportunity.archivedAt) {
-      throw new BadRequestException('Archived opportunities cannot be changed');
+      throw new BadRequestException("Archived opportunities cannot be changed");
     }
 
     return opportunity;
@@ -328,10 +408,7 @@ export class OpportunityLineItemsService {
     }
 
     return {
-      OR: [
-        { ownerId: user.userId },
-        { company: { ownerId: user.userId } },
-      ],
+      OR: [{ ownerId: user.userId }, { company: { ownerId: user.userId } }],
     };
   }
 
@@ -341,10 +418,52 @@ export class OpportunityLineItemsService {
     });
 
     if (!product || !product.isActive) {
-      throw new BadRequestException('محصول یا سرویس انتخاب‌شده معتبر یا فعال نیست');
+      throw new BadRequestException(
+        "محصول یا سرویس انتخاب‌شده معتبر یا فعال نیست",
+      );
     }
 
     return product;
+  }
+
+  private writeChannel(channel: SalesChannel | undefined, hasProduct: boolean) {
+    const result =
+      channel ?? (hasProduct ? SalesChannel.IN_PERSON : SalesChannel.OTHER);
+    if (result === SalesChannel.LEGACY_UNKNOWN)
+      throw new BadRequestException(
+        "LEGACY_UNKNOWN cannot be selected for writes",
+      );
+    if (!hasProduct && result !== SalesChannel.OTHER)
+      throw new BadRequestException(
+        "A catalog product is required for IN_PERSON or DIGIKALA",
+      );
+    return result;
+  }
+
+  private async resolveCatalogSnapshot(
+    product: {
+      id: string;
+      inPersonPriceIrr: Prisma.Decimal;
+      digikalaPriceIrr: Prisma.Decimal;
+    } | null,
+    channel: SalesChannel,
+  ) {
+    if (!product || channel === SalesChannel.OTHER)
+      return { catalogPrice: null, historyId: null };
+    const history = await this.prisma.productPriceHistory.findFirst({
+      where: { productId: product.id, validTo: null },
+      select: { id: true },
+    });
+    if (!history)
+      throw new BadRequestException("Current product price history is missing");
+    return {
+      catalogPrice: new Prisma.Decimal(
+        channel === SalesChannel.DIGIKALA
+          ? product.digikalaPriceIrr
+          : product.inPersonPriceIrr,
+      ),
+      historyId: history.id,
+    };
   }
 
   private toPositiveDecimal(value: number, fieldName: string) {
@@ -373,10 +492,13 @@ export class OpportunityLineItemsService {
     discountAmount: Prisma.Decimal,
     taxAmount: Prisma.Decimal,
   ) {
-    const lineTotal = quantity.mul(unitPrice).minus(discountAmount).plus(taxAmount);
+    const lineTotal = quantity
+      .mul(unitPrice)
+      .minus(discountAmount)
+      .plus(taxAmount);
 
     if (lineTotal.lessThan(0)) {
-      throw new BadRequestException('مبلغ نهایی آیتم نمی‌تواند منفی باشد');
+      throw new BadRequestException("مبلغ نهایی آیتم نمی‌تواند منفی باشد");
     }
 
     return lineTotal;
@@ -394,7 +516,7 @@ export class OpportunityLineItemsService {
       data: {
         estimatedValue:
           aggregate._count._all > 0
-            ? aggregate._sum.lineTotal ?? new Prisma.Decimal(0)
+            ? (aggregate._sum.lineTotal ?? new Prisma.Decimal(0))
             : null,
       },
     });

@@ -20,12 +20,44 @@ const jwt_auth_guard_1 = require("../common/guards/jwt-auth.guard");
 const permissions_guard_1 = require("../common/guards/permissions.guard");
 const advanced_reports_service_1 = require("../reports/advanced-reports.service");
 const advanced_report_filters_dto_1 = require("../reports/dto/advanced-report-filters.dto");
+const commercial_reports_service_1 = require("../reports/commercial-reports.service");
 let DashboardController = class DashboardController {
-    constructor(reports) {
+    constructor(reports, commercial) {
         this.reports = reports;
+        this.commercial = commercial;
     }
-    getSummary(filters, user) {
-        return this.reports.dashboard(filters, user);
+    async getSummary(filters, user) {
+        const [summary, finance, products, exchange] = await Promise.all([
+            this.reports.dashboard(filters, user),
+            this.commercial.financial(filters, user),
+            this.commercial.products(filters, user),
+            this.commercial.exchangeImpact(filters),
+        ]);
+        const channel = (name) => products.byChannel.find((item) => item.salesChannel === name)
+            ?.netValueIrr ?? "0";
+        return {
+            ...summary,
+            finance: {
+                outstandingAmountIrr: finance.current.outstandingAmountIrr,
+                overdueAmountIrr: finance.current.overdueAmountIrr,
+                collectedInPeriodAmountIrr: finance.periodFlow.collectedAmountIrr,
+                overduePaymentCount: finance.current.overduePaymentCount,
+            },
+            catalog: {
+                activeProductCount: exchange.current.usdProductCount + exchange.current.irrProductCount,
+                usdProductCount: exchange.current.usdProductCount,
+                irrProductCount: exchange.current.irrProductCount,
+                currentExchangeRate: exchange.current.currentRate,
+                currentExchangeRateValidFrom: exchange.current.currentValidFrom,
+                staleUsdProductCount: exchange.current.staleUsdProductCount,
+            },
+            salesChannels: {
+                wonInPersonAmountIrr: channel("IN_PERSON"),
+                wonDigikalaAmountIrr: channel("DIGIKALA"),
+                wonOtherAmountIrr: channel("OTHER"),
+                wonLegacyUnknownAmountIrr: channel("LEGACY_UNKNOWN"),
+            },
+        };
     }
 };
 exports.DashboardController = DashboardController;
@@ -35,12 +67,13 @@ __decorate([
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [advanced_report_filters_dto_1.AdvancedReportFiltersDto, Object]),
-    __metadata("design:returntype", void 0)
+    __metadata("design:returntype", Promise)
 ], DashboardController.prototype, "getSummary", null);
 exports.DashboardController = DashboardController = __decorate([
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, permissions_guard_1.PermissionsGuard),
     (0, permissions_decorator_1.Permissions)("report:view"),
     (0, common_1.Controller)("dashboard"),
-    __metadata("design:paramtypes", [advanced_reports_service_1.AdvancedReportsService])
+    __metadata("design:paramtypes", [advanced_reports_service_1.AdvancedReportsService,
+        commercial_reports_service_1.CommercialReportsService])
 ], DashboardController);
 //# sourceMappingURL=dashboard.controller.js.map

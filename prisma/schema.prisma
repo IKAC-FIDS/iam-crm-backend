@@ -178,6 +178,21 @@ enum PricingCurrency {
   USD
 }
 
+enum SalesChannel {
+  LEGACY_UNKNOWN
+  IN_PERSON
+  DIGIKALA
+  OTHER
+}
+
+enum ProductPriceHistoryReason {
+  MIGRATION_BASELINE
+  PRODUCT_CREATED
+  PRODUCT_UPDATED
+  EXCHANGE_RATE_CHANGED
+  MANUAL_RECALCULATION
+}
+
 enum NotificationType {
   SYSTEM
   TASK_CREATED
@@ -269,6 +284,7 @@ model User {
   meetingAssignments     MeetingAssignee[]      @relation("MeetingAssignedUser")
   meetingAssignmentsMade MeetingAssignee[]      @relation("MeetingAssignedBy")
   exchangeRatesCreated   CurrencyExchangeRate[] @relation("ExchangeRateCreatedBy")
+  productPriceChanges    ProductPriceHistory[]  @relation("ProductPriceHistoryChangedBy")
 
   notifications       Notification[] @relation("NotificationRecipient")
   notificationActions Notification[] @relation("NotificationActor")
@@ -1015,7 +1031,8 @@ model ProductCatalogItem {
   createdAt                DateTime              @default(now())
   updatedAt                DateTime              @updatedAt
 
-  lineItems OpportunityLineItem[]
+  lineItems    OpportunityLineItem[]
+  priceHistory ProductPriceHistory[]
 
   @@index([isActive, sortOrder])
   @@index([category])
@@ -1025,17 +1042,18 @@ model ProductCatalogItem {
 }
 
 model CurrencyExchangeRate {
-  id            String               @id @default(uuid())
-  baseCurrency  String               @default("USD")
-  quoteCurrency String               @default("IRR")
-  rate          Decimal              @db.Decimal(24, 6)
-  validFrom     DateTime
-  validTo       DateTime?
-  createdById   String
-  createdBy     User                 @relation("ExchangeRateCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
-  note          String?
-  createdAt     DateTime             @default(now())
-  products      ProductCatalogItem[]
+  id                  String                @id @default(uuid())
+  baseCurrency        String                @default("USD")
+  quoteCurrency       String                @default("IRR")
+  rate                Decimal               @db.Decimal(24, 6)
+  validFrom           DateTime
+  validTo             DateTime?
+  createdById         String
+  createdBy           User                  @relation("ExchangeRateCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  note                String?
+  createdAt           DateTime              @default(now())
+  products            ProductCatalogItem[]
+  productPriceHistory ProductPriceHistory[]
 
   @@index([baseCurrency, quoteCurrency, validFrom])
   @@index([baseCurrency, quoteCurrency, validTo])
@@ -1061,6 +1079,11 @@ model OpportunityLineItem {
   taxAmount      Decimal @default(0) @db.Decimal(18, 2)
   lineTotal      Decimal @db.Decimal(18, 2)
 
+  salesChannel                SalesChannel         @default(IN_PERSON)
+  catalogUnitPriceIrrSnapshot Decimal?             @db.Decimal(24, 0)
+  productPriceHistoryId       String?
+  productPriceHistory         ProductPriceHistory? @relation(fields: [productPriceHistoryId], references: [id], onDelete: SetNull)
+
   sortOrder Int @default(0)
 
   createdAt DateTime @default(now())
@@ -1069,7 +1092,40 @@ model OpportunityLineItem {
   @@index([opportunityId])
   @@index([productId])
   @@index([sortOrder])
+  @@index([salesChannel])
+  @@index([productPriceHistoryId])
+  @@index([opportunityId, salesChannel])
   @@map("opportunity_line_items")
+}
+
+model ProductPriceHistory {
+  id                        String                    @id @default(uuid())
+  productId                 String
+  product                   ProductCatalogItem        @relation(fields: [productId], references: [id], onDelete: Restrict)
+  pricingCurrency           PricingCurrency
+  inPersonInputPrice        Decimal                   @db.Decimal(24, 6)
+  digikalaInputPrice        Decimal                   @db.Decimal(24, 6)
+  inPersonProfitPercent     Decimal?                  @db.Decimal(7, 3)
+  digikalaProfitPercent     Decimal?                  @db.Decimal(7, 3)
+  inPersonPriceIrr          Decimal                   @db.Decimal(24, 0)
+  digikalaPriceIrr          Decimal                   @db.Decimal(24, 0)
+  calculatedExchangeRateId  String?
+  calculatedExchangeRate    CurrencyExchangeRate?     @relation(fields: [calculatedExchangeRateId], references: [id], onDelete: SetNull)
+  exchangeRateValueSnapshot Decimal?                  @db.Decimal(24, 6)
+  reason                    ProductPriceHistoryReason
+  validFrom                 DateTime
+  validTo                   DateTime?
+  changedById               String?
+  changedBy                 User?                     @relation("ProductPriceHistoryChangedBy", fields: [changedById], references: [id], onDelete: SetNull)
+  note                      String?
+  createdAt                 DateTime                  @default(now())
+  lineItems                 OpportunityLineItem[]
+
+  @@index([productId, validFrom])
+  @@index([reason, validFrom])
+  @@index([calculatedExchangeRateId])
+  @@index([changedById])
+  @@map("product_price_histories")
 }
 
 model OpportunityStageHistory {

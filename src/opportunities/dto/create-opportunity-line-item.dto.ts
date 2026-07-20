@@ -1,15 +1,16 @@
-import {
-  IsNumber,
-  IsOptional,
-  IsString,
-  IsUUID,
-  Min,
-} from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsNumber, IsOptional, IsString, IsUUID, Min } from "class-validator";
+import { Type } from "class-transformer";
+import { SalesChannel } from "@prisma/client";
+import { IsEnum } from "class-validator";
 
 export class CreateOpportunityLineItemDto {
+  @IsOptional()
   @IsUUID()
-  productId!: string;
+  productId?: string | null;
+
+  @IsOptional()
+  @IsEnum(SalesChannel)
+  salesChannel?: SalesChannel;
 
   @IsOptional()
   @IsString()

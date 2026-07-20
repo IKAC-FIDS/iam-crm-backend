@@ -8,7 +8,12 @@ import {
   Max,
   Min,
 } from "class-validator";
-import { MeetingMode, MeetingStatus, TaskStatus } from "@prisma/client";
+import {
+  MeetingMode,
+  MeetingStatus,
+  SalesChannel,
+  TaskStatus,
+} from "@prisma/client";
 import { ReportFiltersDto } from "./report-filters.dto";
 const csv = ({ value }: { value: unknown }) =>
   value == null || value === ""
@@ -33,6 +38,21 @@ export class AdvancedReportFiltersDto extends ReportFiltersDto {
   @IsArray()
   @IsEnum(TaskStatus, { each: true })
   taskStatuses?: TaskStatus[];
+  @Transform(csv)
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  productIds?: string[];
+  @Transform(csv)
+  @IsOptional()
+  @IsArray()
+  @IsEnum(SalesChannel, { each: true })
+  salesChannels?: SalesChannel[];
+  @Transform(csv)
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  categories?: string[];
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) page = 1;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) limit = 20;
   @IsOptional() @IsString() trend?: string;

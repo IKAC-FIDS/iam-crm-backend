@@ -22,10 +22,21 @@ const report_filters_dto_1 = require("./dto/report-filters.dto");
 const advanced_report_filters_dto_1 = require("./dto/advanced-report-filters.dto");
 const advanced_reports_service_1 = require("./advanced-reports.service");
 const reports_service_1 = require("./reports.service");
+const commercial_reports_service_1 = require("./commercial-reports.service");
 let ReportsController = class ReportsController {
-    constructor(reportsService, advancedReportsService) {
+    constructor(reportsService, advancedReportsService, commercialReportsService) {
         this.reportsService = reportsService;
         this.advancedReportsService = advancedReportsService;
+        this.commercialReportsService = commercialReportsService;
+    }
+    getFinancialCollections(filters, user) {
+        return this.commercialReportsService.financial(filters, user);
+    }
+    getProductPerformance(filters, user) {
+        return this.commercialReportsService.products(filters, user);
+    }
+    getExchangeRateImpact(filters) {
+        return this.commercialReportsService.exchangeImpact(filters);
     }
     getOpportunityForecast(filters, user) {
         return this.advancedReportsService.forecast(filters, user);
@@ -62,6 +73,29 @@ let ReportsController = class ReportsController {
     }
 };
 exports.ReportsController = ReportsController;
+__decorate([
+    (0, common_1.Get)("financial/collections"),
+    __param(0, (0, common_1.Query)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [advanced_report_filters_dto_1.AdvancedReportFiltersDto, Object]),
+    __metadata("design:returntype", void 0)
+], ReportsController.prototype, "getFinancialCollections", null);
+__decorate([
+    (0, common_1.Get)("products/performance"),
+    __param(0, (0, common_1.Query)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [advanced_report_filters_dto_1.AdvancedReportFiltersDto, Object]),
+    __metadata("design:returntype", void 0)
+], ReportsController.prototype, "getProductPerformance", null);
+__decorate([
+    (0, common_1.Get)("exchange-rates/impact"),
+    __param(0, (0, common_1.Query)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [advanced_report_filters_dto_1.AdvancedReportFiltersDto]),
+    __metadata("design:returntype", void 0)
+], ReportsController.prototype, "getExchangeRateImpact", null);
 __decorate([
     (0, common_1.Get)("opportunities/forecast"),
     __param(0, (0, common_1.Query)()),
@@ -154,6 +188,7 @@ exports.ReportsController = ReportsController = __decorate([
     (0, permissions_decorator_1.Permissions)("report:view"),
     (0, common_1.Controller)("reports"),
     __metadata("design:paramtypes", [reports_service_1.ReportsService,
-        advanced_reports_service_1.AdvancedReportsService])
+        advanced_reports_service_1.AdvancedReportsService,
+        commercial_reports_service_1.CommercialReportsService])
 ], ReportsController);
 //# sourceMappingURL=reports.controller.js.map

@@ -11,14 +11,15 @@ const common_1 = require("@nestjs/common");
 const reports_service_1 = require("./reports.service");
 const reports_controller_1 = require("./reports.controller");
 const advanced_reports_service_1 = require("./advanced-reports.service");
+const commercial_reports_service_1 = require("./commercial-reports.service");
 let ReportsModule = class ReportsModule {
 };
 exports.ReportsModule = ReportsModule;
 exports.ReportsModule = ReportsModule = __decorate([
     (0, common_1.Module)({
-        providers: [reports_service_1.ReportsService, advanced_reports_service_1.AdvancedReportsService],
+        providers: [reports_service_1.ReportsService, advanced_reports_service_1.AdvancedReportsService, commercial_reports_service_1.CommercialReportsService],
         controllers: [reports_controller_1.ReportsController],
-        exports: [advanced_reports_service_1.AdvancedReportsService],
+        exports: [advanced_reports_service_1.AdvancedReportsService, commercial_reports_service_1.CommercialReportsService],
     })
 ], ReportsModule);
 //# sourceMappingURL=reports.module.js.map
