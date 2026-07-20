@@ -1918,6 +1918,15 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 
 ---
 
+### fix 000069 - اصلاح خطای P2010 در قفل تراکنشی نرخ ارز
+
+- علت خطای `Prisma P2010: Failed to deserialize column of type 'void'` در `POST /api/admin/exchange-rates`، بازگرداندن مستقیم نتیجه `void` تابع PostgreSQL به نام `pg_advisory_xact_lock` بود.
+- قفل advisory تراکنشی و ترتیب کامل تراکنش حفظ شد، اما نتیجه تابع با `CAST(... AS TEXT) AS "lockResult"` به نوع قابل deserialize برای Prisma تبدیل شد؛ از APIهای unsafe استفاده نشده است.
+- تست regression، cast و alias غیر-void، اجرای قفل پیش از خواندن نرخ فعال، بستن دوره قبلی، ایجاد نرخ جدید، انتخاب صرفاً محصولات USD، محاسبه مجدد و عدم ثبت audit هنگام شکست تراکنش را پوشش می‌دهد.
+- فایل‌های تغییرکرده: `src/admin/exchange-rates/exchange-rates.service.ts`، `test/exchange-rates.service.spec.ts`، خروجی build متناظر در `dist/src/admin/exchange-rates/exchange-rates.service.js` و source map، و `README.md`.
+- این hotfix هیچ تغییری در Prisma schema یا پایگاه داده ندارد و migration جدیدی نیاز ندارد.
+- بررسی‌ها: دو suite مرتبط exchange-rate با ۶ test موفق؛ lint بدون error و با ۹ warning از قبل موجود؛ build موفق.
+
 ### fix 000068 - قیمت‌گذاری چندارزی و چندکاناله محصولات و تاریخچه نرخ ارز
 
 - قیمت مستقل فروش حضوری و دیجی‌کالا با ورودی `IRR` یا `USD` به کاتالوگ محصول اضافه شد. محاسبات USD با `Prisma.Decimal` و گردکردن قطعی `ROUND_HALF_UP` تا ریال کامل در backend انجام می‌شوند.

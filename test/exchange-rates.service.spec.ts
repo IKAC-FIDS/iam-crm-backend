@@ -11,6 +11,16 @@ function setup(active: any = null, products: any[] = []) {
   return { service: new ExchangeRatesService(prisma as any, pricing as any, audit as any), tx, audit };
 }
 describe('ExchangeRatesService', () => {
+  it('casts the advisory-lock void result to text before Prisma deserializes it', async () => {
+    const { service, tx } = setup();
+    await service.create({ rate: '2050000', effectiveFrom: '2026-07-20T00:00:00Z' }, user as any);
+    const lockQuery = tx.$queryRaw.mock.calls[0][0] as { strings: readonly string[] };
+    const sql = lockQuery.strings.join(' ');
+    expect(sql).toContain('pg_advisory_xact_lock(89241377)');
+    expect(sql).toMatch(/CAST[\s\S]*AS TEXT/i);
+    expect(sql).toContain('AS "lockResult"');
+    expect(tx.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(tx.currencyExchangeRate.findFirst.mock.invocationCallOrder[0]);
+  });
   it('closes the active range and creates the replacement', async () => {
     const active = { id: 'old', validFrom: new Date('2026-01-01T00:00:00Z') }; const { service, tx } = setup(active);
     await service.create({ rate: '2050000', effectiveFrom: '2026-07-20T00:00:00Z' }, user as any);
@@ -23,6 +33,13 @@ describe('ExchangeRatesService', () => {
   it('recalculates USD products transactionally and reports the count', async () => {
     const products = [{ id: 'usd-1' }, { id: 'usd-2' }]; const { service, tx } = setup(null, products);
     const result = await service.create({ rate: '2050000', effectiveFrom: '2026-07-20T00:00:00Z' }, user as any);
+    expect(tx.productCatalogItem.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { pricingCurrency: 'USD' } }));
     expect(tx.productCatalogItem.update).toHaveBeenCalledTimes(2); expect(result.recalculatedProductCount).toBe(2);
+  });
+  it('does not write the audit record when the transaction fails', async () => {
+    const { service, tx, audit } = setup(null, [{ id: 'usd-1' }]);
+    tx.productCatalogItem.update.mockRejectedValue(new Error('recalculation failed'));
+    await expect(service.create({ rate: '2050000', effectiveFrom: '2026-07-20T00:00:00Z' }, user as any)).rejects.toThrow('recalculation failed');
+    expect(audit.record).not.toHaveBeenCalled();
   });
 });

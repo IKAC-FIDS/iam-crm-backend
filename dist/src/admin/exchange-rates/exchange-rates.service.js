@@ -33,7 +33,12 @@ let ExchangeRatesService = class ExchangeRatesService {
         if (effectiveFrom > new Date())
             throw new common_1.BadRequestException('effectiveFrom cannot be in the future');
         const result = await this.prisma.$transaction(async (tx) => {
-            await tx.$queryRaw(client_1.Prisma.sql `SELECT pg_advisory_xact_lock(89241377)`);
+            await tx.$queryRaw(client_1.Prisma.sql `
+        SELECT CAST(
+          pg_advisory_xact_lock(89241377)
+          AS TEXT
+        ) AS "lockResult"
+      `);
             const active = await tx.currencyExchangeRate.findFirst({ where: { baseCurrency: 'USD', quoteCurrency: 'IRR', validTo: null }, orderBy: { validFrom: 'desc' } });
             if (active && effectiveFrom <= active.validFrom)
                 throw new common_1.BadRequestException('effectiveFrom must be after the active rate validFrom');

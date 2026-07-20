@@ -20,7 +20,12 @@ export class ExchangeRatesService {
     const rate = new Prisma.Decimal(dto.rate); if (rate.lessThanOrEqualTo(0)) throw new BadRequestException('Exchange rate must be greater than zero');
     const effectiveFrom = dto.effectiveFrom ? parseApiDate(dto.effectiveFrom, 'effectiveFrom') : new Date(); if (effectiveFrom > new Date()) throw new BadRequestException('effectiveFrom cannot be in the future');
     const result = await this.prisma.$transaction(async tx => {
-      await tx.$queryRaw(Prisma.sql`SELECT pg_advisory_xact_lock(89241377)`);
+      await tx.$queryRaw<Array<{ lockResult: string | null }>>(Prisma.sql`
+        SELECT CAST(
+          pg_advisory_xact_lock(89241377)
+          AS TEXT
+        ) AS "lockResult"
+      `);
       const active = await tx.currencyExchangeRate.findFirst({ where: { baseCurrency: 'USD', quoteCurrency: 'IRR', validTo: null }, orderBy: { validFrom: 'desc' } });
       if (active && effectiveFrom <= active.validFrom) throw new BadRequestException('effectiveFrom must be after the active rate validFrom');
       const overlap = await tx.currencyExchangeRate.findFirst({ where: { baseCurrency: 'USD', quoteCurrency: 'IRR', validFrom: { lt: effectiveFrom }, OR: [{ validTo: null }, { validTo: { gt: effectiveFrom } }] } });
