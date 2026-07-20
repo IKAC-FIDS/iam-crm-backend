@@ -44,6 +44,13 @@ const attachments_module_1 = require("./attachments/attachments.module");
 const tasks_module_1 = require("./tasks/tasks.module");
 const notifications_module_1 = require("./notifications/notifications.module");
 const organizations_module_1 = require("./organizations/organizations.module");
+const teams_module_1 = require("./teams/teams.module");
+const universities_module_1 = require("./universities/universities.module");
+const company_access_module_1 = require("./companies/company-access.module");
+const schedule_1 = require("@nestjs/schedule");
+const meetings_module_1 = require("./meetings/meetings.module");
+const exchange_rates_module_1 = require("./admin/exchange-rates/exchange-rates.module");
+const dashboard_module_1 = require("./dashboard/dashboard.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -61,13 +68,15 @@ exports.AppModule = AppModule = __decorate([
                 useFactory: (config) => ({
                     throttlers: [
                         {
-                            ttl: config.get('THROTTLE_TTL', 60000),
-                            limit: config.get('THROTTLE_LIMIT', 100),
+                            ttl: config.get("THROTTLE_TTL", 60000),
+                            limit: config.get("THROTTLE_LIMIT", 100),
                         },
                     ],
                 }),
             }),
+            schedule_1.ScheduleModule.forRoot(),
             health_module_1.HealthModule,
+            company_access_module_1.CompanyAccessModule,
             prisma_module_1.PrismaModule,
             auth_module_1.AuthModule,
             sso_module_1.SsoModule,
@@ -98,6 +107,11 @@ exports.AppModule = AppModule = __decorate([
             tasks_module_1.TasksModule,
             notifications_module_1.NotificationsModule,
             organizations_module_1.OrganizationsModule,
+            teams_module_1.TeamsModule,
+            universities_module_1.UniversitiesModule,
+            meetings_module_1.MeetingsModule,
+            exchange_rates_module_1.ExchangeRatesModule,
+            dashboard_module_1.DashboardModule,
         ],
         providers: [
             {

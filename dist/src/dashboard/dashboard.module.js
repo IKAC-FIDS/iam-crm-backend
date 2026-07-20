@@ -6,19 +6,17 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ReportsModule = void 0;
+exports.DashboardModule = void 0;
 const common_1 = require("@nestjs/common");
-const reports_service_1 = require("./reports.service");
-const reports_controller_1 = require("./reports.controller");
-const advanced_reports_service_1 = require("./advanced-reports.service");
-let ReportsModule = class ReportsModule {
+const reports_module_1 = require("../reports/reports.module");
+const dashboard_controller_1 = require("./dashboard.controller");
+let DashboardModule = class DashboardModule {
 };
-exports.ReportsModule = ReportsModule;
-exports.ReportsModule = ReportsModule = __decorate([
+exports.DashboardModule = DashboardModule;
+exports.DashboardModule = DashboardModule = __decorate([
     (0, common_1.Module)({
-        providers: [reports_service_1.ReportsService, advanced_reports_service_1.AdvancedReportsService],
-        controllers: [reports_controller_1.ReportsController],
-        exports: [advanced_reports_service_1.AdvancedReportsService],
+        imports: [reports_module_1.ReportsModule],
+        controllers: [dashboard_controller_1.DashboardController],
     })
-], ReportsModule);
-//# sourceMappingURL=reports.module.js.map
+], DashboardModule);
+//# sourceMappingURL=dashboard.module.js.map

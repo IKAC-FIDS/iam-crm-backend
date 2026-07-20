@@ -1918,6 +1918,16 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 
 ---
 
+### fix 000071 - گزارش‌های پیشرفته فروش، عملیات و داشبورد مدیریتی
+
+- endpointهای دارای مجوز `report:view` شامل `GET /api/dashboard/summary`، `GET /api/reports/opportunities/forecast`، `GET /api/reports/opportunities/aging`، `GET /api/reports/meetings/performance` و `GET /api/reports/tasks/performance` اضافه شدند. همه queryها با `organizationId` محدود می‌شوند و فیلترهای شرکت، مالک/مسئول، تیم، وضعیت و بازه زمانی را حفظ می‌کنند.
+- forecast فقط فرصت‌های فعال را بر مبنای `expectedCloseDate` گزارش می‌کند و جمع مبلغ اسمی و weighted را با `Prisma.Decimal`، به تفکیک ماه، stage و مالک برمی‌گرداند. aging سن کل و سن stage جاری، bucketهای ثابت، فرصت‌های overdue و صفحه‌بندی deterministic را با projection سبک شرکت/مالک محاسبه می‌کند.
+- گزارش جلسات شاخص‌های completed/cancelled/past-scheduled، نرخ completion/execution/cancellation، مدت برنامه‌ریزی‌شده، تفکیک وضعیت/mode/organizer و trend روزانه برای بازه‌های حداکثر ۳۱ روز و هفتگی برای بازه‌های بلندتر را ارائه می‌دهد. گزارش کارها snapshot جاری open/overdue/due-today/next-seven-days و جریان created/completed/cancelled/due/on-time/late را جدا نگه می‌دارد.
+- مرز «امروز» و بازه‌های تقویمی با timezone سازمان محاسبه می‌شوند و روزهای DST نیز با midnight محلی بعدی بسته می‌شوند. داشبورد به‌صورت پیش‌فرض ۳۰ روز کامل تقویمی، snapshot جاری، performance دوره، forecast نودروزه و فهرست‌های attention محدود به ۵ رکورد را ترکیب می‌کند.
+- فایل‌های مهم: `src/common/dates/timezone-boundary.util.ts`، `src/reports/advanced-reports.service.ts`، `src/reports/dto/advanced-report-filters.dto.ts`، controller/module گزارش‌ها، `src/dashboard/*`، `src/app.module.ts`، `test/advanced-reports.service.spec.ts` و خروجی build متناظر در `dist`.
+- بررسی‌ها: سه suite مرتبط گزارش با ۸ test موفق؛ lint بدون error و با همان ۹ warning از قبل موجود؛ build موفق. `prisma generate` فقط برای همگام‌سازی client قدیمی workspace با schema موجود اجرا شد.
+- schema پایگاه داده تغییر نکرد، migration جدیدی ایجاد نشد و هیچ دستور مخرب یا seed گسترده‌ای اجرا نشد.
+
 ### fix 000070 - اصلاح معنای تاریخ و شمارش دقیق فرصت فعال و کار عقب‌افتاده در گزارش‌ها
 
 - پارامتر اختیاری `activeOnly=true|false` به فهرست فرصت‌ها اضافه شد. مقدار true فقط فرصت غیرآرشیوی با stage غیرنهایی و `terminalType=null` را برمی‌گرداند، تمام فیلترهای سازمان/مالک/تیم/شرکت و صفحه‌بندی را حفظ می‌کند و ترکیب آن با `archivedOnly=true` با خطای روشن رد می‌شود.

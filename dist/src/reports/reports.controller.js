@@ -19,10 +19,25 @@ const permissions_decorator_1 = require("../common/decorators/permissions.decora
 const jwt_auth_guard_1 = require("../common/guards/jwt-auth.guard");
 const permissions_guard_1 = require("../common/guards/permissions.guard");
 const report_filters_dto_1 = require("./dto/report-filters.dto");
+const advanced_report_filters_dto_1 = require("./dto/advanced-report-filters.dto");
+const advanced_reports_service_1 = require("./advanced-reports.service");
 const reports_service_1 = require("./reports.service");
 let ReportsController = class ReportsController {
-    constructor(reportsService) {
+    constructor(reportsService, advancedReportsService) {
         this.reportsService = reportsService;
+        this.advancedReportsService = advancedReportsService;
+    }
+    getOpportunityForecast(filters, user) {
+        return this.advancedReportsService.forecast(filters, user);
+    }
+    getOpportunityAging(filters, user) {
+        return this.advancedReportsService.aging(filters, user);
+    }
+    getMeetingPerformance(filters, user) {
+        return this.advancedReportsService.meetingPerformance(filters, user);
+    }
+    getTaskPerformance(filters, user) {
+        return this.advancedReportsService.taskPerformance(filters, user);
     }
     getConversionRates(filters, user) {
         return this.reportsService.getConversionRates(filters, user);
@@ -48,7 +63,39 @@ let ReportsController = class ReportsController {
 };
 exports.ReportsController = ReportsController;
 __decorate([
-    (0, common_1.Get)('conversion-rates'),
+    (0, common_1.Get)("opportunities/forecast"),
+    __param(0, (0, common_1.Query)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [advanced_report_filters_dto_1.AdvancedReportFiltersDto, Object]),
+    __metadata("design:returntype", void 0)
+], ReportsController.prototype, "getOpportunityForecast", null);
+__decorate([
+    (0, common_1.Get)("opportunities/aging"),
+    __param(0, (0, common_1.Query)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [advanced_report_filters_dto_1.AdvancedReportFiltersDto, Object]),
+    __metadata("design:returntype", void 0)
+], ReportsController.prototype, "getOpportunityAging", null);
+__decorate([
+    (0, common_1.Get)("meetings/performance"),
+    __param(0, (0, common_1.Query)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [advanced_report_filters_dto_1.AdvancedReportFiltersDto, Object]),
+    __metadata("design:returntype", void 0)
+], ReportsController.prototype, "getMeetingPerformance", null);
+__decorate([
+    (0, common_1.Get)("tasks/performance"),
+    __param(0, (0, common_1.Query)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [advanced_report_filters_dto_1.AdvancedReportFiltersDto, Object]),
+    __metadata("design:returntype", void 0)
+], ReportsController.prototype, "getTaskPerformance", null);
+__decorate([
+    (0, common_1.Get)("conversion-rates"),
     __param(0, (0, common_1.Query)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
@@ -56,7 +103,7 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], ReportsController.prototype, "getConversionRates", null);
 __decorate([
-    (0, common_1.Get)('stage-durations'),
+    (0, common_1.Get)("stage-durations"),
     __param(0, (0, common_1.Query)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
@@ -64,7 +111,7 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], ReportsController.prototype, "getAverageStageDuration", null);
 __decorate([
-    (0, common_1.Get)('pipeline-summary'),
+    (0, common_1.Get)("pipeline-summary"),
     __param(0, (0, common_1.Query)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
@@ -72,7 +119,7 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], ReportsController.prototype, "getPipelineSummary", null);
 __decorate([
-    (0, common_1.Get)('activities/by-user'),
+    (0, common_1.Get)("activities/by-user"),
     __param(0, (0, common_1.Query)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
@@ -80,7 +127,7 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], ReportsController.prototype, "getActivitiesByUser", null);
 __decorate([
-    (0, common_1.Get)('activities'),
+    (0, common_1.Get)("activities"),
     __param(0, (0, common_1.Query)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
@@ -88,7 +135,7 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], ReportsController.prototype, "getActivityReport", null);
 __decorate([
-    (0, common_1.Get)('pipeline/by-owner'),
+    (0, common_1.Get)("pipeline/by-owner"),
     __param(0, (0, common_1.Query)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
@@ -96,7 +143,7 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], ReportsController.prototype, "getPipelineByOwner", null);
 __decorate([
-    (0, common_1.Get)('filter-options'),
+    (0, common_1.Get)("filter-options"),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
@@ -104,8 +151,9 @@ __decorate([
 ], ReportsController.prototype, "getFilterOptions", null);
 exports.ReportsController = ReportsController = __decorate([
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, permissions_guard_1.PermissionsGuard),
-    (0, permissions_decorator_1.Permissions)('report:view'),
-    (0, common_1.Controller)('reports'),
-    __metadata("design:paramtypes", [reports_service_1.ReportsService])
+    (0, permissions_decorator_1.Permissions)("report:view"),
+    (0, common_1.Controller)("reports"),
+    __metadata("design:paramtypes", [reports_service_1.ReportsService,
+        advanced_reports_service_1.AdvancedReportsService])
 ], ReportsController);
 //# sourceMappingURL=reports.controller.js.map
