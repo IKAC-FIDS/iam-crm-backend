@@ -40,6 +40,7 @@ import { UniversitiesModule } from './universities/universities.module';
 import { CompanyAccessModule } from './companies/company-access.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { MeetingsModule } from './meetings/meetings.module';
+import { ExchangeRatesModule } from './admin/exchange-rates/exchange-rates.module';
 
 @Module({
   imports: [
@@ -96,6 +97,7 @@ import { MeetingsModule } from './meetings/meetings.module';
     TeamsModule,
     UniversitiesModule,
     MeetingsModule,
+    ExchangeRatesModule,
   ],
   providers: [
     {

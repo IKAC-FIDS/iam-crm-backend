@@ -21,6 +21,7 @@ const lineItemInclude = {
       category: true,
       unit: true,
       defaultUnitPrice: true,
+      inPersonPriceIrr: true,
       currency: true,
       isActive: true,
     },
@@ -78,7 +79,7 @@ export class OpportunityLineItemsService {
     const unitPrice =
       dto.unitPrice !== undefined
         ? this.toNonNegativeDecimal(dto.unitPrice, 'unitPrice')
-        : new Prisma.Decimal(product.defaultUnitPrice);
+        : new Prisma.Decimal(product.inPersonPriceIrr);
 
     const discountAmount = this.toNonNegativeDecimal(
       dto.discountAmount ?? 0,

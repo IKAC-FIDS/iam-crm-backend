@@ -4,19 +4,23 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { PricingCurrency, Prisma } from '@prisma/client';
 import { AuditLogService } from '../audit-log/audit-log.service';
 import { CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateProductCatalogItemDto } from './dto/create-product-catalog-item.dto';
 import { FindProductCatalogItemsDto } from './dto/find-product-catalog-items.dto';
 import { UpdateProductCatalogItemDto } from './dto/update-product-catalog-item.dto';
+import { ProductPricingService } from './product-pricing.service';
+
+const productInclude = { calculatedExchangeRate: { select: { id: true, rate: true, validFrom: true, validTo: true } } } satisfies Prisma.ProductCatalogItemInclude;
 
 @Injectable()
 export class ProductCatalogService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditLogService,
+    private readonly pricing: ProductPricingService,
   ) {}
 
   async findAll(query: FindProductCatalogItemsDto) {
@@ -50,6 +54,7 @@ export class ProductCatalogService {
     const [data, total] = await Promise.all([
       this.prisma.productCatalogItem.findMany({
         where,
+        include: productInclude,
         orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
         skip: (page - 1) * limit,
         take: limit,
@@ -75,6 +80,7 @@ export class ProductCatalogService {
   async findOne(id: string) {
     const item = await this.prisma.productCatalogItem.findUnique({
       where: { id },
+      include: productInclude,
     });
 
     if (!item) {
@@ -95,6 +101,14 @@ export class ProductCatalogService {
       throw new ConflictException('کد محصول یا سرویس قبلاً ثبت شده است');
     }
 
+    const compatibilityPrice = dto.inPersonInputPrice ?? dto.defaultUnitPrice ?? '0';
+    const prices = await this.pricing.calculate({
+      pricingCurrency: dto.pricingCurrency ?? PricingCurrency.IRR,
+      inPersonInputPrice: compatibilityPrice,
+      digikalaInputPrice: dto.digikalaInputPrice ?? compatibilityPrice,
+      inPersonProfitPercent: dto.inPersonProfitPercent,
+      digikalaProfitPercent: dto.digikalaProfitPercent,
+    });
     const item = await this.prisma.productCatalogItem.create({
       data: {
         code,
@@ -102,11 +116,12 @@ export class ProductCatalogService {
         description: dto.description?.trim() || undefined,
         category: dto.category?.trim() || undefined,
         unit: dto.unit?.trim() || undefined,
-        defaultUnitPrice: new Prisma.Decimal(dto.defaultUnitPrice),
-        currency: dto.currency?.trim().toUpperCase() || 'IRR',
+        ...prices,
+        defaultUnitPrice: prices.inPersonPriceIrr,
+        currency: 'IRR',
         isActive: dto.isActive ?? true,
         sortOrder: dto.sortOrder ?? 0,
-      },
+      }, include: productInclude,
     });
 
     await this.audit.record({
@@ -168,12 +183,18 @@ export class ProductCatalogService {
       data.unit = dto.unit?.trim() || null;
     }
 
-    if (dto.defaultUnitPrice !== undefined) {
-      data.defaultUnitPrice = new Prisma.Decimal(dto.defaultUnitPrice);
-    }
-
-    if (dto.currency !== undefined) {
-      data.currency = dto.currency.trim().toUpperCase() || 'IRR';
+    const pricingChanged = dto.pricingCurrency !== undefined || dto.inPersonInputPrice !== undefined || dto.digikalaInputPrice !== undefined || dto.inPersonProfitPercent !== undefined || dto.digikalaProfitPercent !== undefined || dto.defaultUnitPrice !== undefined;
+    if (pricingChanged) {
+      const nextCurrency = dto.pricingCurrency ?? current.pricingCurrency;
+      const compatibilityPrice = dto.defaultUnitPrice;
+      const prices = await this.pricing.calculate({
+        pricingCurrency: nextCurrency,
+        inPersonInputPrice: dto.inPersonInputPrice ?? compatibilityPrice ?? current.inPersonInputPrice,
+        digikalaInputPrice: dto.digikalaInputPrice ?? compatibilityPrice ?? current.digikalaInputPrice,
+        inPersonProfitPercent: dto.inPersonProfitPercent !== undefined ? dto.inPersonProfitPercent : nextCurrency === PricingCurrency.IRR ? null : current.inPersonProfitPercent,
+        digikalaProfitPercent: dto.digikalaProfitPercent !== undefined ? dto.digikalaProfitPercent : nextCurrency === PricingCurrency.IRR ? null : current.digikalaProfitPercent,
+      });
+      Object.assign(data, prices, { defaultUnitPrice: prices.inPersonPriceIrr, currency: 'IRR' });
     }
 
     if (dto.isActive !== undefined) {
@@ -187,6 +208,7 @@ export class ProductCatalogService {
     const updated = await this.prisma.productCatalogItem.update({
       where: { id },
       data,
+      include: productInclude,
     });
 
     await this.audit.record({

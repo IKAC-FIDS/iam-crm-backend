@@ -882,6 +882,8 @@ async function main() {
 
     { action: 'product:view', description: 'مشاهده کاتالوگ محصولات و سرویس‌ها' },
     { action: 'product:manage', description: 'مدیریت کاتالوگ محصولات و سرویس‌ها' },
+    { action: 'exchange-rate:view', description: 'View USD to IRR exchange-rate history' },
+    { action: 'exchange-rate:manage', description: 'Create USD to IRR exchange rates' },
     { action: 'opportunity-line-item:view', description: 'مشاهده آیتم‌های مالی فرصت فروش' },
     { action: 'opportunity-line-item:manage', description: 'مدیریت آیتم‌های مالی فرصت فروش' },
 

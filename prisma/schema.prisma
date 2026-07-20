@@ -173,6 +173,11 @@ enum MeetingMode {
   HYBRID
 }
 
+enum PricingCurrency {
+  IRR
+  USD
+}
+
 enum NotificationType {
   SYSTEM
   TASK_CREATED
@@ -257,12 +262,13 @@ model User {
   createdTasks   Task[] @relation("TaskCreatedBy")
   completedTasks Task[] @relation("TaskCompletedBy")
 
-  organizedMeetings      Meeting[]         @relation("MeetingOrganizer")
-  createdMeetings        Meeting[]         @relation("MeetingCreatedBy")
-  completedMeetings      Meeting[]         @relation("MeetingCompletedBy")
-  cancelledMeetings      Meeting[]         @relation("MeetingCancelledBy")
-  meetingAssignments     MeetingAssignee[] @relation("MeetingAssignedUser")
-  meetingAssignmentsMade MeetingAssignee[] @relation("MeetingAssignedBy")
+  organizedMeetings      Meeting[]              @relation("MeetingOrganizer")
+  createdMeetings        Meeting[]              @relation("MeetingCreatedBy")
+  completedMeetings      Meeting[]              @relation("MeetingCompletedBy")
+  cancelledMeetings      Meeting[]              @relation("MeetingCancelledBy")
+  meetingAssignments     MeetingAssignee[]      @relation("MeetingAssignedUser")
+  meetingAssignmentsMade MeetingAssignee[]      @relation("MeetingAssignedBy")
+  exchangeRatesCreated   CurrencyExchangeRate[] @relation("ExchangeRateCreatedBy")
 
   notifications       Notification[] @relation("NotificationRecipient")
   notificationActions Notification[] @relation("NotificationActor")
@@ -986,24 +992,54 @@ model OpportunityPayment {
 }
 
 model ProductCatalogItem {
-  id               String   @id @default(uuid())
-  code             String   @unique
-  name             String
-  description      String?
-  category         String?
-  unit             String?
-  defaultUnitPrice Decimal  @default(0) @db.Decimal(18, 2)
-  currency         String   @default("IRR")
-  isActive         Boolean  @default(true)
-  sortOrder        Int      @default(0)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id                       String                @id @default(uuid())
+  code                     String                @unique
+  name                     String
+  description              String?
+  category                 String?
+  unit                     String?
+  defaultUnitPrice         Decimal               @default(0) @db.Decimal(18, 2)
+  currency                 String                @default("IRR")
+  pricingCurrency          PricingCurrency       @default(IRR)
+  inPersonInputPrice       Decimal               @default(0) @db.Decimal(24, 6)
+  digikalaInputPrice       Decimal               @default(0) @db.Decimal(24, 6)
+  inPersonProfitPercent    Decimal?              @db.Decimal(7, 3)
+  digikalaProfitPercent    Decimal?              @db.Decimal(7, 3)
+  inPersonPriceIrr         Decimal               @default(0) @db.Decimal(24, 0)
+  digikalaPriceIrr         Decimal               @default(0) @db.Decimal(24, 0)
+  calculatedExchangeRateId String?
+  calculatedExchangeRate   CurrencyExchangeRate? @relation(fields: [calculatedExchangeRateId], references: [id], onDelete: SetNull)
+  priceCalculatedAt        DateTime?
+  isActive                 Boolean               @default(true)
+  sortOrder                Int                   @default(0)
+  createdAt                DateTime              @default(now())
+  updatedAt                DateTime              @updatedAt
 
   lineItems OpportunityLineItem[]
 
   @@index([isActive, sortOrder])
   @@index([category])
+  @@index([pricingCurrency])
+  @@index([calculatedExchangeRateId])
   @@map("product_catalog_items")
+}
+
+model CurrencyExchangeRate {
+  id            String               @id @default(uuid())
+  baseCurrency  String               @default("USD")
+  quoteCurrency String               @default("IRR")
+  rate          Decimal              @db.Decimal(24, 6)
+  validFrom     DateTime
+  validTo       DateTime?
+  createdById   String
+  createdBy     User                 @relation("ExchangeRateCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  note          String?
+  createdAt     DateTime             @default(now())
+  products      ProductCatalogItem[]
+
+  @@index([baseCurrency, quoteCurrency, validFrom])
+  @@index([baseCurrency, quoteCurrency, validTo])
+  @@map("currency_exchange_rates")
 }
 
 model OpportunityLineItem {

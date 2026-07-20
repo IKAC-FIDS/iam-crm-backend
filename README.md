@@ -1918,6 +1918,18 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 
 ---
 
+### fix 000068 - قیمت‌گذاری چندارزی و چندکاناله محصولات و تاریخچه نرخ ارز
+
+- قیمت مستقل فروش حضوری و دیجی‌کالا با ورودی `IRR` یا `USD` به کاتالوگ محصول اضافه شد. محاسبات USD با `Prisma.Decimal` و گردکردن قطعی `ROUND_HALF_UP` تا ریال کامل در backend انجام می‌شوند.
+- فیلدهای سازگاری `defaultUnitPrice` و `currency` حفظ شدند و در هر ایجاد، ویرایش یا محاسبه مجدد به‌ترتیب با قیمت نهایی حضوری و `IRR` همگام می‌شوند. ایجاد line item فرصت نیز صراحتاً قیمت نهایی حضوری IRR را به‌عنوان قیمت پیش‌فرض snapshot می‌کند.
+- مدل append-only نرخ `USD` به `IRR` با بازه‌های `validFrom`/`validTo` و endpointهای `GET /api/admin/exchange-rates/current`، `GET /api/admin/exchange-rates` و `POST /api/admin/exchange-rates` اضافه شد.
+- ثبت نرخ جدید در یک تراکنش و زیر advisory lock انجام می‌شود: نرخ فعال قبلی بسته، نرخ جدید ایجاد و تمام محصولات USD دوباره محاسبه می‌شوند. محصولات IRR و snapshotهای line item، سند تجاری و پرداخت تغییر نمی‌کنند.
+- migration تولید-safe و افزایشی `20260720160000_add_multi_channel_product_pricing` همه محصولات موجود را بدون حذف به IRR backfill می‌کند؛ دو قیمت ورودی و نهایی از `defaultUnitPrice` گرفته شده، profit و rate reference خالی می‌مانند. SQL بازبینی شد و شامل `DROP TABLE`، `TRUNCATE` یا `DELETE` نیست.
+- مجوزهای `exchange-rate:view` و `exchange-rate:manage` در migration به‌صورت idempotent ایجاد و فقط به نقش سیستمی ADMIN اضافه می‌شوند؛ seed نیز برای محیط‌های جدید به‌روزرسانی شد و مجوز نقش‌های سفارشی overwrite نمی‌شود.
+- فایل‌های مهم: `prisma/schema.prisma`، migration جدید، `prisma/seed.ts`، `src/product-catalog/*`، `src/admin/exchange-rates/*`، `src/opportunities/opportunity-line-items.service.ts`، `src/app.module.ts` و تست‌های pricing/rate/permission.
+- بررسی‌ها: `prisma format`، `prisma validate` و `prisma generate` موفق؛ lint بدون error و با ۹ warning از قبل موجود؛ build موفق؛ ۱۱ suite و ۶۳ test موفق.
+- وضعیت migration پایگاه محلی: migrationهای `20260720120000_add_meetings` و `20260720160000_add_multi_channel_product_pricing` هنوز اعمال نشده‌اند و migration ثبت‌شده `20260710203701_` در پایگاه، فایل متناظر محلی ندارد؛ بنابراین migration اجرا نشد. فرض نسخه اول این است که نرخ ارز یک مرجع سراسری و فقط USD/IRR است.
+
 ### fix 000067 - افزودن ماژول جلسات و یادآوری جلسه
 
 - جلسه به‌عنوان موجودیت مستقل `Meeting` با چرخه وضعیت `SCHEDULED`، `COMPLETED` و `CANCELLED` اضافه شد؛ `ActivityType.MEETING` همچنان فقط برای سوابق فعالیت‌ها باقی می‌ماند.
