@@ -1,5 +1,5 @@
 import { Priority, TaskStatus } from '@prisma/client';
-import { IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsBooleanString, IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 import { IsApiDateString } from '../../common/validators/api-date-string.validator';
 
@@ -51,4 +51,8 @@ export class FindTasksDto extends PaginationDto {
   @IsOptional()
   @IsString()
   search?: string;
+
+  @IsOptional()
+  @IsBooleanString()
+  overdueOnly?: string;
 }

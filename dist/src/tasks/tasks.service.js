@@ -16,6 +16,7 @@ const notifications_service_1 = require("../notifications/notifications.service"
 const audit_log_service_1 = require("../audit-log/audit-log.service");
 const prisma_service_1 = require("../prisma/prisma.service");
 const tenant_scope_util_1 = require("../common/tenant/tenant-scope.util");
+const team_scope_util_1 = require("../common/tenant/team-scope.util");
 const api_date_util_1 = require("../common/dates/api-date.util");
 const taskInclude = {
     company: {
@@ -362,6 +363,12 @@ let TasksService = class TasksService {
         return deleted;
     }
     buildWhere(query, user) {
+        if (query.overdueOnly === 'true' &&
+            query.status &&
+            query.status !== client_1.TaskStatus.TODO &&
+            query.status !== client_1.TaskStatus.IN_PROGRESS) {
+            throw new common_1.BadRequestException('overdueOnly=true is only compatible with TODO or IN_PROGRESS status');
+        }
         const and = [
             {
                 organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
@@ -370,6 +377,12 @@ let TasksService = class TasksService {
         ];
         if (query.status)
             and.push({ status: query.status });
+        if (query.overdueOnly === 'true') {
+            and.push({
+                dueAt: { not: null, lt: new Date() },
+                ...(!query.status && { status: { in: [client_1.TaskStatus.TODO, client_1.TaskStatus.IN_PROGRESS] } }),
+            });
+        }
         if (query.priority)
             and.push({ priority: query.priority });
         if (query.assignedToId)
@@ -435,23 +448,21 @@ let TasksService = class TasksService {
             return {};
         }
         if (user.role === client_1.UserRole.MANAGER) {
-            if (!user.team) {
+            if (!user.teamId && !user.team) {
                 return { id: { in: [] } };
             }
             return {
                 OR: [
-                    { assignedTo: { team: user.team } },
-                    { createdBy: { team: user.team } },
-                    { company: { owner: { team: user.team } } },
-                    { opportunity: { company: { owner: { team: user.team } } } },
-                    { person: { company: { owner: { team: user.team } } } },
+                    { assignedTo: (0, team_scope_util_1.userTeamScopeWhere)(user) },
+                    { createdBy: (0, team_scope_util_1.userTeamScopeWhere)(user) },
+                    { company: { owner: (0, team_scope_util_1.userTeamScopeWhere)(user) } },
+                    { opportunity: { company: { owner: (0, team_scope_util_1.userTeamScopeWhere)(user) } } },
+                    { person: { company: { owner: (0, team_scope_util_1.userTeamScopeWhere)(user) } } },
                     {
                         commercialDocument: {
                             opportunity: {
                                 company: {
-                                    owner: {
-                                        team: user.team,
-                                    },
+                                    owner: (0, team_scope_util_1.userTeamScopeWhere)(user),
                                 },
                             },
                         },
@@ -460,9 +471,7 @@ let TasksService = class TasksService {
                         payment: {
                             opportunity: {
                                 company: {
-                                    owner: {
-                                        team: user.team,
-                                    },
+                                    owner: (0, team_scope_util_1.userTeamScopeWhere)(user),
                                 },
                             },
                         },
@@ -739,12 +748,8 @@ let TasksService = class TasksService {
             return {};
         }
         if (user.role === client_1.UserRole.MANAGER) {
-            return user.team
-                ? {
-                    owner: {
-                        team: user.team,
-                    },
-                }
+            return user.teamId || user.team
+                ? { owner: (0, team_scope_util_1.userTeamScopeWhere)(user) }
                 : {
                     id: {
                         in: [],
@@ -760,14 +765,8 @@ let TasksService = class TasksService {
             return {};
         }
         if (user.role === client_1.UserRole.MANAGER) {
-            return user.team
-                ? {
-                    company: {
-                        owner: {
-                            team: user.team,
-                        },
-                    },
-                }
+            return user.teamId || user.team
+                ? { company: { owner: (0, team_scope_util_1.userTeamScopeWhere)(user) } }
                 : {
                     id: {
                         in: [],
@@ -801,7 +800,7 @@ let TasksService = class TasksService {
             throw new common_1.ForbiddenException('REP can only assign tasks to self');
         }
         if (user.role === client_1.UserRole.MANAGER &&
-            (!user.team || assignee.team !== user.team)) {
+            !(0, team_scope_util_1.userMatchesTeam)(assignee, user)) {
             throw new common_1.ForbiddenException('Assignee must belong to the manager team');
         }
     }

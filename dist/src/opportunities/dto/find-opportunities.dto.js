@@ -14,9 +14,15 @@ const client_1 = require("@prisma/client");
 const class_validator_1 = require("class-validator");
 const pagination_dto_1 = require("../../common/dto/pagination.dto");
 const api_date_string_validator_1 = require("../../common/validators/api-date-string.validator");
+const ownership_scope_dto_1 = require("../../common/dto/ownership-scope.dto");
 class FindOpportunitiesDto extends pagination_dto_1.PaginationDto {
 }
 exports.FindOpportunitiesDto = FindOpportunitiesDto;
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsEnum)(ownership_scope_dto_1.OwnershipScope),
+    __metadata("design:type", String)
+], FindOpportunitiesDto.prototype, "ownershipScope", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
@@ -32,6 +38,11 @@ __decorate([
     (0, class_validator_1.IsUUID)(),
     __metadata("design:type", String)
 ], FindOpportunitiesDto.prototype, "ownerId", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsUUID)(),
+    __metadata("design:type", String)
+], FindOpportunitiesDto.prototype, "teamId", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
@@ -92,4 +103,9 @@ __decorate([
     (0, class_validator_1.IsBooleanString)(),
     __metadata("design:type", String)
 ], FindOpportunitiesDto.prototype, "archivedOnly", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsBooleanString)(),
+    __metadata("design:type", String)
+], FindOpportunitiesDto.prototype, "activeOnly", void 0);
 //# sourceMappingURL=find-opportunities.dto.js.map

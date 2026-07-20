@@ -604,6 +604,9 @@ export class OpportunitiesService {
     query: FindOpportunitiesDto,
     user: CurrentUserPayload,
   ): Prisma.OpportunityWhereInput {
+    if (query.activeOnly === 'true' && query.archivedOnly === 'true') {
+      throw new BadRequestException('activeOnly=true cannot be combined with archivedOnly=true');
+    }
     const and: Prisma.OpportunityWhereInput[] = [
       {
         organizationId: getCurrentOrganizationId(user),
@@ -712,7 +715,9 @@ export class OpportunitiesService {
       and.push({ expectedCloseDate: expectedCloseRange });
     }
 
-    if (query.archivedOnly === 'true') {
+    if (query.activeOnly === 'true') {
+      and.push({ archivedAt: null, stage: { isTerminal: false, terminalType: null } });
+    } else if (query.archivedOnly === 'true') {
       and.push({
         archivedAt: {
           not: null,

@@ -489,6 +489,14 @@ export class TasksService {
     query: FindTasksDto,
     user: CurrentUserPayload,
   ): Prisma.TaskWhereInput {
+    if (
+      query.overdueOnly === 'true' &&
+      query.status &&
+      query.status !== TaskStatus.TODO &&
+      query.status !== TaskStatus.IN_PROGRESS
+    ) {
+      throw new BadRequestException('overdueOnly=true is only compatible with TODO or IN_PROGRESS status');
+    }
     const and: Prisma.TaskWhereInput[] = [
       {
         organizationId: getCurrentOrganizationId(user),
@@ -497,6 +505,12 @@ export class TasksService {
     ];
 
     if (query.status) and.push({ status: query.status });
+    if (query.overdueOnly === 'true') {
+      and.push({
+        dueAt: { not: null, lt: new Date() },
+        ...(!query.status && { status: { in: [TaskStatus.TODO, TaskStatus.IN_PROGRESS] } }),
+      });
+    }
     if (query.priority) and.push({ priority: query.priority });
     if (query.assignedToId) and.push({ assignedToId: query.assignedToId });
     if (query.createdById) and.push({ createdById: query.createdById });

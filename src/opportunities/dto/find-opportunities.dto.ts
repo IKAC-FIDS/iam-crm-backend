@@ -22,4 +22,5 @@ export class FindOpportunitiesDto extends PaginationDto {
   @IsOptional() @IsApiDateString() expectedCloseTo?: string;
   @IsOptional() @IsBooleanString() includeArchived?: string;
   @IsOptional() @IsBooleanString() archivedOnly?: string;
+  @IsOptional() @IsBooleanString() activeOnly?: string;
 }

@@ -1918,6 +1918,17 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 
 ---
 
+### fix 000070 - اصلاح معنای تاریخ و شمارش دقیق فرصت فعال و کار عقب‌افتاده در گزارش‌ها
+
+- پارامتر اختیاری `activeOnly=true|false` به فهرست فرصت‌ها اضافه شد. مقدار true فقط فرصت غیرآرشیوی با stage غیرنهایی و `terminalType=null` را برمی‌گرداند، تمام فیلترهای سازمان/مالک/تیم/شرکت و صفحه‌بندی را حفظ می‌کند و ترکیب آن با `archivedOnly=true` با خطای روشن رد می‌شود.
+- پارامتر اختیاری `overdueOnly=true|false` به فهرست کارها اضافه شد. predicate دقیق سمت پایگاه شامل `dueAt < now` و status یکی از `TODO`/`IN_PROGRESS` است؛ status نهایی ناسازگار رد و `meta.total` مستقیماً از count پایگاه محاسبه می‌شود.
+- مبنای تاریخ `pipeline-summary` و `pipeline/by-owner` برابر `opportunity.createdAt`، مبنای `conversion-rates` برابر `opportunityStageHistory.changedAt`، مبنای نمونه stage-duration زمان خروج `changedAt` و مبنای هر دو گزارش فعالیت `activity.occurredAt` شد. بدون تاریخ، همه تاریخچه موجود لحاظ می‌شود و قرارداد inclusive تاریخ روزانه حفظ شده است.
+- conversion اکنون denominator و تعداد برد را از opportunityهای distinct دارای transition واجد شرایط در دوره می‌گیرد؛ aliasهای سازگاری موجود حذف یا تغییرنام داده نشدند. duration ورود قبل از شروع دوره را حفظ می‌کند و فقط sample را بر اساس زمان خروج فیلتر می‌کند.
+- `companyIds` و `ownershipScope` از helperهای سازمان/مالک/تیم موجود در همه مسیرهای opportunity و activity عبور می‌کنند؛ scope فعالیت همچنان از visibility شرکت جدا از فیلتر actor/team است. `filter-options` بدون فهرست نامحدود شرکت باقی ماند و endpoint صفحه‌بندی‌شده company options موجود تغییری نکرد.
+- فایل‌های مهم: DTO و service فرصت‌ها، DTO و service کارها، `src/reports/reports.service.ts`، تست‌های `opportunity-task-list-filters` و `reports-correctness`، خروجی build متناظر در `dist` و `README.md`.
+- بررسی‌ها: ۱۳ suite و ۷۵ test موفق؛ lint بدون error و با ۹ warning از قبل موجود؛ build موفق.
+- این fix هیچ تغییر schema یا migration ندارد. فرض حفظ‌شده: گزارش‌ها مطابق رفتار قبلی فرصت‌ها و شرکت‌های آرشیوی را از scope گزارش حذف می‌کنند.
+
 ### fix 000069 - اصلاح خطای P2010 در قفل تراکنشی نرخ ارز
 
 - علت خطای `Prisma P2010: Failed to deserialize column of type 'void'` در `POST /api/admin/exchange-rates`، بازگرداندن مستقیم نتیجه `void` تابع PostgreSQL به نام `pg_advisory_xact_lock` بود.

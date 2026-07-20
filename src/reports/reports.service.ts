@@ -59,7 +59,7 @@ export class ReportsService {
     return and.length ? { AND: and } : {};
   }
 
-  private opportunityWhere(filters: ReportFiltersDto, user: CurrentUserPayload): Prisma.OpportunityWhereInput {
+  private opportunityWhere(filters: ReportFiltersDto, user: CurrentUserPayload, applyCreatedAt = false): Prisma.OpportunityWhereInput {
     const and: Prisma.OpportunityWhereInput[] = [
       { organizationId: getCurrentOrganizationId(user) },
       { archivedAt: null },
@@ -75,6 +75,10 @@ export class ReportsService {
     if (filters.industries?.length) and.push({ company: { industry: { in: filters.industries } } });
     if (filters.sources?.length) and.push({ source: { in: filters.sources } });
     if (filters.companyIds?.length) and.push({ companyId: { in: filters.companyIds } });
+    if (applyCreatedAt) {
+      const { range } = this.dateRange(filters);
+      if (range) and.push({ createdAt: range });
+    }
     and.push(this.opportunityOwnershipScopeWhere(filters.ownershipScope, user));
     return { AND: and };
   }
@@ -142,8 +146,13 @@ export class ReportsService {
 
   async getConversionRates(filters: ReportFiltersDto, user: CurrentUserPayload) {
     const where = this.opportunityWhere(filters, user);
+    const { range, startDate, endDate } = this.dateRange(filters);
+    const historyWhere: Prisma.OpportunityStageHistoryWhereInput = {
+      opportunity: where,
+      ...(range && { changedAt: range }),
+    };
 
-    const [transitions, totalOpportunities, movementCounts, reachedRows, wonStages] = await Promise.all([
+    const [transitions, qualifyingOpportunityRows, movementCounts, reachedRows, wonRows] = await Promise.all([
       this.prisma.pipelineStageTransition.findMany({
         where: {
           isAllowed: true,
@@ -156,20 +165,20 @@ export class ReportsService {
         },
       }),
 
-      this.prisma.opportunity.count({ where }),
+      this.prisma.opportunityStageHistory.findMany({
+        where: historyWhere,
+        select: { opportunityId: true },
+        distinct: ['opportunityId'],
+      }),
 
       this.prisma.opportunityStageHistory.groupBy({
         by: ['fromStageId', 'toStageId'],
-        where: {
-          opportunity: where,
-        },
+        where: historyWhere,
         _count: { opportunityId: true },
       }),
 
       this.prisma.opportunityStageHistory.findMany({
-        where: {
-          opportunity: where,
-        },
+        where: historyWhere,
         select: {
           opportunityId: true,
           toStageId: true,
@@ -177,11 +186,13 @@ export class ReportsService {
         distinct: ['opportunityId', 'toStageId'],
       }),
 
-      this.prisma.pipelineStage.findMany({
-        where: { terminalType: 'WON' },
-        select: { id: true },
+      this.prisma.opportunityStageHistory.findMany({
+        where: { AND: [historyWhere, { toStage: { terminalType: 'WON' } }] },
+        select: { opportunityId: true },
+        distinct: ['opportunityId'],
       }),
     ]);
+    const totalOpportunities = qualifyingOpportunityRows.length;
 
     const uniqueTransitions = new Map<string, (typeof transitions)[number]>();
 
@@ -235,15 +246,7 @@ export class ReportsService {
         };
       });
 
-    const wonStageIds = wonStages.map((stage) => stage.id);
-
-    const wonCount = wonStageIds.length
-      ? await this.prisma.opportunity.count({
-          where: {
-            AND: [where, { stageId: { in: wonStageIds } }],
-          },
-        })
-      : 0;
+    const wonCount = wonRows.length;
 
     return {
       stages: rows,
@@ -256,6 +259,7 @@ export class ReportsService {
         wonOpportunities: wonCount,
         overallOpportunityConversionRate: this.percent(wonCount, totalOpportunities),
       },
+      period: this.period(startDate, endDate, 'STAGE_TRANSITION_CHANGED_AT'),
     };
   }
 
@@ -296,6 +300,7 @@ export class ReportsService {
     const stageByCode = new Map(stages.map((stage) => [stage.code, stage]));
     const durations = new Map<string, number[]>();
     const previous = new Map<string, Date>();
+    const { range } = this.dateRange(filters);
 
     for (const item of histories) {
       const previousDate = previous.get(item.opportunityId);
@@ -305,7 +310,8 @@ export class ReportsService {
         filters.stages.includes(item.fromStageId ?? '') ||
         (item.fromStage && filters.stages.map((value) => value.toUpperCase()).includes(item.fromStage.code));
 
-      if (previousDate && item.fromStage && stageFilterMatches) {
+      const exitInPeriod = !range || this.dateMatchesRange(item.changedAt, range);
+      if (previousDate && item.fromStage && stageFilterMatches && exitInPeriod) {
         const days = (item.changedAt.getTime() - previousDate.getTime()) / 86_400_000;
 
         durations.set(item.fromStage.code, [
@@ -336,7 +342,8 @@ export class ReportsService {
   }
 
   async getPipelineSummary(filters: ReportFiltersDto, user: CurrentUserPayload) {
-    const where = this.opportunityWhere(filters, user);
+    const where = this.opportunityWhere(filters, user, true);
+    const { startDate, endDate } = this.dateRange(filters);
 
     const [stageCounts, stages] = await Promise.all([
       this.prisma.opportunity.groupBy({
@@ -362,7 +369,9 @@ export class ReportsService {
       .filter((stage) => stage.terminalType === 'LOST')
       .reduce((sum, stage) => sum + (countMap.get(stage.id) ?? 0), 0);
 
-    const activeCount = totalOpportunities - wonCount - lostCount;
+    const activeCount = stages
+      .filter((stage) => !stage.isTerminal && stage.terminalType === null)
+      .reduce((sum, stage) => sum + (countMap.get(stage.id) ?? 0), 0);
 
     return {
       stages: stages.map((stage) => {
@@ -391,13 +400,14 @@ export class ReportsService {
         wonRate: this.percent(wonCount, totalOpportunities),
         lostOpportunityRate: this.percent(lostCount, totalOpportunities),
       },
+      period: this.period(startDate, endDate, 'OPPORTUNITY_CREATED_AT'),
     };
   }
 
   async getActivityReport(filters: ReportFiltersDto, user: CurrentUserPayload) {
-    const { startDate, endDate } = this.dateRange(filters, true);
+    const { startDate, endDate } = this.dateRange(filters);
     const activities = await this.prisma.activity.groupBy({
-      by: ['type'], where: this.activityWhere(filters, user, true), _count: { id: true }, orderBy: { type: 'asc' },
+      by: ['type'], where: this.activityWhere(filters, user), _count: { id: true }, orderBy: { type: 'asc' },
     });
     const totalActivities = activities.reduce((sum, item) => sum + item._count.id, 0);
     return {
@@ -409,6 +419,7 @@ export class ReportsService {
         count: item._count.id,
         percentage: totalActivities ? Math.round((item._count.id / totalActivities) * 100) : 0,
       })),
+      period: this.period(startDate, endDate, 'ACTIVITY_OCCURRED_AT'),
     };
   }
 
@@ -446,7 +457,7 @@ export class ReportsService {
     const [opportunities, stages] = await Promise.all([
       this.prisma.opportunity.findMany({
         where: {
-          AND: [this.opportunityWhere(filters, user), { ownerId: { not: null } }],
+          AND: [this.opportunityWhere(filters, user, true), { ownerId: { not: null } }],
         },
         select: {
           ownerId: true,
@@ -482,7 +493,9 @@ export class ReportsService {
         const wonOpportunities = items.filter((item) => item.stage.terminalType === 'WON').length;
         const lostOpportunities = items.filter((item) => item.stage.terminalType === 'LOST').length;
         const totalOpportunities = items.length;
-        const activeOpportunities = totalOpportunities - wonOpportunities - lostOpportunities;
+        const activeOpportunities = items.filter(
+          (item) => !item.stage.isTerminal && item.stage.terminalType === null,
+        ).length;
 
         return {
           ownerId,
@@ -720,6 +733,22 @@ export class ReportsService {
     if (filters.userIds?.length) and.push({ id: { in: filters.userIds } });
     if (filters.teams?.length) and.push(userTeamFilterWhere(filters.teams));
     return and.length ? { AND: and } : {};
+  }
+
+  private dateMatchesRange(date: Date, range: { gte?: Date; lte?: Date; lt?: Date }) {
+    return (!range.gte || date >= range.gte) && (!range.lte || date <= range.lte) && (!range.lt || date < range.lt);
+  }
+
+  private period(
+    startDate: Date | undefined,
+    endDate: Date | undefined,
+    dateBasis: 'OPPORTUNITY_CREATED_AT' | 'STAGE_TRANSITION_CHANGED_AT' | 'ACTIVITY_OCCURRED_AT',
+  ) {
+    return {
+      startDate: startDate?.toISOString() ?? null,
+      endDate: endDate?.toISOString() ?? null,
+      dateBasis,
+    };
   }
 
   private round(value: number) {

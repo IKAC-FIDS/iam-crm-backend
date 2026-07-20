@@ -77,4 +77,9 @@ __decorate([
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], FindTasksDto.prototype, "search", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsBooleanString)(),
+    __metadata("design:type", String)
+], FindTasksDto.prototype, "overdueOnly", void 0);
 //# sourceMappingURL=find-tasks.dto.js.map

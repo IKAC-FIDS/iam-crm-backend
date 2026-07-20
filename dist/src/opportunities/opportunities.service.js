@@ -16,7 +16,9 @@ const pipeline_config_service_1 = require("../admin/pipeline/pipeline-config.ser
 const audit_log_service_1 = require("../audit-log/audit-log.service");
 const prisma_service_1 = require("../prisma/prisma.service");
 const tenant_scope_util_1 = require("../common/tenant/tenant-scope.util");
+const team_scope_util_1 = require("../common/tenant/team-scope.util");
 const api_date_util_1 = require("../common/dates/api-date.util");
+const ownership_scope_dto_1 = require("../common/dto/ownership-scope.dto");
 const opportunityInclude = {
     company: {
         select: {
@@ -154,7 +156,6 @@ let OpportunitiesService = class OpportunitiesService {
                 AND: [
                     { id },
                     { organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user) },
-                    this.scopeWhere(user),
                 ],
             },
             include: {
@@ -278,7 +279,7 @@ let OpportunitiesService = class OpportunitiesService {
     async create(dto, user) {
         const company = await this.getCompanyInScope(dto.companyId, user);
         const stage = await this.resolveStage(dto.stageId, dto.stage);
-        const ownerId = dto.ownerId ?? company.ownerId;
+        const ownerId = dto.ownerId ?? user.userId;
         const source = await this.resolveOpportunitySource(dto.sourceOptionId, dto.opportunitySource, dto.source);
         if (dto.ownerId) {
             await this.validateOwner(dto.ownerId, user);
@@ -507,11 +508,14 @@ let OpportunitiesService = class OpportunitiesService {
         return updated;
     }
     buildWhere(query, user) {
+        if (query.activeOnly === 'true' && query.archivedOnly === 'true') {
+            throw new common_1.BadRequestException('activeOnly=true cannot be combined with archivedOnly=true');
+        }
         const and = [
             {
                 organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
             },
-            this.scopeWhere(user),
+            this.readOwnershipScopeWhere(query.ownershipScope, user),
             {
                 company: {
                     archivedAt: null,
@@ -528,10 +532,21 @@ let OpportunitiesService = class OpportunitiesService {
                 ownerId: query.ownerId,
             });
         }
+        if (query.teamId) {
+            and.push({
+                owner: {
+                    teamId: query.teamId,
+                },
+            });
+        }
         if (query.team?.trim()) {
             and.push({
                 owner: {
-                    team: query.team.trim(),
+                    OR: [
+                        { team: query.team.trim() },
+                        { teamRef: { code: { equals: query.team.trim(), mode: 'insensitive' } } },
+                        { teamRef: { name: { equals: query.team.trim(), mode: 'insensitive' } } },
+                    ],
                 },
             });
         }
@@ -586,7 +601,10 @@ let OpportunitiesService = class OpportunitiesService {
         if (expectedCloseRange) {
             and.push({ expectedCloseDate: expectedCloseRange });
         }
-        if (query.archivedOnly === 'true') {
+        if (query.activeOnly === 'true') {
+            and.push({ archivedAt: null, stage: { isTerminal: false, terminalType: null } });
+        }
+        else if (query.archivedOnly === 'true') {
             and.push({
                 archivedAt: {
                     not: null,
@@ -653,17 +671,32 @@ let OpportunitiesService = class OpportunitiesService {
             AND: and,
         };
     }
-    scopeWhere(user) {
+    readOwnershipScopeWhere(scope, user) {
+        switch (scope ?? ownership_scope_dto_1.OwnershipScope.ALL) {
+            case ownership_scope_dto_1.OwnershipScope.MINE:
+                return {
+                    OR: [
+                        { ownerId: user.userId },
+                        { company: { ownerId: user.userId } },
+                    ],
+                };
+            case ownership_scope_dto_1.OwnershipScope.TEAM:
+                return { owner: (0, team_scope_util_1.userTeamScopeWhere)(user) };
+            case ownership_scope_dto_1.OwnershipScope.UNASSIGNED:
+                return { ownerId: null };
+            default:
+                return {};
+        }
+    }
+    mutationScopeWhere(user) {
         if (user.role === client_1.UserRole.ADMIN || user.role === client_1.UserRole.BOARDS) {
             return {};
         }
         if (user.role === client_1.UserRole.MANAGER) {
-            return user.team
+            return user.teamId || user.team
                 ? {
                     company: {
-                        owner: {
-                            team: user.team,
-                        },
+                        owner: (0, team_scope_util_1.userTeamScopeWhere)(user),
                     },
                 }
                 : {
@@ -694,7 +727,7 @@ let OpportunitiesService = class OpportunitiesService {
                 AND: [
                     { id },
                     { organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user) },
-                    this.scopeWhere(user),
+                    this.mutationScopeWhere(user),
                 ],
             },
             include: opportunityInclude,
@@ -714,6 +747,7 @@ let OpportunitiesService = class OpportunitiesService {
                 owner: {
                     select: {
                         team: true,
+                        teamId: true,
                     },
                 },
             },
@@ -721,18 +755,7 @@ let OpportunitiesService = class OpportunitiesService {
         if (!company || company.archivedAt) {
             throw new common_1.NotFoundException('Company not found');
         }
-        if (user.role === client_1.UserRole.ADMIN) {
-            return company;
-        }
-        if (user.role === client_1.UserRole.MANAGER &&
-            user.team &&
-            company.owner?.team === user.team) {
-            return company;
-        }
-        if (user.role === client_1.UserRole.REP && company.ownerId === user.userId) {
-            return company;
-        }
-        throw new common_1.ForbiddenException('You do not have access to this company');
+        return company;
     }
     async validateOwner(ownerId, user) {
         const owner = await this.prisma.user.findUnique({
@@ -750,7 +773,7 @@ let OpportunitiesService = class OpportunitiesService {
             throw new common_1.ForbiddenException('REP can only assign opportunities to self');
         }
         if (user.role === client_1.UserRole.MANAGER &&
-            (!user.team || owner.team !== user.team)) {
+            !(0, team_scope_util_1.userMatchesTeam)(owner, user)) {
             throw new common_1.ForbiddenException('Owner must belong to the manager team');
         }
     }
