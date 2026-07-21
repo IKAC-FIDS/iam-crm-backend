@@ -2012,6 +2012,16 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 - Validation status: 4 focused suites with 7 tests passed; the full 21-suite run with 95 tests passed; lint passed with no errors and 9 pre-existing warnings; build passed. `prisma generate` was used only to synchronize the stale local client with the already committed schema.
 - No Prisma schema change or migration was required. No migration, destructive database command, or broad seed operation was run.
 
+### fix 000074 - Preserve composite reports in the standardized API response envelope
+
+- Fixed `ApiResponseInterceptor` pagination detection. The interceptor previously treated any object containing `data` and `meta` as a pure paginated payload, lifted those two fields into the global response envelope, and silently discarded sibling report fields such as `asOf`, `summary`, and `buckets`.
+- A payload is now lifted only when its own enumerable keys are exactly `data` and `meta`. Pure list pagination keeps the existing `{ success, data, meta, requestId, timestamp }` contract, while composite reports are preserved whole under the standardized response's `data` field.
+- Audited all backend producers containing both `data` and `meta`. Opportunity aging and data-quality issue details are composite top-level reports and are now preserved. Exchange-rate impact remains a composite report with a nested paginated `productImpacts` object. Product price history, exchange-rate lists, audit logs, and the other list/detail endpoints returning exactly `{ data, meta }` remain pure pagination and retain their existing contract.
+- Frontend response helpers were inspected and already distinguish standardized object envelopes from lifted pagination; no frontend change was required.
+- Important changed files: `src/common/interceptors/api-response.interceptor.ts`, `test/api-response.interceptor.spec.ts`, `test/advanced-reports.service.spec.ts`, `README.md`, and the corresponding tracked interceptor output under `dist`.
+- Validation status: 2 focused suites with 10 tests passed; the full 22-suite run with 102 tests passed; lint passed with no errors and 9 pre-existing warnings; build passed. Regression coverage includes pure pagination, normal objects, complete composite aging reports, `StreamableFile`, already standardized responses, and null responses.
+- No Prisma schema change or migration was required. No migration, destructive database command, or broad seed operation was run.
+
 ---
 
 **Built with ❤️ for the sales team**

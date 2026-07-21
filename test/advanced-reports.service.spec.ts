@@ -1,6 +1,11 @@
 import { Prisma, UserRole } from "@prisma/client";
+import { ExecutionContext } from "@nestjs/common";
+import { CallHandler } from "@nestjs/common/interfaces";
+import { from, lastValueFrom } from "rxjs";
 import { organizationDayBounds } from "../src/common/dates/timezone-boundary.util";
+import { ApiResponseInterceptor } from "../src/common/interceptors/api-response.interceptor";
 import { AdvancedReportsService } from "../src/reports/advanced-reports.service";
+import { ReportsController } from "../src/reports/reports.controller";
 
 const organizationId = "00000000-0000-4000-8000-000000000001";
 const user = {
@@ -68,5 +73,61 @@ describe("AdvancedReportsService", () => {
       company: { archivedAt: null },
       stage: { isTerminal: false, terminalType: null },
     });
+  });
+
+  it("preserves the complete aging report through the endpoint response interceptor", async () => {
+    const opportunity = {
+      id: "opp-aging-1",
+      title: "Aging opportunity",
+      company: { id: "company-1", legalName: "Company", brandName: null },
+      owner: null,
+      stage: { id: "stage-1", code: "OPEN", label: "Open", sortOrder: 1 },
+      stageId: "stage-1",
+      priority: "MEDIUM",
+      estimatedValue: new Prisma.Decimal("1000"),
+      probability: 50,
+      expectedCloseDate: null,
+      createdAt: new Date("2026-07-01T00:00:00.000Z"),
+      updatedAt: new Date("2026-07-02T00:00:00.000Z"),
+    };
+    const prisma = {
+      organization: {
+        findUnique: jest.fn().mockResolvedValue({ timezone: "UTC" }),
+      },
+      opportunity: { findMany: jest.fn().mockResolvedValue([opportunity]) },
+      opportunityStageHistory: { findMany: jest.fn().mockResolvedValue([]) },
+    };
+    const advanced = new AdvancedReportsService(prisma as any);
+    const controller = new ReportsController(
+      {} as any,
+      advanced,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+    );
+    const endpointResult = controller.getOpportunityAging(
+      { page: 1, limit: 20 },
+      user as any,
+    );
+    const context = {
+      switchToHttp: () => ({
+        getResponse: () => ({ getHeader: () => "aging-request" }),
+      }),
+    } as ExecutionContext;
+    const next = { handle: () => from(endpointResult) } as CallHandler;
+    const response = (await lastValueFrom(
+      new ApiResponseInterceptor().intercept(context, next),
+    )) as any;
+
+    expect(response.success).toBe(true);
+    expect(response).not.toHaveProperty("meta");
+    expect(response.data).toMatchObject({
+      summary: { activeOpportunityCount: 1 },
+      buckets: expect.any(Array),
+      data: [expect.objectContaining({ id: "opp-aging-1" })],
+      meta: { total: 1, page: 1, limit: 20 },
+    });
+    expect(response.data.asOf).toEqual(expect.any(String));
   });
 });

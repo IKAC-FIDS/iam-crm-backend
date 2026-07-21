@@ -10,20 +10,22 @@ exports.ApiResponseInterceptor = void 0;
 const common_1 = require("@nestjs/common");
 const rxjs_1 = require("rxjs");
 function isObject(value) {
-    return typeof value === 'object' && value !== null && !Array.isArray(value);
+    return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function isAlreadyStandardResponse(value) {
-    return isObject(value) && typeof value.success === 'boolean';
+    return isObject(value) && typeof value.success === "boolean";
 }
 function isPaginatedPayload(value) {
-    return (isObject(value) &&
-        Object.prototype.hasOwnProperty.call(value, 'data') &&
-        Object.prototype.hasOwnProperty.call(value, 'meta'));
+    if (!isObject(value)) {
+        return false;
+    }
+    const keys = Object.keys(value);
+    return keys.length === 2 && keys.includes("data") && keys.includes("meta");
 }
 function getResponseRequestId(response) {
-    const header = response.getHeader('x-request-id');
+    const header = response.getHeader("x-request-id");
     if (Array.isArray(header)) {
-        return String(header[0] ?? '').trim() || null;
+        return String(header[0] ?? "").trim() || null;
     }
     if (header !== undefined) {
         return String(header).trim() || null;
@@ -34,6 +36,9 @@ let ApiResponseInterceptor = class ApiResponseInterceptor {
     intercept(context, next) {
         const response = context.switchToHttp().getResponse();
         return next.handle().pipe((0, rxjs_1.map)((payload) => {
+            if (payload instanceof common_1.StreamableFile) {
+                return payload;
+            }
             if (isAlreadyStandardResponse(payload)) {
                 return payload;
             }
