@@ -8,13 +8,17 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuditLogModule = void 0;
 const common_1 = require("@nestjs/common");
+const http_request_logging_middleware_1 = require("../common/logging/http-request-logging.middleware");
 const audit_log_controller_1 = require("./audit-log.controller");
 const audit_request_context_middleware_1 = require("./audit-request-context.middleware");
 const audit_request_context_service_1 = require("./audit-request-context.service");
 const audit_log_service_1 = require("./audit-log.service");
+const report_export_service_1 = require("../common/export/report-export.service");
 let AuditLogModule = class AuditLogModule {
     configure(consumer) {
-        consumer.apply(audit_request_context_middleware_1.AuditRequestContextMiddleware).forRoutes('*');
+        consumer
+            .apply(audit_request_context_middleware_1.AuditRequestContextMiddleware, http_request_logging_middleware_1.HttpRequestLoggingMiddleware)
+            .forRoutes("*");
     }
 };
 exports.AuditLogModule = AuditLogModule;
@@ -26,11 +30,10 @@ exports.AuditLogModule = AuditLogModule = __decorate([
             audit_log_service_1.AuditLogService,
             audit_request_context_service_1.AuditRequestContextService,
             audit_request_context_middleware_1.AuditRequestContextMiddleware,
+            http_request_logging_middleware_1.HttpRequestLoggingMiddleware,
+            report_export_service_1.ReportExportService,
         ],
-        exports: [
-            audit_log_service_1.AuditLogService,
-            audit_request_context_service_1.AuditRequestContextService,
-        ],
+        exports: [audit_log_service_1.AuditLogService, audit_request_context_service_1.AuditRequestContextService, report_export_service_1.ReportExportService],
     })
 ], AuditLogModule);
 //# sourceMappingURL=audit-log.module.js.map

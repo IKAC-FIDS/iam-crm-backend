@@ -12,14 +12,31 @@ const reports_service_1 = require("./reports.service");
 const reports_controller_1 = require("./reports.controller");
 const advanced_reports_service_1 = require("./advanced-reports.service");
 const commercial_reports_service_1 = require("./commercial-reports.service");
+const data_quality_service_1 = require("./data-quality.service");
+const period_comparison_service_1 = require("./period-comparison.service");
+const reporting_scope_service_1 = require("./reporting-scope.service");
+const report_exports_service_1 = require("./report-exports.service");
 let ReportsModule = class ReportsModule {
 };
 exports.ReportsModule = ReportsModule;
 exports.ReportsModule = ReportsModule = __decorate([
     (0, common_1.Module)({
-        providers: [reports_service_1.ReportsService, advanced_reports_service_1.AdvancedReportsService, commercial_reports_service_1.CommercialReportsService],
+        providers: [
+            reports_service_1.ReportsService,
+            advanced_reports_service_1.AdvancedReportsService,
+            commercial_reports_service_1.CommercialReportsService,
+            reporting_scope_service_1.ReportingScopeService,
+            data_quality_service_1.DataQualityService,
+            period_comparison_service_1.PeriodComparisonService,
+            report_exports_service_1.ReportExportsService,
+        ],
         controllers: [reports_controller_1.ReportsController],
-        exports: [advanced_reports_service_1.AdvancedReportsService, commercial_reports_service_1.CommercialReportsService],
+        exports: [
+            advanced_reports_service_1.AdvancedReportsService,
+            commercial_reports_service_1.CommercialReportsService,
+            data_quality_service_1.DataQualityService,
+            period_comparison_service_1.PeriodComparisonService,
+        ],
     })
 ], ReportsModule);
 //# sourceMappingURL=reports.module.js.map

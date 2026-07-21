@@ -10,9 +10,16 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.FindAuditLogsDto = void 0;
+const class_transformer_1 = require("class-transformer");
 const class_validator_1 = require("class-validator");
 const pagination_dto_1 = require("../../common/dto/pagination.dto");
 const api_date_string_validator_1 = require("../../common/validators/api-date-string.validator");
+const csv = ({ value }) => value == null || value === ""
+    ? undefined
+    : (Array.isArray(value) ? value : String(value).split(","))
+        .map(String)
+        .map((v) => v.trim())
+        .filter(Boolean);
 class FindAuditLogsDto extends pagination_dto_1.PaginationDto {
 }
 exports.FindAuditLogsDto = FindAuditLogsDto;
@@ -22,10 +29,24 @@ __decorate([
     __metadata("design:type", String)
 ], FindAuditLogsDto.prototype, "actorId", void 0);
 __decorate([
+    (0, class_transformer_1.Transform)(csv),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.IsUUID)("4", { each: true }),
+    __metadata("design:type", Array)
+], FindAuditLogsDto.prototype, "actorIds", void 0);
+__decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], FindAuditLogsDto.prototype, "entityType", void 0);
+__decorate([
+    (0, class_transformer_1.Transform)(csv),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.IsString)({ each: true }),
+    __metadata("design:type", Array)
+], FindAuditLogsDto.prototype, "entityTypes", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
@@ -36,6 +57,13 @@ __decorate([
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], FindAuditLogsDto.prototype, "action", void 0);
+__decorate([
+    (0, class_transformer_1.Transform)(csv),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.IsString)({ each: true }),
+    __metadata("design:type", Array)
+], FindAuditLogsDto.prototype, "actions", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
@@ -52,10 +80,22 @@ __decorate([
     __metadata("design:type", String)
 ], FindAuditLogsDto.prototype, "requestMethod", void 0);
 __decorate([
+    (0, class_transformer_1.Transform)(csv),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.IsString)({ each: true }),
+    __metadata("design:type", Array)
+], FindAuditLogsDto.prototype, "requestMethods", void 0);
+__decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], FindAuditLogsDto.prototype, "requestPath", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], FindAuditLogsDto.prototype, "search", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, api_date_string_validator_1.IsApiDateString)(),
@@ -66,4 +106,21 @@ __decorate([
     (0, api_date_string_validator_1.IsApiDateString)(),
     __metadata("design:type", String)
 ], FindAuditLogsDto.prototype, "endDate", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Type)(() => Boolean),
+    (0, class_validator_1.IsBoolean)(),
+    __metadata("design:type", Boolean)
+], FindAuditLogsDto.prototype, "compact", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Type)(() => Boolean),
+    (0, class_validator_1.IsBoolean)(),
+    __metadata("design:type", Boolean)
+], FindAuditLogsDto.prototype, "includePayload", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsIn)(["csv", "xlsx"]),
+    __metadata("design:type", String)
+], FindAuditLogsDto.prototype, "format", void 0);
 //# sourceMappingURL=find-audit-logs.dto.js.map

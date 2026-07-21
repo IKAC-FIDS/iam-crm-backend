@@ -23,11 +23,34 @@ const advanced_report_filters_dto_1 = require("./dto/advanced-report-filters.dto
 const advanced_reports_service_1 = require("./advanced-reports.service");
 const reports_service_1 = require("./reports.service");
 const commercial_reports_service_1 = require("./commercial-reports.service");
+const data_quality_service_1 = require("./data-quality.service");
+const data_quality_dto_1 = require("./dto/data-quality.dto");
+const period_comparison_dto_1 = require("./dto/period-comparison.dto");
+const period_comparison_service_1 = require("./period-comparison.service");
+const report_exports_service_1 = require("./report-exports.service");
 let ReportsController = class ReportsController {
-    constructor(reportsService, advancedReportsService, commercialReportsService) {
+    constructor(reportsService, advancedReportsService, commercialReportsService, dataQualityService, periodComparisonService, reportExports) {
         this.reportsService = reportsService;
         this.advancedReportsService = advancedReportsService;
         this.commercialReportsService = commercialReportsService;
+        this.dataQualityService = dataQualityService;
+        this.periodComparisonService = periodComparisonService;
+        this.reportExports = reportExports;
+    }
+    getDataQualityIssues(query, user) {
+        return this.dataQualityService.issues(query, user);
+    }
+    getDataQuality(query, user) {
+        return this.dataQualityService.report(query, user);
+    }
+    getPeriodComparison(query, user) {
+        return this.periodComparisonService.compare(query, user);
+    }
+    async exportReport(reportKey, query, user, response) {
+        const file = await this.reportExports.export(reportKey, query, user);
+        response.setHeader("Content-Type", file.contentType);
+        response.setHeader("Content-Disposition", file.contentDisposition);
+        return new common_1.StreamableFile(file.buffer);
     }
     getFinancialCollections(filters, user) {
         return this.commercialReportsService.financial(filters, user);
@@ -73,6 +96,40 @@ let ReportsController = class ReportsController {
     }
 };
 exports.ReportsController = ReportsController;
+__decorate([
+    (0, common_1.Get)("data-quality/issues"),
+    __param(0, (0, common_1.Query)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [data_quality_dto_1.DataQualityIssuesQueryDto, Object]),
+    __metadata("design:returntype", void 0)
+], ReportsController.prototype, "getDataQualityIssues", null);
+__decorate([
+    (0, common_1.Get)("data-quality"),
+    __param(0, (0, common_1.Query)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [data_quality_dto_1.DataQualityQueryDto, Object]),
+    __metadata("design:returntype", void 0)
+], ReportsController.prototype, "getDataQuality", null);
+__decorate([
+    (0, common_1.Get)("period-comparison"),
+    __param(0, (0, common_1.Query)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [period_comparison_dto_1.PeriodComparisonDto, Object]),
+    __metadata("design:returntype", void 0)
+], ReportsController.prototype, "getPeriodComparison", null);
+__decorate([
+    (0, common_1.Get)("exports/:reportKey"),
+    __param(0, (0, common_1.Param)("reportKey")),
+    __param(1, (0, common_1.Query)()),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
+    __param(3, (0, common_1.Res)({ passthrough: true })),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object, Object, Object]),
+    __metadata("design:returntype", Promise)
+], ReportsController.prototype, "exportReport", null);
 __decorate([
     (0, common_1.Get)("financial/collections"),
     __param(0, (0, common_1.Query)()),
@@ -189,6 +246,9 @@ exports.ReportsController = ReportsController = __decorate([
     (0, common_1.Controller)("reports"),
     __metadata("design:paramtypes", [reports_service_1.ReportsService,
         advanced_reports_service_1.AdvancedReportsService,
-        commercial_reports_service_1.CommercialReportsService])
+        commercial_reports_service_1.CommercialReportsService,
+        data_quality_service_1.DataQualityService,
+        period_comparison_service_1.PeriodComparisonService,
+        report_exports_service_1.ReportExportsService])
 ], ReportsController);
 //# sourceMappingURL=reports.controller.js.map

@@ -1,4 +1,13 @@
-import { Controller, Get, Query, UseGuards } from "@nestjs/common";
+import {
+  Controller,
+  Get,
+  Param,
+  Query,
+  Res,
+  StreamableFile,
+  UseGuards,
+} from "@nestjs/common";
+import type { Response } from "express";
 import {
   CurrentUser,
   CurrentUserPayload,
@@ -11,6 +20,14 @@ import { AdvancedReportFiltersDto } from "./dto/advanced-report-filters.dto";
 import { AdvancedReportsService } from "./advanced-reports.service";
 import { ReportsService } from "./reports.service";
 import { CommercialReportsService } from "./commercial-reports.service";
+import { DataQualityService } from "./data-quality.service";
+import {
+  DataQualityIssuesQueryDto,
+  DataQualityQueryDto,
+} from "./dto/data-quality.dto";
+import { PeriodComparisonDto } from "./dto/period-comparison.dto";
+import { PeriodComparisonService } from "./period-comparison.service";
+import { ReportExportsService } from "./report-exports.service";
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @Permissions("report:view")
@@ -20,7 +37,47 @@ export class ReportsController {
     private reportsService: ReportsService,
     private advancedReportsService: AdvancedReportsService,
     private commercialReportsService: CommercialReportsService,
+    private dataQualityService: DataQualityService,
+    private periodComparisonService: PeriodComparisonService,
+    private reportExports: ReportExportsService,
   ) {}
+
+  @Get("data-quality/issues")
+  getDataQualityIssues(
+    @Query() query: DataQualityIssuesQueryDto,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.dataQualityService.issues(query, user);
+  }
+
+  @Get("data-quality")
+  getDataQuality(
+    @Query() query: DataQualityQueryDto,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.dataQualityService.report(query, user);
+  }
+
+  @Get("period-comparison")
+  getPeriodComparison(
+    @Query() query: PeriodComparisonDto,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.periodComparisonService.compare(query, user);
+  }
+
+  @Get("exports/:reportKey")
+  async exportReport(
+    @Param("reportKey") reportKey: string,
+    @Query() query: any,
+    @CurrentUser() user: CurrentUserPayload,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const file = await this.reportExports.export(reportKey, query, user);
+    response.setHeader("Content-Type", file.contentType);
+    response.setHeader("Content-Disposition", file.contentDisposition);
+    return new StreamableFile(file.buffer);
+  }
 
   @Get("financial/collections")
   getFinancialCollections(

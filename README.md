@@ -2001,6 +2001,17 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 - Validation status: `prisma format`, `prisma validate`, and `prisma generate` passed; 6 focused suites with 19 tests passed; the full 18-suite test run with 89 tests passed; lint passed with no errors and 9 pre-existing warnings; build passed.
 - Assumption: because the payment model does not store separate paid and outstanding amounts, a `PARTIAL` payment row's amount is treated as the authoritative receivable amount. When no previous history exists, no synthetic prior impact is created and the delta remains `null`. The migration was not applied to the database, and no seed or destructive command was run.
 
+### fix 000073 - Add tenant-safe audit analytics, data quality, comparisons, and report exports
+
+- Added organization-scoped audit-log list, detail, summary, filter-options, and CSV/XLSX export APIs. Reads always force the authenticated organization, exclude global and foreign audit rows, batch actor summaries, support compact responses, recursively sanitize sensitive fields, and report bounded changed-field paths.
+- Added a centralized typed data-quality rule catalog with separate `organization` and `globalCatalog` scores and paginated issue details. Companies, opportunities, tasks, meetings, payments, and commercial documents remain organization-scoped; the platform-global product catalog and exchange-rate checks are returned only to callers that also have `product:view`.
+- Added period comparison for previous-period, previous-year, and explicit non-overlapping ranges. Metrics use their business event dates, Decimal-safe monetary calculations, explicit zero-baseline percentage semantics, stable uppercase keys, and organization-aware reporting filters.
+- Extended the management dashboard additively with organization data quality, permission-gated catalog quality, and a concise comparison snapshot. Existing dashboard fields were preserved.
+- Added whitelisted CSV/XLSX exports for the supported reports through one shared export utility. CSV output includes a UTF-8 BOM, CRLF rows, correct quoting, and spreadsheet-formula neutralization; XLSX output uses safe worksheet names, frozen headers, bounded widths, and format-specific row limits. Successful exports write sanitized audit records.
+- Important changed or new files include `src/audit-log/*`, `src/common/export/report-export.service.ts`, `src/reports/data-quality*`, `src/reports/period-comparison.service.ts`, `src/reports/reporting-scope.service.ts`, `src/reports/report-exports.service.ts`, report/dashboard controllers and modules, focused regression tests, and corresponding tracked `dist` output.
+- Validation status: 4 focused suites with 7 tests passed; the full 21-suite run with 95 tests passed; lint passed with no errors and 9 pre-existing warnings; build passed. `prisma generate` was used only to synchronize the stale local client with the already committed schema.
+- No Prisma schema change or migration was required. No migration, destructive database command, or broad seed operation was run.
+
 ---
 
 **Built with ❤️ for the sales team**

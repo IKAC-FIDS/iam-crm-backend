@@ -3,10 +3,27 @@ import { ReportsService } from "./reports.service";
 import { ReportsController } from "./reports.controller";
 import { AdvancedReportsService } from "./advanced-reports.service";
 import { CommercialReportsService } from "./commercial-reports.service";
+import { DataQualityService } from "./data-quality.service";
+import { PeriodComparisonService } from "./period-comparison.service";
+import { ReportingScopeService } from "./reporting-scope.service";
+import { ReportExportsService } from "./report-exports.service";
 
 @Module({
-  providers: [ReportsService, AdvancedReportsService, CommercialReportsService],
+  providers: [
+    ReportsService,
+    AdvancedReportsService,
+    CommercialReportsService,
+    ReportingScopeService,
+    DataQualityService,
+    PeriodComparisonService,
+    ReportExportsService,
+  ],
   controllers: [ReportsController],
-  exports: [AdvancedReportsService, CommercialReportsService],
+  exports: [
+    AdvancedReportsService,
+    CommercialReportsService,
+    DataQualityService,
+    PeriodComparisonService,
+  ],
 })
 export class ReportsModule {}
