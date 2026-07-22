@@ -1,5 +1,6 @@
 import { PaymentStatus, Prisma, SalesChannel, UserRole } from "@prisma/client";
 import { CommercialReportsService } from "../src/reports/commercial-reports.service";
+import { ReportingScopeService } from "../src/reports/reporting-scope.service";
 
 const user = {
   userId: "u1",
@@ -31,25 +32,23 @@ describe("CommercialReportsService", () => {
         findUnique: jest.fn().mockResolvedValue({ timezone: "Asia/Tehran" }),
       },
       opportunityPayment: {
-        findMany: jest
-          .fn()
-          .mockResolvedValue([
-            payment({ id: "irr" }),
-            payment({
-              id: "usd",
-              currency: "USD",
-              amount: new Prisma.Decimal(999),
-            }),
-          ]),
+        findMany: jest.fn().mockResolvedValue([
+          payment({ id: "irr" }),
+          payment({
+            id: "usd",
+            currency: "USD",
+            amount: new Prisma.Decimal(999),
+          }),
+        ]),
       },
       opportunityCommercialDocument: {
         findMany: jest.fn().mockResolvedValue([]),
       },
     };
-    const result = await new CommercialReportsService(prisma as any).financial(
-      { page: 1, limit: 20 },
-      user as any,
-    );
+    const result = await new CommercialReportsService(
+      prisma as any,
+      new ReportingScopeService(),
+    ).financial({ page: 1, limit: 20 }, user as any);
     expect(result.current.outstandingAmountIrr).toBe("100");
     expect(result.current.outstandingPaymentCount).toBe(1);
     expect(result.excludedCurrencies).toEqual([
@@ -91,7 +90,10 @@ describe("CommercialReportsService", () => {
           .mockResolvedValueOnce([line("active-1", SalesChannel.OTHER, "80")]),
       },
     };
-    const result = await new CommercialReportsService(prisma as any).products(
+    const result = await new CommercialReportsService(
+      prisma as any,
+      new ReportingScopeService(),
+    ).products(
       { startDate: "2026-07-01", endDate: "2026-07-31", page: 1, limit: 20 },
       user as any,
     );
@@ -106,5 +108,9 @@ describe("CommercialReportsService", () => {
       productCode: "CUSTOM",
       productName: "Historical custom",
     });
+    const activeWhere =
+      prisma.opportunityLineItem.findMany.mock.calls[1][0].where;
+    expect(JSON.stringify(activeWhere)).toContain('"isTerminal":false');
+    expect(JSON.stringify(activeWhere)).not.toContain("terminalType");
   });
 });

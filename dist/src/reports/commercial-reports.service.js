@@ -12,20 +12,20 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.CommercialReportsService = void 0;
 const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
-const ownership_scope_dto_1 = require("../common/dto/ownership-scope.dto");
 const api_date_util_1 = require("../common/dates/api-date.util");
 const timezone_boundary_util_1 = require("../common/dates/timezone-boundary.util");
 const tenant_scope_util_1 = require("../common/tenant/tenant-scope.util");
-const team_scope_util_1 = require("../common/tenant/team-scope.util");
 const prisma_service_1 = require("../prisma/prisma.service");
+const reporting_scope_service_1 = require("./reporting-scope.service");
 const OUTSTANDING = [
     client_1.PaymentStatus.PENDING,
     client_1.PaymentStatus.PARTIAL,
     client_1.PaymentStatus.OVERDUE,
 ];
 let CommercialReportsService = class CommercialReportsService {
-    constructor(prisma) {
+    constructor(prisma, scopes) {
         this.prisma = prisma;
+        this.scopes = scopes;
     }
     decimal(value) {
         return new client_1.Prisma.Decimal(value ?? 0);
@@ -42,34 +42,7 @@ let CommercialReportsService = class CommercialReportsService {
         return (0, api_date_util_1.parseApiDateRange)(f.startDate, f.endDate, "startDate", "endDate");
     }
     scope(f, user, active = false) {
-        const ownership = f.ownershipScope === ownership_scope_dto_1.OwnershipScope.MINE
-            ? {
-                OR: [
-                    { ownerId: user.userId },
-                    { company: { ownerId: user.userId } },
-                ],
-            }
-            : f.ownershipScope === ownership_scope_dto_1.OwnershipScope.TEAM
-                ? { owner: (0, team_scope_util_1.userTeamScopeWhere)(user) }
-                : f.ownershipScope === ownership_scope_dto_1.OwnershipScope.UNASSIGNED
-                    ? { ownerId: null }
-                    : {};
-        return {
-            AND: [
-                {
-                    organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
-                    company: { archivedAt: null },
-                    ...(active && {
-                        archivedAt: null,
-                        stage: { isTerminal: false, terminalType: null },
-                    }),
-                },
-                ownership,
-                ...(f.companyIds?.length ? [{ companyId: { in: f.companyIds } }] : []),
-                ...(f.ownerIds?.length ? [{ ownerId: { in: f.ownerIds } }] : []),
-                ...(f.teams?.length ? [{ owner: (0, team_scope_util_1.userTeamFilterWhere)(f.teams) }] : []),
-            ],
-        };
+        return this.scopes.opportunity(f, user, active);
     }
     period(range) {
         return {
@@ -497,6 +470,7 @@ let CommercialReportsService = class CommercialReportsService {
 exports.CommercialReportsService = CommercialReportsService;
 exports.CommercialReportsService = CommercialReportsService = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [prisma_service_1.PrismaService])
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService,
+        reporting_scope_service_1.ReportingScopeService])
 ], CommercialReportsService);
 //# sourceMappingURL=commercial-reports.service.js.map

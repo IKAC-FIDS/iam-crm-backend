@@ -56,3 +56,18 @@ export function organizationDayBounds(now: Date, timeZone: string) {
   );
   return { start, end };
 }
+
+export function addOrganizationCalendarDays(
+  date: Date,
+  days: number,
+  timeZone: string,
+) {
+  const { year, month, day } = zonedDateParts(date, timeZone);
+  const target = new Date(Date.UTC(year, month - 1, day + days));
+  return zonedMidnightUtc(
+    target.getUTCFullYear(),
+    target.getUTCMonth() + 1,
+    target.getUTCDate(),
+    timeZone,
+  );
+}

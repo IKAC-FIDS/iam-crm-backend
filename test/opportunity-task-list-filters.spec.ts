@@ -14,7 +14,7 @@ describe('activeOnly opportunity filtering', () => {
     const { prisma, service } = setup();
     await service.findAll({ activeOnly: 'true', ownerId: '00000000-0000-4000-8000-000000000002' }, user as any);
     const where = prisma.opportunity.findMany.mock.calls[0][0].where;
-    expect(where.AND).toEqual(expect.arrayContaining([{ organizationId }, { ownerId: '00000000-0000-4000-8000-000000000002' }, { archivedAt: null, stage: { isTerminal: false, terminalType: null } }]));
+    expect(where.AND).toEqual(expect.arrayContaining([{ organizationId }, { ownerId: '00000000-0000-4000-8000-000000000002' }, { archivedAt: null, company: { archivedAt: null }, stage: { isTerminal: false } }]));
   });
   it('rejects activeOnly with archivedOnly', async () => {
     const { service } = setup();
@@ -23,6 +23,13 @@ describe('activeOnly opportunity filtering', () => {
   it('preserves prior archive behavior when activeOnly is omitted', async () => {
     const { prisma, service } = setup(); await service.findAll({}, user as any);
     expect(prisma.opportunity.findMany.mock.calls[0][0].where.AND).toContainEqual({ archivedAt: null });
+  });
+  it('returns the same three-opportunity active population used by report reconciliation fixtures', async () => {
+    const prisma = { opportunity: { findMany: jest.fn().mockResolvedValue([{}, {}, {}]), count: jest.fn().mockResolvedValue(3) } };
+    const service = new OpportunitiesService(prisma as any, {} as any, {} as any);
+    const result = await service.findAll({ activeOnly: 'true', page: 1, limit: 20 }, user as any);
+    expect(result.meta.total).toBe(3); expect(result.data).toHaveLength(3);
+    expect(prisma.opportunity.count.mock.calls[0][0].where).toEqual(prisma.opportunity.findMany.mock.calls[0][0].where);
   });
 });
 

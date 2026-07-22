@@ -18,10 +18,12 @@ const timezone_boundary_util_1 = require("../common/dates/timezone-boundary.util
 const tenant_scope_util_1 = require("../common/tenant/tenant-scope.util");
 const team_scope_util_1 = require("../common/tenant/team-scope.util");
 const prisma_service_1 = require("../prisma/prisma.service");
+const reporting_scope_service_1 = require("./reporting-scope.service");
 const OPEN_TASKS = [client_1.TaskStatus.TODO, client_1.TaskStatus.IN_PROGRESS];
 let AdvancedReportsService = class AdvancedReportsService {
-    constructor(prisma) {
+    constructor(prisma, scopes) {
         this.prisma = prisma;
+        this.scopes = scopes;
     }
     percent(part, total) {
         return total ? Math.round((part / total) * 100) : 0;
@@ -43,51 +45,8 @@ let AdvancedReportsService = class AdvancedReportsService {
         const timezone = org?.timezone || "UTC";
         return { now, timezone, ...(0, timezone_boundary_util_1.organizationDayBounds)(now, timezone) };
     }
-    ownerScope(scope, user) {
-        if (scope === ownership_scope_dto_1.OwnershipScope.MINE)
-            return {
-                OR: [{ ownerId: user.userId }, { company: { ownerId: user.userId } }],
-            };
-        if (scope === ownership_scope_dto_1.OwnershipScope.TEAM)
-            return { owner: (0, team_scope_util_1.userTeamScopeWhere)(user) };
-        if (scope === ownership_scope_dto_1.OwnershipScope.UNASSIGNED)
-            return { ownerId: null };
-        return {};
-    }
     opportunityWhere(f, user) {
-        return {
-            AND: [
-                {
-                    organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
-                    archivedAt: null,
-                    company: { archivedAt: null },
-                    stage: { isTerminal: false, terminalType: null },
-                },
-                this.ownerScope(f.ownershipScope, user),
-                ...(f.companyIds?.length ? [{ companyId: { in: f.companyIds } }] : []),
-                ...(f.ownerIds?.length ? [{ ownerId: { in: f.ownerIds } }] : []),
-                ...(f.teams?.length ? [{ owner: (0, team_scope_util_1.userTeamFilterWhere)(f.teams) }] : []),
-                ...(f.stages?.length
-                    ? [
-                        {
-                            OR: [
-                                { stageId: { in: f.stages } },
-                                {
-                                    stage: {
-                                        code: { in: f.stages.map((v) => v.toUpperCase()) },
-                                    },
-                                },
-                            ],
-                        },
-                    ]
-                    : []),
-                ...(f.priorities?.length ? [{ priority: { in: f.priorities } }] : []),
-                ...(f.industries?.length
-                    ? [{ company: { industry: { in: f.industries } } }]
-                    : []),
-                ...(f.sources?.length ? [{ source: { in: f.sources } }] : []),
-            ],
-        };
+        return this.scopes.opportunity(f, user, true);
     }
     taskWhere(f, user) {
         const scope = f.ownershipScope;
@@ -170,8 +129,8 @@ let AdvancedReportsService = class AdvancedReportsService {
             (fallback ? { gte: fallback.start, lt: fallback.end } : undefined));
     }
     async forecast(f, user) {
-        const { start: today, now } = await this.clock(user);
-        const defaultEnd = new Date(today.getTime() + 91 * 86_400_000);
+        const { start: today, now, timezone } = await this.clock(user);
+        const defaultEnd = (0, timezone_boundary_util_1.addOrganizationCalendarDays)(today, 90, timezone);
         const range = this.period(f, { start: today, end: defaultEnd });
         const all = await this.prisma.opportunity.findMany({
             where: this.opportunityWhere(f, user),
@@ -477,7 +436,8 @@ let AdvancedReportsService = class AdvancedReportsService {
             end: clock.start,
         };
         const range = this.period(f, defaultPeriod);
-        const [forecast, tasks, meetings, opportunities, periodOpp, overdueOpportunities, overdueTasks, pastMeetings,] = await Promise.all([
+        const historicalScope = this.scopes.opportunity(f, user);
+        const [forecast, tasks, meetings, opportunities, createdOpportunities, wonOpportunities, lostOpportunities, overdueOpportunities, overdueTasks, pastMeetings,] = await Promise.all([
             this.forecast({ ...f, startDate: undefined, endDate: undefined }, user),
             this.taskPerformance(f, user),
             this.meetingPerformance(f, user),
@@ -487,20 +447,27 @@ let AdvancedReportsService = class AdvancedReportsService {
             }),
             this.prisma.opportunity.findMany({
                 where: {
+                    AND: [historicalScope, { createdAt: range }],
+                },
+                select: { id: true },
+            }),
+            this.prisma.opportunity.findMany({
+                where: {
                     AND: [
-                        {
-                            organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
-                            createdAt: range,
-                        },
-                        ...(f.companyIds?.length
-                            ? [{ companyId: { in: f.companyIds } }]
-                            : []),
+                        historicalScope,
+                        { wonAt: range, stage: { terminalType: "WON" } },
                     ],
                 },
-                select: {
-                    stage: { select: { terminalType: true } },
-                    estimatedValue: true,
+                select: { estimatedValue: true },
+            }),
+            this.prisma.opportunity.findMany({
+                where: {
+                    AND: [
+                        historicalScope,
+                        { lostAt: range, stage: { terminalType: "LOST" } },
+                    ],
                 },
+                select: { id: true },
             }),
             this.prisma.opportunity.findMany({
                 where: {
@@ -562,7 +529,6 @@ let AdvancedReportsService = class AdvancedReportsService {
                 take: 5,
             }),
         ]);
-        const won = periodOpp.filter((o) => o.stage.terminalType === "WON"), lost = periodOpp.filter((o) => o.stage.terminalType === "LOST");
         const [todayMeetingCount, upcomingMeetingCount] = await Promise.all([
             this.prisma.meeting.count({
                 where: {
@@ -610,11 +576,11 @@ let AdvancedReportsService = class AdvancedReportsService {
             },
             periodPerformance: {
                 opportunities: {
-                    createdCount: periodOpp.length,
-                    wonCount: won.length,
-                    lostCount: lost.length,
-                    wonEstimatedValueIrr: this.money(won).toString(),
-                    winRate: this.percent(won.length, won.length + lost.length),
+                    createdCount: createdOpportunities.length,
+                    wonCount: wonOpportunities.length,
+                    lostCount: lostOpportunities.length,
+                    wonEstimatedValueIrr: this.money(wonOpportunities).toString(),
+                    winRate: this.percent(wonOpportunities.length, wonOpportunities.length + lostOpportunities.length),
                 },
                 tasks: tasks.periodFlow,
                 meetings: {
@@ -705,6 +671,7 @@ let AdvancedReportsService = class AdvancedReportsService {
 exports.AdvancedReportsService = AdvancedReportsService;
 exports.AdvancedReportsService = AdvancedReportsService = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [prisma_service_1.PrismaService])
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService,
+        reporting_scope_service_1.ReportingScopeService])
 ], AdvancedReportsService);
 //# sourceMappingURL=advanced-reports.service.js.map

@@ -19,6 +19,7 @@ const tenant_scope_util_1 = require("../common/tenant/tenant-scope.util");
 const team_scope_util_1 = require("../common/tenant/team-scope.util");
 const api_date_util_1 = require("../common/dates/api-date.util");
 const ownership_scope_dto_1 = require("../common/dto/ownership-scope.dto");
+const active_opportunity_scope_1 = require("../common/opportunities/active-opportunity-scope");
 const opportunityInclude = {
     company: {
         select: {
@@ -74,9 +75,7 @@ const opportunityInclude = {
         },
     },
     commercialDocuments: {
-        orderBy: [
-            { createdAt: 'desc' },
-        ],
+        orderBy: [{ createdAt: "desc" }],
         include: {
             payments: {
                 select: {
@@ -90,15 +89,13 @@ const opportunityInclude = {
                     referenceNumber: true,
                 },
                 orderBy: {
-                    createdAt: 'desc',
+                    createdAt: "desc",
                 },
             },
         },
     },
     payments: {
-        orderBy: [
-            { createdAt: 'desc' },
-        ],
+        orderBy: [{ createdAt: "desc" }],
         include: {
             commercialDocument: {
                 select: {
@@ -127,7 +124,7 @@ let OpportunitiesService = class OpportunitiesService {
                 where,
                 include: opportunityInclude,
                 orderBy: {
-                    updatedAt: 'desc',
+                    updatedAt: "desc",
                 },
                 skip: (page - 1) * limit,
                 take: limit,
@@ -153,10 +150,7 @@ let OpportunitiesService = class OpportunitiesService {
     async findOne(id, user) {
         const opportunity = await this.prisma.opportunity.findFirst({
             where: {
-                AND: [
-                    { id },
-                    { organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user) },
-                ],
+                AND: [{ id }, { organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user) }],
             },
             include: {
                 ...opportunityInclude,
@@ -178,12 +172,12 @@ let OpportunitiesService = class OpportunitiesService {
                         },
                     },
                     orderBy: {
-                        changedAt: 'desc',
+                        changedAt: "desc",
                     },
                 },
                 activities: {
                     orderBy: {
-                        occurredAt: 'desc',
+                        occurredAt: "desc",
                     },
                     take: 20,
                 },
@@ -202,15 +196,10 @@ let OpportunitiesService = class OpportunitiesService {
                             },
                         },
                     },
-                    orderBy: [
-                        { sortOrder: 'asc' },
-                        { createdAt: 'asc' },
-                    ],
+                    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
                 },
                 commercialDocuments: {
-                    orderBy: [
-                        { createdAt: 'desc' },
-                    ],
+                    orderBy: [{ createdAt: "desc" }],
                     include: {
                         payments: {
                             select: {
@@ -224,15 +213,13 @@ let OpportunitiesService = class OpportunitiesService {
                                 referenceNumber: true,
                             },
                             orderBy: {
-                                createdAt: 'desc',
+                                createdAt: "desc",
                             },
                         },
                     },
                 },
                 payments: {
-                    orderBy: [
-                        { createdAt: 'desc' },
-                    ],
+                    orderBy: [{ createdAt: "desc" }],
                     include: {
                         commercialDocument: {
                             select: {
@@ -264,15 +251,12 @@ let OpportunitiesService = class OpportunitiesService {
                             },
                         },
                     },
-                    orderBy: [
-                        { dueAt: 'asc' },
-                        { createdAt: 'desc' },
-                    ],
+                    orderBy: [{ dueAt: "asc" }, { createdAt: "desc" }],
                 },
             },
         });
         if (!opportunity) {
-            throw new common_1.NotFoundException('Opportunity not found');
+            throw new common_1.NotFoundException("Opportunity not found");
         }
         return opportunity;
     }
@@ -298,15 +282,15 @@ let OpportunitiesService = class OpportunitiesService {
                 priority: dto.priority,
                 estimatedValue: dto.estimatedValue,
                 expectedCloseDate: dto.expectedCloseDate
-                    ? (0, api_date_util_1.parseApiDate)(dto.expectedCloseDate, 'expectedCloseDate')
+                    ? (0, api_date_util_1.parseApiDate)(dto.expectedCloseDate, "expectedCloseDate")
                     : undefined,
                 sourceOptionId: source.sourceOptionId,
                 source: source.source,
                 primaryContactId: dto.primaryContactId,
                 probability: dto.probability,
                 competitor: dto.competitor?.trim() || undefined,
-                wonAt: stage.terminalType === 'WON' ? new Date() : undefined,
-                lostAt: stage.terminalType === 'LOST' ? new Date() : undefined,
+                wonAt: stage.terminalType === "WON" ? new Date() : undefined,
+                lostAt: stage.terminalType === "LOST" ? new Date() : undefined,
                 stageHistories: {
                     create: {
                         fromStageId: null,
@@ -319,9 +303,9 @@ let OpportunitiesService = class OpportunitiesService {
         });
         await this.audit.record({
             actorId: user.userId,
-            entityType: 'opportunity',
+            entityType: "opportunity",
             entityId: opportunity.id,
-            action: 'opportunity.created',
+            action: "opportunity.created",
             after: opportunity,
         });
         return opportunity;
@@ -348,7 +332,7 @@ let OpportunitiesService = class OpportunitiesService {
                     title: dto.title.trim(),
                 }),
                 ...(dto.expectedCloseDate !== undefined && {
-                    expectedCloseDate: (0, api_date_util_1.parseApiDate)(dto.expectedCloseDate, 'expectedCloseDate'),
+                    expectedCloseDate: (0, api_date_util_1.parseApiDate)(dto.expectedCloseDate, "expectedCloseDate"),
                 }),
                 ...(source !== undefined && {
                     sourceOptionId: source.sourceOptionId,
@@ -365,9 +349,9 @@ let OpportunitiesService = class OpportunitiesService {
         });
         await this.audit.record({
             actorId: user.userId,
-            entityType: 'opportunity',
+            entityType: "opportunity",
             entityId: id,
-            action: 'opportunity.updated',
+            action: "opportunity.updated",
             before: current,
             after: updated,
         });
@@ -376,10 +360,10 @@ let OpportunitiesService = class OpportunitiesService {
     async changeStage(id, dto, user) {
         const current = await this.getForMutation(id, user);
         if (current.archivedAt) {
-            throw new common_1.BadRequestException('Archived opportunities cannot change stage');
+            throw new common_1.BadRequestException("Archived opportunities cannot change stage");
         }
         if (!dto.stageId && !dto.stage) {
-            throw new common_1.BadRequestException('stageId or stage code is required');
+            throw new common_1.BadRequestException("stageId or stage code is required");
         }
         const target = await this.resolveStage(dto.stageId, dto.stage);
         await this.pipelineConfig.assertTransitionAllowed(current.stageId, target.id, user.role);
@@ -389,8 +373,8 @@ let OpportunitiesService = class OpportunitiesService {
                 where: { id },
                 data: {
                     stageId: target.id,
-                    wonAt: target.terminalType === 'WON' ? now : null,
-                    lostAt: target.terminalType === 'LOST' ? now : null,
+                    wonAt: target.terminalType === "WON" ? now : null,
+                    lostAt: target.terminalType === "LOST" ? now : null,
                 },
                 include: opportunityInclude,
             }),
@@ -416,9 +400,9 @@ let OpportunitiesService = class OpportunitiesService {
         ]);
         await this.audit.record({
             actorId: user.userId,
-            entityType: 'opportunity',
+            entityType: "opportunity",
             entityId: id,
-            action: 'opportunity.stage_changed',
+            action: "opportunity.stage_changed",
             before: {
                 stageId: current.stageId,
                 code: current.stage.code,
@@ -447,9 +431,9 @@ let OpportunitiesService = class OpportunitiesService {
         });
         await this.audit.record({
             actorId: user.userId,
-            entityType: 'opportunity',
+            entityType: "opportunity",
             entityId: id,
-            action: 'opportunity.owner_changed',
+            action: "opportunity.owner_changed",
             before: {
                 ownerId: current.ownerId,
             },
@@ -462,7 +446,7 @@ let OpportunitiesService = class OpportunitiesService {
     async archive(id, dto, user) {
         const current = await this.getForMutation(id, user);
         if (current.archivedAt) {
-            throw new common_1.BadRequestException('Opportunity is already archived');
+            throw new common_1.BadRequestException("Opportunity is already archived");
         }
         const updated = await this.prisma.opportunity.update({
             where: { id },
@@ -475,9 +459,9 @@ let OpportunitiesService = class OpportunitiesService {
         });
         await this.audit.record({
             actorId: user.userId,
-            entityType: 'opportunity',
+            entityType: "opportunity",
             entityId: id,
-            action: 'opportunity.archived',
+            action: "opportunity.archived",
             before: current,
             after: updated,
         });
@@ -486,7 +470,7 @@ let OpportunitiesService = class OpportunitiesService {
     async restore(id, user) {
         const current = await this.getForMutation(id, user);
         if (!current.archivedAt) {
-            throw new common_1.BadRequestException('Opportunity is not archived');
+            throw new common_1.BadRequestException("Opportunity is not archived");
         }
         const updated = await this.prisma.opportunity.update({
             where: { id },
@@ -499,17 +483,17 @@ let OpportunitiesService = class OpportunitiesService {
         });
         await this.audit.record({
             actorId: user.userId,
-            entityType: 'opportunity',
+            entityType: "opportunity",
             entityId: id,
-            action: 'opportunity.restored',
+            action: "opportunity.restored",
             before: current,
             after: updated,
         });
         return updated;
     }
     buildWhere(query, user) {
-        if (query.activeOnly === 'true' && query.archivedOnly === 'true') {
-            throw new common_1.BadRequestException('activeOnly=true cannot be combined with archivedOnly=true');
+        if (query.activeOnly === "true" && query.archivedOnly === "true") {
+            throw new common_1.BadRequestException("activeOnly=true cannot be combined with archivedOnly=true");
         }
         const and = [
             {
@@ -544,8 +528,16 @@ let OpportunitiesService = class OpportunitiesService {
                 owner: {
                     OR: [
                         { team: query.team.trim() },
-                        { teamRef: { code: { equals: query.team.trim(), mode: 'insensitive' } } },
-                        { teamRef: { name: { equals: query.team.trim(), mode: 'insensitive' } } },
+                        {
+                            teamRef: {
+                                code: { equals: query.team.trim(), mode: "insensitive" },
+                            },
+                        },
+                        {
+                            teamRef: {
+                                name: { equals: query.team.trim(), mode: "insensitive" },
+                            },
+                        },
                     ],
                 },
             });
@@ -572,8 +564,8 @@ let OpportunitiesService = class OpportunitiesService {
             and.push({
                 OR: [
                     { source },
-                    { sourceOption: { code: { equals: source, mode: 'insensitive' } } },
-                    { sourceOption: { label: { equals: source, mode: 'insensitive' } } },
+                    { sourceOption: { code: { equals: source, mode: "insensitive" } } },
+                    { sourceOption: { label: { equals: source, mode: "insensitive" } } },
                 ],
             });
         }
@@ -582,8 +574,8 @@ let OpportunitiesService = class OpportunitiesService {
             and.push({
                 OR: [
                     { source },
-                    { sourceOption: { code: { equals: source, mode: 'insensitive' } } },
-                    { sourceOption: { label: { equals: source, mode: 'insensitive' } } },
+                    { sourceOption: { code: { equals: source, mode: "insensitive" } } },
+                    { sourceOption: { label: { equals: source, mode: "insensitive" } } },
                 ],
             });
         }
@@ -597,21 +589,21 @@ let OpportunitiesService = class OpportunitiesService {
                 primaryContactId: query.primaryContactId,
             });
         }
-        const expectedCloseRange = (0, api_date_util_1.parseApiDateRange)(query.expectedCloseFrom, query.expectedCloseTo, 'expectedCloseFrom', 'expectedCloseTo');
+        const expectedCloseRange = (0, api_date_util_1.parseApiDateRange)(query.expectedCloseFrom, query.expectedCloseTo, "expectedCloseFrom", "expectedCloseTo");
         if (expectedCloseRange) {
             and.push({ expectedCloseDate: expectedCloseRange });
         }
-        if (query.activeOnly === 'true') {
-            and.push({ archivedAt: null, stage: { isTerminal: false, terminalType: null } });
+        if (query.activeOnly === "true") {
+            and.push((0, active_opportunity_scope_1.activeOpportunityStateWhere)());
         }
-        else if (query.archivedOnly === 'true') {
+        else if (query.archivedOnly === "true") {
             and.push({
                 archivedAt: {
                     not: null,
                 },
             });
         }
-        else if (query.includeArchived !== 'true') {
+        else if (query.includeArchived !== "true") {
             and.push({
                 archivedAt: null,
             });
@@ -623,20 +615,20 @@ let OpportunitiesService = class OpportunitiesService {
                     {
                         title: {
                             contains: search,
-                            mode: 'insensitive',
+                            mode: "insensitive",
                         },
                     },
                     {
                         description: {
                             contains: search,
-                            mode: 'insensitive',
+                            mode: "insensitive",
                         },
                     },
                     {
                         company: {
                             legalName: {
                                 contains: search,
-                                mode: 'insensitive',
+                                mode: "insensitive",
                             },
                         },
                     },
@@ -644,7 +636,7 @@ let OpportunitiesService = class OpportunitiesService {
                         company: {
                             brandName: {
                                 contains: search,
-                                mode: 'insensitive',
+                                mode: "insensitive",
                             },
                         },
                     },
@@ -652,7 +644,7 @@ let OpportunitiesService = class OpportunitiesService {
                         owner: {
                             fullName: {
                                 contains: search,
-                                mode: 'insensitive',
+                                mode: "insensitive",
                             },
                         },
                     },
@@ -660,7 +652,7 @@ let OpportunitiesService = class OpportunitiesService {
                         owner: {
                             email: {
                                 contains: search,
-                                mode: 'insensitive',
+                                mode: "insensitive",
                             },
                         },
                     },
@@ -675,10 +667,7 @@ let OpportunitiesService = class OpportunitiesService {
         switch (scope ?? ownership_scope_dto_1.OwnershipScope.ALL) {
             case ownership_scope_dto_1.OwnershipScope.MINE:
                 return {
-                    OR: [
-                        { ownerId: user.userId },
-                        { company: { ownerId: user.userId } },
-                    ],
+                    OR: [{ ownerId: user.userId }, { company: { ownerId: user.userId } }],
                 };
             case ownership_scope_dto_1.OwnershipScope.TEAM:
                 return { owner: (0, team_scope_util_1.userTeamScopeWhere)(user) };
@@ -720,7 +709,7 @@ let OpportunitiesService = class OpportunitiesService {
     }
     async getForMutation(id, user) {
         if (user.role === client_1.UserRole.BOARDS) {
-            throw new common_1.ForbiddenException('Opportunity is read-only for this role');
+            throw new common_1.ForbiddenException("Opportunity is read-only for this role");
         }
         const item = await this.prisma.opportunity.findFirst({
             where: {
@@ -733,7 +722,7 @@ let OpportunitiesService = class OpportunitiesService {
             include: opportunityInclude,
         });
         if (!item) {
-            throw new common_1.NotFoundException('Opportunity not found');
+            throw new common_1.NotFoundException("Opportunity not found");
         }
         return item;
     }
@@ -753,7 +742,7 @@ let OpportunitiesService = class OpportunitiesService {
             },
         });
         if (!company || company.archivedAt) {
-            throw new common_1.NotFoundException('Company not found');
+            throw new common_1.NotFoundException("Company not found");
         }
         return company;
     }
@@ -767,14 +756,13 @@ let OpportunitiesService = class OpportunitiesService {
         if (!owner ||
             !owner.isActive ||
             (owner.role !== client_1.UserRole.REP && owner.role !== client_1.UserRole.MANAGER)) {
-            throw new common_1.BadRequestException('Opportunity owner must be an active REP or MANAGER');
+            throw new common_1.BadRequestException("Opportunity owner must be an active REP or MANAGER");
         }
         if (user.role === client_1.UserRole.REP && owner.id !== user.userId) {
-            throw new common_1.ForbiddenException('REP can only assign opportunities to self');
+            throw new common_1.ForbiddenException("REP can only assign opportunities to self");
         }
-        if (user.role === client_1.UserRole.MANAGER &&
-            !(0, team_scope_util_1.userMatchesTeam)(owner, user)) {
-            throw new common_1.ForbiddenException('Owner must belong to the manager team');
+        if (user.role === client_1.UserRole.MANAGER && !(0, team_scope_util_1.userMatchesTeam)(owner, user)) {
+            throw new common_1.ForbiddenException("Owner must belong to the manager team");
         }
     }
     async resolveOpportunitySource(sourceOptionId, opportunitySource, legacySource) {
@@ -782,12 +770,12 @@ let OpportunitiesService = class OpportunitiesService {
             const option = await this.prisma.lookupOption.findFirst({
                 where: {
                     id: sourceOptionId,
-                    group: 'opportunity-sources',
+                    group: "opportunity-sources",
                     isActive: true,
                 },
             });
             if (!option) {
-                throw new common_1.BadRequestException('Selected opportunity source is invalid or inactive');
+                throw new common_1.BadRequestException("Selected opportunity source is invalid or inactive");
             }
             return {
                 sourceOptionId: option.id,
@@ -800,19 +788,19 @@ let OpportunitiesService = class OpportunitiesService {
         }
         const option = await this.prisma.lookupOption.findFirst({
             where: {
-                group: 'opportunity-sources',
+                group: "opportunity-sources",
                 isActive: true,
                 OR: [
                     {
                         code: {
                             equals: normalizedSource,
-                            mode: 'insensitive',
+                            mode: "insensitive",
                         },
                     },
                     {
                         label: {
                             equals: normalizedSource,
-                            mode: 'insensitive',
+                            mode: "insensitive",
                         },
                     },
                 ],
@@ -825,7 +813,7 @@ let OpportunitiesService = class OpportunitiesService {
             };
         }
         if (opportunitySource) {
-            throw new common_1.BadRequestException('Opportunity source must be selected from opportunity-sources lookup options');
+            throw new common_1.BadRequestException("Opportunity source must be selected from opportunity-sources lookup options");
         }
         return {
             sourceOptionId: undefined,
@@ -843,7 +831,7 @@ let OpportunitiesService = class OpportunitiesService {
             },
         });
         if (!contact) {
-            throw new common_1.BadRequestException('Primary contact must belong to the opportunity company');
+            throw new common_1.BadRequestException("Primary contact must belong to the opportunity company");
         }
     }
     async getDefaultStage() {
@@ -853,11 +841,11 @@ let OpportunitiesService = class OpportunitiesService {
                 isDefault: true,
             },
             orderBy: {
-                sortOrder: 'asc',
+                sortOrder: "asc",
             },
         });
         if (!config) {
-            throw new common_1.BadRequestException('No active initial pipeline stage is configured');
+            throw new common_1.BadRequestException("No active initial pipeline stage is configured");
         }
         return config;
     }
@@ -875,7 +863,7 @@ let OpportunitiesService = class OpportunitiesService {
                 },
         });
         if (!stage?.isActive) {
-            throw new common_1.BadRequestException('Selected pipeline stage is not active');
+            throw new common_1.BadRequestException("Selected pipeline stage is not active");
         }
         return stage;
     }

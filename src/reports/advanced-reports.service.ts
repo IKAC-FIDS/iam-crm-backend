@@ -3,7 +3,10 @@ import { MeetingStatus, Prisma, TaskStatus } from "@prisma/client";
 import { CurrentUserPayload } from "../common/decorators/current-user.decorator";
 import { OwnershipScope } from "../common/dto/ownership-scope.dto";
 import { parseApiDateRange } from "../common/dates/api-date.util";
-import { organizationDayBounds } from "../common/dates/timezone-boundary.util";
+import {
+  addOrganizationCalendarDays,
+  organizationDayBounds,
+} from "../common/dates/timezone-boundary.util";
 import { getCurrentOrganizationId } from "../common/tenant/tenant-scope.util";
 import {
   userTeamFilterWhere,
@@ -11,11 +14,15 @@ import {
 } from "../common/tenant/team-scope.util";
 import { PrismaService } from "../prisma/prisma.service";
 import { AdvancedReportFiltersDto } from "./dto/advanced-report-filters.dto";
+import { ReportingScopeService } from "./reporting-scope.service";
 
 const OPEN_TASKS = [TaskStatus.TODO, TaskStatus.IN_PROGRESS];
 @Injectable()
 export class AdvancedReportsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly scopes: ReportingScopeService,
+  ) {}
   private percent(part: number, total: number) {
     return total ? Math.round((part / total) * 100) : 0;
   }
@@ -50,56 +57,11 @@ export class AdvancedReportsService {
     const timezone = org?.timezone || "UTC";
     return { now, timezone, ...organizationDayBounds(now, timezone) };
   }
-  private ownerScope(
-    scope: OwnershipScope | undefined,
-    user: CurrentUserPayload,
-  ): Prisma.OpportunityWhereInput {
-    if (scope === OwnershipScope.MINE)
-      return {
-        OR: [{ ownerId: user.userId }, { company: { ownerId: user.userId } }],
-      };
-    if (scope === OwnershipScope.TEAM)
-      return { owner: userTeamScopeWhere(user) };
-    if (scope === OwnershipScope.UNASSIGNED) return { ownerId: null };
-    return {};
-  }
   private opportunityWhere(
     f: AdvancedReportFiltersDto,
     user: CurrentUserPayload,
   ): Prisma.OpportunityWhereInput {
-    return {
-      AND: [
-        {
-          organizationId: getCurrentOrganizationId(user),
-          archivedAt: null,
-          company: { archivedAt: null },
-          stage: { isTerminal: false, terminalType: null },
-        },
-        this.ownerScope(f.ownershipScope, user),
-        ...(f.companyIds?.length ? [{ companyId: { in: f.companyIds } }] : []),
-        ...(f.ownerIds?.length ? [{ ownerId: { in: f.ownerIds } }] : []),
-        ...(f.teams?.length ? [{ owner: userTeamFilterWhere(f.teams) }] : []),
-        ...(f.stages?.length
-          ? [
-              {
-                OR: [
-                  { stageId: { in: f.stages } },
-                  {
-                    stage: {
-                      code: { in: f.stages.map((v) => v.toUpperCase()) },
-                    },
-                  },
-                ],
-              },
-            ]
-          : []),
-        ...(f.priorities?.length ? [{ priority: { in: f.priorities } }] : []),
-        ...(f.industries?.length
-          ? [{ company: { industry: { in: f.industries } } }]
-          : []),
-        ...(f.sources?.length ? [{ source: { in: f.sources } }] : []),
-      ],
-    };
+    return this.scopes.opportunity(f, user, true);
   }
   private taskWhere(
     f: AdvancedReportFiltersDto,
@@ -200,8 +162,8 @@ export class AdvancedReportsService {
   }
 
   async forecast(f: AdvancedReportFiltersDto, user: CurrentUserPayload) {
-    const { start: today, now } = await this.clock(user);
-    const defaultEnd = new Date(today.getTime() + 91 * 86_400_000);
+    const { start: today, now, timezone } = await this.clock(user);
+    const defaultEnd = addOrganizationCalendarDays(today, 90, timezone);
     const range = this.period(f, { start: today, end: defaultEnd })!;
     const all = await this.prisma.opportunity.findMany({
       where: this.opportunityWhere(f, user),
@@ -616,12 +578,15 @@ export class AdvancedReportsService {
       end: clock.start,
     };
     const range = this.period(f, defaultPeriod)!;
+    const historicalScope = this.scopes.opportunity(f, user);
     const [
       forecast,
       tasks,
       meetings,
       opportunities,
-      periodOpp,
+      createdOpportunities,
+      wonOpportunities,
+      lostOpportunities,
       overdueOpportunities,
       overdueTasks,
       pastMeetings,
@@ -635,20 +600,27 @@ export class AdvancedReportsService {
       }),
       this.prisma.opportunity.findMany({
         where: {
+          AND: [historicalScope, { createdAt: range }],
+        },
+        select: { id: true },
+      }),
+      this.prisma.opportunity.findMany({
+        where: {
           AND: [
-            {
-              organizationId: getCurrentOrganizationId(user),
-              createdAt: range,
-            },
-            ...(f.companyIds?.length
-              ? [{ companyId: { in: f.companyIds } }]
-              : []),
+            historicalScope,
+            { wonAt: range, stage: { terminalType: "WON" } },
           ],
         },
-        select: {
-          stage: { select: { terminalType: true } },
-          estimatedValue: true,
+        select: { estimatedValue: true },
+      }),
+      this.prisma.opportunity.findMany({
+        where: {
+          AND: [
+            historicalScope,
+            { lostAt: range, stage: { terminalType: "LOST" } },
+          ],
         },
+        select: { id: true },
       }),
       this.prisma.opportunity.findMany({
         where: {
@@ -710,8 +682,6 @@ export class AdvancedReportsService {
         take: 5,
       }),
     ]);
-    const won = periodOpp.filter((o) => o.stage.terminalType === "WON"),
-      lost = periodOpp.filter((o) => o.stage.terminalType === "LOST");
     const [todayMeetingCount, upcomingMeetingCount] = await Promise.all([
       this.prisma.meeting.count({
         where: {
@@ -761,11 +731,14 @@ export class AdvancedReportsService {
       },
       periodPerformance: {
         opportunities: {
-          createdCount: periodOpp.length,
-          wonCount: won.length,
-          lostCount: lost.length,
-          wonEstimatedValueIrr: this.money(won).toString(),
-          winRate: this.percent(won.length, won.length + lost.length),
+          createdCount: createdOpportunities.length,
+          wonCount: wonOpportunities.length,
+          lostCount: lostOpportunities.length,
+          wonEstimatedValueIrr: this.money(wonOpportunities).toString(),
+          winRate: this.percent(
+            wonOpportunities.length,
+            wonOpportunities.length + lostOpportunities.length,
+          ),
         },
         tasks: tasks.periodFlow,
         meetings: {

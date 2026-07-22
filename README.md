@@ -2022,6 +2022,18 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 - Validation status: 2 focused suites with 10 tests passed; the full 22-suite run with 102 tests passed; lint passed with no errors and 9 pre-existing warnings; build passed. Regression coverage includes pure pagination, normal objects, complete composite aging reports, `StreamableFile`, already standardized responses, and null responses.
 - No Prisma schema change or migration was required. No migration, destructive database command, or broad seed operation was run.
 
+### fix 000075 - Canonicalize active opportunities and correct dashboard event metrics
+
+- Fixed the production exclusion of normal active stages whose `isTerminal` is `false` and `terminalType` is `NONE`. Several independent predicates incorrectly also required `terminalType: null`, causing active lists, dashboard/forecast/aging metrics, product pipeline figures, and active-opportunity data-quality rules to see an empty population.
+- Added one canonical current active-opportunity state predicate: the opportunity is not archived, its company is not archived, and its stage has `isTerminal: false`. `isTerminal` is authoritative for current active state; `terminalType` is used only to classify terminal outcomes such as `WON` and `LOST`.
+- `OpportunitiesService`, `AdvancedReportsService`, `CommercialReportsService`, and `ReportingScopeService` now reuse the canonical predicate and shared report filtering. Organization, ownership scope, company, owner, team, stage, priority, industry, and source filters are consistently retained where applicable.
+- Corrected dashboard current active count, estimated value, weighted value, missing-value count, and missing-probability count to use the complete current active population without applying the performance date range. Decimal arithmetic remains exact and missing probability contributes zero weight.
+- Corrected dashboard period performance to query creation, success, and loss independently by `createdAt`, `wonAt`, and `lostAt`. WON/LOST terminal types validate event consistency; an opportunity created before the period and won inside it is counted as won, while an opportunity merely created inside the period is not inferred to be won.
+- Forecast, aging, overdue-opportunity attention, product active pipeline, and organization data quality now reconcile on the same active population. The default forecast contract is documented and tested as `[start of the current organization day, start + 90 organization calendar days)`, including timezone/DST-safe calendar arithmetic.
+- Important changed files include `src/common/opportunities/active-opportunity-scope.ts`, timezone boundary utilities, opportunity/report services, focused active-scope/dashboard/forecast/aging/product/data-quality tests, `README.md`, and corresponding tracked `dist` output.
+- Validation status: 7 focused suites with 20 tests passed; the full 24-suite run with 108 tests passed; lint passed with no errors and 9 pre-existing warnings; build passed.
+- No Prisma schema or migration change was required. No migration, seed, destructive database command, or production-data rewrite was run.
+
 ---
 
 **Built with ❤️ for the sales team**

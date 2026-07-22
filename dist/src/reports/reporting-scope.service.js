@@ -8,6 +8,7 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ReportingScopeService = void 0;
 const common_1 = require("@nestjs/common");
+const active_opportunity_scope_1 = require("../common/opportunities/active-opportunity-scope");
 const ownership_scope_dto_1 = require("../common/dto/ownership-scope.dto");
 const tenant_scope_util_1 = require("../common/tenant/tenant-scope.util");
 const team_scope_util_1 = require("../common/tenant/team-scope.util");
@@ -29,11 +30,8 @@ let ReportingScopeService = class ReportingScopeService {
                 {
                     organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
                     company: { archivedAt: null },
-                    ...(active && {
-                        archivedAt: null,
-                        stage: { isTerminal: false, terminalType: null },
-                    }),
                 },
+                ...(active ? [(0, active_opportunity_scope_1.activeOpportunityStateWhere)()] : []),
                 ...(f.companyIds?.length ? [{ companyId: { in: f.companyIds } }] : []),
                 ...(f.ownerIds?.length ? [{ ownerId: { in: f.ownerIds } }] : []),
                 ...(f.teams?.length ? [{ owner: (0, team_scope_util_1.userTeamFilterWhere)(f.teams) }] : []),

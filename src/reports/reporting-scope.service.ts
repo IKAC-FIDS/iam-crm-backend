@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { CurrentUserPayload } from "../common/decorators/current-user.decorator";
+import { activeOpportunityStateWhere } from "../common/opportunities/active-opportunity-scope";
 import { OwnershipScope } from "../common/dto/ownership-scope.dto";
 import { getCurrentOrganizationId } from "../common/tenant/tenant-scope.util";
 import {
@@ -34,11 +35,8 @@ export class ReportingScopeService {
         {
           organizationId: getCurrentOrganizationId(user),
           company: { archivedAt: null },
-          ...(active && {
-            archivedAt: null,
-            stage: { isTerminal: false, terminalType: null },
-          }),
         },
+        ...(active ? [activeOpportunityStateWhere()] : []),
         ...(f.companyIds?.length ? [{ companyId: { in: f.companyIds } }] : []),
         ...(f.ownerIds?.length ? [{ ownerId: { in: f.ownerIds } }] : []),
         ...(f.teams?.length ? [{ owner: userTeamFilterWhere(f.teams) }] : []),

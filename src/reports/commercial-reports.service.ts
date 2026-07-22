@@ -6,16 +6,12 @@ import {
   SalesChannel,
 } from "@prisma/client";
 import { CurrentUserPayload } from "../common/decorators/current-user.decorator";
-import { OwnershipScope } from "../common/dto/ownership-scope.dto";
 import { parseApiDateRange } from "../common/dates/api-date.util";
 import { organizationDayBounds } from "../common/dates/timezone-boundary.util";
 import { getCurrentOrganizationId } from "../common/tenant/tenant-scope.util";
-import {
-  userTeamFilterWhere,
-  userTeamScopeWhere,
-} from "../common/tenant/team-scope.util";
 import { PrismaService } from "../prisma/prisma.service";
 import { AdvancedReportFiltersDto } from "./dto/advanced-report-filters.dto";
+import { ReportingScopeService } from "./reporting-scope.service";
 
 const OUTSTANDING: PaymentStatus[] = [
   PaymentStatus.PENDING,
@@ -24,7 +20,10 @@ const OUTSTANDING: PaymentStatus[] = [
 ];
 @Injectable()
 export class CommercialReportsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly scopes: ReportingScopeService,
+  ) {}
   private decimal(value: Prisma.Decimal | string | number | null | undefined) {
     return new Prisma.Decimal(value ?? 0);
   }
@@ -50,35 +49,7 @@ export class CommercialReportsService {
     user: CurrentUserPayload,
     active = false,
   ): Prisma.OpportunityWhereInput {
-    const ownership =
-      f.ownershipScope === OwnershipScope.MINE
-        ? {
-            OR: [
-              { ownerId: user.userId },
-              { company: { ownerId: user.userId } },
-            ],
-          }
-        : f.ownershipScope === OwnershipScope.TEAM
-          ? { owner: userTeamScopeWhere(user) }
-          : f.ownershipScope === OwnershipScope.UNASSIGNED
-            ? { ownerId: null }
-            : {};
-    return {
-      AND: [
-        {
-          organizationId: getCurrentOrganizationId(user),
-          company: { archivedAt: null },
-          ...(active && {
-            archivedAt: null,
-            stage: { isTerminal: false, terminalType: null },
-          }),
-        },
-        ownership,
-        ...(f.companyIds?.length ? [{ companyId: { in: f.companyIds } }] : []),
-        ...(f.ownerIds?.length ? [{ ownerId: { in: f.ownerIds } }] : []),
-        ...(f.teams?.length ? [{ owner: userTeamFilterWhere(f.teams) }] : []),
-      ],
-    };
+    return this.scopes.opportunity(f, user, active);
   }
   private period(range: ReturnType<CommercialReportsService["range"]>) {
     return {

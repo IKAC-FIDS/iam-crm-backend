@@ -19,6 +19,7 @@ import { getCurrentOrganizationId } from '../common/tenant/tenant-scope.util';
 import { userMatchesTeam, userTeamScopeWhere } from '../common/tenant/team-scope.util';
 import { parseApiDate, parseApiDateRange } from '../common/dates/api-date.util';
 import { OwnershipScope } from '../common/dto/ownership-scope.dto';
+import { activeOpportunityStateWhere } from '../common/opportunities/active-opportunity-scope';
 
 const opportunityInclude = {
   company: {
@@ -716,7 +717,7 @@ export class OpportunitiesService {
     }
 
     if (query.activeOnly === 'true') {
-      and.push({ archivedAt: null, stage: { isTerminal: false, terminalType: null } });
+      and.push(activeOpportunityStateWhere());
     } else if (query.archivedOnly === 'true') {
       and.push({
         archivedAt: {

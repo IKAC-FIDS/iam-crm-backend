@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.zonedDateParts = zonedDateParts;
 exports.zonedMidnightUtc = zonedMidnightUtc;
 exports.organizationDayBounds = organizationDayBounds;
+exports.addOrganizationCalendarDays = addOrganizationCalendarDays;
 function zonedDateParts(date, timeZone) {
     const parts = new Intl.DateTimeFormat("en-CA", {
         timeZone,
@@ -39,5 +40,10 @@ function organizationDayBounds(now, timeZone) {
     const nextDate = new Date(Date.UTC(year, month - 1, day + 1));
     const end = zonedMidnightUtc(nextDate.getUTCFullYear(), nextDate.getUTCMonth() + 1, nextDate.getUTCDate(), timeZone);
     return { start, end };
+}
+function addOrganizationCalendarDays(date, days, timeZone) {
+    const { year, month, day } = zonedDateParts(date, timeZone);
+    const target = new Date(Date.UTC(year, month - 1, day + days));
+    return zonedMidnightUtc(target.getUTCFullYear(), target.getUTCMonth() + 1, target.getUTCDate(), timeZone);
 }
 //# sourceMappingURL=timezone-boundary.util.js.map
