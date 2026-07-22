@@ -2034,6 +2034,17 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 - Validation status: 7 focused suites with 20 tests passed; the full 24-suite run with 108 tests passed; lint passed with no errors and 9 pre-existing warnings; build passed.
 - No Prisma schema or migration change was required. No migration, seed, destructive database command, or production-data rewrite was run.
 
+### fix 000076 - Add secure post-completion meeting attachments
+
+- Added `MEETING` to `FileAttachmentEntityType` so meeting minutes and related documents reuse the existing secure polymorphic attachment records, multipart API, configured file validation, SHA-256 hashing, local/MinIO storage abstraction, protected downloads, pagination, and soft deletion. No meeting-document table, duplicated file metadata, public object URL, or meeting-completion upload was introduced.
+- Meeting attachment access now verifies the meeting by both ID and the current organization before any attachment query or storage operation. Existing `attachment:view` and `attachment:manage` controller permissions remain in force; BOARDS can list/download but cannot upload/delete, and cross-organization meeting IDs return the same not-found response without revealing tenant existence.
+- Upload and deletion mutations are allowed only when the meeting status is `COMPLETED`; `SCHEDULED` and `CANCELLED` meetings reject both operations. Completing a meeting still succeeds without an attachment, and documents remain an optional post-meeting action through the existing `/api/attachments` endpoints.
+- Preserved `attachment.uploaded`, `attachment.downloaded`, and `attachment.deleted` auditing. Meeting audit metadata identifies the target entity type/ID, original filename, MIME type, size, and existing storage-provider fields; deletion remains a database soft delete.
+- Added exactly one focused migration, `20260722120000_add_meeting_attachment_entity_type`, whose only SQL operation adds `MEETING` to the PostgreSQL `FileAttachmentEntityType` enum. No other schema object or data is changed.
+- Important changed files: `prisma/schema.prisma`, `prisma/migrations/20260722120000_add_meeting_attachment_entity_type/migration.sql`, `src/attachments/attachments.service.ts`, `test/attachments-meeting.service.spec.ts`, `README.md`, and the corresponding tracked attachment-service output under `dist`.
+- Validation status: focused attachment and meeting suites passed with 21 tests; the full configured 25-suite run passed with 124 tests; lint passed with no errors and 9 pre-existing warnings; build passed.
+- No seed, destructive database command, or unrelated meeting/report change was run. The enum-only migration above is the sole migration for this fix.
+
 ---
 
 **Built with ❤️ for the sales team**

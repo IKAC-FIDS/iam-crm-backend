@@ -147,6 +147,7 @@ enum FileAttachmentEntityType {
   COMMERCIAL_DOCUMENT
   PAYMENT
   COMPANY_LEGAL_DOCUMENT
+  MEETING
 }
 
 enum AttachmentStorageProvider {

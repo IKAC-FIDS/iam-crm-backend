@@ -10,6 +10,7 @@ import { ConfigService } from '@nestjs/config';
 import {
   FileAttachment,
   FileAttachmentEntityType,
+  MeetingStatus,
   Prisma,
   UserRole,
 } from '@prisma/client';
@@ -218,6 +219,9 @@ export class AttachmentsService {
       metadata: {
         attachedToEntityType: attachment.entityType,
         attachedToEntityId: attachment.entityId,
+        originalFileName: attachment.originalFileName,
+        mimeType: attachment.mimeType,
+        sizeBytes: attachment.sizeBytes,
         storageProvider: attachment.storageProvider,
         bucket: attachment.bucket,
         objectKey: attachment.objectKey,
@@ -283,6 +287,8 @@ export class AttachmentsService {
           attachedToEntityType: attachment.entityType,
           attachedToEntityId: attachment.entityId,
           originalFileName: attachment.originalFileName,
+          mimeType: attachment.mimeType,
+          sizeBytes: attachment.sizeBytes,
           storageProvider: attachment.storageProvider,
           bucket: attachment.bucket,
           objectKey: attachment.objectKey,
@@ -445,6 +451,30 @@ export class AttachmentsService {
       if (!document) {
         throw new NotFoundException('Company legal document not found');
       }
+      return;
+    }
+
+    if (entityType === FileAttachmentEntityType.MEETING) {
+      const meeting = await this.prisma.meeting.findFirst({
+        where: {
+          id: entityId,
+          organizationId: getCurrentOrganizationId(user),
+        },
+        select: {
+          status: true,
+        },
+      });
+
+      if (!meeting) {
+        throw new NotFoundException('Meeting not found');
+      }
+
+      if (mutation && meeting.status !== MeetingStatus.COMPLETED) {
+        throw new BadRequestException(
+          'بارگذاری مستندات فقط برای جلسات برگزارشده امکان‌پذیر است.',
+        );
+      }
+
       return;
     }
 

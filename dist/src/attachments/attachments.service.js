@@ -11,23 +11,26 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
+var AttachmentsService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AttachmentsService = void 0;
 const common_1 = require("@nestjs/common");
 const config_1 = require("@nestjs/config");
 const client_1 = require("@prisma/client");
 const tenant_scope_util_1 = require("../common/tenant/tenant-scope.util");
+const team_scope_util_1 = require("../common/tenant/team-scope.util");
 const node_crypto_1 = require("node:crypto");
 const node_path_1 = require("node:path");
 const audit_log_service_1 = require("../audit-log/audit-log.service");
 const prisma_service_1 = require("../prisma/prisma.service");
 const attachment_storage_types_1 = require("./storage/attachment-storage.types");
-let AttachmentsService = class AttachmentsService {
+let AttachmentsService = AttachmentsService_1 = class AttachmentsService {
     constructor(prisma, config, audit, storage) {
         this.prisma = prisma;
         this.config = config;
         this.audit = audit;
         this.storage = storage;
+        this.logger = new common_1.Logger(AttachmentsService_1.name);
     }
     async findAll(query, user) {
         await this.assertEntityAccess(query.entityType, query.entityId, user);
@@ -128,21 +131,11 @@ let AttachmentsService = class AttachmentsService {
     async getDownloadStream(id, user) {
         const attachment = await this.getActiveAttachment(id, user);
         await this.assertEntityAccess(attachment.entityType, attachment.entityId, user);
-        const stream = await this.storage.getStream(attachment.objectKey, attachment.storagePath);
-        await this.audit.record({
-            actorId: user.userId,
-            entityType: 'file-attachment',
-            entityId: attachment.id,
-            action: 'attachment.downloaded',
-            metadata: {
-                attachedToEntityType: attachment.entityType,
-                attachedToEntityId: attachment.entityId,
-                originalFileName: attachment.originalFileName,
-                storageProvider: attachment.storageProvider,
-                bucket: attachment.bucket,
-                objectKey: attachment.objectKey,
-            },
-        });
+        if (!attachment.objectKey) {
+            throw new common_1.BadRequestException('Attachment does not have a stored file available for download');
+        }
+        const stream = await this.storage.getStream(attachment.objectKey, attachment.storagePath, attachment.bucket);
+        await this.recordDownloadAudit(attachment, user);
         return {
             attachment,
             stream,
@@ -168,6 +161,9 @@ let AttachmentsService = class AttachmentsService {
             metadata: {
                 attachedToEntityType: attachment.entityType,
                 attachedToEntityId: attachment.entityId,
+                originalFileName: attachment.originalFileName,
+                mimeType: attachment.mimeType,
+                sizeBytes: attachment.sizeBytes,
                 storageProvider: attachment.storageProvider,
                 bucket: attachment.bucket,
                 objectKey: attachment.objectKey,
@@ -201,9 +197,43 @@ let AttachmentsService = class AttachmentsService {
             throw new common_1.BadRequestException('فایل خالی است');
         }
     }
+    async recordDownloadAudit(attachment, user) {
+        try {
+            await this.audit.record({
+                actorId: user.userId,
+                entityType: 'file-attachment',
+                entityId: attachment.id,
+                action: 'attachment.downloaded',
+                metadata: {
+                    attachedToEntityType: attachment.entityType,
+                    attachedToEntityId: attachment.entityId,
+                    originalFileName: attachment.originalFileName,
+                    mimeType: attachment.mimeType,
+                    sizeBytes: attachment.sizeBytes,
+                    storageProvider: attachment.storageProvider,
+                    bucket: attachment.bucket,
+                    objectKey: attachment.objectKey,
+                },
+            });
+        }
+        catch (error) {
+            this.logger.error(`Failed to record download audit for attachment ${attachment.id}`, error instanceof Error ? error.stack : String(error));
+        }
+    }
     getAllowedMimeTypes() {
         return this.config
-            .get('ALLOWED_ATTACHMENT_MIME_TYPES', 'application/pdf,image/jpeg,image/png,image/webp,text/plain,text/csv')
+            .get('ALLOWED_ATTACHMENT_MIME_TYPES', [
+            'application/pdf',
+            'image/png',
+            'image/jpeg',
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'image/webp',
+            'text/plain',
+            'text/csv',
+        ].join(','))
             .split(',')
             .map((item) => item.trim())
             .filter(Boolean);
@@ -291,6 +321,39 @@ let AttachmentsService = class AttachmentsService {
             }
             return;
         }
+        if (entityType === client_1.FileAttachmentEntityType.COMPANY_LEGAL_DOCUMENT) {
+            const document = await this.prisma.companyLegalDocument.findFirst({
+                where: {
+                    id: entityId,
+                    company: {
+                        organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
+                        archivedAt: null,
+                    },
+                },
+            });
+            if (!document) {
+                throw new common_1.NotFoundException('Company legal document not found');
+            }
+            return;
+        }
+        if (entityType === client_1.FileAttachmentEntityType.MEETING) {
+            const meeting = await this.prisma.meeting.findFirst({
+                where: {
+                    id: entityId,
+                    organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
+                },
+                select: {
+                    status: true,
+                },
+            });
+            if (!meeting) {
+                throw new common_1.NotFoundException('Meeting not found');
+            }
+            if (mutation && meeting.status !== client_1.MeetingStatus.COMPLETED) {
+                throw new common_1.BadRequestException('بارگذاری مستندات فقط برای جلسات برگزارشده امکان‌پذیر است.');
+            }
+            return;
+        }
         throw new common_1.BadRequestException('Unsupported attachment entity type');
     }
     opportunityScopeWhere(user) {
@@ -298,12 +361,10 @@ let AttachmentsService = class AttachmentsService {
             return {};
         }
         if (user.role === client_1.UserRole.MANAGER) {
-            return user.team
+            return user.teamId || user.team
                 ? {
                     company: {
-                        owner: {
-                            team: user.team,
-                        },
+                        owner: (0, team_scope_util_1.userTeamScopeWhere)(user),
                     },
                 }
                 : {
@@ -327,7 +388,7 @@ let AttachmentsService = class AttachmentsService {
     }
 };
 exports.AttachmentsService = AttachmentsService;
-exports.AttachmentsService = AttachmentsService = __decorate([
+exports.AttachmentsService = AttachmentsService = AttachmentsService_1 = __decorate([
     (0, common_1.Injectable)(),
     __param(3, (0, common_1.Inject)(attachment_storage_types_1.ATTACHMENT_STORAGE)),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
