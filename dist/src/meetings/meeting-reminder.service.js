@@ -15,6 +15,7 @@ const common_1 = require("@nestjs/common");
 const schedule_1 = require("@nestjs/schedule");
 const client_1 = require("@prisma/client");
 const prisma_service_1 = require("../prisma/prisma.service");
+const DEFAULT_ORGANIZATION_TIME_ZONE = 'Asia/Tehran';
 let MeetingReminderService = MeetingReminderService_1 = class MeetingReminderService {
     constructor(prisma) {
         this.prisma = prisma;
@@ -26,10 +27,41 @@ let MeetingReminderService = MeetingReminderService_1 = class MeetingReminderSer
                 const locked = await tx.$queryRaw(client_1.Prisma.sql `SELECT pg_try_advisory_xact_lock(73644291) AS locked`);
                 if (!locked[0]?.locked)
                     return;
-                const due = await tx.meeting.findMany({ where: { status: client_1.MeetingStatus.SCHEDULED, reminderAt: { lte: new Date() }, reminderSentAt: null }, include: { assignees: { select: { userId: true } } }, take: 100, orderBy: { reminderAt: 'asc' } });
+                const due = await tx.meeting.findMany({
+                    where: {
+                        status: client_1.MeetingStatus.SCHEDULED,
+                        reminderAt: { lte: new Date() },
+                        reminderSentAt: null,
+                    },
+                    include: {
+                        assignees: { select: { userId: true } },
+                        organization: { select: { timezone: true } },
+                    },
+                    take: 100,
+                    orderBy: { reminderAt: 'asc' },
+                });
                 for (const meeting of due) {
                     const recipientIds = [...new Set([meeting.organizerId, ...meeting.assignees.map(a => a.userId)])];
-                    await tx.notification.createMany({ data: recipientIds.map(recipientId => ({ organizationId: meeting.organizationId, recipientId, type: client_1.NotificationType.MEETING_REMINDER, title: 'یادآوری جلسه', body: `جلسه «${meeting.title}» در تاریخ ${meeting.startAt.toISOString()} برگزار می‌شود.`, entityType: client_1.NotificationEntityType.MEETING, entityId: meeting.id, actionUrl: `/meetings/${meeting.id}` })) });
+                    const metadata = {
+                        meetingTitle: meeting.title,
+                        meetingStartAt: meeting.startAt.toISOString(),
+                        meetingEndAt: meeting.endAt.toISOString(),
+                        reminderAt: meeting.reminderAt?.toISOString() ?? null,
+                        organizationTimeZone: this.organizationTimeZone(meeting.organization.timezone),
+                    };
+                    await tx.notification.createMany({
+                        data: recipientIds.map(recipientId => ({
+                            organizationId: meeting.organizationId,
+                            recipientId,
+                            type: client_1.NotificationType.MEETING_REMINDER,
+                            title: 'یادآوری جلسه',
+                            body: `جلسه «${meeting.title}» به‌زودی برگزار می‌شود.`,
+                            entityType: client_1.NotificationEntityType.MEETING,
+                            entityId: meeting.id,
+                            actionUrl: `/meetings/${meeting.id}`,
+                            metadata: { ...metadata },
+                        })),
+                    });
                     await tx.meeting.update({ where: { id: meeting.id }, data: { reminderSentAt: new Date() } });
                     await tx.auditLog.create({ data: { organizationId: meeting.organizationId, entityType: 'meeting', entityId: meeting.id, action: 'meeting.reminder_sent', metadata: { recipientCount: recipientIds.length } } });
                 }
@@ -37,6 +69,19 @@ let MeetingReminderService = MeetingReminderService_1 = class MeetingReminderSer
         }
         catch (error) {
             this.logger.error('Meeting reminder processing failed', error instanceof Error ? error.stack : undefined);
+        }
+    }
+    organizationTimeZone(value) {
+        const timeZone = value?.trim();
+        if (!timeZone) {
+            return DEFAULT_ORGANIZATION_TIME_ZONE;
+        }
+        try {
+            new Intl.DateTimeFormat('en-US', { timeZone }).format();
+            return timeZone;
+        }
+        catch {
+            return DEFAULT_ORGANIZATION_TIME_ZONE;
         }
     }
 };

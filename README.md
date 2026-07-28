@@ -2045,6 +2045,17 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 - Validation status: focused attachment and meeting suites passed with 21 tests; the full configured 25-suite run passed with 124 tests; lint passed with no errors and 9 pre-existing warnings; build passed.
 - No seed, destructive database command, or unrelated meeting/report change was run. The enum-only migration above is the sole migration for this fix.
 
+### fix 000077 - Add structured meeting-reminder time metadata
+
+- Fixed meeting reminders exposing `meeting.startAt.toISOString()` directly in the user-facing Persian notification body. A raw UTC timestamp cannot be reliably presented in the end user's browser timezone and is no longer embedded or preformatted by the backend.
+- New `MEETING_REMINDER` notifications use the neutral body `جلسه «${meeting.title}» به‌زودی برگزار می‌شود.` so title-based notification search remains compatible without storing a backend-formatted local date.
+- Added one typed internal meeting-reminder metadata contract containing `meetingTitle`, UTC ISO-8601 `meetingStartAt`, UTC ISO-8601 `meetingEndAt`, nullable UTC ISO-8601 `reminderAt`, and `organizationTimeZone`. The organization timezone is read with each due meeting and stored only as display metadata; missing, blank, or invalid values fall back to `Asia/Tehran` without changing stored UTC instants.
+- Preserved scheduled/due/unprocessed filtering, the transaction-level advisory lock, 100-record batch limit, organizer/assignee recipient deduplication, tenant organization IDs, atomic notification creation plus `reminderSentAt` update, audit logging, `MEETING_REMINDER`/`MEETING` types, and `/meetings/:id` action URLs.
+- Existing notification APIs continue returning JSON metadata unchanged and continue searching title/body only. Historical notification rows and legacy bodies remain untouched for frontend compatibility.
+- Important changed files: `src/meetings/meeting-reminder.service.ts`, `test/meeting-reminder.service.spec.ts`, `test/notifications.service.spec.ts`, `README.md`, and the corresponding tracked reminder-service output under `dist`.
+- Validation status: focused meeting-reminder, notification, and meeting suites passed with 16 tests; the full configured 27-suite run passed with 135 tests; lint passed with no errors and 9 pre-existing warnings; build passed.
+- No Prisma schema change or migration was required or created. No seed, destructive database command, historical notification rewrite, or unrelated notification-type change was performed.
+
 ---
 
 **Built with ❤️ for the sales team**
