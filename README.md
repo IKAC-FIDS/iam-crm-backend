@@ -2056,6 +2056,17 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 - Validation status: focused meeting-reminder, notification, and meeting suites passed with 16 tests; the full configured 27-suite run passed with 135 tests; lint passed with no errors and 9 pre-existing warnings; build passed.
 - No Prisma schema change or migration was required or created. No seed, destructive database command, historical notification rewrite, or unrelated notification-type change was performed.
 
+### fix 000078 - Add normalized company central phone support
+
+- Reused the existing nullable `Company.centralPhone` field for one primary company switchboard number and exposed it through company create/update DTOs. Full Prisma company records already returned the field from create, update, list, and detail endpoints, so no response mapper or field removal was needed.
+- Added one shared company-phone normalizer that converts Persian and Arabic digits to English, removes surrounding/internal whitespace, hyphens, and parentheses, and preserves a leading zero or optional leading `+`. Phone values remain strings and are validated after normalization against the conservative `^\\+?\\d{5,20}$` format without country-specific length or uniqueness rules.
+- Company creation persists the normalized value while an omitted phone remains unset/null. Updates normalize changed values, retain the stored value when the field is omitted, and clear it when an explicit `null` or supported empty input is supplied; audit before/after records continue receiving full company data naturally.
+- Company-list search continues matching legal name, brand name, industry, city, and source. Phone-like search input is additionally normalized before matching `centralPhone`, no empty `contains` clause is added, and the existing organization scope remains mandatory.
+- Duplicate central switchboard numbers remain allowed. Person contacts and company-branch phone behavior were not changed.
+- Important changed files: `src/companies/company-phone.util.ts`, `src/companies/dto/create-company.dto.ts`, `src/companies/companies.service.ts`, `test/company-central-phone.spec.ts`, `README.md`, and corresponding tracked company build output under `dist`.
+- Validation status: focused company suites passed with 32 tests; the full configured 28-suite run passed with 151 tests; lint passed with no errors and 9 pre-existing warnings; build passed.
+- No Prisma schema change or migration was required or created. No uniqueness constraint, seed, destructive database command, person-contact change, or branch-phone change was performed.
+
 ---
 
 **Built with ❤️ for the sales team**

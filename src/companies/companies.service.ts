@@ -19,6 +19,10 @@ import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import { CompanyAccessService } from './company-access.service';
 import { FindCompanyOptionsDto } from './dto/find-company-options.dto';
+import {
+  isPhoneLikeSearch,
+  normalizeCompanyPhone,
+} from './company-phone.util';
 
 const companyOptionSelect = {
   id: true,
@@ -179,6 +183,7 @@ export class CompaniesService {
 
     if (filters?.search?.trim()) {
       const search = filters.search.trim();
+      const normalizedPhoneSearch = normalizeCompanyPhone(search);
 
       where.OR = [
         { legalName: { contains: search, mode: 'insensitive' } },
@@ -189,6 +194,12 @@ export class CompaniesService {
         { sourceRef: { name: { contains: search, mode: 'insensitive' } } },
         { sourceRef: { code: { contains: search, mode: 'insensitive' } } },
       ];
+
+      if (isPhoneLikeSearch(normalizedPhoneSearch)) {
+        where.OR.push({
+          centralPhone: { contains: normalizedPhoneSearch },
+        });
+      }
     }
 
     if (filters?.archivedOnly) {
@@ -283,7 +294,7 @@ export class CompaniesService {
       throw new ForbiddenException('شما اجازه ایجاد شرکت را ندارید');
     }
 
-    const { industryId, industry, sourceId, source, parentCompanyIds, subsidiaryCompanyIds, establishmentDate, registeredCapital, ...companyData } = dto;
+    const { industryId, industry, sourceId, source, parentCompanyIds, subsidiaryCompanyIds, establishmentDate, registeredCapital, centralPhone, ...companyData } = dto;
 
     const normalizedRefs = await this.resolveCompanyReferences({
       industryId,
@@ -302,6 +313,7 @@ export class CompaniesService {
     const company = await this.prisma.$transaction(async (tx) => {
       const created = await tx.company.create({ data: {
           ...companyData,
+          centralPhone: normalizeCompanyPhone(centralPhone),
           establishmentDate: establishmentDate ? parseApiDate(establishmentDate, 'establishmentDate') : undefined,
           registeredCapital: registeredCapital !== undefined ? new Prisma.Decimal(registeredCapital) : undefined,
           industryId: normalizedRefs.industryId, industry: normalizedRefs.industryName,
@@ -337,13 +349,16 @@ export class CompaniesService {
 
     await this.companyAccess.assertCompanyMutable(id, user);
 
-    const { industryId, industry, sourceId, source, parentCompanyIds, subsidiaryCompanyIds, establishmentDate, registeredCapital, ...companyData } = dto;
+    const { industryId, industry, sourceId, source, parentCompanyIds, subsidiaryCompanyIds, establishmentDate, registeredCapital, centralPhone, ...companyData } = dto;
 
     const updateData: Prisma.CompanyUncheckedUpdateInput = {
       ...companyData,
     };
     if (establishmentDate !== undefined) updateData.establishmentDate = establishmentDate ? parseApiDate(establishmentDate, 'establishmentDate') : null;
     if (registeredCapital !== undefined) updateData.registeredCapital = new Prisma.Decimal(registeredCapital);
+    if (centralPhone !== undefined) {
+      updateData.centralPhone = normalizeCompanyPhone(centralPhone);
+    }
 
     if (industryId !== undefined || industry !== undefined) {
       const normalizedIndustry = await this.resolveIndustryReference(

@@ -13,41 +13,109 @@ exports.CompaniesService = void 0;
 const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
 const audit_log_service_1 = require("../audit-log/audit-log.service");
+const ownership_scope_dto_1 = require("../common/dto/ownership-scope.dto");
 const tenant_scope_util_1 = require("../common/tenant/tenant-scope.util");
+const api_date_util_1 = require("../common/dates/api-date.util");
+const team_scope_util_1 = require("../common/tenant/team-scope.util");
 const prisma_service_1 = require("../prisma/prisma.service");
+const company_access_service_1 = require("./company-access.service");
+const company_phone_util_1 = require("./company-phone.util");
+const companyOptionSelect = {
+    id: true,
+    legalName: true,
+    brandName: true,
+    nationalId: true,
+    registrationNumber: true,
+    economicCode: true,
+    parentCompanyId: true,
+};
 let CompaniesService = class CompaniesService {
-    constructor(prisma, audit) {
+    constructor(prisma, audit, companyAccess) {
         this.prisma = prisma;
         this.audit = audit;
+        this.companyAccess = companyAccess;
+    }
+    async findOptions(user, query) {
+        const page = query.page ?? 1;
+        const limit = query.limit ?? 25;
+        const search = query.search?.trim();
+        const where = {
+            organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
+            ...(!query.includeArchived && { archivedAt: null }),
+            ...(query.excludeId && { id: { not: query.excludeId } }),
+        };
+        if (query.selectedId) {
+            where.id = query.excludeId
+                ? { equals: query.selectedId, not: query.excludeId }
+                : query.selectedId;
+        }
+        else if (search) {
+            where.OR = [
+                { legalName: { contains: search, mode: 'insensitive' } },
+                { brandName: { contains: search, mode: 'insensitive' } },
+                { nationalId: { contains: search, mode: 'insensitive' } },
+                { registrationNumber: { contains: search, mode: 'insensitive' } },
+                { economicCode: { contains: search, mode: 'insensitive' } },
+            ];
+        }
+        const [data, total] = await Promise.all([
+            this.prisma.company.findMany({
+                where,
+                select: companyOptionSelect,
+                orderBy: [
+                    { brandName: 'asc' },
+                    { legalName: 'asc' },
+                    { createdAt: 'desc' },
+                    { id: 'asc' },
+                ],
+                skip: (page - 1) * limit,
+                take: limit,
+            }),
+            this.prisma.company.count({ where }),
+        ]);
+        const totalPages = Math.ceil(total / limit);
+        return {
+            data,
+            meta: {
+                total,
+                page,
+                limit,
+                totalPages,
+                hasNext: page < totalPages,
+                hasPrevious: page > 1,
+            },
+        };
+    }
+    async findOption(id, user) {
+        const company = await this.prisma.company.findFirst({
+            where: {
+                id,
+                organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
+            },
+            select: companyOptionSelect,
+        });
+        if (!company)
+            throw new common_1.NotFoundException('Company not found');
+        return company;
     }
     async findAll(user, pagination, filters) {
         const page = pagination.page ?? 1;
         const limit = pagination.limit ?? 20;
         const skip = (page - 1) * limit;
-        let where = {
+        const where = {
             organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
         };
-        if (user.role === client_1.UserRole.REP) {
+        const ownershipScope = filters?.ownershipScope ?? ownership_scope_dto_1.OwnershipScope.ALL;
+        if (ownershipScope === ownership_scope_dto_1.OwnershipScope.MINE) {
             where.ownerId = user.userId;
         }
-        else if (user.role === client_1.UserRole.MANAGER) {
-            if (user.team) {
-                where.owner = { team: user.team };
-            }
-            else {
-                where = {
-                    organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
-                    id: { in: [] },
-                };
-            }
+        else if (ownershipScope === ownership_scope_dto_1.OwnershipScope.TEAM) {
+            where.owner = (0, team_scope_util_1.userTeamScopeWhere)(user);
         }
-        else if (user.role === client_1.UserRole.BOARDS) {
-            where = {
-                organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
-                id: { in: [] },
-            };
+        else if (ownershipScope === ownership_scope_dto_1.OwnershipScope.UNASSIGNED) {
+            where.ownerId = null;
         }
-        if (filters?.withoutOwner && user.role !== client_1.UserRole.REP) {
+        if (filters?.withoutOwner) {
             where.ownerId = null;
         }
         if (filters?.stage) {
@@ -75,12 +143,11 @@ let CompaniesService = class CompaniesService {
             };
         }
         if (filters?.ownerId) {
-            if (user.role === client_1.UserRole.ADMIN || user.role === client_1.UserRole.MANAGER) {
-                where.ownerId = filters.ownerId;
-            }
+            where.ownerId = filters.ownerId;
         }
         if (filters?.search?.trim()) {
             const search = filters.search.trim();
+            const normalizedPhoneSearch = (0, company_phone_util_1.normalizeCompanyPhone)(search);
             where.OR = [
                 { legalName: { contains: search, mode: 'insensitive' } },
                 { brandName: { contains: search, mode: 'insensitive' } },
@@ -90,6 +157,11 @@ let CompaniesService = class CompaniesService {
                 { sourceRef: { name: { contains: search, mode: 'insensitive' } } },
                 { sourceRef: { code: { contains: search, mode: 'insensitive' } } },
             ];
+            if ((0, company_phone_util_1.isPhoneLikeSearch)(normalizedPhoneSearch)) {
+                where.OR.push({
+                    centralPhone: { contains: normalizedPhoneSearch },
+                });
+            }
         }
         if (filters?.archivedOnly) {
             where.archivedAt = { not: null };
@@ -145,9 +217,6 @@ let CompaniesService = class CompaniesService {
         };
     }
     async findOne(id, user) {
-        if (user.role === client_1.UserRole.BOARDS) {
-            throw new common_1.ForbiddenException('شما دسترسی به شرکت‌ها را ندارید');
-        }
         const company = await this.prisma.company.findFirst({
             where: { id, organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user) },
             include: {
@@ -167,18 +236,20 @@ let CompaniesService = class CompaniesService {
                     },
                     orderBy: { updatedAt: 'desc' },
                 },
+                parentRelations: { include: { parentCompany: true } },
+                subsidiaryRelations: { include: { subsidiaryCompany: true } },
+                legalDocuments: { orderBy: { createdAt: 'desc' } },
             },
         });
         if (!company)
             throw new common_1.NotFoundException('شرکت پیدا نشد');
-        this.assertAccess(company, user);
-        return company;
+        return this.withHierarchy(company);
     }
     async create(dto, user) {
         if (user.role === client_1.UserRole.BOARDS) {
             throw new common_1.ForbiddenException('شما اجازه ایجاد شرکت را ندارید');
         }
-        const { industryId, industry, sourceId, source, ...companyData } = dto;
+        const { industryId, industry, sourceId, source, parentCompanyIds, subsidiaryCompanyIds, establishmentDate, registeredCapital, centralPhone, ...companyData } = dto;
         const normalizedRefs = await this.resolveCompanyReferences({
             industryId,
             industry,
@@ -189,21 +260,20 @@ let CompaniesService = class CompaniesService {
         if (dto.ownerId) {
             await this.assertOwnerInOrganization(dto.ownerId, user);
         }
-        const company = await this.prisma.company.create({
-            data: {
-                ...companyData,
-                industryId: normalizedRefs.industryId,
-                industry: normalizedRefs.industryName,
-                sourceId: normalizedRefs.sourceId,
-                source: normalizedRefs.sourceCode,
-                ownerId: dto.ownerId ?? user.userId,
-                organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
-            },
-            include: {
-                owner: { select: { id: true, fullName: true, team: true } },
-                industryRef: true,
-                sourceRef: true,
-            },
+        const organizationId = (0, tenant_scope_util_1.getCurrentOrganizationId)(user);
+        await this.validateRelatedCompanies([...new Set([...(parentCompanyIds ?? []), ...(subsidiaryCompanyIds ?? [])])], organizationId);
+        const company = await this.prisma.$transaction(async (tx) => {
+            const created = await tx.company.create({ data: {
+                    ...companyData,
+                    centralPhone: (0, company_phone_util_1.normalizeCompanyPhone)(centralPhone),
+                    establishmentDate: establishmentDate ? (0, api_date_util_1.parseApiDate)(establishmentDate, 'establishmentDate') : undefined,
+                    registeredCapital: registeredCapital !== undefined ? new client_1.Prisma.Decimal(registeredCapital) : undefined,
+                    industryId: normalizedRefs.industryId, industry: normalizedRefs.industryName,
+                    sourceId: normalizedRefs.sourceId, source: normalizedRefs.sourceCode,
+                    ownerId: dto.ownerId ?? null, organizationId,
+                } });
+            await this.replaceHierarchy(tx, created.id, parentCompanyIds ?? [], subsidiaryCompanyIds ?? []);
+            return tx.company.findUniqueOrThrow({ where: { id: created.id }, include: this.companySummaryInclude() });
         });
         await this.audit.record({
             actorId: user.userId,
@@ -213,7 +283,7 @@ let CompaniesService = class CompaniesService {
             action: 'company.created',
             after: company,
         });
-        return company;
+        return this.withHierarchy(company);
     }
     async update(id, dto, user) {
         if (user.role === client_1.UserRole.BOARDS) {
@@ -224,11 +294,18 @@ let CompaniesService = class CompaniesService {
         });
         if (!company)
             throw new common_1.NotFoundException('شرکت پیدا نشد');
-        this.assertAccess(company, user);
-        const { industryId, industry, sourceId, source, ...companyData } = dto;
+        await this.companyAccess.assertCompanyMutable(id, user);
+        const { industryId, industry, sourceId, source, parentCompanyIds, subsidiaryCompanyIds, establishmentDate, registeredCapital, centralPhone, ...companyData } = dto;
         const updateData = {
             ...companyData,
         };
+        if (establishmentDate !== undefined)
+            updateData.establishmentDate = establishmentDate ? (0, api_date_util_1.parseApiDate)(establishmentDate, 'establishmentDate') : null;
+        if (registeredCapital !== undefined)
+            updateData.registeredCapital = new client_1.Prisma.Decimal(registeredCapital);
+        if (centralPhone !== undefined) {
+            updateData.centralPhone = (0, company_phone_util_1.normalizeCompanyPhone)(centralPhone);
+        }
         if (industryId !== undefined || industry !== undefined) {
             const normalizedIndustry = await this.resolveIndustryReference(industryId, industry);
             updateData.industryId = normalizedIndustry.industryId;
@@ -239,14 +316,19 @@ let CompaniesService = class CompaniesService {
             updateData.sourceId = normalizedSource.sourceId;
             updateData.source = normalizedSource.sourceCode;
         }
-        const updated = await this.prisma.company.update({
-            where: { id },
-            data: updateData,
-            include: {
-                owner: { select: { id: true, fullName: true, team: true } },
-                industryRef: true,
-                sourceRef: true,
-            },
+        const organizationId = (0, tenant_scope_util_1.getCurrentOrganizationId)(user);
+        const relationIds = [...new Set([...(parentCompanyIds ?? []), ...(subsidiaryCompanyIds ?? [])])];
+        if (relationIds.includes(id))
+            throw new common_1.BadRequestException('A company cannot be related to itself');
+        await this.validateRelatedCompanies(relationIds, organizationId);
+        const updated = await this.prisma.$transaction(async (tx) => {
+            await tx.company.update({ where: { id }, data: updateData });
+            if (parentCompanyIds !== undefined || subsidiaryCompanyIds !== undefined) {
+                const currentParents = parentCompanyIds ?? (await tx.companyHierarchyRelation.findMany({ where: { subsidiaryCompanyId: id }, select: { parentCompanyId: true } })).map((item) => item.parentCompanyId);
+                const currentSubsidiaries = subsidiaryCompanyIds ?? (await tx.companyHierarchyRelation.findMany({ where: { parentCompanyId: id }, select: { subsidiaryCompanyId: true } })).map((item) => item.subsidiaryCompanyId);
+                await this.replaceHierarchy(tx, id, currentParents, currentSubsidiaries);
+            }
+            return tx.company.findUniqueOrThrow({ where: { id }, include: this.companySummaryInclude() });
         });
         await this.audit.record({
             actorId: user.userId,
@@ -257,7 +339,7 @@ let CompaniesService = class CompaniesService {
             before: company,
             after: updated,
         });
-        return updated;
+        return this.withHierarchy(updated);
     }
     async changeOwner(id, dto, user) {
         if (user.role === client_1.UserRole.BOARDS) {
@@ -269,7 +351,7 @@ let CompaniesService = class CompaniesService {
         });
         if (!company)
             throw new common_1.NotFoundException('شرکت پیدا نشد');
-        await this.assertChangeOwnerAccess(company, user);
+        await this.companyAccess.assertCompanyMutable(id, user);
         const newOwner = await this.prisma.user.findUnique({
             where: { id: dto.newOwnerId },
         });
@@ -282,8 +364,11 @@ let CompaniesService = class CompaniesService {
             throw new common_1.BadRequestException('کاربر جدید باید نقش REP یا MANAGER داشته باشد');
         }
         if (newOwner.role === client_1.UserRole.MANAGER) {
-            const companyTeam = company.owner?.team;
-            if (companyTeam && newOwner.team !== companyTeam) {
+            if (company.owner && !(0, team_scope_util_1.userMatchesTeam)(newOwner, {
+                ...user,
+                teamId: company.owner.teamId,
+                team: company.owner.team,
+            })) {
                 throw new common_1.BadRequestException('مدیر فروش باید در همان تیم شرکت باشد');
             }
         }
@@ -305,11 +390,11 @@ let CompaniesService = class CompaniesService {
     async archive(id, dto, user) {
         const company = await this.prisma.company.findFirst({
             where: { id, organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user) },
-            include: { owner: { select: { team: true } } },
+            include: { owner: { select: { team: true, teamId: true } } },
         });
         if (!company)
             throw new common_1.NotFoundException('شرکت پیدا نشد');
-        this.assertArchiveAccess(company, user);
+        await this.companyAccess.assertCompanyMutable(id, user);
         if (company.archivedAt) {
             throw new common_1.BadRequestException('شرکت قبلاً بایگانی شده است');
         }
@@ -335,11 +420,11 @@ let CompaniesService = class CompaniesService {
     async restore(id, user) {
         const company = await this.prisma.company.findFirst({
             where: { id, organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user) },
-            include: { owner: { select: { team: true } } },
+            include: { owner: { select: { team: true, teamId: true } } },
         });
         if (!company)
             throw new common_1.NotFoundException('شرکت پیدا نشد');
-        this.assertArchiveAccess(company, user);
+        await this.companyAccess.assertCompanyMutable(id, user, { allowArchived: true });
         if (!company.archivedAt) {
             throw new common_1.BadRequestException('شرکت بایگانی نشده است');
         }
@@ -388,13 +473,16 @@ let CompaniesService = class CompaniesService {
             throw new common_1.BadRequestException('هیچ شرکتی با این شناسه‌ها پیدا نشد');
         }
         for (const company of companies) {
-            await this.assertChangeOwnerAccess(company, user);
+            await this.companyAccess.assertCompanyMutable(company.id, user);
         }
         if (newOwner.role === client_1.UserRole.MANAGER) {
             for (const company of companies) {
-                const companyTeam = company.owner?.team;
-                if (companyTeam && newOwner.team !== companyTeam) {
-                    throw new common_1.BadRequestException(`شرکت ${company.legalName} در تیم ${companyTeam} است اما مدیر جدید در تیم ${newOwner.team} است`);
+                if (company.owner && !(0, team_scope_util_1.userMatchesTeam)(newOwner, {
+                    ...user,
+                    teamId: company.owner.teamId,
+                    team: company.owner.team,
+                })) {
+                    throw new common_1.BadRequestException(`شرکت ${company.legalName} در تیم دیگری است و مدیر جدید عضو همان تیم نیست`);
                 }
             }
         }
@@ -419,42 +507,6 @@ let CompaniesService = class CompaniesService {
             message: `${result.count} شرکت با موفقیت به کاربر ${newOwner.fullName} اختصاص یافت`,
             updatedCount: result.count,
         };
-    }
-    assertAccess(company, user) {
-        if (user.role === client_1.UserRole.BOARDS) {
-            throw new common_1.ForbiddenException('شما دسترسی به شرکت‌ها را ندارید');
-        }
-        if (user.role === client_1.UserRole.REP && company.ownerId !== user.userId) {
-            throw new common_1.ForbiddenException('شما به این شرکت دسترسی ندارید');
-        }
-    }
-    assertArchiveAccess(company, user) {
-        if (user.role === client_1.UserRole.ADMIN)
-            return;
-        if (user.role === client_1.UserRole.MANAGER &&
-            user.team &&
-            company.owner?.team === user.team) {
-            return;
-        }
-        throw new common_1.ForbiddenException('شما اجازه بایگانی یا بازیابی این شرکت را ندارید');
-    }
-    async assertChangeOwnerAccess(company, user) {
-        if (user.role === client_1.UserRole.BOARDS) {
-            throw new common_1.ForbiddenException('شما اجازه تغییر مالکیت شرکت را ندارید');
-        }
-        if (user.role === client_1.UserRole.ADMIN)
-            return;
-        if (user.role === client_1.UserRole.MANAGER) {
-            if (!company.ownerId) {
-                throw new common_1.ForbiddenException('فقط ادمین می‌تواند مالکیت شرکت‌های بدون مالک را تغییر دهد');
-            }
-            const companyTeam = company.owner?.team;
-            if (!companyTeam || companyTeam !== user.team) {
-                throw new common_1.ForbiddenException('شما فقط می‌توانید شرکت‌های تیم خود را تغییر دهید');
-            }
-            return;
-        }
-        throw new common_1.ForbiddenException('شما اجازه تغییر مالکیت شرکت‌ها را ندارید');
     }
     async assertOwnerInOrganization(ownerId, user) {
         const owner = await this.prisma.user.findFirst({
@@ -570,11 +622,118 @@ let CompaniesService = class CompaniesService {
             sourceCode: null,
         };
     }
+    companySummaryInclude() {
+        return {
+            owner: { select: { id: true, fullName: true, team: true } },
+            industryRef: true,
+            sourceRef: true,
+            parentRelations: { include: { parentCompany: true } },
+            subsidiaryRelations: { include: { subsidiaryCompany: true } },
+        };
+    }
+    withHierarchy(company) {
+        return {
+            ...company,
+            parentCompanies: company.parentRelations?.map((item) => item.parentCompany) ?? [],
+            subsidiaryCompanies: company.subsidiaryRelations?.map((item) => item.subsidiaryCompany) ?? [],
+        };
+    }
+    async validateRelatedCompanies(ids, organizationId) {
+        if (!ids.length)
+            return;
+        const companies = await this.prisma.company.findMany({
+            where: { id: { in: ids }, organizationId },
+            select: { id: true, archivedAt: true },
+        });
+        if (companies.length !== ids.length) {
+            throw new common_1.BadRequestException('All related companies must exist in the current organization');
+        }
+        if (companies.some((company) => company.archivedAt)) {
+            throw new common_1.BadRequestException('Archived companies cannot be used in company hierarchy');
+        }
+    }
+    async replaceHierarchy(tx, companyId, parentCompanyIds, subsidiaryCompanyIds) {
+        const parents = [...new Set(parentCompanyIds)];
+        const subsidiaries = [...new Set(subsidiaryCompanyIds)];
+        if (parents.includes(companyId) || subsidiaries.includes(companyId)) {
+            throw new common_1.BadRequestException('A company cannot be related to itself');
+        }
+        const overlap = parents.find((id) => subsidiaries.includes(id));
+        if (overlap)
+            throw new common_1.BadRequestException('A company cannot be both parent and subsidiary directly');
+        await this.assertHierarchyAcyclic(tx, companyId, parents, subsidiaries);
+        const reverse = await tx.companyHierarchyRelation.findFirst({
+            where: {
+                OR: [
+                    { parentCompanyId: companyId, subsidiaryCompanyId: { in: parents } },
+                    { parentCompanyId: { in: subsidiaries }, subsidiaryCompanyId: companyId },
+                ],
+            },
+        });
+        if (reverse)
+            throw new common_1.BadRequestException('Reverse company hierarchy relation already exists');
+        await tx.companyHierarchyRelation.deleteMany({
+            where: { OR: [{ parentCompanyId: companyId }, { subsidiaryCompanyId: companyId }] },
+        });
+        await tx.companyHierarchyRelation.createMany({
+            data: [
+                ...parents.map((parentCompanyId) => ({ parentCompanyId, subsidiaryCompanyId: companyId })),
+                ...subsidiaries.map((subsidiaryCompanyId) => ({ parentCompanyId: companyId, subsidiaryCompanyId })),
+            ],
+            skipDuplicates: true,
+        });
+    }
+    async assertHierarchyAcyclic(tx, companyId, parents, subsidiaries) {
+        const relations = await tx.companyHierarchyRelation.findMany({
+            where: {
+                parentCompany: { organizationId: (await tx.company.findUniqueOrThrow({
+                        where: { id: companyId },
+                        select: { organizationId: true },
+                    })).organizationId },
+            },
+            select: { parentCompanyId: true, subsidiaryCompanyId: true },
+        });
+        const graph = new Map();
+        const addEdge = (parent, child) => {
+            const children = graph.get(parent) ?? new Set();
+            children.add(child);
+            graph.set(parent, children);
+        };
+        for (const relation of relations) {
+            if (relation.parentCompanyId !== companyId && relation.subsidiaryCompanyId !== companyId) {
+                addEdge(relation.parentCompanyId, relation.subsidiaryCompanyId);
+            }
+        }
+        const reaches = (start, target) => {
+            const pending = [start];
+            const visited = new Set();
+            while (pending.length) {
+                const current = pending.pop();
+                if (current === target)
+                    return true;
+                if (visited.has(current))
+                    continue;
+                visited.add(current);
+                pending.push(...(graph.get(current) ?? []));
+            }
+            return false;
+        };
+        for (const [parent, child] of [
+            ...parents.map((parent) => [parent, companyId]),
+            ...subsidiaries.map((subsidiary) => [companyId, subsidiary]),
+        ]) {
+            if (reaches(child, parent)) {
+                throw new common_1.BadRequestException('Company hierarchy cannot contain a cycle');
+            }
+            addEdge(parent, child);
+        }
+    }
 };
 exports.CompaniesService = CompaniesService;
 exports.CompaniesService = CompaniesService = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
-        audit_log_service_1.AuditLogService])
+        audit_log_service_1.AuditLogService,
+        company_access_service_1.CompanyAccessService])
 ], CompaniesService);
 //# sourceMappingURL=companies.service.js.map
