@@ -11,6 +11,7 @@ import { AdvancedReportFiltersDto } from "../reports/dto/advanced-report-filters
 import { CommercialReportsService } from "../reports/commercial-reports.service";
 import { DataQualityService } from "../reports/data-quality.service";
 import { PeriodComparisonService } from "../reports/period-comparison.service";
+import { DashboardService } from "./dashboard.service";
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @Permissions("report:view")
@@ -21,7 +22,14 @@ export class DashboardController {
     private readonly commercial: CommercialReportsService,
     private readonly quality: DataQualityService,
     private readonly comparison: PeriodComparisonService,
+    private readonly dashboard: DashboardService,
   ) {}
+
+  @Get("latest-activities")
+  @Permissions("activity:view")
+  latestActivities(@CurrentUser() user: CurrentUserPayload) {
+    return this.dashboard.latestActivities(user);
+  }
 
   @Get("summary")
   async getSummary(

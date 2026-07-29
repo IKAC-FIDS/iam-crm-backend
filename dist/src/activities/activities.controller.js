@@ -29,8 +29,8 @@ let ActivitiesController = class ActivitiesController {
     constructor(activitiesService) {
         this.activitiesService = activitiesService;
     }
-    findByCompany(query, user) {
-        return this.activitiesService.findByCompany(query.companyId, query, user);
+    findAll(query, user) {
+        return this.activitiesService.findAll(query, user);
     }
     findDueFollowUps(user, pagination) {
         return this.activitiesService.findDueFollowUps(user, pagination);
@@ -57,7 +57,7 @@ __decorate([
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [find_activities_dto_1.FindActivitiesDto, Object]),
     __metadata("design:returntype", void 0)
-], ActivitiesController.prototype, "findByCompany", null);
+], ActivitiesController.prototype, "findAll", null);
 __decorate([
     (0, common_1.Get)('follow-ups/due'),
     (0, permissions_decorator_1.Permissions)('activity:view'),

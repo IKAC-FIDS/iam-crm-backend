@@ -12,42 +12,180 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ActivitiesService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../prisma/prisma.service");
-const client_1 = require("@prisma/client");
 const audit_log_service_1 = require("../audit-log/audit-log.service");
 const api_date_util_1 = require("../common/dates/api-date.util");
+const company_access_service_1 = require("../companies/company-access.service");
+const tenant_scope_util_1 = require("../common/tenant/tenant-scope.util");
+const team_scope_util_1 = require("../common/tenant/team-scope.util");
+const ownership_scope_dto_1 = require("../common/dto/ownership-scope.dto");
+const api_date_util_2 = require("../common/dates/api-date.util");
+const find_activities_dto_1 = require("./dto/find-activities.dto");
+const activityCenterSelect = {
+    id: true,
+    type: true,
+    notes: true,
+    outcome: true,
+    occurredAt: true,
+    completedAt: true,
+    createdAt: true,
+    person: { select: { id: true, fullName: true } },
+    company: {
+        select: {
+            id: true,
+            legalName: true,
+            brandName: true,
+            owner: {
+                select: {
+                    id: true,
+                    fullName: true,
+                    email: true,
+                    team: true,
+                    teamId: true,
+                },
+            },
+        },
+    },
+    user: {
+        select: { id: true, fullName: true, email: true },
+    },
+};
 let ActivitiesService = class ActivitiesService {
-    constructor(prisma, audit) {
+    constructor(prisma, audit, companyAccess) {
         this.prisma = prisma;
         this.audit = audit;
+        this.companyAccess = companyAccess;
+    }
+    async findAll(query, user) {
+        const page = query.page ?? 1;
+        const limit = query.limit ?? 20;
+        const where = this.activityCenterWhere(query, user);
+        const orderBy = query.sortBy === 'createdAt'
+            ? { createdAt: query.sortOrder ?? 'desc' }
+            : { occurredAt: query.sortOrder ?? 'desc' };
+        const [rows, total] = await Promise.all([
+            this.prisma.activity.findMany({
+                where,
+                select: activityCenterSelect,
+                orderBy,
+                skip: (page - 1) * limit,
+                take: limit,
+            }),
+            this.prisma.activity.count({ where }),
+        ]);
+        const totalPages = Math.ceil(total / limit);
+        return {
+            data: rows.map((row) => this.activityCenterRow(row)),
+            meta: {
+                total,
+                page,
+                limit,
+                totalPages,
+                hasNext: page < totalPages,
+                hasPrevious: page > 1,
+            },
+        };
+    }
+    async latestActivities(user) {
+        const rows = await this.prisma.activity.findMany({
+            where: this.activityCenterWhere({}, user),
+            select: activityCenterSelect,
+            orderBy: { occurredAt: 'desc' },
+            take: 10,
+        });
+        return rows.map((row) => {
+            const mapped = this.activityCenterRow(row);
+            return {
+                id: mapped.id,
+                type: mapped.type,
+                title: mapped.title,
+                activityDate: mapped.activityDate,
+                person: mapped.person,
+                company: mapped.company,
+                createdBy: mapped.createdBy,
+            };
+        });
+    }
+    activityCenterWhere(query, user) {
+        const and = [
+            {
+                company: {
+                    organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
+                    archivedAt: null,
+                },
+            },
+        ];
+        if (query.activityType)
+            and.push({ type: query.activityType });
+        if (query.status === find_activities_dto_1.ActivityListStatus.COMPLETED) {
+            and.push({ completedAt: { not: null } });
+        }
+        else if (query.status === find_activities_dto_1.ActivityListStatus.RECORDED) {
+            and.push({ completedAt: null });
+        }
+        if (query.ownerId)
+            and.push({ company: { ownerId: query.ownerId } });
+        if (query.createdById)
+            and.push({ userId: query.createdById });
+        if (query.personId)
+            and.push({ personId: query.personId });
+        if (query.companyId)
+            and.push({ companyId: query.companyId });
+        const activityDate = (0, api_date_util_2.parseApiDateRange)(query.dateFrom, query.dateTo, 'dateFrom', 'dateTo');
+        if (activityDate)
+            and.push({ occurredAt: activityDate });
+        if (query.team?.trim()) {
+            and.push({ company: { owner: (0, team_scope_util_1.userTeamFilterWhere)([query.team]) } });
+        }
+        if (query.ownershipScope === ownership_scope_dto_1.OwnershipScope.MINE) {
+            and.push({ company: { ownerId: user.userId } });
+        }
+        else if (query.ownershipScope === ownership_scope_dto_1.OwnershipScope.TEAM) {
+            and.push({ company: { owner: (0, team_scope_util_1.userTeamScopeWhere)(user) } });
+        }
+        else if (query.ownershipScope === ownership_scope_dto_1.OwnershipScope.UNASSIGNED) {
+            and.push({ company: { ownerId: null } });
+        }
+        if (query.mine)
+            and.push({ userId: user.userId });
+        if (query.unassigned)
+            and.push({ company: { ownerId: null } });
+        const search = query.search?.trim();
+        if (search) {
+            and.push({
+                OR: [
+                    { outcome: { contains: search, mode: 'insensitive' } },
+                    { notes: { contains: search, mode: 'insensitive' } },
+                    { person: { fullName: { contains: search, mode: 'insensitive' } } },
+                    { company: { legalName: { contains: search, mode: 'insensitive' } } },
+                    { company: { brandName: { contains: search, mode: 'insensitive' } } },
+                ],
+            });
+        }
+        return { AND: and };
+    }
+    activityCenterRow(row) {
+        const { owner, ...company } = row.company;
+        return {
+            ...row,
+            title: row.outcome ?? row.type,
+            description: row.notes,
+            status: row.completedAt
+                ? find_activities_dto_1.ActivityListStatus.COMPLETED
+                : find_activities_dto_1.ActivityListStatus.RECORDED,
+            activityDate: row.occurredAt,
+            updatedAt: row.createdAt,
+            company,
+            owner,
+            createdBy: row.user,
+        };
     }
     async validateCompanyAccess(companyId, user) {
-        const company = await this.prisma.company.findUnique({
-            where: { id: companyId },
-            select: { ownerId: true, owner: { select: { team: true } } },
-        });
-        if (!company) {
-            throw new common_1.NotFoundException('شرکت پیدا نشد');
-        }
-        if (user.role === client_1.UserRole.ADMIN)
-            return;
-        if (user.role === client_1.UserRole.MANAGER) {
-            const companyTeam = company.owner?.team;
-            if (!companyTeam || companyTeam !== user.team) {
-                throw new common_1.ForbiddenException('شما به این شرکت دسترسی ندارید');
-            }
-            return;
-        }
-        if (user.role === client_1.UserRole.REP && company.ownerId !== user.userId) {
-            throw new common_1.ForbiddenException('شما به این شرکت دسترسی ندارید');
-        }
-        if (user.role === client_1.UserRole.BOARDS) {
-            throw new common_1.ForbiddenException('شما دسترسی به فعالیت‌ها را ندارید');
-        }
+        await this.companyAccess.assertCompanyMutable(companyId, user);
     }
     async validatePersonAccess(personId, user) {
         const person = await this.prisma.person.findUnique({
             where: { id: personId },
-            include: { company: { select: { ownerId: true, owner: { select: { team: true } } } } },
+            include: { company: { select: { ownerId: true, owner: { select: { team: true, teamId: true } } } } },
         });
         if (!person) {
             throw new common_1.NotFoundException('مخاطب پیدا نشد');
@@ -74,7 +212,7 @@ let ActivitiesService = class ActivitiesService {
         if (!companyId) {
             throw new common_1.BadRequestException('شناسه شرکت الزامی است');
         }
-        await this.validateCompanyAccess(companyId, user);
+        await this.assertCompanyReadable(companyId, user);
         const page = pagination.page ?? 1;
         const limit = pagination.limit ?? 20;
         const skip = (page - 1) * limit;
@@ -123,6 +261,9 @@ let ActivitiesService = class ActivitiesService {
         });
         await this.audit.record({ actorId: user.userId, entityType: 'activity', entityId: activity.id, action: 'activity.created', after: activity });
         return activity;
+    }
+    async assertCompanyReadable(companyId, user) {
+        await this.companyAccess.assertCompanyReadable(companyId, user);
     }
     async updateActivity(activityId, dto, user) {
         const activity = await this.findActivityForMutation(activityId, user);
@@ -198,9 +339,6 @@ let ActivitiesService = class ActivitiesService {
         return rescheduled;
     }
     async findDueFollowUps(user, pagination) {
-        if (user.role === client_1.UserRole.BOARDS) {
-            throw new common_1.ForbiddenException('شما دسترسی به فعالیت‌ها را ندارید');
-        }
         const page = pagination.page ?? 1;
         const limit = pagination.limit ?? 20;
         const skip = (page - 1) * limit;
@@ -243,6 +381,6 @@ let ActivitiesService = class ActivitiesService {
 exports.ActivitiesService = ActivitiesService;
 exports.ActivitiesService = ActivitiesService = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [prisma_service_1.PrismaService, audit_log_service_1.AuditLogService])
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService, audit_log_service_1.AuditLogService, company_access_service_1.CompanyAccessService])
 ], ActivitiesService);
 //# sourceMappingURL=activities.service.js.map

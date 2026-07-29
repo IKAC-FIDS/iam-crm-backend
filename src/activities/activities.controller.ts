@@ -18,11 +18,11 @@ export class ActivitiesController {
 
   @Get()
   @Permissions('activity:view')
-  findByCompany(
+  findAll(
     @Query() query: FindActivitiesDto,
     @CurrentUser() user: CurrentUserPayload,
   ) {
-    return this.activitiesService.findByCompany(query.companyId, query, user);
+    return this.activitiesService.findAll(query, user);
   }
 
   @Get('follow-ups/due')

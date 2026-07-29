@@ -74,6 +74,7 @@ describe("DashboardController commercial sections", () => {
       commercial as any,
       quality as any,
       comparison as any,
+      { latestActivities: jest.fn() } as any,
     ).getSummary(
       { page: 1, limit: 20 },
       { userId: "u", email: "e", role: "ADMIN", organizationId: "org" },

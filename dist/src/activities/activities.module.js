@@ -17,6 +17,7 @@ exports.ActivitiesModule = ActivitiesModule = __decorate([
     (0, common_1.Module)({
         providers: [activities_service_1.ActivitiesService],
         controllers: [activities_controller_1.ActivitiesController],
+        exports: [activities_service_1.ActivitiesService],
     })
 ], ActivitiesModule);
 //# sourceMappingURL=activities.module.js.map

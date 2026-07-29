@@ -23,12 +23,17 @@ const advanced_report_filters_dto_1 = require("../reports/dto/advanced-report-fi
 const commercial_reports_service_1 = require("../reports/commercial-reports.service");
 const data_quality_service_1 = require("../reports/data-quality.service");
 const period_comparison_service_1 = require("../reports/period-comparison.service");
+const dashboard_service_1 = require("./dashboard.service");
 let DashboardController = class DashboardController {
-    constructor(reports, commercial, quality, comparison) {
+    constructor(reports, commercial, quality, comparison, dashboard) {
         this.reports = reports;
         this.commercial = commercial;
         this.quality = quality;
         this.comparison = comparison;
+        this.dashboard = dashboard;
+    }
+    latestActivities(user) {
+        return this.dashboard.latestActivities(user);
     }
     async getSummary(filters, user) {
         const [summary, finance, products, exchange, quality, comparison] = await Promise.all([
@@ -110,6 +115,14 @@ let DashboardController = class DashboardController {
 };
 exports.DashboardController = DashboardController;
 __decorate([
+    (0, common_1.Get)("latest-activities"),
+    (0, permissions_decorator_1.Permissions)("activity:view"),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], DashboardController.prototype, "latestActivities", null);
+__decorate([
     (0, common_1.Get)("summary"),
     __param(0, (0, common_1.Query)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
@@ -124,6 +137,7 @@ exports.DashboardController = DashboardController = __decorate([
     __metadata("design:paramtypes", [advanced_reports_service_1.AdvancedReportsService,
         commercial_reports_service_1.CommercialReportsService,
         data_quality_service_1.DataQualityService,
-        period_comparison_service_1.PeriodComparisonService])
+        period_comparison_service_1.PeriodComparisonService,
+        dashboard_service_1.DashboardService])
 ], DashboardController);
 //# sourceMappingURL=dashboard.controller.js.map

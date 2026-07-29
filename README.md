@@ -2067,6 +2067,17 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 - Validation status: focused company suites passed with 32 tests; the full configured 28-suite run passed with 151 tests; lint passed with no errors and 9 pre-existing warnings; build passed.
 - No Prisma schema change or migration was required or created. No uniqueness constraint, seed, destructive database command, person-contact change, or branch-phone change was performed.
 
+### fix 000079 - Add the Activity Center and latest dashboard activities
+
+- Promoted `GET /api/activities` to the primary organization-scoped Activity Center list while keeping the existing optional `companyId` query compatible. The endpoint uses the existing `activity:view` permission and supports pagination, search, activity type, derived recorded/completed status, owner, creator, person, company, date range, ownership scope, team, mine, unassigned, and ascending/descending activity-date or creation-date sorting.
+- Activity Center search covers the stored outcome/title, notes/description, person full name, and company legal/brand names. Ownership uses the company owner, `createdById`/`mine` use the activity's existing `userId`, and all queries retain the current organization and non-archived-company boundary.
+- Added a schema-compatible response projection without changing activity storage: `outcome` is exposed as `title` (falling back to type), `notes` as `description`, `occurredAt` as `activityDate`, `completedAt` as derived `RECORDED`/`COMPLETED` status, company owner as `owner`, and activity user as `createdBy`. Because Activity has no update timestamp, `updatedAt` reflects immutable `createdAt`; legacy stored fields remain present for existing consumers.
+- Added `GET /api/dashboard/latest-activities`, protected by `activity:view`, returning at most 10 organization-scoped activities ordered by `occurredAt DESC` with activity ID/type/title/date, person, company, and creator.
+- Listing uses one selected Prisma query plus one count query, and dashboard uses one nested-select query capped with `take: 10`; no N+1 loading was introduced. Activity creation, mutation, follow-up behavior, and person timelines were not changed.
+- Important changed files: `src/activities/activities.controller.ts`, `src/activities/activities.service.ts`, `src/activities/activities.module.ts`, `src/activities/dto/find-activities.dto.ts`, `src/dashboard/dashboard.controller.ts`, `src/dashboard/dashboard.module.ts`, `src/dashboard/dashboard.service.ts`, `test/activity-center.spec.ts`, `test/dashboard-commercial-summary.spec.ts`, `README.md`, and corresponding tracked `dist` output.
+- Validation status: focused Activity Center/dashboard suites passed with 9 tests; the full configured 29-suite run passed with 159 tests; lint passed with no errors and 9 pre-existing warnings; build passed.
+- No Prisma schema change or migration was required or created. No new permission, seed, destructive database command, activity-creation change, or person-timeline change was introduced.
+
 ---
 
 **Built with ❤️ for the sales team**
