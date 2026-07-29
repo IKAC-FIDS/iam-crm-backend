@@ -19,6 +19,9 @@ const booleanValue = ({ value }: { value: unknown }) =>
       ? false
       : value;
 
+const emptyToUndefined = ({ value }: { value: unknown }) =>
+  typeof value === 'string' && value.trim() === '' ? undefined : value;
+
 export enum ActivityListStatus {
   RECORDED = 'RECORDED',
   COMPLETED = 'COMPLETED',
@@ -38,18 +41,22 @@ export class FindActivitiesDto extends PaginationDto {
   status?: ActivityListStatus;
 
   @IsOptional()
+  @Transform(emptyToUndefined)
   @IsUUID()
   ownerId?: string;
 
   @IsOptional()
+  @Transform(emptyToUndefined)
   @IsUUID()
   createdById?: string;
 
   @IsOptional()
+  @Transform(emptyToUndefined)
   @IsUUID()
   personId?: string;
 
   @IsOptional()
+  @Transform(emptyToUndefined)
   @IsUUID()
   companyId?: string;
 

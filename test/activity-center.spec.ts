@@ -98,7 +98,11 @@ describe('Activity Center listing', () => {
       user,
     );
     expect(prisma.activity.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ skip: 20, take: 20, orderBy: { createdAt: 'asc' } }),
+      expect.objectContaining({
+        skip: 20,
+        take: 20,
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      }),
     );
     expect(result.meta).toEqual({
       total: 45,

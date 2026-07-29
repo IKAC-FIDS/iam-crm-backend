@@ -59,9 +59,17 @@ let ActivitiesService = class ActivitiesService {
         const page = query.page ?? 1;
         const limit = query.limit ?? 20;
         const where = this.activityCenterWhere(query, user);
-        const orderBy = query.sortBy === 'createdAt'
+        const primaryOrder = query.sortBy === 'createdAt'
             ? { createdAt: query.sortOrder ?? 'desc' }
             : { occurredAt: query.sortOrder ?? 'desc' };
+        const orderDirection = query.sortOrder ?? 'desc';
+        const orderBy = query.sortBy === 'createdAt'
+            ? [primaryOrder, { id: orderDirection }]
+            : [
+                primaryOrder,
+                { createdAt: orderDirection },
+                { id: orderDirection },
+            ];
         const [rows, total] = await Promise.all([
             this.prisma.activity.findMany({
                 where,

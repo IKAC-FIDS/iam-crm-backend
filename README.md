@@ -2078,6 +2078,16 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 - Validation status: focused Activity Center/dashboard suites passed with 9 tests; the full configured 29-suite run passed with 159 tests; lint passed with no errors and 9 pre-existing warnings; build passed.
 - No Prisma schema change or migration was required or created. No new permission, seed, destructive database command, activity-creation change, or person-timeline change was introduced.
 
+### fix 000080 - اصلاح اعتبارسنجی و مرتب‌سازی مرکز فعالیت‌ها
+
+- اعتبارسنجی پارامترهای `GET /api/activities` زیر `ValidationPipe` سراسری اصلاح شد؛ `sortBy` و `sortOrder` اکنون بخشی صریح و مجاز از قرارداد مرکز فعالیت‌ها هستند و نبودن یا خالی بودن فیلترهای اختیاری UUID دیگر خطای `@IsUUID()` ایجاد نمی‌کند.
+- مقادیر خالی یا فقط شامل فاصله برای `ownerId`، `createdById`، `personId` و `companyId` پیش از اعتبارسنجی به `undefined` تبدیل می‌شوند؛ UUID معتبر بدون تغییر پذیرفته و UUID نامعتبر و غیرخالی همچنان رد می‌شود. اعتبارسنجی صفحه‌بندی، رد پارامتر ناشناخته، احراز هویت، مرز سازمان و محدودیت مالکیت بدون تغییر حفظ شده‌اند.
+- مرتب‌سازی فقط مقادیر مجاز `activityDate`/`createdAt` و `asc`/`desc` را می‌پذیرد. سرویس `activityDate` را به ستون ذخیره‌شده `occurredAt` نگاشت می‌کند و برای نتیجه قطعی، مرتب‌سازی ثانویه بر اساس زمان ایجاد و شناسه را اضافه می‌کند؛ نام فیلد دریافتی کاربر مستقیماً به Prisma ارسال نمی‌شود.
+- تست‌های رگرسیون با همان تنظیمات تبدیل و whitelist در `ValidationPipe` برنامه و مسیر واقعی کنترلر اضافه شدند. پوشش شامل مرتب‌سازی پیش‌فرض، معتبر و نامعتبر، UUIDهای حذف‌شده/خالی/معتبر/نامعتبر، محدودیت صفحه‌بندی، پارامتر ناشناخته، عبور DTO از کنترلر و رفتار موجود سرویس مرکز فعالیت‌ها است.
+- فایل‌های مهم تغییرکرده: `src/activities/dto/find-activities.dto.ts`، `src/activities/activities.service.ts`، `test/activity-query-validation.spec.ts`، `test/activity-center.spec.ts`، `README.md` و خروجی build متناظر و tracked زیر `dist`.
+- وضعیت اعتبارسنجی: ۲ suite متمرکز با ۲۴ تست و کل مجموعه پیکربندی‌شده شامل ۳۰ suite و ۱۷۵ تست موفق بود؛ lint بدون خطا و با ۹ هشدار از پیش موجود و build موفق بود. `prisma generate` فقط برای همگام‌سازی کلاینت محلی قدیمی با schema از قبل commit‌شده اجرا شد.
+- هیچ تغییری در Prisma schema انجام نشد و migration جدیدی لازم یا ایجاد نشد. seed، فرمان مخرب دیتابیس، تغییر permission، تغییر ساخت فعالیت یا تغییر timeline اشخاص نیز انجام نشد.
+
 ---
 
 **Built with ❤️ for the sales team**

@@ -21,6 +21,7 @@ const booleanValue = ({ value }) => value === true || value === 'true'
     : value === false || value === 'false'
         ? false
         : value;
+const emptyToUndefined = ({ value }) => typeof value === 'string' && value.trim() === '' ? undefined : value;
 var ActivityListStatus;
 (function (ActivityListStatus) {
     ActivityListStatus["RECORDED"] = "RECORDED";
@@ -51,21 +52,25 @@ __decorate([
 ], FindActivitiesDto.prototype, "status", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Transform)(emptyToUndefined),
     (0, class_validator_1.IsUUID)(),
     __metadata("design:type", String)
 ], FindActivitiesDto.prototype, "ownerId", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Transform)(emptyToUndefined),
     (0, class_validator_1.IsUUID)(),
     __metadata("design:type", String)
 ], FindActivitiesDto.prototype, "createdById", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Transform)(emptyToUndefined),
     (0, class_validator_1.IsUUID)(),
     __metadata("design:type", String)
 ], FindActivitiesDto.prototype, "personId", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Transform)(emptyToUndefined),
     (0, class_validator_1.IsUUID)(),
     __metadata("design:type", String)
 ], FindActivitiesDto.prototype, "companyId", void 0);
