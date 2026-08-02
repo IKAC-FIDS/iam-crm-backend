@@ -1,7 +1,6 @@
 import {
   BadRequestException,
   Injectable,
-  InternalServerErrorException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -11,6 +10,7 @@ import NodeCache from 'node-cache';
 import { randomBytes } from 'crypto';
 import { Issuer, generators } from 'openid-client';
 import { AuditLogService } from '../../audit-log/audit-log.service';
+import { OrganizationMembershipsService } from '../../organization-memberships/organization-memberships.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SsoSecretService } from './sso-secret.service';
 import { SsoTicketService } from './sso-ticket.service';
@@ -39,6 +39,7 @@ export class OidcService {
     private readonly secretService: SsoSecretService,
     private readonly ticketService: SsoTicketService,
     private readonly auditLog: AuditLogService,
+    private readonly memberships: OrganizationMembershipsService,
   ) {}
 
   async buildAuthorizationUrl(providerId: string): Promise<string> {
@@ -279,21 +280,25 @@ export class OidcService {
 
     const role = provider.defaultRole ?? UserRole.REP;
 
-    const user = await this.prisma.user.create({
-      data: {
-        fullName: identity.fullName,
-        email: identity.email,
-        passwordHash,
-        role,
-        isActive: true,
-        externalIdentities: {
-          create: {
-            providerId,
-            subject: identity.subject,
-            email: identity.email,
+    const user = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.user.create({
+        data: {
+          fullName: identity.fullName,
+          email: identity.email,
+          passwordHash,
+          role,
+          isActive: true,
+          externalIdentities: {
+            create: {
+              providerId,
+              subject: identity.subject,
+              email: identity.email,
+            },
           },
         },
-      },
+      });
+      await this.memberships.createInitialMembership(tx, created);
+      return created;
     });
 
     await this.auditLog.record({

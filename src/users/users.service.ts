@@ -15,6 +15,7 @@ import { FindUsersDto } from './dto/find-users.dto';
 import { UpdateUserRoleDto } from './dto/update-user-role.dto';
 import { FindOwnerOptionsDto } from './dto/find-owner-options.dto';
 import { FindAssigneeOptionsDto } from './dto/find-assignee-options.dto';
+import { OrganizationMembershipsService } from '../organization-memberships/organization-memberships.service';
 
 const safeUserSelect = {
   id: true,
@@ -54,23 +55,27 @@ export class UsersService {
   constructor(
     private prisma: PrismaService,
     private audit: AuditLogService,
+    private memberships: OrganizationMembershipsService,
   ) {}
 
   async create(dto: CreateUserDto, actor?: CurrentUserPayload) {
     const passwordHash = await bcrypt.hash(dto.password, 10);
     const teamAssignment = await this.resolveTeamAssignment(dto.teamId, dto.team, actor);
 
-    const user = await this.prisma.user.create({
-      data: {
-        fullName: dto.fullName,
-        email: dto.email,
-        passwordHash,
-        role: dto.role,
-        team: teamAssignment.team,
-        teamId: teamAssignment.teamId,
-        organizationId: actor ? getCurrentOrganizationId(actor) : undefined,
-      },
-      select: safeUserSelect,
+    const user = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.user.create({
+        data: {
+          fullName: dto.fullName,
+          email: dto.email,
+          passwordHash,
+          role: dto.role,
+          team: teamAssignment.team,
+          teamId: teamAssignment.teamId,
+          organizationId: actor ? getCurrentOrganizationId(actor) : undefined,
+        },
+      });
+      await this.memberships.createInitialMembership(tx, created);
+      return tx.user.findUniqueOrThrow({ where: { id: created.id }, select: safeUserSelect });
     });
 
     await this.audit.record({
@@ -237,10 +242,14 @@ export class UsersService {
       throw new NotFoundException('User not found');
     }
 
-    const updated = await this.prisma.user.update({
-      where: { id },
-      data: { isActive: false },
-      select: safeUserSelect,
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.user.update({
+        where: { id },
+        data: { isActive: false },
+        select: safeUserSelect,
+      });
+      await this.memberships.suspendForUser(tx, id, organizationId);
+      return result;
     });
 
     await this.audit.record({
@@ -268,10 +277,14 @@ export class UsersService {
       throw new BadRequestException('User is already active');
     }
 
-    const updated = await this.prisma.user.update({
-      where: { id },
-      data: { isActive: true },
-      select: safeUserSelect,
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.user.update({
+        where: { id },
+        data: { isActive: true },
+        select: safeUserSelect,
+      });
+      await this.memberships.activateForUser(tx, id, organizationId);
+      return result;
     });
 
     await this.audit.record({
@@ -330,15 +343,26 @@ export class UsersService {
       throw new BadRequestException('A manager with owned companies must have a team');
     }
 
-    const updatedUser = await this.prisma.user.update({
-      where: { id },
-      data: {
-        role: nextBaseRole,
-        roleId: assignedRole?.id ?? (dto.role ? null : user.roleId),
-        team: teamAssignment.team,
-        teamId: teamAssignment.teamId,
-      },
-      select: safeUserSelect,
+    const nextRoleId = assignedRole?.id ?? (dto.role ? null : user.roleId);
+    const updatedUser = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.user.update({
+        where: { id },
+        data: {
+          role: nextBaseRole,
+          roleId: nextRoleId,
+          team: teamAssignment.team,
+          teamId: teamAssignment.teamId,
+        },
+        select: safeUserSelect,
+      });
+      await this.memberships.syncDefaultAssignment(
+        tx,
+        id,
+        user.organizationId,
+        nextRoleId,
+        teamAssignment.teamId,
+      );
+      return result;
     });
 
     PermissionsGuard.clearCache(nextBaseRole);

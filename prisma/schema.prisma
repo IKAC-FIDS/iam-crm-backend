@@ -232,6 +232,12 @@ enum OrganizationStatus {
   ARCHIVED
 }
 
+enum OrganizationMembershipStatus {
+  INVITED
+  ACTIVE
+  SUSPENDED
+}
+
 // ============================================================
 // Users & Auth
 // ============================================================
@@ -287,9 +293,10 @@ model User {
   exchangeRatesCreated   CurrencyExchangeRate[] @relation("ExchangeRateCreatedBy")
   productPriceChanges    ProductPriceHistory[]  @relation("ProductPriceHistoryChangedBy")
 
-  notifications       Notification[] @relation("NotificationRecipient")
-  notificationActions Notification[] @relation("NotificationActor")
-  managedTeams        Team[]         @relation("TeamManager")
+  notifications           Notification[]           @relation("NotificationRecipient")
+  notificationActions     Notification[]           @relation("NotificationActor")
+  managedTeams            Team[]                   @relation("TeamManager")
+  organizationMemberships OrganizationMembership[]
 
   @@index([organizationId])
   @@index([teamId])
@@ -314,7 +321,8 @@ model Team {
   organizationId String       @default("00000000-0000-4000-8000-000000000001")
   organization   Organization @relation(fields: [organizationId], references: [id])
 
-  members User[] @relation("UserPrimaryTeam")
+  members                 User[]                   @relation("UserPrimaryTeam")
+  organizationMemberships OrganizationMembership[]
 
   @@index([managerId])
   @@index([isActive])
@@ -347,6 +355,7 @@ model Organization {
   fileAttachments FileAttachment[]
   auditLogs       AuditLog[]
   meetings        Meeting[]
+  memberships     OrganizationMembership[]
 
   @@index([status])
   @@index([createdAt])
@@ -1615,20 +1624,51 @@ model Permission {
 }
 
 model Role {
-  id          String           @id @default(uuid())
-  code        String           @unique
-  name        String
-  description String?
-  baseRole    UserRole         @default(REP)
-  isSystem    Boolean          @default(false)
-  isActive    Boolean          @default(true)
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
-  users       User[]
-  permissions RolePermission[]
+  id                      String                   @id @default(uuid())
+  code                    String                   @unique
+  name                    String
+  description             String?
+  baseRole                UserRole                 @default(REP)
+  isSystem                Boolean                  @default(false)
+  isActive                Boolean                  @default(true)
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+  users                   User[]
+  permissions             RolePermission[]
+  organizationMemberships OrganizationMembership[]
 
   @@index([isActive])
   @@map("roles")
+}
+
+model OrganizationMembership {
+  id             String                       @id @default(uuid())
+  userId         String
+  user           User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization                 @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  roleId         String?
+  role           Role?                        @relation(fields: [roleId], references: [id], onDelete: SetNull)
+  teamId         String?
+  team           Team?                        @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  status         OrganizationMembershipStatus @default(INVITED)
+  isDefault      Boolean                      @default(false)
+  joinedAt       DateTime?
+  invitedAt      DateTime?
+  suspendedAt    DateTime?
+  lastAccessAt   DateTime?
+  createdAt      DateTime                     @default(now())
+  updatedAt      DateTime                     @updatedAt
+
+  @@unique([userId, organizationId])
+  @@index([userId])
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@index([userId, status])
+  @@index([roleId])
+  @@index([teamId])
+  @@index([userId, isDefault, status])
+  @@map("organization_memberships")
 }
 
 model RolePermission {

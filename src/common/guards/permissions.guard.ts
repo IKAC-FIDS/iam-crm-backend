@@ -18,9 +18,10 @@ const cache = new NodeCache({ stdTTL: 600 });
 type RequestUser = {
   userId?: string;
   email?: string;
-  role?: string;
+  role?: UserRole;
   team?: string | null;
   teamId?: string | null;
+  roleId?: string | null;
 };
 
 @Injectable()
@@ -62,9 +63,10 @@ export class PermissionsGuard implements CanActivate {
       throw new ForbiddenException('حساب کاربری فعال نیست');
     }
 
-    const userPermissions = dbUser.roleId
-      ? await this.getPermissionsForRoleId(dbUser.roleId)
-      : await this.getPermissionsForRole(dbUser.role);
+    const effectiveRoleId = requestUser.roleId ?? dbUser.roleId;
+    const userPermissions = effectiveRoleId
+      ? await this.getPermissionsForRoleId(effectiveRoleId)
+      : await this.getPermissionsForRole(requestUser.role ?? dbUser.role);
 
     const allowed =
       normalizedPolicy.mode === 'any'

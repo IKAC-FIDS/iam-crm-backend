@@ -8,6 +8,7 @@ import { buildHttpLogContext } from '../common/logging/http-log-context';
 import { PrismaService } from '../prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenService } from './refresh-token.service';
+import { OrganizationMembershipsService } from '../organization-memberships/organization-memberships.service';
 
 export interface AuthUserResponse {
   id: string;
@@ -47,6 +48,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly refreshTokenService: RefreshTokenService,
     private readonly config: ConfigService,
+    private readonly memberships: OrganizationMembershipsService,
   ) {}
 
   async login(dto: LoginDto, req?: Request): Promise<AuthSessionLoginResponse> {
@@ -104,6 +106,7 @@ export class AuthService {
       JSON.stringify(this.buildAuthLogContext(dto.email, req)),
     );
 
+    await this.memberships.resolveEffectiveContext(user);
     await this.recordSuccessfulLogin(user.id, req);
 
     return this.buildSessionLoginResponse(user, req);
@@ -113,6 +116,8 @@ export class AuthService {
     refreshToken: string,
     req?: Request,
   ): Promise<AuthSessionLoginResponse> {
+    const currentUser = await this.refreshTokenService.getActiveUser(refreshToken);
+    await this.memberships.resolveEffectiveContext(currentUser);
     const rotated = await this.refreshTokenService.rotateRefreshToken(
       refreshToken,
       req,
@@ -170,32 +175,31 @@ export class AuthService {
   }
 
   async buildLoginResponse(user: User): Promise<AuthAccessResponse> {
-    const assignedRole = user.roleId
-      ? await this.prisma.role.findUnique({ where: { id: user.roleId } })
+    const effective = await this.memberships.resolveEffectiveContext(user);
+    const assignedRole = effective.roleId
+      ? await this.prisma.role.findUnique({ where: { id: effective.roleId } })
       : null;
     const rolePermissions = await this.prisma.rolePermission.findMany({
-      where: user.roleId ? { roleId: user.roleId } : { role: user.role },
+      where: effective.roleId
+        ? { roleId: effective.roleId }
+        : { role: effective.role },
       include: { permission: true },
     });
 
     const permissions = rolePermissions.filter((rp) => rp.permission.isActive).map((rp) => rp.permission.action);
-    const team = user.teamId
-      ? await this.prisma.team.findUnique({
-          where: { id: user.teamId },
-          select: { id: true, code: true, name: true },
-        })
-      : null;
 
     const payload = {
       sub: user.id,
       email: user.email,
-      role: user.role,
-      team: user.team,
-      teamId: team?.id ?? user.teamId,
-      teamCode: team?.code ?? user.team ?? null,
-      teamName: team?.name ?? null,
-      organizationId: user.organizationId,
+      role: effective.role,
+      team: effective.team,
+      teamId: effective.teamId,
+      teamCode: effective.teamCode,
+      teamName: effective.teamName,
+      organizationId: effective.organizationId,
     };
+
+    await this.memberships.touchLastAccess(effective.membershipId);
 
     return {
       accessToken: await this.jwtService.signAsync(payload),
@@ -204,16 +208,16 @@ export class AuthService {
         id: user.id,
         fullName: user.fullName,
         email: user.email,
-        role: user.role,
-        team: user.team,
-        teamId: team?.id ?? user.teamId,
-        teamCode: team?.code ?? user.team ?? null,
-        teamName: team?.name ?? null,
-        organizationId: user.organizationId,
+        role: effective.role,
+        team: effective.team,
+        teamId: effective.teamId,
+        teamCode: effective.teamCode,
+        teamName: effective.teamName,
+        organizationId: effective.organizationId,
         permissions,
         roleId: assignedRole?.id ?? null,
-        roleCode: assignedRole?.code ?? user.role,
-        roleName: assignedRole?.name ?? user.role,
+        roleCode: assignedRole?.code ?? effective.role,
+        roleName: assignedRole?.name ?? effective.role,
       },
     };
   }

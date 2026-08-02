@@ -8,7 +8,6 @@ const MEMBERSHIP_STATUSES = new Set<TenantMembershipStatus>([
   'invited',
   'active',
   'suspended',
-  'revoked',
 ]);
 
 const RESOLUTION_SOURCES = new Set<TenantResolutionSource>([

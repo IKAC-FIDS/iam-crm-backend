@@ -11,6 +11,7 @@ import { randomBytes } from 'crypto';
 import { Prisma, SsoProvider, SsoProviderType, UserRole } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SsoTicketService } from './sso-ticket.service';
+import { OrganizationMembershipsService } from '../../organization-memberships/organization-memberships.service';
 
 type SamlProfile = Record<string, unknown> & {
   nameID?: string;
@@ -25,6 +26,7 @@ export class SamlService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     private readonly ssoTicketService: SsoTicketService,
+    private readonly memberships: OrganizationMembershipsService,
   ) {}
 
   async buildLoginUrl(providerId: string): Promise<string> {
@@ -314,6 +316,8 @@ export class SamlService {
           isActive: true,
         },
       });
+
+      await this.memberships.createInitialMembership(tx, user);
 
       await tx.externalIdentity.create({
         data: {

@@ -21,6 +21,10 @@
     "safety:scan-migrations": "node tools/migration-safety/cli.cjs scan-migrations",
     "safety:inventory": "node tools/migration-safety/cli.cjs inventory",
     "safety:backup:dry-run": "node tools/migration-safety/cli.cjs backup --dry-run",
+    "membership:preflight": "node dist/src/organization-memberships/membership-maintenance.js preflight",
+    "membership:backfill:dry-run": "node dist/src/organization-memberships/membership-maintenance.js backfill --dry-run",
+    "membership:backfill": "node dist/src/organization-memberships/membership-maintenance.js backfill",
+    "membership:validate": "node dist/src/organization-memberships/membership-maintenance.js validate",
     "ci": "npm run prisma:generate && npm run lint && npm run test && npm run build"
   },
   "dependencies": {

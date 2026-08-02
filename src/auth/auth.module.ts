@@ -11,10 +11,12 @@ import { SessionsController } from './sessions.controller';
 import { SessionsService } from './sessions.service';
 import { AccountSecurityController } from './account-security.controller';
 import { AccountSecurityService } from './account-security.service';
+import { OrganizationMembershipsModule } from '../organization-memberships/organization-memberships.module';
 
 @Module({
   imports: [
     PassportModule,
+    OrganizationMembershipsModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({

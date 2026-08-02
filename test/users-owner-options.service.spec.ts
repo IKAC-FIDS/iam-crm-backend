@@ -35,7 +35,18 @@ function setup() {
     team: { findFirst: jest.fn().mockResolvedValue({ id: teamId }) },
   };
   const audit = { record: jest.fn().mockResolvedValue(undefined) };
-  return { prisma, audit, service: new UsersService(prisma as any, audit as any) };
+  const memberships = {
+    createInitialMembership: jest.fn(),
+    suspendForUser: jest.fn(),
+    activateForUser: jest.fn(),
+    syncDefaultAssignment: jest.fn(),
+  };
+  return {
+    prisma,
+    audit,
+    memberships,
+    service: new UsersService(prisma as any, audit as any, memberships as any),
+  };
 }
 
 describe('UsersService owner options', () => {

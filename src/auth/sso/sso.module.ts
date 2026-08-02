@@ -10,9 +10,10 @@ import { SsoSecretService } from './sso-secret.service';
 import { SsoTicketService } from './sso-ticket.service';
 import { SamlController } from './saml.controller';
 import { SamlService } from './saml.service';
+import { OrganizationMembershipsModule } from '../../organization-memberships/organization-memberships.module';
 
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, OrganizationMembershipsModule],
   controllers: [
     SsoPublicController,
     SsoAdminController,

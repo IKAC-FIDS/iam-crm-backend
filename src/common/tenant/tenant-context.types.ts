@@ -6,8 +6,7 @@ export type TenantResolutionSource =
 export type TenantMembershipStatus =
   | 'invited'
   | 'active'
-  | 'suspended'
-  | 'revoked';
+  | 'suspended';
 
 /**
  * Server-side context for a tenant-owned operation.

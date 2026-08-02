@@ -42,7 +42,7 @@ describe('TenantContext architecture contract', () => {
     },
   );
 
-  it.each(['invited', 'suspended', 'revoked'] as const)(
+  it.each(['invited', 'suspended'] as const)(
     'rejects %s membership',
     (membershipStatus) => {
       expect(() =>

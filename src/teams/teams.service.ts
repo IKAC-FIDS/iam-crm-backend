@@ -14,6 +14,7 @@ import { AddTeamMemberDto } from './dto/add-team-member.dto';
 import { CreateTeamDto } from './dto/create-team.dto';
 import { FindTeamsDto } from './dto/find-teams.dto';
 import { UpdateTeamDto } from './dto/update-team.dto';
+import { OrganizationMembershipsService } from '../organization-memberships/organization-memberships.service';
 
 const teamInclude = {
   manager: {
@@ -55,6 +56,7 @@ export class TeamsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditLogService,
+    private readonly memberships: OrganizationMembershipsService,
   ) {}
 
   async findAll(query: FindTeamsDto, user: CurrentUserPayload) {
@@ -243,13 +245,20 @@ export class TeamsService {
 
     const member = await this.getUserInOrganization(dto.userId, user);
 
-    const updated = await this.prisma.user.update({
-      where: { id: member.id },
-      data: {
-        teamId: team.id,
-        team: team.code,
-      },
-      select: memberSelect,
+    const organizationId = getCurrentOrganizationId(user);
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.user.update({
+        where: { id: member.id },
+        data: { teamId: team.id, team: team.code },
+        select: memberSelect,
+      });
+      await this.memberships.syncDefaultTeam(
+        tx,
+        member.id,
+        organizationId,
+        team.id,
+      );
+      return result;
     });
 
     await this.audit.record({
@@ -275,13 +284,20 @@ export class TeamsService {
       throw new BadRequestException('User is not a member of this team');
     }
 
-    const updated = await this.prisma.user.update({
-      where: { id: member.id },
-      data: {
-        teamId: null,
-        team: null,
-      },
-      select: memberSelect,
+    const organizationId = getCurrentOrganizationId(user);
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.user.update({
+        where: { id: member.id },
+        data: { teamId: null, team: null },
+        select: memberSelect,
+      });
+      await this.memberships.syncDefaultTeam(
+        tx,
+        member.id,
+        organizationId,
+        null,
+      );
+      return result;
     });
 
     await this.audit.record({

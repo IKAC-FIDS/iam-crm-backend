@@ -4,14 +4,10 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Prisma, RefreshSession, User } from '@prisma/client';
+import { Prisma, User } from '@prisma/client';
 import { createHash, randomBytes } from 'crypto';
 import type { Request } from 'express';
 import { PrismaService } from '../prisma/prisma.service';
-
-type RefreshSessionWithUser = RefreshSession & {
-  user: User;
-};
 
 export interface CreatedRefreshSession {
   refreshToken: string;
@@ -40,6 +36,22 @@ export class RefreshTokenService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
   ) {}
+
+  async getActiveUser(refreshToken: string): Promise<User> {
+    const session = await this.prisma.refreshSession.findUnique({
+      where: { refreshTokenHash: this.hashRefreshToken(refreshToken) },
+      include: { user: true },
+    });
+    if (
+      !session ||
+      session.revokedAt ||
+      session.expiresAt <= new Date() ||
+      !session.user.isActive
+    ) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+    return session.user;
+  }
 
   async createSession(
     userId: string,

@@ -16,6 +16,7 @@ import { AuthService } from '../auth.service';
 import { StartPasskeyRegistrationDto } from './dto/start-passkey-registration.dto';
 import { VerifyPasskeyAuthenticationDto } from './dto/verify-passkey-authentication.dto';
 import { VerifyPasskeyRegistrationDto } from './dto/verify-passkey-registration.dto';
+import { OrganizationMembershipsService } from '../../organization-memberships/organization-memberships.service';
 
 type RegistrationResponse = Parameters<typeof verifyRegistrationResponse>[0]['response'];
 type AuthenticationResponse = Parameters<typeof verifyAuthenticationResponse>[0]['response'];
@@ -31,6 +32,7 @@ export class PasskeysService {
     private config: ConfigService,
     private authService: AuthService,
     private audit: AuditLogService,
+    private memberships: OrganizationMembershipsService,
   ) {}
 
   async listMine(user: CurrentUserPayload) {
@@ -161,6 +163,8 @@ export class PasskeysService {
       await this.recordLoginFailure(credentialId);
       throw new UnauthorizedException('Passkey authentication failed');
     }
+
+    await this.memberships.resolveEffectiveContext(passkey.user);
 
     const verification = await verifyAuthenticationResponse({
       response,
