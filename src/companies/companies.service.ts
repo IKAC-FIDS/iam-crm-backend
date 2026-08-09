@@ -9,7 +9,7 @@ import { AuditLogService } from '../audit-log/audit-log.service';
 import { CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { PaginatedResponse, PaginationDto } from '../common/dto/pagination.dto';
 import { OwnershipScope } from '../common/dto/ownership-scope.dto';
-import { getCurrentOrganizationId } from '../common/tenant/tenant-scope.util';
+import { getCurrentOrganizationId, tenantScope } from '../common/tenant/tenant-scope.util';
 import { parseApiDate } from '../common/dates/api-date.util';
 import { userMatchesTeam, userTeamScopeWhere } from '../common/tenant/team-scope.util';
 import { PrismaService } from '../prisma/prisma.service';
@@ -426,17 +426,11 @@ export class CompaniesService {
 
     await this.companyAccess.assertCompanyMutable(id, user);
 
-    const newOwner = await this.prisma.user.findUnique({
-      where: { id: dto.newOwnerId },
+    const newOwner = await this.prisma.user.findFirst({
+      where: { id: dto.newOwnerId, ...tenantScope.activeMembership(user) },
     });
 
     if (!newOwner) throw new NotFoundException('کاربر جدید پیدا نشد');
-
-    if (newOwner.organizationId !== getCurrentOrganizationId(user)) {
-      throw new BadRequestException(
-        'New owner must belong to the current organization',
-      );
-    }
 
     if (newOwner.role !== UserRole.REP && newOwner.role !== UserRole.MANAGER) {
       throw new BadRequestException('کاربر جدید باید نقش REP یا MANAGER داشته باشد');
@@ -550,20 +544,14 @@ export class CompaniesService {
       throw new ForbiddenException('شما اجازه تغییر مالکیت گروهی شرکت‌ها را ندارید');
     }
 
-    const newOwner = await this.prisma.user.findUnique({
-      where: { id: dto.newOwnerId },
+    const newOwner = await this.prisma.user.findFirst({
+      where: { id: dto.newOwnerId, ...tenantScope.activeMembership(user) },
     });
 
     if (!newOwner) throw new NotFoundException('کاربر جدید پیدا نشد');
 
     if (newOwner.role !== UserRole.REP && newOwner.role !== UserRole.MANAGER) {
       throw new BadRequestException('کاربر جدید باید نقش REP یا MANAGER داشته باشد');
-    }
-
-    if (newOwner.organizationId !== getCurrentOrganizationId(user)) {
-      throw new BadRequestException(
-        'New owner must belong to the current organization',
-      );
     }
 
     const companies = await this.prisma.company.findMany({
@@ -632,7 +620,7 @@ export class CompaniesService {
     const owner = await this.prisma.user.findFirst({
       where: {
         id: ownerId,
-        organizationId: getCurrentOrganizationId(user),
+        ...tenantScope.activeMembership(user),
         isActive: true,
       },
     });

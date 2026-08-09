@@ -11,15 +11,16 @@ import {
 } from '../src/common/decorators/permissions.decorator';
 import { OwnershipScope } from '../src/common/dto/ownership-scope.dto';
 import { DashboardController } from '../src/dashboard/dashboard.controller';
+import { tenantUser } from './helpers/tenant-user';
 
 const organizationId = '00000000-0000-4000-8000-000000000001';
-const user = {
+const user = tenantUser({
   userId: '00000000-0000-4000-8000-000000000002',
   email: 'user@example.com',
   role: UserRole.ADMIN,
   organizationId,
   teamId: 'team-1',
-};
+});
 const occurredAt = new Date('2026-07-29T08:00:00.000Z');
 const createdAt = new Date('2026-07-29T09:00:00.000Z');
 const row = {

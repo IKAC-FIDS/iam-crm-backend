@@ -3,7 +3,7 @@ import { MeetingStatus, Prisma } from '@prisma/client';
 import { AuditLogService } from '../audit-log/audit-log.service';
 import { CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { parseApiDate, parseApiDateRange } from '../common/dates/api-date.util';
-import { getCurrentOrganizationId } from '../common/tenant/tenant-scope.util';
+import { getCurrentOrganizationId, tenantScope } from '../common/tenant/tenant-scope.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { CancelMeetingDto } from './dto/cancel-meeting.dto';
 import { CompleteMeetingDto } from './dto/complete-meeting.dto';
@@ -41,7 +41,7 @@ export class MeetingsService {
 
   async create(dto: CreateMeetingDto, user: CurrentUserPayload) {
     const organizationId = getCurrentOrganizationId(user);
-    const values = await this.validate(dto, organizationId);
+    const values = await this.validate(dto, user);
     const meeting = await this.prisma.$transaction(async tx => tx.meeting.create({
       data: {
         organizationId, companyId: dto.companyId, opportunityId: dto.opportunityId,
@@ -59,14 +59,13 @@ export class MeetingsService {
   async update(id: string, dto: UpdateMeetingDto, user: CurrentUserPayload) {
     const current = await this.get(id, user);
     if (current.status !== MeetingStatus.SCHEDULED) throw new BadRequestException('Only scheduled meetings can be updated');
-    const organizationId = getCurrentOrganizationId(user);
     const merged = {
       companyId: dto.companyId ?? current.companyId, opportunityId: dto.opportunityId === undefined ? current.opportunityId ?? undefined : dto.opportunityId,
       startAt: dto.startAt ?? current.startAt.toISOString(), endAt: dto.endAt ?? current.endAt.toISOString(),
       reminderAt: dto.reminderAt === undefined ? current.reminderAt?.toISOString() : dto.reminderAt,
       assigneeUserIds: dto.assigneeUserIds, attendeePersonIds: dto.attendeePersonIds,
     };
-    const values = await this.validate(merged, organizationId);
+    const values = await this.validate(merged, user);
     const updated = await this.prisma.$transaction(async tx => {
       if (dto.assigneeUserIds) { await tx.meetingAssignee.deleteMany({ where: { meetingId: id } }); await tx.meetingAssignee.createMany({ data: dto.assigneeUserIds.map(userId => ({ meetingId: id, userId, assignedById: user.userId })) }); }
       if (dto.attendeePersonIds) { await tx.meetingAttendee.deleteMany({ where: { meetingId: id } }); await tx.meetingAttendee.createMany({ data: dto.attendeePersonIds.map(personId => ({ meetingId: id, personId })) }); }
@@ -116,14 +115,15 @@ export class MeetingsService {
 
   private async get(id: string, user: CurrentUserPayload) { const value = await this.prisma.meeting.findFirst({ where: { id, organizationId: getCurrentOrganizationId(user) }, include: meetingInclude }); if (!value) throw new NotFoundException('Meeting not found'); return value; }
   private title(value: string) { const v = value.trim(); if (!v) throw new BadRequestException('Meeting title is required'); return v; }
-  private async validate(dto: { companyId: string; opportunityId?: string; startAt: string; endAt: string; reminderAt?: string; assigneeUserIds?: string[]; attendeePersonIds?: string[] }, organizationId: string) {
+  private async validate(dto: { companyId: string; opportunityId?: string; startAt: string; endAt: string; reminderAt?: string; assigneeUserIds?: string[]; attendeePersonIds?: string[] }, user: CurrentUserPayload) {
+    const organizationId = getCurrentOrganizationId(user);
     const startAt = parseApiDate(dto.startAt, 'startAt'), endAt = parseApiDate(dto.endAt, 'endAt'), reminderAt = dto.reminderAt ? parseApiDate(dto.reminderAt, 'reminderAt') : undefined;
     if (endAt <= startAt) throw new BadRequestException('endAt must be after startAt');
     if (reminderAt && reminderAt >= startAt) throw new BadRequestException('reminderAt must be before startAt');
     if (reminderAt && startAt > new Date() && reminderAt < new Date()) throw new BadRequestException('Reminder for a future meeting cannot be in the past');
     const company = await this.prisma.company.findFirst({ where: { id: dto.companyId, organizationId }, select: { id: true } }); if (!company) throw new BadRequestException('Invalid company');
     if (dto.opportunityId) { const o = await this.prisma.opportunity.findFirst({ where: { id: dto.opportunityId, organizationId }, select: { companyId: true } }); if (!o || o.companyId !== dto.companyId) throw new BadRequestException('Opportunity must belong to the meeting company'); }
-    const users = [...new Set(dto.assigneeUserIds ?? [])]; if (users.length) { const count = await this.prisma.user.count({ where: { id: { in: users }, organizationId, isActive: true } }); if (count !== users.length) throw new BadRequestException('One or more assignees are invalid'); }
+    const users = [...new Set(dto.assigneeUserIds ?? [])]; if (users.length) { const count = await this.prisma.user.count({ where: { id: { in: users }, ...tenantScope.activeMembership(user), isActive: true } }); if (count !== users.length) throw new BadRequestException('One or more assignees are invalid'); }
     const people = [...new Set(dto.attendeePersonIds ?? [])]; if (people.length) { const count = await this.prisma.person.count({ where: { id: { in: people }, companyId: dto.companyId, company: { organizationId } } }); if (count !== people.length) throw new BadRequestException('One or more attendees do not belong to the meeting company'); }
     return { startAt, endAt, reminderAt };
   }

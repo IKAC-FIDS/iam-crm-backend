@@ -207,8 +207,8 @@ export class ActivitiesService {
   // متد کمکی: بررسی دسترسی به مخاطب
   // ============================================================
   private async validatePersonAccess(personId: string, user: CurrentUserPayload) {
-    const person = await this.prisma.person.findUnique({
-      where: { id: personId },
+    const person = await this.prisma.person.findFirst({
+      where: { id: personId, company: { organizationId: getCurrentOrganizationId(user) } },
       include: { company: { select: { ownerId: true, owner: { select: { team: true, teamId: true } } } } },
     });
 
@@ -222,8 +222,8 @@ export class ActivitiesService {
   }
 
   private async findActivityForMutation(activityId: string, user: CurrentUserPayload) {
-    const activity = await this.prisma.activity.findUnique({
-      where: { id: activityId },
+    const activity = await this.prisma.activity.findFirst({
+      where: { id: activityId, company: { organizationId: getCurrentOrganizationId(user) } },
       include: {
         company: true,
         person: true,
@@ -288,7 +288,10 @@ export class ActivitiesService {
 
     // اگر personId ارسال شده، بررسی دسترسی به مخاطب
     if (dto.personId) {
-      await this.validatePersonAccess(dto.personId, user);
+      const person = await this.validatePersonAccess(dto.personId, user);
+      if (person.companyId !== dto.companyId) {
+        throw new BadRequestException('Person must belong to the activity company');
+      }
     }
     if (dto.opportunityId) await this.validateOpportunityCompany(dto.opportunityId, dto.companyId);
 
@@ -408,6 +411,7 @@ export class ActivitiesService {
 
     const where = {
       userId: user.userId,
+      company: { organizationId: getCurrentOrganizationId(user) },
       nextActionDate: { lte: new Date() },
       completedAt: null,
     };
@@ -438,8 +442,7 @@ export class ActivitiesService {
   }
 
   private async validateOpportunityCompany(opportunityId: string, companyId: string) {
-    const opportunity = await this.prisma.opportunity.findUnique({ where: { id: opportunityId }, select: { companyId: true } });
+    const opportunity = await this.prisma.opportunity.findFirst({ where: { id: opportunityId, companyId }, select: { companyId: true } });
     if (!opportunity) throw new NotFoundException('Opportunity not found');
-    if (opportunity.companyId !== companyId) throw new BadRequestException('Opportunity must belong to the activity company');
   }
 }

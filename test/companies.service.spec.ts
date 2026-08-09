@@ -3,13 +3,14 @@ import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { CompaniesService } from '../src/companies/companies.service';
 import { FindCompanyOptionsDto } from '../src/companies/dto/find-company-options.dto';
+import { tenantUser } from './helpers/tenant-user';
 
 const organizationId = '00000000-0000-4000-8000-000000000001';
 const otherOrganizationId = '00000000-0000-4000-8000-000000000002';
 const companyId = '00000000-0000-4000-8000-000000000010';
 const parentId = '00000000-0000-4000-8000-000000000011';
 const descendantId = '00000000-0000-4000-8000-000000000012';
-const user = { userId: companyId, email: 'user@example.com', role: 'ADMIN' as const, organizationId };
+const user = tenantUser({ userId: companyId, email: 'user@example.com', role: 'ADMIN' as const, organizationId });
 
 const option = {
   id: companyId,

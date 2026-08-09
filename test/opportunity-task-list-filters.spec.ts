@@ -1,9 +1,10 @@
 import { TaskStatus, UserRole } from '@prisma/client';
 import { OpportunitiesService } from '../src/opportunities/opportunities.service';
 import { TasksService } from '../src/tasks/tasks.service';
+import { tenantUser } from './helpers/tenant-user';
 
 const organizationId = '00000000-0000-4000-8000-000000000001';
-const user = { userId: 'user-1', email: 'a@example.com', role: UserRole.ADMIN, organizationId };
+const user = tenantUser({ userId: 'user-1', email: 'a@example.com', role: UserRole.ADMIN, organizationId });
 
 describe('activeOnly opportunity filtering', () => {
   function setup() {

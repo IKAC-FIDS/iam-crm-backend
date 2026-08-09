@@ -11,16 +11,17 @@ import {
 } from '@prisma/client';
 import { Readable } from 'node:stream';
 import { AttachmentsService } from '../src/attachments/attachments.service';
+import { tenantUser } from './helpers/tenant-user';
 
 const organizationId = '00000000-0000-4000-8000-000000000001';
 const meetingId = '00000000-0000-4000-8000-000000000010';
 const attachmentId = '00000000-0000-4000-8000-000000000020';
-const user = {
+const user = tenantUser({
   userId: 'user-1',
   email: 'user@example.com',
   role: UserRole.ADMIN,
   organizationId,
-};
+});
 const file = {
   originalname: 'minutes.pdf',
   mimetype: 'application/pdf',

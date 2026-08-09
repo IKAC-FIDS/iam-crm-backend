@@ -1,9 +1,10 @@
 import { BadRequestException } from '@nestjs/common';
 import { MeetingMode, UserRole } from '@prisma/client';
 import { MeetingsService } from '../src/meetings/meetings.service';
+import { tenantUser } from './helpers/tenant-user';
 
 const organizationId = '00000000-0000-4000-8000-000000000001';
-const user = { userId: 'user-1', email: 'a@example.com', role: UserRole.ADMIN, organizationId };
+const user = tenantUser({ userId: 'user-1', email: 'a@example.com', role: UserRole.ADMIN, organizationId });
 const base = { companyId: '00000000-0000-4000-8000-000000000010', title: 'Review', mode: MeetingMode.ONLINE, startAt: '2099-01-01T10:00:00.000Z', endAt: '2099-01-01T11:00:00.000Z' };
 
 function setup() {

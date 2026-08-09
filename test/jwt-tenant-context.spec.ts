@@ -20,6 +20,7 @@ describe('JwtStrategy Tenant boundary', () => {
     const strategy = new JwtStrategy(
       { get: jest.fn().mockReturnValue('test-secret') } as any,
       resolver as any,
+      { setOrganizationId: jest.fn() } as any,
     );
     const req = {
       requestId: 'request-1',

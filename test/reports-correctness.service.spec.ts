@@ -1,8 +1,9 @@
 import { UserRole } from '@prisma/client';
 import { OwnershipScope } from '../src/common/dto/ownership-scope.dto';
 import { ReportsService } from '../src/reports/reports.service';
+import { tenantUser } from './helpers/tenant-user';
 const organizationId = '00000000-0000-4000-8000-000000000001';
-const user = { userId: 'user-1', email: 'a@example.com', role: UserRole.ADMIN, organizationId };
+const user = tenantUser({ userId: 'user-1', email: 'a@example.com', role: UserRole.ADMIN, organizationId });
 const range = { gte: new Date('2026-07-01T00:00:00.000Z'), lt: new Date('2026-08-01T00:00:00.000Z') };
 
 describe('ReportsService correctness filters', () => {

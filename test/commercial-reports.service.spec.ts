@@ -1,13 +1,14 @@
 import { PaymentStatus, Prisma, SalesChannel, UserRole } from "@prisma/client";
 import { CommercialReportsService } from "../src/reports/commercial-reports.service";
 import { ReportingScopeService } from "../src/reports/reporting-scope.service";
+import { tenantUser } from "./helpers/tenant-user";
 
-const user = {
+const user = tenantUser({
   userId: "u1",
   email: "u@example.com",
   role: UserRole.ADMIN,
   organizationId: "org1",
-};
+});
 
 describe("CommercialReportsService", () => {
   it("keeps financial totals IRR-only, counts each payment once, and enforces organization scope", async () => {

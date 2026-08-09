@@ -5,6 +5,7 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import type { Request } from 'express';
 import type { RequestWithRequestId } from '../common/logging/http-log-context';
 import { TenantResolverService } from '../organization-memberships/tenant-resolver.service';
+import { AuditRequestContextService } from '../audit-log/audit-request-context.service';
 
 interface JwtPayload {
   sub?: string;
@@ -24,6 +25,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
     configService: ConfigService,
     private readonly tenantResolver: TenantResolverService,
+    private readonly auditRequestContext: AuditRequestContextService,
   ) {
     const secret = configService.get<string>('JWT_SECRET');
 
@@ -56,6 +58,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       .catch(() => {
         throw new UnauthorizedException('No active organization membership');
       });
+
+    this.auditRequestContext.setOrganizationId(effective.organizationId);
 
     return {
       userId: payload.sub,

@@ -9,6 +9,7 @@ import {
   NotificationEntityType,
   NotificationPriority,
   NotificationType,
+  OrganizationMembershipStatus,
   Prisma,
   UserRole,
 } from '@prisma/client';
@@ -45,7 +46,7 @@ const notificationInclude = {
 export interface NotifyUserInput {
   recipientId: string;
   actorId?: string | null;
-  organizationId?: string | null;
+  organizationId: string;
   type: NotificationType;
   priority?: NotificationPriority;
   title: string;
@@ -335,9 +336,13 @@ export class NotificationsService {
       return null;
     }
 
-    const recipient = await this.prisma.user.findUnique({
+    const recipient = await this.prisma.user.findFirst({
       where: {
         id: input.recipientId,
+        isActive: true,
+        organizationMemberships: {
+          some: { organizationId: input.organizationId, status: OrganizationMembershipStatus.ACTIVE },
+        },
       },
       select: {
         id: true,
@@ -352,7 +357,7 @@ export class NotificationsService {
 
     return this.prisma.notification.create({
       data: {
-        organizationId: input.organizationId ?? recipient.organizationId,
+        organizationId: input.organizationId,
         recipientId: input.recipientId,
         actorId: input.actorId ?? undefined,
         type: input.type,
@@ -489,8 +494,13 @@ export class NotificationsService {
         id: {
           in: uniqueIds,
         },
-        organizationId: getCurrentOrganizationId(user),
         isActive: true,
+        organizationMemberships: {
+          some: {
+            organizationId: getCurrentOrganizationId(user),
+            status: OrganizationMembershipStatus.ACTIVE,
+          },
+        },
       },
       select: {
         id: true,

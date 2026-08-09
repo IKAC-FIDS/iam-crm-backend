@@ -171,8 +171,8 @@ export class PeopleService {
   // ۲. دریافت یک مخاطب (با بررسی دسترسی)
   // ============================================================
   async findOne(id: string, user: CurrentUserPayload) {
-    const person = await this.prisma.person.findUnique({
-      where: { id },
+    const person = await this.prisma.person.findFirst({
+      where: { id, company: { organizationId: getCurrentOrganizationId(user) } },
       include: {
       company: true,
       contacts: true,  // ← اضافه شد
@@ -192,7 +192,6 @@ export class PeopleService {
     });
     if (!person) throw new NotFoundException('مخاطب پیدا نشد');
 
-    await this.assertCompanyReadable(person.companyId, user);
     return this.withDomainAliases(person);
   }
 
@@ -283,8 +282,8 @@ export class PeopleService {
   // ۴. ویرایش مخاطب (با بررسی دسترسی)
   // ============================================================
   async update(id: string, dto: UpdatePersonDto, user: CurrentUserPayload) {
-    const person = await this.prisma.person.findUnique({
-      where: { id },
+    const person = await this.prisma.person.findFirst({
+      where: { id, company: { organizationId: getCurrentOrganizationId(user) } },
       include: { company: true },
     });
     if (!person) throw new NotFoundException('مخاطب پیدا نشد');
@@ -307,17 +306,19 @@ export class PeopleService {
   // ۵. حذف مخاطب (با بررسی دسترسی)
   // ============================================================
   async remove(id: string, user: CurrentUserPayload) {
-    const person = await this.prisma.person.findUnique({
-      where: { id },
+    const person = await this.prisma.person.findFirst({
+      where: { id, company: { organizationId: getCurrentOrganizationId(user) } },
       include: { company: true },
     });
     if (!person) throw new NotFoundException('مخاطب پیدا نشد');
 
     await this.validateCompanyAccess(person.companyId, user);
 
-    return this.prisma.person.delete({
-      where: { id },
+    const deleted = await this.prisma.person.deleteMany({
+      where: { id, company: { organizationId: getCurrentOrganizationId(user) } },
     });
+    if (!deleted.count) throw new NotFoundException('Person not found');
+    return person;
   }
 
   private withDomainAliases<T extends { title?: string | null; personaTag?: string | null }>(

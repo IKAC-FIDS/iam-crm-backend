@@ -1,14 +1,15 @@
 import { BadRequestException } from '@nestjs/common';
 import { Priority, TaskStatus, UserRole } from '@prisma/client';
 import { TasksService } from '../src/tasks/tasks.service';
+import { tenantUser } from './helpers/tenant-user';
 
 const organizationId = '00000000-0000-4000-8000-000000000001';
-const user = {
+const user = tenantUser({
   userId: 'user-1',
   email: 'admin@example.com',
   role: UserRole.ADMIN,
   organizationId,
-};
+});
 
 function createPrismaService() {
   return {
@@ -33,7 +34,7 @@ function createPrismaService() {
       findFirst: jest.fn(),
     },
     user: {
-      findUnique: jest.fn().mockResolvedValue({
+      findFirst: jest.fn().mockResolvedValue({
         id: user.userId,
         isActive: true,
         role: UserRole.ADMIN,

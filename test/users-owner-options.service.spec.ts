@@ -5,13 +5,14 @@ import { validate } from 'class-validator';
 import { FindOwnerOptionsDto } from '../src/users/dto/find-owner-options.dto';
 import { UsersService } from '../src/users/users.service';
 import { PermissionsGuard } from '../src/common/guards/permissions.guard';
+import { tenantUser } from './helpers/tenant-user';
 
 const organizationId = '00000000-0000-4000-8000-000000000001';
 const otherOrganizationId = '00000000-0000-4000-8000-000000000002';
 const callerId = '00000000-0000-4000-8000-000000000010';
 const selectedId = '00000000-0000-4000-8000-000000000011';
 const teamId = '00000000-0000-4000-8000-000000000012';
-const rep = { userId: callerId, email: 'rep@example.com', role: UserRole.REP, organizationId };
+const rep = tenantUser({ userId: callerId, email: 'rep@example.com', role: UserRole.REP, organizationId });
 const manager = { ...rep, role: UserRole.MANAGER, teamId };
 const option = {
   id: selectedId,
@@ -134,15 +135,16 @@ describe('UsersService tenant isolation audit', () => {
   it('returns 404 for cross-organization activation and deactivation targets', async () => {
     const { service, prisma } = setup();
     prisma.user.findFirst.mockResolvedValue(null);
-    await expect(service.deactivate(selectedId, { ...rep, organizationId: otherOrganizationId })).rejects.toBeInstanceOf(NotFoundException);
-    await expect(service.activate(selectedId, { ...rep, organizationId: otherOrganizationId })).rejects.toBeInstanceOf(NotFoundException);
+    const otherTenant = tenantUser({ ...rep, organizationId: otherOrganizationId }, otherOrganizationId);
+    await expect(service.deactivate(selectedId, otherTenant)).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.activate(selectedId, otherTenant)).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('returns 404 before changing the role of a user in another organization', async () => {
     const { service, prisma } = setup();
     prisma.user.findFirst.mockResolvedValue(null);
     await expect(
-      service.updateUserRole(selectedId, { role: UserRole.REP }, { ...rep, organizationId: otherOrganizationId }),
+      service.updateUserRole(selectedId, { role: UserRole.REP }, tenantUser({ ...rep, organizationId: otherOrganizationId }, otherOrganizationId)),
     ).rejects.toBeInstanceOf(NotFoundException);
     expect(prisma.user.findFirst).toHaveBeenCalledWith(expect.objectContaining({
       where: { id: selectedId, organizationId: otherOrganizationId },

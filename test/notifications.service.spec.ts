@@ -1,5 +1,6 @@
 import { NotificationType, UserRole } from '@prisma/client';
 import { NotificationsService } from '../src/notifications/notifications.service';
+import { tenantUser } from './helpers/tenant-user';
 
 describe('NotificationsService metadata compatibility', () => {
   it('returns existing notification metadata unchanged', async () => {
@@ -28,12 +29,12 @@ describe('NotificationsService metadata compatibility', () => {
 
     const result = await service.findAll(
       {},
-      {
+      tenantUser({
         userId: 'user-1',
         email: 'user@example.com',
         role: UserRole.ADMIN,
         organizationId: 'organization-1',
-      },
+      }),
     );
 
     expect(result.data[0].metadata).toBe(metadata);
@@ -66,12 +67,12 @@ describe('NotificationsService metadata compatibility', () => {
 
     await service.findAll(
       { search: 'معرفی محصول' },
-      {
+      tenantUser({
         userId: 'user-1',
         email: 'user@example.com',
         role: UserRole.ADMIN,
         organizationId: 'organization-1',
-      },
+      }),
     );
 
     const where = prisma.notification.findMany.mock.calls[0][0].where;

@@ -1,5 +1,6 @@
 import { ActivityType, UserRole } from '@prisma/client';
 import { ReportsService } from '../src/reports/reports.service';
+import { tenantUser } from './helpers/tenant-user';
 
 function createPrismaService() {
   return {
@@ -24,12 +25,12 @@ describe('ReportsService date filters', () => {
         startDate: '2026-07-01',
         endDate: '2026-07-12',
       },
-      {
+      tenantUser({
         userId: '00000000-0000-4000-8000-000000000001',
         email: 'admin@example.com',
         role: UserRole.ADMIN,
         organizationId: '00000000-0000-4000-8000-000000000001',
-      },
+      }),
     );
 
     expect(result.startDate?.toISOString()).toBe('2026-07-01T00:00:00.000Z');

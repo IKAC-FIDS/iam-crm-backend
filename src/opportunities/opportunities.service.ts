@@ -15,7 +15,7 @@ import { ChangeOpportunityStageDto } from './dto/change-opportunity-stage.dto';
 import { CreateOpportunityDto } from './dto/create-opportunity.dto';
 import { FindOpportunitiesDto } from './dto/find-opportunities.dto';
 import { UpdateOpportunityDto } from './dto/update-opportunity.dto';
-import { getCurrentOrganizationId } from '../common/tenant/tenant-scope.util';
+import { getCurrentOrganizationId, tenantScope } from '../common/tenant/tenant-scope.util';
 import { userMatchesTeam, userTeamScopeWhere } from '../common/tenant/team-scope.util';
 import { parseApiDate, parseApiDateRange } from '../common/dates/api-date.util';
 import { OwnershipScope } from '../common/dto/ownership-scope.dto';
@@ -892,10 +892,10 @@ export class OpportunitiesService {
   }
 
   private async validateOwner(ownerId: string, user: CurrentUserPayload) {
-    const owner = await this.prisma.user.findUnique({
+    const owner = await this.prisma.user.findFirst({
       where: {
         id: ownerId,
-        organizationId: getCurrentOrganizationId(user),
+        ...tenantScope.activeMembership(user),
       },
     });
 

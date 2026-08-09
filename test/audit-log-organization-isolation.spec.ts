@@ -1,13 +1,14 @@
 import { NotFoundException } from "@nestjs/common";
 import { AuditLogService } from "../src/audit-log/audit-log.service";
+import { tenantUser } from "./helpers/tenant-user";
 
 describe("AuditLogService organization isolation", () => {
-  const user = {
+  const user = tenantUser({
     userId: "user-1",
     email: "u@example.com",
     role: "ADMIN",
     organizationId: "org-1",
-  } as any;
+  } as any);
 
   it("forces the current organization on list queries and batches actor lookup", async () => {
     const row = {

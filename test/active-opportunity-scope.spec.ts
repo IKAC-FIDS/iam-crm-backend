@@ -1,5 +1,6 @@
 import { activeOpportunityStateWhere } from "../src/common/opportunities/active-opportunity-scope";
 import { ReportingScopeService } from "../src/reports/reporting-scope.service";
+import { tenantUser } from "./helpers/tenant-user";
 
 describe("canonical active opportunity scope", () => {
   it("uses isTerminal only and excludes archived opportunity/company state", () => {
@@ -14,7 +15,7 @@ describe("canonical active opportunity scope", () => {
   });
 
   it("combines canonical state with tenant and reporting filters", () => {
-    const user = { userId: "u1", organizationId: "org1" } as any;
+    const user = tenantUser({ userId: "u1", email: "u@example.com", role: "ADMIN", organizationId: "org1" } as any);
     const where = new ReportingScopeService().opportunity(
       {
         ownerIds: ["owner1"],

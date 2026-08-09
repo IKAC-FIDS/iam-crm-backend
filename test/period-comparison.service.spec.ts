@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { PeriodComparisonService } from "../src/reports/period-comparison.service";
+import { tenantUser } from "./helpers/tenant-user";
 
 describe("PeriodComparisonService", () => {
   it("uses event dates, stable metric keys, and defined zero-baseline semantics", async () => {
@@ -38,12 +39,12 @@ describe("PeriodComparisonService", () => {
         compareStartDate: "2025-01-01",
         compareEndDate: "2025-01-10",
       } as any,
-      {
+      tenantUser({
         userId: "u",
         email: "e",
         role: "ADMIN",
         organizationId: "org-1",
-      } as any,
+      } as any),
     );
     const metrics = result.groups.flatMap((group: any) => group.metrics);
     const won = metrics.find(

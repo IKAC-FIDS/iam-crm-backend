@@ -21,4 +21,10 @@ export class AuditRequestContextService {
   getContext(): AuditRequestContext | undefined {
     return this.storage.getStore();
   }
+
+  /** Bind the resolver-validated tenant to the current request's audit scope. */
+  setOrganizationId(organizationId: string): void {
+    const context = this.storage.getStore();
+    if (context) context.organizationId = organizationId;
+  }
 }

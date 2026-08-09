@@ -23,7 +23,7 @@ import { CreateTaskDto } from './dto/create-task.dto';
 import { FindTasksDto } from './dto/find-tasks.dto';
 import { RescheduleTaskDto } from './dto/reschedule-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
-import { getCurrentOrganizationId } from '../common/tenant/tenant-scope.util';
+import { getCurrentOrganizationId, tenantScope } from '../common/tenant/tenant-scope.util';
 import { userMatchesTeam, userTeamScopeWhere } from '../common/tenant/team-scope.util';
 import { parseApiDate, parseApiDateRange } from '../common/dates/api-date.util';
 
@@ -1048,10 +1048,10 @@ export class TasksService {
     assignedToId: string,
     user: CurrentUserPayload,
   ) {
-    const assignee = await this.prisma.user.findUnique({
+    const assignee = await this.prisma.user.findFirst({
       where: {
         id: assignedToId,
-        organizationId: getCurrentOrganizationId(user),
+        ...tenantScope.activeMembership(user),
       },
     });
 
@@ -1141,6 +1141,7 @@ private async notifyTaskAssigned(
   }
 
   await this.notifications.notifyUser({
+    organizationId: getCurrentOrganizationId(user),
     recipientId: task.assignedToId,
     actorId: user.userId,
     type: NotificationType.TASK_ASSIGNED,
@@ -1167,6 +1168,7 @@ private async notifyTaskCompleted(
   }
 
   await this.notifications.notifyUser({
+    organizationId: getCurrentOrganizationId(user),
     recipientId: task.createdById,
     actorId: user.userId,
     type: NotificationType.TASK_COMPLETED,
@@ -1194,6 +1196,7 @@ private async notifyTaskRescheduled(
   }
 
   await this.notifications.notifyUser({
+    organizationId: getCurrentOrganizationId(user),
     recipientId: task.assignedToId,
     actorId: user.userId,
     type: NotificationType.TASK_RESCHEDULED,

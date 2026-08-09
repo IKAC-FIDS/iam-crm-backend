@@ -7,14 +7,15 @@ import { ApiResponseInterceptor } from "../src/common/interceptors/api-response.
 import { AdvancedReportsService } from "../src/reports/advanced-reports.service";
 import { ReportsController } from "../src/reports/reports.controller";
 import { ReportingScopeService } from "../src/reports/reporting-scope.service";
+import { tenantUser } from "./helpers/tenant-user";
 
 const organizationId = "00000000-0000-4000-8000-000000000001";
-const user = {
+const user = tenantUser({
   userId: "user-1",
   email: "admin@example.com",
   role: UserRole.ADMIN,
   organizationId,
-};
+});
 
 describe("AdvancedReportsService", () => {
   const activeFixture = [

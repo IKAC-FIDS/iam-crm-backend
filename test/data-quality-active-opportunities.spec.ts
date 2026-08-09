@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { DataQualityService } from "../src/reports/data-quality.service";
 import { ReportingScopeService } from "../src/reports/reporting-scope.service";
+import { tenantUser } from "./helpers/tenant-user";
 
 describe("DataQualityService active opportunities", () => {
   it("evaluates NONE terminalType opportunities in organization quality rules", async () => {
@@ -41,12 +42,12 @@ describe("DataQualityService active opportunities", () => {
     );
     const result = await service.report(
       {} as any,
-      {
+      tenantUser({
         userId: "user-1",
         email: "u@example.com",
         role: "ADMIN",
         organizationId: "org-1",
-      } as any,
+      } as any),
     );
 
     const probability = result.organization.rules.find(
