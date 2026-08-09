@@ -1,5 +1,7 @@
 /** Trusted sources from which a future server-side context may be resolved. */
 export type TenantResolutionSource =
+  | 'token-session'
+  | 'explicit-selection'
   | 'authenticated-membership'
   | 'migration-compatibility';
 

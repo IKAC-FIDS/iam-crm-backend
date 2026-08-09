@@ -7,6 +7,7 @@ import {
 import { Reflector } from '@nestjs/core';
 import { UserRole } from '@prisma/client';
 import NodeCache from 'node-cache';
+import type { TenantContext } from '../tenant/tenant-context.types';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   PERMISSIONS_KEY,
@@ -22,6 +23,9 @@ type RequestUser = {
   team?: string | null;
   teamId?: string | null;
   roleId?: string | null;
+  organizationId?: string | null;
+  membershipId?: string | null;
+  tenantContext?: TenantContext;
 };
 
 @Injectable()
@@ -63,10 +67,18 @@ export class PermissionsGuard implements CanActivate {
       throw new ForbiddenException('حساب کاربری فعال نیست');
     }
 
+    const discriminator = requestUser.tenantContext
+      ? `${requestUser.tenantContext.organizationId}:${requestUser.tenantContext.membershipId}`
+      : `${requestUser.organizationId ?? 'legacy'}:${requestUser.membershipId ?? 'legacy'}`;
     const effectiveRoleId = requestUser.roleId ?? dbUser.roleId;
-    const userPermissions = effectiveRoleId
-      ? await this.getPermissionsForRoleId(effectiveRoleId)
-      : await this.getPermissionsForRole(requestUser.role ?? dbUser.role);
+    const userPermissions = requestUser.tenantContext
+      ? new Set(requestUser.tenantContext.permissions)
+      : effectiveRoleId
+        ? await this.getPermissionsForRoleId(effectiveRoleId, discriminator)
+        : await this.getPermissionsForRole(
+            requestUser.role ?? dbUser.role,
+            discriminator,
+          );
 
     const allowed =
       normalizedPolicy.mode === 'any'
@@ -110,8 +122,11 @@ export class PermissionsGuard implements CanActivate {
     };
   }
 
-  private async getPermissionsForRole(role: UserRole): Promise<Set<string>> {
-    const cacheKey = `permissions:${role}`;
+  private async getPermissionsForRole(
+    role: UserRole,
+    discriminator: string,
+  ): Promise<Set<string>> {
+    const cacheKey = `permissions:${discriminator}:${role}`;
     let permissions = cache.get<string[]>(cacheKey);
 
     if (!permissions) {
@@ -127,8 +142,11 @@ export class PermissionsGuard implements CanActivate {
     return new Set(permissions);
   }
 
-  private async getPermissionsForRoleId(roleId: string): Promise<Set<string>> {
-    const cacheKey = `permissions:role:${roleId}`;
+  private async getPermissionsForRoleId(
+    roleId: string,
+    discriminator: string,
+  ): Promise<Set<string>> {
+    const cacheKey = `permissions:${discriminator}:role:${roleId}`;
     let permissions = cache.get<string[]>(cacheKey);
     if (!permissions) {
       const rows = await this.prisma.rolePermission.findMany({
@@ -143,7 +161,12 @@ export class PermissionsGuard implements CanActivate {
 
   static clearCache(role?: UserRole | string) {
     if (role) {
-      cache.del(`permissions:${role}`);
+      const suffixes = [`:${role}`, `:role:${role}`];
+      cache.del(
+        cache
+          .keys()
+          .filter((key) => suffixes.some((suffix) => key.endsWith(suffix))),
+      );
       return;
     }
 

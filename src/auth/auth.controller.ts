@@ -22,6 +22,7 @@ import {
 } from '../common/cookies/refresh-token-cookie';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
+import { SwitchTenantDto } from './dto/switch-tenant.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -96,6 +97,34 @@ export class AuthController {
     return {
       success: true,
     };
+  }
+
+  @Post('switch-tenant')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  async switchTenant(
+    @CurrentUser() user: CurrentUserPayload,
+    @Body() dto: SwitchTenantDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const refreshToken = getRefreshTokenFromRequest(req);
+    if (!refreshToken) {
+      throw new UnauthorizedException('Refresh token is missing');
+    }
+    const result = await this.authService.switchTenant(
+      user,
+      dto.organizationId,
+      refreshToken,
+      req,
+    );
+    setRefreshTokenCookie(
+      res,
+      result.refreshToken,
+      result.refreshTokenMaxAgeMs,
+    );
+    return this.authService.toPublicAuthResponse(result);
   }
 
   @Post('logout-all')

@@ -16,7 +16,7 @@ import { AuthService } from '../auth.service';
 import { StartPasskeyRegistrationDto } from './dto/start-passkey-registration.dto';
 import { VerifyPasskeyAuthenticationDto } from './dto/verify-passkey-authentication.dto';
 import { VerifyPasskeyRegistrationDto } from './dto/verify-passkey-registration.dto';
-import { OrganizationMembershipsService } from '../../organization-memberships/organization-memberships.service';
+import { TenantResolverService } from '../../organization-memberships/tenant-resolver.service';
 
 type RegistrationResponse = Parameters<typeof verifyRegistrationResponse>[0]['response'];
 type AuthenticationResponse = Parameters<typeof verifyAuthenticationResponse>[0]['response'];
@@ -32,7 +32,7 @@ export class PasskeysService {
     private config: ConfigService,
     private authService: AuthService,
     private audit: AuditLogService,
-    private memberships: OrganizationMembershipsService,
+    private tenantResolver: TenantResolverService,
   ) {}
 
   async listMine(user: CurrentUserPayload) {
@@ -164,7 +164,9 @@ export class PasskeysService {
       throw new UnauthorizedException('Passkey authentication failed');
     }
 
-    await this.memberships.resolveEffectiveContext(passkey.user);
+    const tenant = await this.tenantResolver.resolveAuthenticatedTenant(
+      passkey.user.id,
+    );
 
     const verification = await verifyAuthenticationResponse({
       response,
@@ -207,7 +209,7 @@ export class PasskeysService {
       metadata: { credentialId: passkey.credentialId },
     });
 
-    return this.authService.buildLoginResponse(passkey.user);
+    return this.authService.buildLoginResponse(passkey.user, tenant);
   }
 
   async listForUser(userId: string) {

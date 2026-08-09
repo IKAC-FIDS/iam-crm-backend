@@ -1,14 +1,25 @@
-import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  Logger,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { User, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import type { Request } from 'express';
 import { buildHttpLogContext } from '../common/logging/http-log-context';
+import type { CurrentUserPayload } from '../common/decorators/current-user.decorator';
+import { AuditLogService } from '../audit-log/audit-log.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenService } from './refresh-token.service';
 import { OrganizationMembershipsService } from '../organization-memberships/organization-memberships.service';
+import {
+  ResolvedTenantContext,
+  TenantResolverService,
+} from '../organization-memberships/tenant-resolver.service';
 
 export interface AuthUserResponse {
   id: string;
@@ -49,6 +60,8 @@ export class AuthService {
     private readonly refreshTokenService: RefreshTokenService,
     private readonly config: ConfigService,
     private readonly memberships: OrganizationMembershipsService,
+    private readonly tenantResolver: TenantResolverService,
+    private readonly audit: AuditLogService,
   ) {}
 
   async login(dto: LoginDto, req?: Request): Promise<AuthSessionLoginResponse> {
@@ -106,24 +119,36 @@ export class AuthService {
       JSON.stringify(this.buildAuthLogContext(dto.email, req)),
     );
 
-    await this.memberships.resolveEffectiveContext(user);
+    const tenant = await this.tenantResolver.resolveAuthenticatedTenant(user.id, {
+      requestId: this.requestId(req),
+    });
     await this.recordSuccessfulLogin(user.id, req);
 
-    return this.buildSessionLoginResponse(user, req);
+    return this.buildSessionLoginResponse(user, req, tenant);
   }
 
   async refresh(
     refreshToken: string,
     req?: Request,
   ): Promise<AuthSessionLoginResponse> {
-    const currentUser = await this.refreshTokenService.getActiveUser(refreshToken);
-    await this.memberships.resolveEffectiveContext(currentUser);
+    const activeSession = await this.refreshTokenService.getActiveSession(refreshToken);
+    const effective = await this.tenantResolver.resolveAuthenticatedTenant(
+      activeSession.user.id,
+      {
+        claims: activeSession.tenantContext ?? undefined,
+        requestId: this.requestId(req),
+      },
+    );
     const rotated = await this.refreshTokenService.rotateRefreshToken(
       refreshToken,
       req,
+      {
+        activeOrganizationId: effective.organizationId,
+        membershipId: effective.membershipId,
+      },
     );
 
-    const accessResponse = await this.buildLoginResponse(rotated.user);
+    const accessResponse = await this.buildLoginResponse(rotated.user, effective);
 
     return {
       ...accessResponse,
@@ -154,15 +179,26 @@ export class AuthService {
   async buildSessionLoginResponse(
     user: User,
     req?: Request,
+    resolved?: ResolvedTenantContext,
   ): Promise<AuthSessionLoginResponse> {
     const context = this.buildAuthLogContext(user.email, req);
     this.logger.log('Login token generation started', JSON.stringify(context));
 
     try {
-      const accessResponse = await this.buildLoginResponse(user);
+      const effective =
+        resolved ??
+        (await this.tenantResolver.resolveAuthenticatedTenant(user.id, {
+          requestId: this.requestId(req),
+        }));
+      const accessResponse = await this.buildLoginResponse(user, effective);
       const refreshSession = await this.refreshTokenService.createSession(
         user.id,
         req,
+        undefined,
+        {
+          activeOrganizationId: effective.organizationId,
+          membershipId: effective.membershipId,
+        },
       );
 
       this.logger.log('Login token generation succeeded', JSON.stringify(context));
@@ -174,20 +210,16 @@ export class AuthService {
     }
   }
 
-  async buildLoginResponse(user: User): Promise<AuthAccessResponse> {
-    const effective = await this.memberships.resolveEffectiveContext(user);
+  async buildLoginResponse(
+    user: User,
+    resolved?: ResolvedTenantContext,
+  ): Promise<AuthAccessResponse> {
+    const effective =
+      resolved ??
+      (await this.tenantResolver.resolveAuthenticatedTenant(user.id));
     const assignedRole = effective.roleId
       ? await this.prisma.role.findUnique({ where: { id: effective.roleId } })
       : null;
-    const rolePermissions = await this.prisma.rolePermission.findMany({
-      where: effective.roleId
-        ? { roleId: effective.roleId }
-        : { role: effective.role },
-      include: { permission: true },
-    });
-
-    const permissions = rolePermissions.filter((rp) => rp.permission.isActive).map((rp) => rp.permission.action);
-
     const payload = {
       sub: user.id,
       email: user.email,
@@ -197,6 +229,8 @@ export class AuthService {
       teamCode: effective.teamCode,
       teamName: effective.teamName,
       organizationId: effective.organizationId,
+      activeOrganizationId: effective.organizationId,
+      membershipId: effective.membershipId,
     };
 
     await this.memberships.touchLastAccess(effective.membershipId);
@@ -214,12 +248,97 @@ export class AuthService {
         teamCode: effective.teamCode,
         teamName: effective.teamName,
         organizationId: effective.organizationId,
-        permissions,
+        permissions: [...effective.permissions],
         roleId: assignedRole?.id ?? null,
         roleCode: assignedRole?.code ?? effective.role,
         roleName: assignedRole?.name ?? effective.role,
       },
     };
+  }
+
+  async switchTenant(
+    user: CurrentUserPayload,
+    organizationId: string,
+    refreshToken: string,
+    req?: Request,
+  ): Promise<AuthSessionLoginResponse> {
+    const requestId = this.requestId(req);
+    try {
+      const activeSession = await this.refreshTokenService.getActiveSession(refreshToken);
+      if (activeSession.user.id !== user.userId) {
+        throw new ForbiddenException('Tenant selection is not permitted');
+      }
+      const current = await this.tenantResolver.resolveAuthenticatedTenant(
+        user.userId,
+        {
+          claims: activeSession.tenantContext ?? undefined,
+          requestId,
+        },
+      );
+      if (
+        user.tenantContext &&
+        (current.organizationId !== user.tenantContext.organizationId ||
+          current.membershipId !== user.tenantContext.membershipId)
+      ) {
+        throw new ForbiddenException('Tenant selection is not permitted');
+      }
+
+      const selected = await this.tenantResolver.selectTenant(
+        user.userId,
+        organizationId,
+        requestId,
+      );
+      const rotated = await this.refreshTokenService.rotateRefreshToken(
+        refreshToken,
+        req,
+        {
+          activeOrganizationId: selected.organizationId,
+          membershipId: selected.membershipId,
+        },
+      );
+      const accessResponse = await this.buildLoginResponse(
+        activeSession.user,
+        selected,
+      );
+      await this.audit
+        .record({
+          actorId: user.userId,
+          organizationId: selected.organizationId,
+          entityType: 'organization-membership',
+          entityId: selected.membershipId,
+          action: 'tenant.switched',
+          requestId,
+          metadata: {
+            previousMembershipId: current.membershipId,
+            newMembershipId: selected.membershipId,
+          },
+        })
+        .catch((auditError) => {
+          this.logger.error(
+            `Tenant switch audit failed requestId=${requestId ?? 'none'}`,
+            auditError instanceof Error ? auditError.stack : undefined,
+          );
+        });
+      return {
+        ...accessResponse,
+        refreshToken: rotated.refreshToken,
+        refreshTokenMaxAgeMs: rotated.refreshTokenMaxAgeMs,
+        refreshTokenExpiresAt: rotated.refreshTokenExpiresAt,
+        refreshSessionId: rotated.refreshSessionId,
+      };
+    } catch (error) {
+      await this.audit
+        .record({
+          actorId: user.userId,
+          entityType: 'tenant-session',
+          action: 'tenant.switch-rejected',
+          requestId,
+          metadata: { reason: 'candidate-not-authorized' },
+        })
+        .catch(() => undefined);
+      if (error instanceof UnauthorizedException) throw error;
+      throw new ForbiddenException('Tenant selection is not permitted');
+    }
   }
 
   toPublicAuthResponse(result: AuthSessionLoginResponse): AuthAccessResponse {
@@ -228,13 +347,15 @@ export class AuthService {
       refreshTokenMaxAgeMs,
       refreshTokenExpiresAt,
       refreshSessionId,
+      tenantContext,
       ...publicResponse
-    } = result;
+    } = result as AuthSessionLoginResponse & { tenantContext?: unknown };
 
     void refreshToken;
     void refreshTokenMaxAgeMs;
     void refreshTokenExpiresAt;
     void refreshSessionId;
+    void tenantContext;
 
     return publicResponse;
   }
@@ -298,5 +419,9 @@ export class AuthService {
       origin: context.origin,
       userAgent: context.userAgent,
     };
+  }
+
+  private requestId(req?: Request): string | null {
+    return (req as (Request & { requestId?: string }) | undefined)?.requestId ?? null;
   }
 }

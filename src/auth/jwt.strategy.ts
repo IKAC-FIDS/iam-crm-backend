@@ -2,8 +2,9 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
-import { PrismaService } from '../prisma/prisma.service';
-import { OrganizationMembershipsService } from '../organization-memberships/organization-memberships.service';
+import type { Request } from 'express';
+import type { RequestWithRequestId } from '../common/logging/http-log-context';
+import { TenantResolverService } from '../organization-memberships/tenant-resolver.service';
 
 interface JwtPayload {
   sub?: string;
@@ -14,14 +15,15 @@ interface JwtPayload {
   teamCode?: string | null;
   teamName?: string | null;
   organizationId?: string | null;
+  activeOrganizationId?: string | null;
+  membershipId?: string | null;
 }
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
     configService: ConfigService,
-    private readonly prisma: PrismaService,
-    private readonly memberships: OrganizationMembershipsService,
+    private readonly tenantResolver: TenantResolverService,
   ) {
     const secret = configService.get<string>('JWT_SECRET');
 
@@ -33,49 +35,31 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
       secretOrKey: secret,
+      passReqToCallback: true,
     });
   }
 
-  async validate(payload: JwtPayload) {
+  async validate(req: Request, payload: JwtPayload) {
     if (!payload?.sub || !payload.email || !payload.role) {
       throw new UnauthorizedException('Invalid token payload');
     }
 
-    const user = await this.prisma.user.findUnique({
-      where: { id: payload.sub },
-      select: {
-        id: true,
-        email: true,
-        role: true,
-        roleId: true,
-        team: true,
-        teamId: true,
-        teamRef: {
-          select: {
-            code: true,
-            name: true,
-          },
+    const requestId = (req as RequestWithRequestId).requestId ?? null;
+    const effective = await this.tenantResolver
+      .resolveAuthenticatedTenant(payload.sub, {
+        claims: {
+          activeOrganizationId: payload.activeOrganizationId,
+          membershipId: payload.membershipId,
         },
-        organizationId: true,
-        isActive: true,
-      },
-    });
-
-    if (!user?.isActive) {
-      throw new UnauthorizedException('Invalid token payload');
-    }
-
-    const effective = await this.memberships
-      .resolveEffectiveContext({
-        ...user,
+        requestId,
       })
       .catch(() => {
         throw new UnauthorizedException('No active organization membership');
       });
 
     return {
-      userId: user.id,
-      email: user.email,
+      userId: payload.sub,
+      email: payload.email,
       role: effective.role,
       roleId: effective.roleId,
       team: effective.team,
@@ -83,8 +67,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       teamCode: effective.teamCode,
       teamName: effective.teamName,
       organizationId: effective.organizationId,
+      activeOrganizationId: effective.organizationId,
       membershipId: effective.membershipId,
-      tenantResolutionSource: effective.source,
+      tenantResolutionSource: effective.resolutionSource,
+      tenantContext: effective,
     };
   }
 }

@@ -11,6 +11,8 @@ const MEMBERSHIP_STATUSES = new Set<TenantMembershipStatus>([
 ]);
 
 const RESOLUTION_SOURCES = new Set<TenantResolutionSource>([
+  'token-session',
+  'explicit-selection',
   'authenticated-membership',
   'migration-compatibility',
 ]);

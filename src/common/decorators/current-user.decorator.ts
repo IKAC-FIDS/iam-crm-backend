@@ -1,5 +1,7 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 
+import type { TenantContext } from '../tenant/tenant-context.types';
+
 export interface CurrentUserPayload {
   userId: string;
   email: string;
@@ -10,10 +12,14 @@ export interface CurrentUserPayload {
   teamCode?: string | null;
   teamName?: string | null;
   organizationId?: string | null;
+  activeOrganizationId?: string | null;
   membershipId?: string | null;
   tenantResolutionSource?:
+    | 'token-session'
+    | 'explicit-selection'
     | 'authenticated-membership'
     | 'migration-compatibility';
+  tenantContext?: TenantContext;
 }
 
 export const CurrentUser = createParamDecorator(

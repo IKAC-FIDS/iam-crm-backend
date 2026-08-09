@@ -14,10 +14,22 @@ export interface CreatedRefreshSession {
   refreshTokenMaxAgeMs: number;
   refreshTokenExpiresAt: Date;
   refreshSessionId: string;
+  tenantContext: RefreshTenantContext | null;
 }
 
 export interface RotatedRefreshSession extends CreatedRefreshSession {
   user: User;
+}
+
+export interface RefreshTenantContext {
+  activeOrganizationId: string;
+  membershipId: string;
+}
+
+export interface ActiveRefreshSession {
+  user: User;
+  refreshSessionId: string;
+  tenantContext: RefreshTenantContext | null;
 }
 
 export interface UserSessionResponse {
@@ -38,6 +50,10 @@ export class RefreshTokenService {
   ) {}
 
   async getActiveUser(refreshToken: string): Promise<User> {
+    return (await this.getActiveSession(refreshToken)).user;
+  }
+
+  async getActiveSession(refreshToken: string): Promise<ActiveRefreshSession> {
     const session = await this.prisma.refreshSession.findUnique({
       where: { refreshTokenHash: this.hashRefreshToken(refreshToken) },
       include: { user: true },
@@ -50,17 +66,22 @@ export class RefreshTokenService {
     ) {
       throw new UnauthorizedException('Invalid refresh token');
     }
-    return session.user;
+    return {
+      user: session.user,
+      refreshSessionId: session.id,
+      tenantContext: this.parseTenantContext(refreshToken),
+    };
   }
 
   async createSession(
     userId: string,
     req?: Request,
     tx?: Prisma.TransactionClient,
+    tenantContext?: RefreshTenantContext | null,
   ): Promise<CreatedRefreshSession> {
     const prisma = tx ?? this.prisma;
 
-    const refreshToken = this.generateRefreshToken();
+    const refreshToken = this.generateRefreshToken(tenantContext);
     const refreshTokenHash = this.hashRefreshToken(refreshToken);
     const refreshTokenMaxAgeMs = this.getRefreshTokenTtlMs();
     const refreshTokenExpiresAt = new Date(Date.now() + refreshTokenMaxAgeMs);
@@ -80,12 +101,14 @@ export class RefreshTokenService {
       refreshTokenMaxAgeMs,
       refreshTokenExpiresAt,
       refreshSessionId: session.id,
+      tenantContext: tenantContext ?? null,
     };
   }
 
   async rotateRefreshToken(
     refreshToken: string,
     req?: Request,
+    nextTenantContext?: RefreshTenantContext | null,
   ): Promise<RotatedRefreshSession> {
     const oldHash = this.hashRefreshToken(refreshToken);
 
@@ -126,7 +149,9 @@ export class RefreshTokenService {
       throw new UnauthorizedException('User is inactive');
     }
 
-    const newRefreshToken = this.generateRefreshToken();
+    const currentTenantContext = this.parseTenantContext(refreshToken);
+    const tenantContext = nextTenantContext ?? currentTenantContext;
+    const newRefreshToken = this.generateRefreshToken(tenantContext);
     const newRefreshTokenHash = this.hashRefreshToken(newRefreshToken);
     const refreshTokenMaxAgeMs = this.getRefreshTokenTtlMs();
     const refreshTokenExpiresAt = new Date(Date.now() + refreshTokenMaxAgeMs);
@@ -179,6 +204,7 @@ export class RefreshTokenService {
       refreshTokenMaxAgeMs,
       refreshTokenExpiresAt,
       refreshSessionId: result.id,
+      tenantContext,
     };
   }
 
@@ -338,8 +364,45 @@ async revokeAllUserSessionsExceptToken(
     });
   }
 
-  private generateRefreshToken(): string {
-    return randomBytes(64).toString('base64url');
+  private generateRefreshToken(
+    tenantContext?: RefreshTenantContext | null,
+  ): string {
+    const random = randomBytes(64).toString('base64url');
+    if (!tenantContext) return random;
+    const payload = Buffer.from(
+      JSON.stringify({
+        v: 2,
+        activeOrganizationId: tenantContext.activeOrganizationId,
+        membershipId: tenantContext.membershipId,
+      }),
+      'utf8',
+    ).toString('base64url');
+    return `rt2.${payload}.${random}`;
+  }
+
+  private parseTenantContext(refreshToken: string): RefreshTenantContext | null {
+    const parts = refreshToken.split('.');
+    if (parts.length !== 3 || parts[0] !== 'rt2') return null;
+    try {
+      const value = JSON.parse(
+        Buffer.from(parts[1], 'base64url').toString('utf8'),
+      ) as Record<string, unknown>;
+      if (
+        value.v !== 2 ||
+        typeof value.activeOrganizationId !== 'string' ||
+        !value.activeOrganizationId ||
+        typeof value.membershipId !== 'string' ||
+        !value.membershipId
+      ) {
+        return null;
+      }
+      return {
+        activeOrganizationId: value.activeOrganizationId,
+        membershipId: value.membershipId,
+      };
+    } catch {
+      return null;
+    }
   }
 
   private hashRefreshToken(refreshToken: string): string {
