@@ -15,11 +15,18 @@ import {
 } from '@prisma/client';
 import { AuditLogService } from '../audit-log/audit-log.service';
 import { CurrentUserPayload } from '../common/decorators/current-user.decorator';
-import { PrismaService } from '../prisma/prisma.service';
+import {
+  PrismaService,
+  TenantTransactionClient,
+} from '../prisma/prisma.service';
 import { CreateNotificationDto } from './dto/create-notification.dto';
 import { FindNotificationsDto } from './dto/find-notifications.dto';
 import { ReadAllNotificationsDto } from './dto/read-all-notifications.dto';
-import { getCurrentOrganizationId } from '../common/tenant/tenant-scope.util';
+import {
+  getCurrentOrganizationId,
+  tenantScope,
+} from '../common/tenant/tenant-scope.util';
+import type { TenantContext } from '../common/tenant/tenant-context.types';
 import { userMatchesTeam } from '../common/tenant/team-scope.util';
 
 const notificationInclude = {
@@ -70,8 +77,8 @@ export class NotificationsService {
     const limit = query.limit ?? 20;
     const where = this.buildWhere(query, user);
 
-    const [data, total] = await Promise.all([
-      this.prisma.notification.findMany({
+    const [data, total] = await this.withTenant(user, async (tx) => Promise.all([
+      tx.notification.findMany({
         where,
         include: notificationInclude,
         orderBy: {
@@ -80,8 +87,8 @@ export class NotificationsService {
         skip: (page - 1) * limit,
         take: limit,
       }),
-      this.prisma.notification.count({ where }),
-    ]);
+      tx.notification.count({ where }),
+    ]));
 
     const totalPages = Math.ceil(total / limit);
 
@@ -99,14 +106,14 @@ export class NotificationsService {
   }
 
   async unreadCount(user: CurrentUserPayload) {
-    const total = await this.prisma.notification.count({
+    const total = await this.withTenant(user, (tx) => tx.notification.count({
       where: {
         organizationId: getCurrentOrganizationId(user),
         recipientId: user.userId,
         readAt: null,
         archivedAt: null,
       },
-    });
+    }));
 
     return {
       total,
@@ -114,7 +121,9 @@ export class NotificationsService {
   }
 
   async findOne(id: string, user: CurrentUserPayload) {
-    return this.getNotificationInScope(id, user);
+    return this.withTenant(user, (tx) =>
+      this.getNotificationInScope(tx, id, user),
+    );
   }
 
   async create(dto: CreateNotificationDto, user: CurrentUserPayload) {
@@ -124,9 +133,9 @@ export class NotificationsService {
 
     const recipients = await this.validateRecipients(dto.recipientIds, user);
 
-    const notifications = await Promise.all(
+    const notifications = await this.withTenant(user, (tx) => Promise.all(
       recipients.map((recipient) =>
-        this.prisma.notification.create({
+        tx.notification.create({
           data: {
             organizationId: getCurrentOrganizationId(user),
             recipientId: recipient.id,
@@ -143,7 +152,7 @@ export class NotificationsService {
           include: notificationInclude,
         }),
       ),
-    );
+    ));
 
     await this.audit.record({
       actorId: user.userId,
@@ -167,19 +176,16 @@ export class NotificationsService {
   }
 
   async markRead(id: string, user: CurrentUserPayload) {
-    const current = await this.getNotificationInScope(id, user);
-
-    if (current.readAt) {
-      return current;
-    }
-
-    const updated = await this.prisma.notification.update({
-      where: { id },
-      data: {
-        readAt: new Date(),
-      },
-      include: notificationInclude,
+    const { current, updated } = await this.withTenant(user, async (tx) => {
+      const current = await this.getNotificationInScope(tx, id, user);
+      if (current.readAt) return { current, updated: current };
+      const updated = await tx.notification.update({
+        where: { id }, data: { readAt: new Date() }, include: notificationInclude,
+      });
+      return { current, updated };
     });
+
+    if (updated === current) return current;
 
     await this.audit.record({
       actorId: user.userId,
@@ -198,14 +204,12 @@ export class NotificationsService {
   }
 
   async markUnread(id: string, user: CurrentUserPayload) {
-    const current = await this.getNotificationInScope(id, user);
-
-    const updated = await this.prisma.notification.update({
-      where: { id },
-      data: {
-        readAt: null,
-      },
-      include: notificationInclude,
+    const { current, updated } = await this.withTenant(user, async (tx) => {
+      const current = await this.getNotificationInScope(tx, id, user);
+      const updated = await tx.notification.update({
+        where: { id }, data: { readAt: null }, include: notificationInclude,
+      });
+      return { current, updated };
     });
 
     await this.audit.record({
@@ -235,12 +239,12 @@ export class NotificationsService {
       ...(dto.entityId && { entityId: dto.entityId }),
     };
 
-    const result = await this.prisma.notification.updateMany({
+    const result = await this.withTenant(user, (tx) => tx.notification.updateMany({
       where,
       data: {
         readAt: new Date(),
       },
-    });
+    }));
 
     await this.audit.record({
       actorId: user.userId,
@@ -260,14 +264,12 @@ export class NotificationsService {
   }
 
   async archive(id: string, user: CurrentUserPayload) {
-    const current = await this.getNotificationInScope(id, user);
-
-    const updated = await this.prisma.notification.update({
-      where: { id },
-      data: {
-        archivedAt: new Date(),
-      },
-      include: notificationInclude,
+    const { current, updated } = await this.withTenant(user, async (tx) => {
+      const current = await this.getNotificationInScope(tx, id, user);
+      const updated = await tx.notification.update({
+        where: { id }, data: { archivedAt: new Date() }, include: notificationInclude,
+      });
+      return { current, updated };
     });
 
     await this.audit.record({
@@ -287,14 +289,12 @@ export class NotificationsService {
   }
 
   async unarchive(id: string, user: CurrentUserPayload) {
-    const current = await this.getNotificationInScope(id, user);
-
-    const updated = await this.prisma.notification.update({
-      where: { id },
-      data: {
-        archivedAt: null,
-      },
-      include: notificationInclude,
+    const { current, updated } = await this.withTenant(user, async (tx) => {
+      const current = await this.getNotificationInScope(tx, id, user);
+      const updated = await tx.notification.update({
+        where: { id }, data: { archivedAt: null }, include: notificationInclude,
+      });
+      return { current, updated };
     });
 
     await this.audit.record({
@@ -314,10 +314,10 @@ export class NotificationsService {
   }
 
   async remove(id: string, user: CurrentUserPayload) {
-    const current = await this.getNotificationInScope(id, user);
-
-    const deleted = await this.prisma.notification.delete({
-      where: { id },
+    const { current, deleted } = await this.withTenant(user, async (tx) => {
+      const current = await this.getNotificationInScope(tx, id, user);
+      const deleted = await tx.notification.delete({ where: { id } });
+      return { current, deleted };
     });
 
     await this.audit.record({
@@ -355,7 +355,9 @@ export class NotificationsService {
       return null;
     }
 
-    return this.prisma.notification.create({
+    return this.prisma.withTenantTransaction(
+      this.contextForInternalNotification(input),
+      (tx) => tx.notification.create({
       data: {
         organizationId: input.organizationId,
         recipientId: input.recipientId,
@@ -369,7 +371,8 @@ export class NotificationsService {
         actionUrl: input.actionUrl ?? undefined,
         metadata: input.metadata as Prisma.InputJsonValue | undefined,
       },
-    });
+      }),
+    );
   }
 
   private buildWhere(
@@ -460,10 +463,11 @@ export class NotificationsService {
   }
 
   private async getNotificationInScope(
+    tx: TenantTransactionClient,
     id: string,
     user: CurrentUserPayload,
   ) {
-    const notification = await this.prisma.notification.findFirst({
+    const notification = await tx.notification.findFirst({
       where: {
         id,
         organizationId: getCurrentOrganizationId(user),
@@ -477,6 +481,27 @@ export class NotificationsService {
     }
 
     return notification;
+  }
+
+  private withTenant<T>(
+    user: CurrentUserPayload,
+    callback: (tx: TenantTransactionClient) => Promise<T>,
+  ) {
+    return this.prisma.withTenantTransaction(tenantScope.require(user), callback);
+  }
+
+  private contextForInternalNotification(input: NotifyUserInput): TenantContext {
+    return {
+      tenantId: input.organizationId,
+      organizationId: input.organizationId,
+      userId: input.actorId ?? input.recipientId,
+      membershipId: `internal-notification:${input.recipientId}`,
+      tenantRole: 'SYSTEM',
+      permissions: [],
+      platformAdmin: false,
+      membershipStatus: 'active' as const,
+      resolutionSource: 'authenticated-membership' as const,
+    };
   }
 
   private async validateRecipients(

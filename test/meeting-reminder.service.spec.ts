@@ -44,6 +44,7 @@ function setup(due = [meeting()]) {
     auditLog: { create: jest.fn().mockResolvedValue({}) },
   };
   const prisma = {
+    installTenantContext: jest.fn().mockResolvedValue(undefined),
     $transaction: jest.fn(async (callback: (client: typeof tx) => unknown) =>
       callback(tx),
     ),
@@ -65,7 +66,7 @@ function createdRows(tx: ReturnType<typeof setup>['tx']) {
 
 describe('MeetingReminderService', () => {
   it('creates due meeting reminders with a neutral body and structured UTC metadata', async () => {
-    const { service, tx } = setup();
+    const { service, prisma, tx } = setup();
 
     await service.processDueReminders();
 
@@ -85,6 +86,10 @@ describe('MeetingReminderService', () => {
 
     const rows = createdRows(tx);
     expect(rows).toHaveLength(2);
+    expect(prisma.installTenantContext).toHaveBeenCalledWith(
+      tx,
+      expect.objectContaining({ organizationId: 'organization-1' }),
+    );
     expect(rows[0]).toEqual(
       expect.objectContaining({
         organizationId: 'organization-1',

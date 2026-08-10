@@ -38,6 +38,17 @@ export class MeetingReminderService {
           orderBy: { reminderAt: 'asc' },
         });
         for (const meeting of due) {
+          await this.prisma.installTenantContext(tx, {
+            tenantId: meeting.organizationId,
+            organizationId: meeting.organizationId,
+            userId: meeting.organizerId,
+            membershipId: `meeting-reminder:${meeting.id}`,
+            tenantRole: 'SYSTEM',
+            permissions: [],
+            platformAdmin: false,
+            membershipStatus: 'active',
+            resolutionSource: 'authenticated-membership',
+          });
           const recipientIds = [...new Set([meeting.organizerId, ...meeting.assignees.map(a => a.userId)])];
           const metadata: MeetingReminderMetadata = {
             meetingTitle: meeting.title,

@@ -154,12 +154,16 @@ describe('fix 000085 Tenant Scope enforcement', () => {
       organizationId: 'tenant-a',
     });
 
-    const notificationPrisma = {
+    const notificationPrisma: any = {
       notification: {
         findMany: jest.fn().mockResolvedValue([]),
         count: jest.fn().mockResolvedValue(0),
       },
     };
+    notificationPrisma.withTenantTransaction = jest.fn(
+      async (_context: unknown, callback: (tx: unknown) => unknown) =>
+        callback(notificationPrisma),
+    );
     await new NotificationsService(notificationPrisma as any, {} as any).findAll({}, tenantA);
     expect(notificationPrisma.notification.findMany.mock.calls[0][0].where.AND[0]).toEqual({
       organizationId: 'tenant-a',

@@ -16,12 +16,16 @@ describe('NotificationsService metadata compatibility', () => {
       type: NotificationType.MEETING_REMINDER,
       metadata,
     };
-    const prisma = {
+    const prisma: any = {
       notification: {
         findMany: jest.fn().mockResolvedValue([notification]),
         count: jest.fn().mockResolvedValue(1),
       },
     };
+    prisma.withTenantTransaction = jest.fn(
+      async (_context: unknown, callback: (tx: unknown) => unknown) =>
+        callback(prisma),
+    );
     const service = new NotificationsService(
       prisma as any,
       { record: jest.fn() } as any,
@@ -54,12 +58,16 @@ describe('NotificationsService metadata compatibility', () => {
   });
 
   it('continues searching notification title and body only', async () => {
-    const prisma = {
+    const prisma: any = {
       notification: {
         findMany: jest.fn().mockResolvedValue([]),
         count: jest.fn().mockResolvedValue(0),
       },
     };
+    prisma.withTenantTransaction = jest.fn(
+      async (_context: unknown, callback: (tx: unknown) => unknown) =>
+        callback(prisma),
+    );
     const service = new NotificationsService(
       prisma as any,
       { record: jest.fn() } as any,
