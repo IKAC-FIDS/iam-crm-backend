@@ -118,9 +118,10 @@ export class TeamsService {
     this.assertAdmin(user);
 
     const code = this.normalizeCode(dto.code);
+    const organizationId = getCurrentOrganizationId(user);
 
     const duplicate = await this.prisma.team.findUnique({
-      where: { code },
+      where: { organizationId_code: { organizationId, code } },
     });
 
     if (duplicate) {
@@ -137,7 +138,7 @@ export class TeamsService {
         name: this.requiredText(dto.name, 'Team name is required'),
         description: dto.description?.trim() || undefined,
         managerId: manager?.id,
-        organizationId: getCurrentOrganizationId(user),
+        organizationId,
       },
       include: teamInclude,
     });
@@ -162,7 +163,10 @@ export class TeamsService {
 
     if (dto.code !== undefined) {
       const code = this.normalizeCode(dto.code);
-      const duplicate = await this.prisma.team.findUnique({ where: { code } });
+      const organizationId = getCurrentOrganizationId(user);
+      const duplicate = await this.prisma.team.findUnique({
+        where: { organizationId_code: { organizationId, code } },
+      });
 
       if (duplicate && duplicate.id !== id) {
         throw new ConflictException('Team code already exists');

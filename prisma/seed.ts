@@ -203,7 +203,12 @@ async function main() {
 
   for (const team of defaultTeams) {
     await prisma.team.upsert({
-      where: { code: team.code },
+      where: {
+        organizationId_code: {
+          organizationId: defaultOrganization.id,
+          code: team.code,
+        },
+      },
       update: {
         name: team.name,
         isActive: true,

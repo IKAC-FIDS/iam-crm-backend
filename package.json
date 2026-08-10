@@ -25,6 +25,10 @@
     "membership:backfill:dry-run": "node dist/src/organization-memberships/membership-maintenance.js backfill --dry-run",
     "membership:backfill": "node dist/src/organization-memberships/membership-maintenance.js backfill",
     "membership:validate": "node dist/src/organization-memberships/membership-maintenance.js validate",
+    "tenant-constraints:preflight": "node dist/src/tenant-constraints/tenant-constraints-maintenance.js preflight",
+    "tenant-constraints:backfill:dry-run": "node dist/src/tenant-constraints/tenant-constraints-maintenance.js backfill --dry-run",
+    "tenant-constraints:backfill": "node dist/src/tenant-constraints/tenant-constraints-maintenance.js backfill",
+    "tenant-constraints:validate": "node dist/src/tenant-constraints/tenant-constraints-maintenance.js validate",
     "ci": "npm run prisma:generate && npm run lint && npm run test && npm run build"
   },
   "dependencies": {
