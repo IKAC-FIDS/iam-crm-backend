@@ -1,6 +1,4 @@
-import { OrganizationStatus } from '@prisma/client';
 import {
-  IsEnum,
   IsObject,
   IsOptional,
   IsString,
@@ -17,10 +15,6 @@ export class CreateOrganizationDto {
   @IsString()
   @MaxLength(200)
   name!: string;
-
-  @IsOptional()
-  @IsEnum(OrganizationStatus)
-  status?: OrganizationStatus;
 
   @IsOptional()
   @IsString()

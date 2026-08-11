@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { MeetingStatus, NotificationEntityType, NotificationType, Prisma } from '@prisma/client';
+import { MeetingStatus, NotificationEntityType, NotificationType, OrganizationStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 const DEFAULT_ORGANIZATION_TIME_ZONE = 'Asia/Tehran';
@@ -29,6 +29,7 @@ export class MeetingReminderService {
             status: MeetingStatus.SCHEDULED,
             reminderAt: { lte: new Date() },
             reminderSentAt: null,
+            organization: { status: OrganizationStatus.ACTIVE },
           },
           include: {
             assignees: { select: { userId: true } },

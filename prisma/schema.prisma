@@ -231,9 +231,17 @@ enum NotificationEntityType {
 }
 
 enum OrganizationStatus {
+  PENDING_SETUP
   ACTIVE
   SUSPENDED
   ARCHIVED
+}
+
+enum OrganizationOnboardingStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  READY
+  FAILED
 }
 
 enum OrganizationMembershipStatus {
@@ -342,7 +350,14 @@ model Organization {
   code String @unique
   name String
 
-  status OrganizationStatus @default(ACTIVE)
+  status           OrganizationStatus           @default(ACTIVE)
+  onboardingStatus OrganizationOnboardingStatus @default(NOT_STARTED)
+
+  onboardingStartedAt      DateTime?
+  onboardingCompletedAt    DateTime?
+  onboardingLastAttemptAt  DateTime?
+  onboardingFailureCode    String?
+  onboardingFailureMessage String?
 
   timezone String @default("Asia/Tehran")
   locale   String @default("fa-IR")
@@ -1659,6 +1674,7 @@ model OrganizationMembership {
   team           Team?                        @relation(fields: [teamId], references: [id], onDelete: SetNull)
   status         OrganizationMembershipStatus @default(INVITED)
   isDefault      Boolean                      @default(false)
+  isTenantOwner  Boolean                      @default(false)
   joinedAt       DateTime?
   invitedAt      DateTime?
   suspendedAt    DateTime?
@@ -1670,6 +1686,7 @@ model OrganizationMembership {
   @@index([userId])
   @@index([organizationId])
   @@index([organizationId, status])
+  @@index([organizationId, isTenantOwner, status])
   @@index([userId, status])
   @@index([roleId])
   @@index([teamId])

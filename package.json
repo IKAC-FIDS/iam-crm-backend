@@ -34,6 +34,8 @@
     "platform-admin:grant": "node dist/src/platform-authority/platform-authority-maintenance.js grant",
     "platform-admin:revoke": "node dist/src/platform-authority/platform-authority-maintenance.js revoke",
     "platform-admin:validate": "node dist/src/platform-authority/platform-authority-maintenance.js validate",
+    "tenant-onboarding:preflight": "node dist/src/organizations/tenant-onboarding-maintenance.js preflight",
+    "tenant-onboarding:validate": "node dist/src/organizations/tenant-onboarding-maintenance.js validate",
     "ci": "npm run prisma:generate && npm run lint && npm run test && npm run build"
   },
   "dependencies": {

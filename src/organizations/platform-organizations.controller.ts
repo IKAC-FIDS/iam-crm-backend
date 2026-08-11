@@ -5,6 +5,7 @@ import { PlatformAdminGuard } from '../platform-authority/platform-admin.guard';
 import { CreateOrganizationDto } from './dto/create-organization.dto';
 import { FindOrganizationsDto } from './dto/find-organizations.dto';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
+import { ProvisionOrganizationDto } from './dto/provision-organization.dto';
 import { OrganizationsService } from './organizations.service';
 
 @Controller('admin/organizations')
@@ -37,8 +38,32 @@ export class PlatformOrganizationsController {
     return this.service.activate(id, platform);
   }
 
+  @Post(':id/provision')
+  provision(
+    @Param('id') id: string,
+    @Body() dto: ProvisionOrganizationDto,
+    @CurrentPlatform() platform: PlatformScopeContext,
+  ) {
+    return this.service.provision(id, dto, platform);
+  }
+
+  @Get(':id/onboarding')
+  onboarding(@Param('id') id: string, @CurrentPlatform() platform: PlatformScopeContext) {
+    return this.service.onboarding(id, platform);
+  }
+
   @Patch(':id/suspend')
   suspend(@Param('id') id: string, @CurrentPlatform() platform: PlatformScopeContext) {
     return this.service.suspend(id, platform);
+  }
+
+  @Patch(':id/resume')
+  resume(@Param('id') id: string, @CurrentPlatform() platform: PlatformScopeContext) {
+    return this.service.resume(id, platform);
+  }
+
+  @Patch(':id/archive')
+  archive(@Param('id') id: string, @CurrentPlatform() platform: PlatformScopeContext) {
+    return this.service.archive(id, platform);
   }
 }

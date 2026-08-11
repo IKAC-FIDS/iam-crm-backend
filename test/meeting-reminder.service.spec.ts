@@ -75,6 +75,7 @@ describe('MeetingReminderService', () => {
         status: MeetingStatus.SCHEDULED,
         reminderAt: { lte: expect.any(Date) },
         reminderSentAt: null,
+        organization: { status: 'ACTIVE' },
       },
       include: {
         assignees: { select: { userId: true } },
