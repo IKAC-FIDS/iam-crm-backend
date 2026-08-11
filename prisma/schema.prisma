@@ -23,6 +23,10 @@ enum UserRole {
   BOARDS
 }
 
+enum PlatformRole {
+  PLATFORM_ADMIN
+}
+
 enum SsoProviderType {
   OIDC
   SAML
@@ -297,6 +301,7 @@ model User {
   notificationActions     Notification[]           @relation("NotificationActor")
   managedTeams            Team[]                   @relation("TeamManager")
   organizationMemberships OrganizationMembership[]
+  platformAuthority       PlatformAuthority?
 
   @@index([organizationId])
   @@index([teamId])
@@ -1670,6 +1675,18 @@ model OrganizationMembership {
   @@index([teamId])
   @@index([userId, isDefault, status])
   @@map("organization_memberships")
+}
+
+model PlatformAuthority {
+  id        String       @id @default(uuid())
+  userId    String       @unique
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      PlatformRole @default(PLATFORM_ADMIN)
+  grantedAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@index([role])
+  @@map("platform_authorities")
 }
 
 model RolePermission {

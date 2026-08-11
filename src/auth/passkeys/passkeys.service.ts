@@ -164,9 +164,7 @@ export class PasskeysService {
       throw new UnauthorizedException('Passkey authentication failed');
     }
 
-    const tenant = await this.tenantResolver.resolveAuthenticatedTenant(
-      passkey.user.id,
-    );
+    const tenant = await this.authService.resolveLoginContext(passkey.user.id);
 
     const verification = await verifyAuthenticationResponse({
       response,

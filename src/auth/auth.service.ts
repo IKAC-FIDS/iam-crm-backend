@@ -119,9 +119,7 @@ export class AuthService {
       JSON.stringify(this.buildAuthLogContext(dto.email, req)),
     );
 
-    const tenant = await this.tenantResolver.resolveAuthenticatedTenant(user.id, {
-      requestId: this.requestId(req),
-    });
+    const tenant = await this.resolveLoginContext(user.id, this.requestId(req));
     await this.recordSuccessfulLogin(user.id, req);
 
     return this.buildSessionLoginResponse(user, req, tenant);
@@ -132,20 +130,26 @@ export class AuthService {
     req?: Request,
   ): Promise<AuthSessionLoginResponse> {
     const activeSession = await this.refreshTokenService.getActiveSession(refreshToken);
-    const effective = await this.tenantResolver.resolveAuthenticatedTenant(
-      activeSession.user.id,
-      {
-        claims: activeSession.tenantContext ?? undefined,
-        requestId: this.requestId(req),
-      },
-    );
+    const refreshContext = activeSession.tenantContext;
+    const effective = refreshContext && !('platformOnly' in refreshContext)
+      ? await this.tenantResolver.resolveAuthenticatedTenant(activeSession.user.id, {
+          claims: refreshContext,
+          requestId: this.requestId(req),
+        })
+      : await this.resolveLoginContext(
+          activeSession.user.id,
+          this.requestId(req),
+          Boolean(refreshContext && 'platformOnly' in refreshContext),
+        );
     const rotated = await this.refreshTokenService.rotateRefreshToken(
       refreshToken,
       req,
-      {
-        activeOrganizationId: effective.organizationId,
-        membershipId: effective.membershipId,
-      },
+      effective
+        ? {
+            activeOrganizationId: effective.organizationId,
+            membershipId: effective.membershipId,
+          }
+        : { platformOnly: true },
     );
 
     const accessResponse = await this.buildLoginResponse(rotated.user, effective);
@@ -179,26 +183,27 @@ export class AuthService {
   async buildSessionLoginResponse(
     user: User,
     req?: Request,
-    resolved?: ResolvedTenantContext,
+    resolved?: ResolvedTenantContext | null,
   ): Promise<AuthSessionLoginResponse> {
     const context = this.buildAuthLogContext(user.email, req);
     this.logger.log('Login token generation started', JSON.stringify(context));
 
     try {
       const effective =
-        resolved ??
-        (await this.tenantResolver.resolveAuthenticatedTenant(user.id, {
-          requestId: this.requestId(req),
-        }));
+        resolved === undefined
+          ? await this.resolveLoginContext(user.id, this.requestId(req))
+          : resolved;
       const accessResponse = await this.buildLoginResponse(user, effective);
       const refreshSession = await this.refreshTokenService.createSession(
         user.id,
         req,
         undefined,
-        {
-          activeOrganizationId: effective.organizationId,
-          membershipId: effective.membershipId,
-        },
+        effective
+          ? {
+              activeOrganizationId: effective.organizationId,
+              membershipId: effective.membershipId,
+            }
+          : { platformOnly: true },
       );
 
       this.logger.log('Login token generation succeeded', JSON.stringify(context));
@@ -212,28 +217,31 @@ export class AuthService {
 
   async buildLoginResponse(
     user: User,
-    resolved?: ResolvedTenantContext,
+    resolved?: ResolvedTenantContext | null,
   ): Promise<AuthAccessResponse> {
     const effective =
-      resolved ??
-      (await this.tenantResolver.resolveAuthenticatedTenant(user.id));
-    const assignedRole = effective.roleId
-      ? await this.prisma.role.findUnique({ where: { id: effective.roleId } })
+      resolved === undefined ? await this.resolveLoginContext(user.id) : resolved;
+    const effectiveRole = effective?.role ?? user.role;
+    const effectiveRoleId = effective?.roleId ?? user.roleId;
+    const assignedRole = effectiveRoleId
+      ? await this.prisma.role.findUnique({ where: { id: effectiveRoleId } })
       : null;
     const payload = {
       sub: user.id,
       email: user.email,
-      role: effective.role,
-      team: effective.team,
-      teamId: effective.teamId,
-      teamCode: effective.teamCode,
-      teamName: effective.teamName,
-      organizationId: effective.organizationId,
-      activeOrganizationId: effective.organizationId,
-      membershipId: effective.membershipId,
+      role: effectiveRole,
+      team: effective?.team ?? null,
+      teamId: effective?.teamId ?? null,
+      teamCode: effective?.teamCode ?? null,
+      teamName: effective?.teamName ?? null,
+      ...(effective && {
+        organizationId: effective.organizationId,
+        activeOrganizationId: effective.organizationId,
+        membershipId: effective.membershipId,
+      }),
     };
 
-    await this.memberships.touchLastAccess(effective.membershipId);
+    await this.memberships.touchLastAccess(effective?.membershipId ?? null);
 
     return {
       accessToken: await this.jwtService.signAsync(payload),
@@ -242,18 +250,51 @@ export class AuthService {
         id: user.id,
         fullName: user.fullName,
         email: user.email,
-        role: effective.role,
-        team: effective.team,
-        teamId: effective.teamId,
-        teamCode: effective.teamCode,
-        teamName: effective.teamName,
-        organizationId: effective.organizationId,
-        permissions: [...effective.permissions],
+        role: effectiveRole,
+        team: effective?.team ?? null,
+        teamId: effective?.teamId ?? null,
+        teamCode: effective?.teamCode ?? null,
+        teamName: effective?.teamName ?? null,
+        organizationId: effective?.organizationId ?? null,
+        permissions: effective ? [...effective.permissions] : [],
         roleId: assignedRole?.id ?? null,
-        roleCode: assignedRole?.code ?? effective.role,
-        roleName: assignedRole?.name ?? effective.role,
+        roleCode: assignedRole?.code ?? effectiveRole,
+        roleName: assignedRole?.name ?? effectiveRole,
       },
     };
+  }
+
+  async resolveLoginContext(
+    userId: string,
+    requestId?: string | null,
+    platformOnly = false,
+  ): Promise<ResolvedTenantContext | null> {
+    if (!platformOnly) {
+      try {
+        return await this.tenantResolver.resolveAuthenticatedTenant(userId, {
+          claims: undefined,
+          requestId,
+        });
+      } catch (error) {
+        const authority = await this.prisma.platformAuthority.findUnique({
+          where: { userId },
+          select: { role: true, user: { select: { isActive: true } } },
+        });
+        if (authority?.user.isActive && authority.role === 'PLATFORM_ADMIN') {
+          return null;
+        }
+        throw error;
+      }
+    }
+
+    const authority = await this.prisma.platformAuthority.findUnique({
+      where: { userId },
+      select: { role: true, user: { select: { isActive: true } } },
+    });
+    if (!authority?.user.isActive || authority.role !== 'PLATFORM_ADMIN') {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+    return null;
   }
 
   async switchTenant(
@@ -271,7 +312,11 @@ export class AuthService {
       const current = await this.tenantResolver.resolveAuthenticatedTenant(
         user.userId,
         {
-          claims: activeSession.tenantContext ?? undefined,
+          claims:
+            activeSession.tenantContext &&
+            !('platformOnly' in activeSession.tenantContext)
+              ? activeSession.tenantContext
+              : undefined,
           requestId,
         },
       );

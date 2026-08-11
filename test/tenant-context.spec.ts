@@ -74,6 +74,7 @@ describe('TenantContext architecture contract', () => {
     const platformAdmin: PlatformScopeContext = {
       userId: 'platform-user-1',
       platformAdmin: true,
+      platformRole: 'PLATFORM_ADMIN',
       requestId: null,
     };
 

@@ -1,14 +1,14 @@
 import {
   BadRequestException,
   ConflictException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { OrganizationStatus, Prisma, UserRole } from '@prisma/client';
+import { OrganizationStatus, Prisma } from '@prisma/client';
 import { AuditLogService } from '../audit-log/audit-log.service';
 import { CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { getCurrentOrganizationId } from '../common/tenant/tenant-scope.util';
+import type { PlatformScopeContext } from '../common/tenant/tenant-context.types';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateOrganizationDto } from './dto/create-organization.dto';
 import { FindOrganizationsDto } from './dto/find-organizations.dto';
@@ -35,8 +35,8 @@ export class OrganizationsService {
     return organization;
   }
 
-  async findAll(query: FindOrganizationsDto, user: CurrentUserPayload) {
-    this.assertAdmin(user);
+  async findAll(query: FindOrganizationsDto, platform: PlatformScopeContext) {
+    void platform;
 
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
@@ -93,8 +93,8 @@ export class OrganizationsService {
     };
   }
 
-  async findOne(id: string, user: CurrentUserPayload) {
-    this.assertAdmin(user);
+  async findOne(id: string, platform: PlatformScopeContext) {
+    void platform;
 
     const organization = await this.prisma.organization.findUnique({
       where: { id },
@@ -107,8 +107,7 @@ export class OrganizationsService {
     return organization;
   }
 
-  async create(dto: CreateOrganizationDto, user: CurrentUserPayload) {
-    this.assertAdmin(user);
+  async create(dto: CreateOrganizationDto, platform: PlatformScopeContext) {
 
     const code = this.normalizeCode(dto.code);
 
@@ -132,8 +131,8 @@ export class OrganizationsService {
     });
 
     await this.audit.record({
-      actorId: user.userId,
-      organizationId: getCurrentOrganizationId(user),
+      actorId: platform.userId,
+      organizationId: null,
       entityType: 'organization',
       entityId: organization.id,
       action: 'organization.created',
@@ -146,11 +145,9 @@ export class OrganizationsService {
   async update(
     id: string,
     dto: UpdateOrganizationDto,
-    user: CurrentUserPayload,
+    platform: PlatformScopeContext,
   ) {
-    this.assertAdmin(user);
-
-    const current = await this.findOne(id, user);
+    const current = await this.findOne(id, platform);
 
     const data: Prisma.OrganizationUpdateInput = {};
 
@@ -199,8 +196,8 @@ export class OrganizationsService {
     });
 
     await this.audit.record({
-      actorId: user.userId,
-      organizationId: getCurrentOrganizationId(user),
+      actorId: platform.userId,
+      organizationId: null,
       entityType: 'organization',
       entityId: id,
       action: 'organization.updated',
@@ -211,10 +208,8 @@ export class OrganizationsService {
     return updated;
   }
 
-  async activate(id: string, user: CurrentUserPayload) {
-    this.assertAdmin(user);
-
-    const current = await this.findOne(id, user);
+  async activate(id: string, platform: PlatformScopeContext) {
+    const current = await this.findOne(id, platform);
 
     const updated = await this.prisma.organization.update({
       where: { id },
@@ -224,8 +219,8 @@ export class OrganizationsService {
     });
 
     await this.audit.record({
-      actorId: user.userId,
-      organizationId: getCurrentOrganizationId(user),
+      actorId: platform.userId,
+      organizationId: null,
       entityType: 'organization',
       entityId: id,
       action: 'organization.activated',
@@ -236,10 +231,8 @@ export class OrganizationsService {
     return updated;
   }
 
-  async suspend(id: string, user: CurrentUserPayload) {
-    this.assertAdmin(user);
-
-    const current = await this.findOne(id, user);
+  async suspend(id: string, platform: PlatformScopeContext) {
+    const current = await this.findOne(id, platform);
 
     const updated = await this.prisma.organization.update({
       where: { id },
@@ -249,8 +242,8 @@ export class OrganizationsService {
     });
 
     await this.audit.record({
-      actorId: user.userId,
-      organizationId: getCurrentOrganizationId(user),
+      actorId: platform.userId,
+      organizationId: null,
       entityType: 'organization',
       entityId: id,
       action: 'organization.suspended',
@@ -259,12 +252,6 @@ export class OrganizationsService {
     });
 
     return updated;
-  }
-
-  private assertAdmin(user: CurrentUserPayload) {
-    if (user.role !== UserRole.ADMIN) {
-      throw new ForbiddenException('Only ADMIN can manage organizations');
-    }
   }
 
   private normalizeCode(code: string) {

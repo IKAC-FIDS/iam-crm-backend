@@ -14,7 +14,7 @@ export interface CreatedRefreshSession {
   refreshTokenMaxAgeMs: number;
   refreshTokenExpiresAt: Date;
   refreshSessionId: string;
-  tenantContext: RefreshTenantContext | null;
+  tenantContext: RefreshSessionContext | null;
 }
 
 export interface RotatedRefreshSession extends CreatedRefreshSession {
@@ -26,10 +26,16 @@ export interface RefreshTenantContext {
   membershipId: string;
 }
 
+export interface PlatformRefreshContext {
+  platformOnly: true;
+}
+
+export type RefreshSessionContext = RefreshTenantContext | PlatformRefreshContext;
+
 export interface ActiveRefreshSession {
   user: User;
   refreshSessionId: string;
-  tenantContext: RefreshTenantContext | null;
+  tenantContext: RefreshSessionContext | null;
 }
 
 export interface UserSessionResponse {
@@ -77,7 +83,7 @@ export class RefreshTokenService {
     userId: string,
     req?: Request,
     tx?: Prisma.TransactionClient,
-    tenantContext?: RefreshTenantContext | null,
+    tenantContext?: RefreshSessionContext | null,
   ): Promise<CreatedRefreshSession> {
     const prisma = tx ?? this.prisma;
 
@@ -108,7 +114,7 @@ export class RefreshTokenService {
   async rotateRefreshToken(
     refreshToken: string,
     req?: Request,
-    nextTenantContext?: RefreshTenantContext | null,
+    nextTenantContext?: RefreshSessionContext | null,
   ): Promise<RotatedRefreshSession> {
     const oldHash = this.hashRefreshToken(refreshToken);
 
@@ -365,10 +371,14 @@ async revokeAllUserSessionsExceptToken(
   }
 
   private generateRefreshToken(
-    tenantContext?: RefreshTenantContext | null,
+    tenantContext?: RefreshSessionContext | null,
   ): string {
     const random = randomBytes(64).toString('base64url');
     if (!tenantContext) return random;
+    if ('platformOnly' in tenantContext) {
+      const payload = Buffer.from(JSON.stringify({ v: 3, platformOnly: true }), 'utf8').toString('base64url');
+      return `rt3.${payload}.${random}`;
+    }
     const payload = Buffer.from(
       JSON.stringify({
         v: 2,
@@ -380,13 +390,16 @@ async revokeAllUserSessionsExceptToken(
     return `rt2.${payload}.${random}`;
   }
 
-  private parseTenantContext(refreshToken: string): RefreshTenantContext | null {
+  private parseTenantContext(refreshToken: string): RefreshSessionContext | null {
     const parts = refreshToken.split('.');
-    if (parts.length !== 3 || parts[0] !== 'rt2') return null;
+    if (parts.length !== 3 || !['rt2', 'rt3'].includes(parts[0])) return null;
     try {
       const value = JSON.parse(
         Buffer.from(parts[1], 'base64url').toString('utf8'),
       ) as Record<string, unknown>;
+      if (parts[0] === 'rt3' && value.v === 3 && value.platformOnly === true) {
+        return { platformOnly: true };
+      }
       if (
         value.v !== 2 ||
         typeof value.activeOrganizationId !== 'string' ||

@@ -33,6 +33,7 @@ export interface TenantContext {
 export interface PlatformScopeContext {
   readonly userId: string;
   readonly platformAdmin: true;
+  readonly platformRole: 'PLATFORM_ADMIN';
   readonly requestId?: string | null;
 }
 

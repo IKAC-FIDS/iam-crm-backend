@@ -30,6 +30,10 @@
     "tenant-constraints:backfill": "node dist/src/tenant-constraints/tenant-constraints-maintenance.js backfill",
     "tenant-constraints:validate": "node dist/src/tenant-constraints/tenant-constraints-maintenance.js validate",
     "rls:verify-pool": "node tools/rls/verify-pool.cjs",
+    "platform-admin:preflight": "node dist/src/platform-authority/platform-authority-maintenance.js preflight",
+    "platform-admin:grant": "node dist/src/platform-authority/platform-authority-maintenance.js grant",
+    "platform-admin:revoke": "node dist/src/platform-authority/platform-authority-maintenance.js revoke",
+    "platform-admin:validate": "node dist/src/platform-authority/platform-authority-maintenance.js validate",
     "ci": "npm run prisma:generate && npm run lint && npm run test && npm run build"
   },
   "dependencies": {
