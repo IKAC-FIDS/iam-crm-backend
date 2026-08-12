@@ -83,7 +83,7 @@ export class OidcService {
       state,
       nonce,
       code_challenge: challenge,
-      code_challenge_method: "S256",
+      code_challenge_method: 'S256',
     });
   }
 

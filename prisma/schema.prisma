@@ -255,6 +255,33 @@ enum OrganizationMembershipStatus {
   SUSPENDED
 }
 
+enum OrganizationCalendarSystem {
+  GREGORIAN
+  PERSIAN
+}
+
+enum OrganizationDateFormat {
+  YYYY_MM_DD
+  DD_MM_YYYY
+  MM_DD_YYYY
+}
+
+enum OrganizationDomainType {
+  SUBDOMAIN
+  CUSTOM
+}
+
+enum OrganizationDomainStatus {
+  PENDING
+  VERIFIED
+  FAILED
+  DISABLED
+}
+
+enum OrganizationDomainVerificationMethod {
+  DNS_TXT
+}
+
 // ============================================================
 // Users & Auth
 // ============================================================
@@ -385,10 +412,76 @@ model Organization {
   ssoProviders        SsoProvider[]
   ssoRoutes           SsoProviderRoute[]
   ssoAuthTransactions SsoAuthTransaction[]
+  tenantSettings      OrganizationSettings?
+  branding            OrganizationBranding?
+  domains             OrganizationDomain[]
 
   @@index([status])
   @@index([createdAt])
   @@map("organizations")
+}
+
+model OrganizationSettings {
+  id             String       @id @default(uuid())
+  organizationId String       @unique
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  timezone               String                     @default("Asia/Tehran")
+  locale                 String                     @default("fa-IR")
+  calendarSystem         OrganizationCalendarSystem @default(PERSIAN)
+  dateFormat             OrganizationDateFormat     @default(YYYY_MM_DD)
+  firstDayOfWeek         Int                        @default(6)
+  emailSenderDisplayName String?
+  allowPasswordLogin     Boolean                    @default(true)
+  allowPasskeyLogin      Boolean                    @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("organization_settings")
+}
+
+model OrganizationBranding {
+  id             String       @id @default(uuid())
+  organizationId String       @unique
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  displayTitle        String?
+  primaryColor        String?
+  secondaryColor      String?
+  accentColor         String?
+  logoAttachmentId    String?
+  faviconAttachmentId String?
+  logoAttachment      FileAttachment? @relation("OrganizationBrandingLogo", fields: [logoAttachmentId], references: [id], onDelete: SetNull)
+  faviconAttachment   FileAttachment? @relation("OrganizationBrandingFavicon", fields: [faviconAttachmentId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([logoAttachmentId])
+  @@index([faviconAttachmentId])
+  @@map("organization_branding")
+}
+
+model OrganizationDomain {
+  id                    String                               @id @default(uuid())
+  organizationId        String
+  organization          Organization                         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  type                  OrganizationDomainType
+  hostname              String                               @unique
+  subdomainLabel        String?                              @unique
+  status                OrganizationDomainStatus             @default(PENDING)
+  verificationMethod    OrganizationDomainVerificationMethod @default(DNS_TXT)
+  verificationTokenHash String
+  verifiedAt            DateTime?
+  lastCheckedAt         DateTime?
+  failureCode           String?
+  createdAt             DateTime                             @default(now())
+  updatedAt             DateTime                             @updatedAt
+
+  @@index([organizationId, status])
+  @@index([status, hostname])
+  @@map("organization_domains")
 }
 
 model UserPasskey {
@@ -1823,8 +1916,10 @@ model FileAttachment {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  organizationId String       @default("00000000-0000-4000-8000-000000000001")
-  organization   Organization @relation(fields: [organizationId], references: [id])
+  organizationId      String                 @default("00000000-0000-4000-8000-000000000001")
+  organization        Organization           @relation(fields: [organizationId], references: [id])
+  brandingLogoUses    OrganizationBranding[] @relation("OrganizationBrandingLogo")
+  brandingFaviconUses OrganizationBranding[] @relation("OrganizationBrandingFavicon")
 
   @@index([entityType, entityId])
   @@index([storageProvider])

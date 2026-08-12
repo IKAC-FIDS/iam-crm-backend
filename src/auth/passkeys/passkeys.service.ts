@@ -165,6 +165,15 @@ export class PasskeysService {
     }
 
     const tenant = await this.authService.resolveLoginContext(passkey.user.id);
+    if (tenant) {
+      const settings = await this.prisma.organizationSettings.findUnique({
+        where: { organizationId: tenant.organizationId },
+        select: { allowPasskeyLogin: true },
+      });
+      if (settings?.allowPasskeyLogin === false) {
+        throw new UnauthorizedException('Passkey login is disabled for this Organization');
+      }
+    }
 
     const verification = await verifyAuthenticationResponse({
       response,

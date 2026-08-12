@@ -120,6 +120,15 @@ export class AuthService {
     );
 
     const tenant = await this.resolveLoginContext(user.id, this.requestId(req));
+    if (tenant) {
+      const settings = await this.prisma.organizationSettings.findUnique({
+        where: { organizationId: tenant.organizationId },
+        select: { allowPasswordLogin: true },
+      });
+      if (settings?.allowPasswordLogin === false) {
+        throw new ForbiddenException('Password login is disabled for this Organization');
+      }
+    }
     await this.recordSuccessfulLogin(user.id, req);
 
     return this.buildSessionLoginResponse(user, req, tenant);
