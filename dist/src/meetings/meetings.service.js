@@ -44,7 +44,7 @@ let MeetingsService = class MeetingsService {
     async findOne(id, user) { return this.get(id, user); }
     async create(dto, user) {
         const organizationId = (0, tenant_scope_util_1.getCurrentOrganizationId)(user);
-        const values = await this.validate(dto, organizationId);
+        const values = await this.validate(dto, user);
         const meeting = await this.prisma.$transaction(async (tx) => tx.meeting.create({
             data: {
                 organizationId, companyId: dto.companyId, opportunityId: dto.opportunityId,
@@ -62,14 +62,13 @@ let MeetingsService = class MeetingsService {
         const current = await this.get(id, user);
         if (current.status !== client_1.MeetingStatus.SCHEDULED)
             throw new common_1.BadRequestException('Only scheduled meetings can be updated');
-        const organizationId = (0, tenant_scope_util_1.getCurrentOrganizationId)(user);
         const merged = {
             companyId: dto.companyId ?? current.companyId, opportunityId: dto.opportunityId === undefined ? current.opportunityId ?? undefined : dto.opportunityId,
             startAt: dto.startAt ?? current.startAt.toISOString(), endAt: dto.endAt ?? current.endAt.toISOString(),
             reminderAt: dto.reminderAt === undefined ? current.reminderAt?.toISOString() : dto.reminderAt,
             assigneeUserIds: dto.assigneeUserIds, attendeePersonIds: dto.attendeePersonIds,
         };
-        const values = await this.validate(merged, organizationId);
+        const values = await this.validate(merged, user);
         const updated = await this.prisma.$transaction(async (tx) => {
             if (dto.assigneeUserIds) {
                 await tx.meetingAssignee.deleteMany({ where: { meetingId: id } });
@@ -152,7 +151,8 @@ let MeetingsService = class MeetingsService {
         throw new common_1.NotFoundException('Meeting not found'); return value; }
     title(value) { const v = value.trim(); if (!v)
         throw new common_1.BadRequestException('Meeting title is required'); return v; }
-    async validate(dto, organizationId) {
+    async validate(dto, user) {
+        const organizationId = (0, tenant_scope_util_1.getCurrentOrganizationId)(user);
         const startAt = (0, api_date_util_1.parseApiDate)(dto.startAt, 'startAt'), endAt = (0, api_date_util_1.parseApiDate)(dto.endAt, 'endAt'), reminderAt = dto.reminderAt ? (0, api_date_util_1.parseApiDate)(dto.reminderAt, 'reminderAt') : undefined;
         if (endAt <= startAt)
             throw new common_1.BadRequestException('endAt must be after startAt');
@@ -170,7 +170,7 @@ let MeetingsService = class MeetingsService {
         }
         const users = [...new Set(dto.assigneeUserIds ?? [])];
         if (users.length) {
-            const count = await this.prisma.user.count({ where: { id: { in: users }, organizationId, isActive: true } });
+            const count = await this.prisma.user.count({ where: { id: { in: users }, ...tenant_scope_util_1.tenantScope.activeMembership(user), isActive: true } });
             if (count !== users.length)
                 throw new common_1.BadRequestException('One or more assignees are invalid');
         }

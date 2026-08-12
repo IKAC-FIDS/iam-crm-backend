@@ -32,6 +32,7 @@ let MeetingReminderService = MeetingReminderService_1 = class MeetingReminderSer
                         status: client_1.MeetingStatus.SCHEDULED,
                         reminderAt: { lte: new Date() },
                         reminderSentAt: null,
+                        organization: { status: client_1.OrganizationStatus.ACTIVE },
                     },
                     include: {
                         assignees: { select: { userId: true } },
@@ -41,6 +42,17 @@ let MeetingReminderService = MeetingReminderService_1 = class MeetingReminderSer
                     orderBy: { reminderAt: 'asc' },
                 });
                 for (const meeting of due) {
+                    await this.prisma.installTenantContext(tx, {
+                        tenantId: meeting.organizationId,
+                        organizationId: meeting.organizationId,
+                        userId: meeting.organizerId,
+                        membershipId: `meeting-reminder:${meeting.id}`,
+                        tenantRole: 'SYSTEM',
+                        permissions: [],
+                        platformAdmin: false,
+                        membershipStatus: 'active',
+                        resolutionSource: 'authenticated-membership',
+                    });
                     const recipientIds = [...new Set([meeting.organizerId, ...meeting.assignees.map(a => a.userId)])];
                     const metadata = {
                         meetingTitle: meeting.title,

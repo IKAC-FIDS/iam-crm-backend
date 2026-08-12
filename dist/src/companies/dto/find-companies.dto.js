@@ -13,9 +13,15 @@ exports.FindCompaniesDto = void 0;
 const class_validator_1 = require("class-validator");
 const client_1 = require("@prisma/client");
 const pagination_dto_1 = require("../../common/dto/pagination.dto");
+const ownership_scope_dto_1 = require("../../common/dto/ownership-scope.dto");
 class FindCompaniesDto extends pagination_dto_1.PaginationDto {
 }
 exports.FindCompaniesDto = FindCompaniesDto;
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsEnum)(ownership_scope_dto_1.OwnershipScope),
+    __metadata("design:type", String)
+], FindCompaniesDto.prototype, "ownershipScope", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsEnum)(client_1.LegacyPipelineStage),

@@ -191,8 +191,8 @@ let ActivitiesService = class ActivitiesService {
         await this.companyAccess.assertCompanyMutable(companyId, user);
     }
     async validatePersonAccess(personId, user) {
-        const person = await this.prisma.person.findUnique({
-            where: { id: personId },
+        const person = await this.prisma.person.findFirst({
+            where: { id: personId, company: { organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user) } },
             include: { company: { select: { ownerId: true, owner: { select: { team: true, teamId: true } } } } },
         });
         if (!person) {
@@ -202,8 +202,8 @@ let ActivitiesService = class ActivitiesService {
         return person;
     }
     async findActivityForMutation(activityId, user) {
-        const activity = await this.prisma.activity.findUnique({
-            where: { id: activityId },
+        const activity = await this.prisma.activity.findFirst({
+            where: { id: activityId, company: { organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user) } },
             include: {
                 company: true,
                 person: true,
@@ -250,7 +250,10 @@ let ActivitiesService = class ActivitiesService {
     async create(dto, user) {
         await this.validateCompanyAccess(dto.companyId, user);
         if (dto.personId) {
-            await this.validatePersonAccess(dto.personId, user);
+            const person = await this.validatePersonAccess(dto.personId, user);
+            if (person.companyId !== dto.companyId) {
+                throw new common_1.BadRequestException('Person must belong to the activity company');
+            }
         }
         if (dto.opportunityId)
             await this.validateOpportunityCompany(dto.opportunityId, dto.companyId);
@@ -352,6 +355,7 @@ let ActivitiesService = class ActivitiesService {
         const skip = (page - 1) * limit;
         const where = {
             userId: user.userId,
+            company: { organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user) },
             nextActionDate: { lte: new Date() },
             completedAt: null,
         };
@@ -379,11 +383,9 @@ let ActivitiesService = class ActivitiesService {
         };
     }
     async validateOpportunityCompany(opportunityId, companyId) {
-        const opportunity = await this.prisma.opportunity.findUnique({ where: { id: opportunityId }, select: { companyId: true } });
+        const opportunity = await this.prisma.opportunity.findFirst({ where: { id: opportunityId, companyId }, select: { companyId: true } });
         if (!opportunity)
             throw new common_1.NotFoundException('Opportunity not found');
-        if (opportunity.companyId !== companyId)
-            throw new common_1.BadRequestException('Opportunity must belong to the activity company');
     }
 };
 exports.ActivitiesService = ActivitiesService;

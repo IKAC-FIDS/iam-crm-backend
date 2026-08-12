@@ -44,6 +44,10 @@
     "sso-tenant:backfill:dry-run": "node dist/src/auth/sso/sso-tenant-maintenance.js backfill",
     "sso-tenant:backfill": "node dist/src/auth/sso/sso-tenant-maintenance.js backfill",
     "sso-tenant:validate": "node dist/src/auth/sso/sso-tenant-maintenance.js validate",
+    "tenant-rbac:preflight": "node dist/src/organization-memberships/tenant-rbac-maintenance.js preflight",
+    "tenant-rbac:backfill:dry-run": "node dist/src/organization-memberships/tenant-rbac-maintenance.js backfill --dry-run",
+    "tenant-rbac:backfill": "node dist/src/organization-memberships/tenant-rbac-maintenance.js backfill --confirm-apply",
+    "tenant-rbac:validate": "node dist/src/organization-memberships/tenant-rbac-maintenance.js validate",
     "ci": "npm run prisma:generate && npm run lint && npm run test && npm run build"
   },
   "dependencies": {

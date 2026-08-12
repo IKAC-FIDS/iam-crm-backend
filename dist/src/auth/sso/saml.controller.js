@@ -19,8 +19,8 @@ let SamlController = class SamlController {
     constructor(samlService) {
         this.samlService = samlService;
     }
-    async login(providerId) {
-        const url = await this.samlService.buildLoginUrl(providerId);
+    async login(providerId, domain, subdomain) {
+        const url = await this.samlService.buildLoginUrl(providerId, domain ? "DOMAIN" : "SUBDOMAIN", domain ?? subdomain ?? "");
         return {
             url,
             statusCode: 302,
@@ -30,24 +30,26 @@ let SamlController = class SamlController {
         const redirectUrl = await this.samlService.handleAcs(providerId, req.body);
         return res.redirect(302, redirectUrl);
     }
-    async metadata(providerId, res) {
-        const xml = await this.samlService.generateMetadata(providerId);
-        res.setHeader('Content-Type', 'application/samlmetadata+xml');
+    async metadata(providerId, domain, subdomain, res) {
+        const xml = await this.samlService.generateMetadata(providerId, domain ? "DOMAIN" : "SUBDOMAIN", domain ?? subdomain ?? "");
+        res.setHeader("Content-Type", "application/samlmetadata+xml");
         return res.send(xml);
     }
 };
 exports.SamlController = SamlController;
 __decorate([
-    (0, common_1.Get)(':providerId/login'),
+    (0, common_1.Get)(":providerId/login"),
     (0, common_1.Redirect)(),
-    __param(0, (0, common_1.Param)('providerId')),
+    __param(0, (0, common_1.Param)("providerId")),
+    __param(1, (0, common_1.Query)("domain")),
+    __param(2, (0, common_1.Query)("subdomain")),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
+    __metadata("design:paramtypes", [String, String, String]),
     __metadata("design:returntype", Promise)
 ], SamlController.prototype, "login", null);
 __decorate([
-    (0, common_1.Post)(':providerId/acs'),
-    __param(0, (0, common_1.Param)('providerId')),
+    (0, common_1.Post)(":providerId/acs"),
+    __param(0, (0, common_1.Param)("providerId")),
     __param(1, (0, common_1.Req)()),
     __param(2, (0, common_1.Res)()),
     __metadata("design:type", Function),
@@ -55,15 +57,17 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], SamlController.prototype, "acs", null);
 __decorate([
-    (0, common_1.Get)(':providerId/metadata'),
-    __param(0, (0, common_1.Param)('providerId')),
-    __param(1, (0, common_1.Res)()),
+    (0, common_1.Get)(":providerId/metadata"),
+    __param(0, (0, common_1.Param)("providerId")),
+    __param(1, (0, common_1.Query)("domain")),
+    __param(2, (0, common_1.Query)("subdomain")),
+    __param(3, (0, common_1.Res)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:paramtypes", [String, Object, Object, Object]),
     __metadata("design:returntype", Promise)
 ], SamlController.prototype, "metadata", null);
 exports.SamlController = SamlController = __decorate([
-    (0, common_1.Controller)('auth/saml'),
+    (0, common_1.Controller)("auth/saml"),
     __metadata("design:paramtypes", [saml_service_1.SamlService])
 ], SamlController);
 //# sourceMappingURL=saml.controller.js.map

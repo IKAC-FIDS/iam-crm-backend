@@ -5,24 +5,12 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
     else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
+var ApiExceptionFilter_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ApiExceptionFilter = void 0;
 const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
-function getResponseRequestId(response, request) {
-    const responseHeader = response.getHeader('x-request-id');
-    if (Array.isArray(responseHeader)) {
-        return String(responseHeader[0] ?? '').trim() || null;
-    }
-    if (responseHeader !== undefined) {
-        return String(responseHeader).trim() || null;
-    }
-    const requestHeader = request.headers['x-request-id'];
-    if (Array.isArray(requestHeader)) {
-        return requestHeader[0]?.trim() || null;
-    }
-    return requestHeader?.trim() || null;
-}
+const http_log_context_1 = require("../logging/http-log-context");
 function normalizeMessage(message) {
     if (Array.isArray(message)) {
         return message.join('; ');
@@ -72,12 +60,16 @@ function isMulterError(exception) {
         'code' in exception &&
         exception.name === 'MulterError');
 }
-let ApiExceptionFilter = class ApiExceptionFilter {
+let ApiExceptionFilter = ApiExceptionFilter_1 = class ApiExceptionFilter {
+    constructor() {
+        this.logger = new common_1.Logger(ApiExceptionFilter_1.name);
+    }
     catch(exception, host) {
         const ctx = host.switchToHttp();
         const request = ctx.getRequest();
         const response = ctx.getResponse();
         const normalized = this.normalizeException(exception);
+        const requestId = (0, http_log_context_1.getRequestId)(request, response);
         const body = {
             success: false,
             error: {
@@ -87,13 +79,41 @@ let ApiExceptionFilter = class ApiExceptionFilter {
                     details: normalized.details,
                 }),
             },
-            requestId: getResponseRequestId(response, request),
+            requestId,
             timestamp: new Date().toISOString(),
             path: request.originalUrl || request.url,
             method: request.method,
             statusCode: normalized.statusCode,
         };
+        this.logException(exception, request, response, normalized, requestId);
         response.status(normalized.statusCode).json(body);
+    }
+    logException(exception, request, response, normalized, requestId) {
+        const error = exception instanceof Error
+            ? {
+                name: exception.name,
+                message: exception.message,
+                stack: exception.stack,
+            }
+            : {
+                name: 'NonErrorException',
+                message: String(exception),
+                stack: null,
+            };
+        const context = {
+            ...(0, http_log_context_1.buildHttpLogContext)(request, response),
+            requestId,
+            statusCode: normalized.statusCode,
+            errorCode: normalized.code,
+            errorMessage: normalized.message,
+            exception: error,
+        };
+        const message = `${request.method} ${request.originalUrl || request.url} failed ${normalized.statusCode} requestId=${requestId ?? 'none'}`;
+        if (normalized.statusCode >= 500) {
+            this.logger.error(message, error.stack, JSON.stringify(context));
+            return;
+        }
+        this.logger.warn(message, JSON.stringify(context));
     }
     normalizeException(exception) {
         if (isMulterError(exception)) {
@@ -178,7 +198,7 @@ let ApiExceptionFilter = class ApiExceptionFilter {
     }
 };
 exports.ApiExceptionFilter = ApiExceptionFilter;
-exports.ApiExceptionFilter = ApiExceptionFilter = __decorate([
+exports.ApiExceptionFilter = ApiExceptionFilter = ApiExceptionFilter_1 = __decorate([
     (0, common_1.Catch)()
 ], ApiExceptionFilter);
 //# sourceMappingURL=api-exception.filter.js.map

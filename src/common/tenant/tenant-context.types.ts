@@ -23,6 +23,7 @@ export interface TenantContext {
   readonly membershipId: string;
   readonly tenantRole: string;
   readonly permissions: readonly string[];
+  readonly authorizationVersion?: number;
   readonly platformAdmin: boolean;
   readonly membershipStatus: TenantMembershipStatus;
   readonly resolutionSource: TenantResolutionSource;

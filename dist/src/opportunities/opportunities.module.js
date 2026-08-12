@@ -9,6 +9,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.OpportunitiesModule = void 0;
 const common_1 = require("@nestjs/common");
 const pipeline_config_module_1 = require("../admin/pipeline/pipeline-config.module");
+const attachments_module_1 = require("../attachments/attachments.module");
 const company_opportunities_controller_1 = require("./company-opportunities.controller");
 const opportunity_commercial_documents_controller_1 = require("./opportunity-commercial-documents.controller");
 const opportunity_commercial_documents_service_1 = require("./opportunity-commercial-documents.service");
@@ -23,7 +24,7 @@ let OpportunitiesModule = class OpportunitiesModule {
 exports.OpportunitiesModule = OpportunitiesModule;
 exports.OpportunitiesModule = OpportunitiesModule = __decorate([
     (0, common_1.Module)({
-        imports: [pipeline_config_module_1.PipelineConfigModule],
+        imports: [pipeline_config_module_1.PipelineConfigModule, attachments_module_1.AttachmentsModule],
         controllers: [
             opportunities_controller_1.OpportunitiesController,
             company_opportunities_controller_1.CompanyOpportunitiesController,

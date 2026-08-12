@@ -14,6 +14,8 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.OpportunityCommercialDocumentsController = void 0;
 const common_1 = require("@nestjs/common");
+const platform_express_1 = require("@nestjs/platform-express");
+const multer_1 = require("multer");
 const current_user_decorator_1 = require("../common/decorators/current-user.decorator");
 const permissions_decorator_1 = require("../common/decorators/permissions.decorator");
 const jwt_auth_guard_1 = require("../common/guards/jwt-auth.guard");
@@ -22,6 +24,7 @@ const change_commercial_document_status_dto_1 = require("./dto/change-commercial
 const create_commercial_document_dto_1 = require("./dto/create-commercial-document.dto");
 const find_commercial_documents_dto_1 = require("./dto/find-commercial-documents.dto");
 const update_commercial_document_dto_1 = require("./dto/update-commercial-document.dto");
+const upload_commercial_document_dto_1 = require("./dto/upload-commercial-document.dto");
 const opportunity_commercial_documents_service_1 = require("./opportunity-commercial-documents.service");
 let OpportunityCommercialDocumentsController = class OpportunityCommercialDocumentsController {
     constructor(service) {
@@ -32,6 +35,9 @@ let OpportunityCommercialDocumentsController = class OpportunityCommercialDocume
     }
     create(opportunityId, dto, user) {
         return this.service.create(opportunityId, dto, user);
+    }
+    createWithFile(opportunityId, dto, file, user) {
+        return this.service.createWithFile(opportunityId, dto, file, user);
     }
     findOne(opportunityId, documentId, user) {
         return this.service.findOne(opportunityId, documentId, user);
@@ -67,6 +73,23 @@ __decorate([
     __metadata("design:paramtypes", [String, create_commercial_document_dto_1.CreateCommercialDocumentDto, Object]),
     __metadata("design:returntype", void 0)
 ], OpportunityCommercialDocumentsController.prototype, "create", null);
+__decorate([
+    (0, common_1.Post)('upload'),
+    (0, permissions_decorator_1.Permissions)('commercial-document:manage'),
+    (0, common_1.UseInterceptors)((0, platform_express_1.FileInterceptor)('file', {
+        storage: (0, multer_1.memoryStorage)(),
+        limits: {
+            fileSize: 25 * 1024 * 1024,
+        },
+    })),
+    __param(0, (0, common_1.Param)('opportunityId')),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, common_1.UploadedFile)()),
+    __param(3, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, upload_commercial_document_dto_1.UploadCommercialDocumentDto, Object, Object]),
+    __metadata("design:returntype", void 0)
+], OpportunityCommercialDocumentsController.prototype, "createWithFile", null);
 __decorate([
     (0, common_1.Get)(':documentId'),
     (0, permissions_decorator_1.Permissions)('commercial-document:view'),

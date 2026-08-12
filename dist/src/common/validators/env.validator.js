@@ -73,6 +73,16 @@ exports.envValidationSchema = Joi.object({
         .messages({
         'string.pattern.base': 'REFRESH_TOKEN_EXPIRES_IN باید فرمت زمان معتبر داشته باشد (مثلاً 30d, 12h, 4w)',
     }),
+    REFRESH_TOKEN_COOKIE_SECURE: Joi.boolean()
+        .truthy('true')
+        .falsy('false')
+        .optional(),
+    REFRESH_TOKEN_COOKIE_SAME_SITE: Joi.string()
+        .valid('lax', 'strict', 'none')
+        .optional(),
+    REFRESH_TOKEN_COOKIE_PATH: Joi.string()
+        .pattern(/^\//)
+        .default('/api/auth'),
     NODE_ENV: Joi.string()
         .valid('development', 'production', 'test')
         .default('development')

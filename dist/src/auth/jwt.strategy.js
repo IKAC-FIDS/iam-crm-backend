@@ -14,9 +14,10 @@ const common_1 = require("@nestjs/common");
 const config_1 = require("@nestjs/config");
 const passport_1 = require("@nestjs/passport");
 const passport_jwt_1 = require("passport-jwt");
-const prisma_service_1 = require("../prisma/prisma.service");
+const tenant_resolver_service_1 = require("../organization-memberships/tenant-resolver.service");
+const audit_request_context_service_1 = require("../audit-log/audit-request-context.service");
 let JwtStrategy = class JwtStrategy extends (0, passport_1.PassportStrategy)(passport_jwt_1.Strategy) {
-    constructor(configService, prisma) {
+    constructor(configService, tenantResolver, auditRequestContext) {
         const secret = configService.get('JWT_SECRET');
         if (!secret) {
             throw new Error('JWT_SECRET is not configured');
@@ -25,33 +26,42 @@ let JwtStrategy = class JwtStrategy extends (0, passport_1.PassportStrategy)(pas
             jwtFromRequest: passport_jwt_1.ExtractJwt.fromAuthHeaderAsBearerToken(),
             ignoreExpiration: false,
             secretOrKey: secret,
+            passReqToCallback: true,
         });
-        this.prisma = prisma;
+        this.tenantResolver = tenantResolver;
+        this.auditRequestContext = auditRequestContext;
     }
-    async validate(payload) {
+    async validate(req, payload) {
         if (!payload?.sub || !payload.email || !payload.role) {
             throw new common_1.UnauthorizedException('Invalid token payload');
         }
-        const user = await this.prisma.user.findUnique({
-            where: { id: payload.sub },
-            select: {
-                id: true,
-                email: true,
-                role: true,
-                team: true,
-                organizationId: true,
-                isActive: true,
+        const requestId = req.requestId ?? null;
+        const effective = await this.tenantResolver
+            .resolveAuthenticatedTenant(payload.sub, {
+            claims: {
+                activeOrganizationId: payload.activeOrganizationId,
+                membershipId: payload.membershipId,
             },
+            requestId,
+        })
+            .catch(() => {
+            throw new common_1.UnauthorizedException('No active organization membership');
         });
-        if (!user?.isActive) {
-            throw new common_1.UnauthorizedException('Invalid token payload');
-        }
+        this.auditRequestContext.setOrganizationId(effective.organizationId);
         return {
-            userId: user.id,
-            email: user.email,
-            role: user.role,
-            team: user.team,
-            organizationId: user.organizationId ?? payload.organizationId ?? null,
+            userId: payload.sub,
+            email: payload.email,
+            role: effective.role,
+            roleId: effective.roleId,
+            team: effective.team,
+            teamId: effective.teamId,
+            teamCode: effective.teamCode,
+            teamName: effective.teamName,
+            organizationId: effective.organizationId,
+            activeOrganizationId: effective.organizationId,
+            membershipId: effective.membershipId,
+            tenantResolutionSource: effective.resolutionSource,
+            tenantContext: effective,
         };
     }
 };
@@ -59,6 +69,7 @@ exports.JwtStrategy = JwtStrategy;
 exports.JwtStrategy = JwtStrategy = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [config_1.ConfigService,
-        prisma_service_1.PrismaService])
+        tenant_resolver_service_1.TenantResolverService,
+        audit_request_context_service_1.AuditRequestContextService])
 ], JwtStrategy);
 //# sourceMappingURL=jwt.strategy.js.map

@@ -787,10 +787,10 @@ let TasksService = class TasksService {
         };
     }
     async validateAssignee(assignedToId, user) {
-        const assignee = await this.prisma.user.findUnique({
+        const assignee = await this.prisma.user.findFirst({
             where: {
                 id: assignedToId,
-                organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
+                ...tenant_scope_util_1.tenantScope.activeMembership(user),
             },
         });
         if (!assignee || !assignee.isActive || assignee.role === client_1.UserRole.BOARDS) {
@@ -854,6 +854,7 @@ let TasksService = class TasksService {
             return;
         }
         await this.notifications.notifyUser({
+            organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
             recipientId: task.assignedToId,
             actorId: user.userId,
             type: client_1.NotificationType.TASK_ASSIGNED,
@@ -871,6 +872,7 @@ let TasksService = class TasksService {
             return;
         }
         await this.notifications.notifyUser({
+            organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
             recipientId: task.createdById,
             actorId: user.userId,
             type: client_1.NotificationType.TASK_COMPLETED,
@@ -888,6 +890,7 @@ let TasksService = class TasksService {
             return;
         }
         await this.notifications.notifyUser({
+            organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
             recipientId: task.assignedToId,
             actorId: user.userId,
             type: client_1.NotificationType.TASK_RESCHEDULED,

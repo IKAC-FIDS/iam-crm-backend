@@ -19,6 +19,11 @@ let AuditRequestContextService = class AuditRequestContextService {
     getContext() {
         return this.storage.getStore();
     }
+    setOrganizationId(organizationId) {
+        const context = this.storage.getStore();
+        if (context)
+            context.organizationId = organizationId;
+    }
 };
 exports.AuditRequestContextService = AuditRequestContextService;
 exports.AuditRequestContextService = AuditRequestContextService = __decorate([

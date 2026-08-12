@@ -68,7 +68,7 @@ export class PermissionsGuard implements CanActivate {
     }
 
     const discriminator = requestUser.tenantContext
-      ? `${requestUser.tenantContext.organizationId}:${requestUser.tenantContext.membershipId}`
+      ? `${requestUser.tenantContext.organizationId}:${requestUser.userId}:${requestUser.tenantContext.membershipId}:${requestUser.tenantContext.authorizationVersion ?? 'unversioned'}`
       : `${requestUser.organizationId ?? 'legacy'}:${requestUser.membershipId ?? 'legacy'}`;
     const effectiveRoleId = requestUser.roleId ?? dbUser.roleId;
     const userPermissions = requestUser.tenantContext

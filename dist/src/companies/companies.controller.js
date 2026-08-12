@@ -24,6 +24,7 @@ const update_company_dto_1 = require("./dto/update-company.dto");
 const change_owner_dto_1 = require("./dto/change-owner.dto");
 const find_companies_dto_1 = require("./dto/find-companies.dto");
 const archive_company_dto_1 = require("./dto/archive-company.dto");
+const find_company_options_dto_1 = require("./dto/find-company-options.dto");
 let CompaniesController = class CompaniesController {
     constructor(companiesService) {
         this.companiesService = companiesService;
@@ -39,9 +40,16 @@ let CompaniesController = class CompaniesController {
             withoutOwner: query.withoutOwner === 'true',
             search: query.search,
             ownerId: query.ownerId,
+            ownershipScope: query.ownershipScope,
             includeArchived: query.includeArchived === 'true',
             archivedOnly: query.archivedOnly === 'true',
         });
+    }
+    findOptions(user, query) {
+        return this.companiesService.findOptions(user, query);
+    }
+    findOption(id, user) {
+        return this.companiesService.findOption(id, user);
     }
     findOne(id, user) {
         return this.companiesService.findOne(id, user);
@@ -83,6 +91,24 @@ __decorate([
     __metadata("design:paramtypes", [Object, find_companies_dto_1.FindCompaniesDto]),
     __metadata("design:returntype", void 0)
 ], CompaniesController.prototype, "findAll", null);
+__decorate([
+    (0, common_1.Get)('options'),
+    (0, permissions_decorator_1.Permissions)('company:view'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Query)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, find_company_options_dto_1.FindCompanyOptionsDto]),
+    __metadata("design:returntype", void 0)
+], CompaniesController.prototype, "findOptions", null);
+__decorate([
+    (0, common_1.Get)('options/:id'),
+    (0, permissions_decorator_1.Permissions)('company:view'),
+    __param(0, (0, common_1.Param)('id', new common_1.ParseUUIDPipe())),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", void 0)
+], CompaniesController.prototype, "findOption", null);
 __decorate([
     (0, common_1.Get)(':id'),
     (0, permissions_decorator_1.Permissions)('company:view'),

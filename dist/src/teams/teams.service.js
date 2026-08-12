@@ -15,6 +15,7 @@ const client_1 = require("@prisma/client");
 const audit_log_service_1 = require("../audit-log/audit-log.service");
 const tenant_scope_util_1 = require("../common/tenant/tenant-scope.util");
 const prisma_service_1 = require("../prisma/prisma.service");
+const organization_memberships_service_1 = require("../organization-memberships/organization-memberships.service");
 const teamInclude = {
     manager: {
         select: {
@@ -49,9 +50,10 @@ const memberSelect = {
     },
 };
 let TeamsService = class TeamsService {
-    constructor(prisma, audit) {
+    constructor(prisma, audit, memberships) {
         this.prisma = prisma;
         this.audit = audit;
+        this.memberships = memberships;
     }
     async findAll(query, user) {
         this.assertCanView(user);
@@ -102,8 +104,9 @@ let TeamsService = class TeamsService {
     async create(dto, user) {
         this.assertAdmin(user);
         const code = this.normalizeCode(dto.code);
+        const organizationId = (0, tenant_scope_util_1.getCurrentOrganizationId)(user);
         const duplicate = await this.prisma.team.findUnique({
-            where: { code },
+            where: { organizationId_code: { organizationId, code } },
         });
         if (duplicate) {
             throw new common_1.ConflictException('Team code already exists');
@@ -117,7 +120,7 @@ let TeamsService = class TeamsService {
                 name: this.requiredText(dto.name, 'Team name is required'),
                 description: dto.description?.trim() || undefined,
                 managerId: manager?.id,
-                organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
+                organizationId,
             },
             include: teamInclude,
         });
@@ -137,7 +140,10 @@ let TeamsService = class TeamsService {
         const data = {};
         if (dto.code !== undefined) {
             const code = this.normalizeCode(dto.code);
-            const duplicate = await this.prisma.team.findUnique({ where: { code } });
+            const organizationId = (0, tenant_scope_util_1.getCurrentOrganizationId)(user);
+            const duplicate = await this.prisma.team.findUnique({
+                where: { organizationId_code: { organizationId, code } },
+            });
             if (duplicate && duplicate.id !== id) {
                 throw new common_1.ConflictException('Team code already exists');
             }
@@ -201,13 +207,15 @@ let TeamsService = class TeamsService {
             throw new common_1.BadRequestException('Cannot assign users to an inactive team');
         }
         const member = await this.getUserInOrganization(dto.userId, user);
-        const updated = await this.prisma.user.update({
-            where: { id: member.id },
-            data: {
-                teamId: team.id,
-                team: team.code,
-            },
-            select: memberSelect,
+        const organizationId = (0, tenant_scope_util_1.getCurrentOrganizationId)(user);
+        const updated = await this.prisma.$transaction(async (tx) => {
+            const result = await tx.user.update({
+                where: { id: member.id },
+                data: { teamId: team.id, team: team.code },
+                select: memberSelect,
+            });
+            await this.memberships.syncDefaultTeam(tx, member.id, organizationId, team.id);
+            return result;
         });
         await this.audit.record({
             actorId: user.userId,
@@ -227,13 +235,15 @@ let TeamsService = class TeamsService {
         if (member.teamId !== id) {
             throw new common_1.BadRequestException('User is not a member of this team');
         }
-        const updated = await this.prisma.user.update({
-            where: { id: member.id },
-            data: {
-                teamId: null,
-                team: null,
-            },
-            select: memberSelect,
+        const organizationId = (0, tenant_scope_util_1.getCurrentOrganizationId)(user);
+        const updated = await this.prisma.$transaction(async (tx) => {
+            const result = await tx.user.update({
+                where: { id: member.id },
+                data: { teamId: null, team: null },
+                select: memberSelect,
+            });
+            await this.memberships.syncDefaultTeam(tx, member.id, organizationId, null);
+            return result;
         });
         await this.audit.record({
             actorId: user.userId,
@@ -337,6 +347,7 @@ exports.TeamsService = TeamsService;
 exports.TeamsService = TeamsService = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
-        audit_log_service_1.AuditLogService])
+        audit_log_service_1.AuditLogService,
+        organization_memberships_service_1.OrganizationMembershipsService])
 ], TeamsService);
 //# sourceMappingURL=teams.service.js.map

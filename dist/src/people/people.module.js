@@ -10,13 +10,15 @@ exports.PeopleModule = void 0;
 const common_1 = require("@nestjs/common");
 const people_service_1 = require("./people.service");
 const people_controller_1 = require("./people.controller");
+const person_histories_controller_1 = require("./person-histories.controller");
+const person_histories_service_1 = require("./person-histories.service");
 let PeopleModule = class PeopleModule {
 };
 exports.PeopleModule = PeopleModule;
 exports.PeopleModule = PeopleModule = __decorate([
     (0, common_1.Module)({
-        providers: [people_service_1.PeopleService],
-        controllers: [people_controller_1.PeopleController],
+        providers: [people_service_1.PeopleService, person_histories_service_1.PersonHistoriesService],
+        controllers: [people_controller_1.PeopleController, person_histories_controller_1.PersonHistoriesController],
     })
 ], PeopleModule);
 //# sourceMappingURL=people.module.js.map

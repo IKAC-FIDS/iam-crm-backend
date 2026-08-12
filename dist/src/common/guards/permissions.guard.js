@@ -40,13 +40,22 @@ let PermissionsGuard = class PermissionsGuard {
             select: {
                 id: true,
                 role: true,
+                roleId: true,
                 isActive: true,
             },
         });
         if (!dbUser || !dbUser.isActive) {
             throw new common_1.ForbiddenException('حساب کاربری فعال نیست');
         }
-        const userPermissions = await this.getPermissionsForRole(dbUser.role);
+        const discriminator = requestUser.tenantContext
+            ? `${requestUser.tenantContext.organizationId}:${requestUser.userId}:${requestUser.tenantContext.membershipId}:${requestUser.tenantContext.authorizationVersion ?? 'unversioned'}`
+            : `${requestUser.organizationId ?? 'legacy'}:${requestUser.membershipId ?? 'legacy'}`;
+        const effectiveRoleId = requestUser.roleId ?? dbUser.roleId;
+        const userPermissions = requestUser.tenantContext
+            ? new Set(requestUser.tenantContext.permissions)
+            : effectiveRoleId
+                ? await this.getPermissionsForRoleId(effectiveRoleId, discriminator)
+                : await this.getPermissionsForRole(requestUser.role ?? dbUser.role, discriminator);
         const allowed = normalizedPolicy.mode === 'any'
             ? normalizedPolicy.actions.some((permission) => userPermissions.has(permission))
             : normalizedPolicy.actions.every((permission) => userPermissions.has(permission));
@@ -71,8 +80,8 @@ let PermissionsGuard = class PermissionsGuard {
             mode: policy.mode ?? 'all',
         };
     }
-    async getPermissionsForRole(role) {
-        const cacheKey = `permissions:${role}`;
+    async getPermissionsForRole(role, discriminator) {
+        const cacheKey = `permissions:${discriminator}:${role}`;
         let permissions = cache.get(cacheKey);
         if (!permissions) {
             const rolePermissions = await this.prisma.rolePermission.findMany({
@@ -84,9 +93,25 @@ let PermissionsGuard = class PermissionsGuard {
         }
         return new Set(permissions);
     }
+    async getPermissionsForRoleId(roleId, discriminator) {
+        const cacheKey = `permissions:${discriminator}:role:${roleId}`;
+        let permissions = cache.get(cacheKey);
+        if (!permissions) {
+            const rows = await this.prisma.rolePermission.findMany({
+                where: { roleId, permission: { isActive: true } },
+                include: { permission: true },
+            });
+            permissions = rows.map((item) => item.permission.action);
+            cache.set(cacheKey, permissions);
+        }
+        return new Set(permissions);
+    }
     static clearCache(role) {
         if (role) {
-            cache.del(`permissions:${role}`);
+            const suffixes = [`:${role}`, `:role:${role}`];
+            cache.del(cache
+                .keys()
+                .filter((key) => suffixes.some((suffix) => key.endsWith(suffix))));
             return;
         }
         cache.flushAll();

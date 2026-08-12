@@ -1,4 +1,5 @@
 import {
+  ConflictException,
   ForbiddenException,
   Injectable,
   Logger,
@@ -212,6 +213,7 @@ export class OrganizationMembershipsService {
     userId: string,
     organizationId: string,
   ) {
+    await this.assertOwnerCanBeDeactivated(tx, userId, organizationId);
     return tx.organizationMembership.updateMany({
       where: {
         userId,
@@ -224,6 +226,25 @@ export class OrganizationMembershipsService {
         suspendedAt: new Date(),
       },
     });
+  }
+
+  private async assertOwnerCanBeDeactivated(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    organizationId: string,
+  ) {
+    await tx.$queryRaw<Array<{ lockResult: string | null }>>(Prisma.sql`
+      SELECT CAST(pg_advisory_xact_lock(hashtext(${`tenant-owner:${organizationId}`})) AS TEXT) AS "lockResult"
+    `);
+    const target = await tx.organizationMembership.findFirst({
+      where: { userId, organizationId, status: OrganizationMembershipStatus.ACTIVE, isTenantOwner: true, user: { isActive: true } },
+      select: { id: true },
+    });
+    if (!target) return;
+    const activeOwners = await tx.organizationMembership.count({
+      where: { organizationId, status: OrganizationMembershipStatus.ACTIVE, isTenantOwner: true, user: { isActive: true } },
+    });
+    if (activeOwners <= 1) throw new ConflictException('The last active tenant owner cannot be deactivated');
   }
 
   async activateForUser(

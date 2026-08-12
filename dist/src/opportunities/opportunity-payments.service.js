@@ -13,6 +13,7 @@ exports.OpportunityPaymentsService = void 0;
 const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
 const audit_log_service_1 = require("../audit-log/audit-log.service");
+const team_scope_util_1 = require("../common/tenant/team-scope.util");
 const prisma_service_1 = require("../prisma/prisma.service");
 const api_date_util_1 = require("../common/dates/api-date.util");
 const paymentInclude = {
@@ -333,8 +334,8 @@ let OpportunityPaymentsService = class OpportunityPaymentsService {
             return {};
         }
         if (user.role === client_1.UserRole.MANAGER) {
-            return user.team
-                ? { company: { owner: { team: user.team } } }
+            return user.teamId || user.team
+                ? { company: { owner: (0, team_scope_util_1.userTeamScopeWhere)(user) } }
                 : { id: { in: [] } };
         }
         return {

@@ -12,30 +12,29 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.PeopleService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../prisma/prisma.service");
-const client_1 = require("@prisma/client");
+const team_scope_util_1 = require("../common/tenant/team-scope.util");
+const tenant_scope_util_1 = require("../common/tenant/tenant-scope.util");
+const company_access_service_1 = require("../companies/company-access.service");
 let PeopleService = class PeopleService {
-    constructor(prisma) {
+    constructor(prisma, companyAccess) {
         this.prisma = prisma;
+        this.companyAccess = companyAccess;
     }
     async findDirectory(query, user) {
         const page = query.page ?? 1;
         const limit = query.limit ?? 20;
-        const and = [{ company: { archivedAt: null } }];
-        if (user.role === client_1.UserRole.MANAGER) {
-            and.push(user.team ? { company: { owner: { team: user.team } } } : { id: { in: [] } });
-        }
-        else if (user.role === client_1.UserRole.REP) {
-            and.push({ company: { ownerId: user.userId } });
-        }
-        else if (user.role === client_1.UserRole.BOARDS) {
-            throw new common_1.ForbiddenException('شما دسترسی به فهرست مخاطبین را ندارید');
-        }
+        const and = [{
+                company: {
+                    organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
+                    archivedAt: null,
+                },
+            }];
         if (query.companyId)
             and.push({ companyId: query.companyId });
         if (query.ownerId)
             and.push({ company: { ownerId: query.ownerId } });
         if (query.team?.trim())
-            and.push({ company: { owner: { team: query.team.trim() } } });
+            and.push({ company: { owner: (0, team_scope_util_1.userTeamFilterWhere)([query.team]) } });
         if (query.department?.trim())
             and.push({ department: query.department.trim() });
         if (query.jobTitle?.trim())
@@ -85,7 +84,23 @@ let PeopleService = class PeopleService {
                 select: {
                     id: true, companyId: true, fullName: true, title: true, department: true, personaTag: true, seniorityLevel: true,
                     email: true, phone: true, isPrimaryContact: true, createdAt: true, updatedAt: true,
-                    company: { select: { id: true, legalName: true, brandName: true, owner: { select: { id: true, fullName: true, email: true, team: true } } } },
+                    company: {
+                        select: {
+                            id: true,
+                            legalName: true,
+                            brandName: true,
+                            owner: {
+                                select: {
+                                    id: true,
+                                    fullName: true,
+                                    email: true,
+                                    team: true,
+                                    teamId: true,
+                                    teamRef: { select: { code: true, name: true } },
+                                },
+                            },
+                        },
+                    },
                     contacts: {
                         select: {
                             id: true,
@@ -125,7 +140,7 @@ let PeopleService = class PeopleService {
         if (!companyId) {
             throw new common_1.BadRequestException('شناسه شرکت الزامی است');
         }
-        await this.validateCompanyAccess(companyId, user);
+        await this.assertCompanyReadable(companyId, user);
         const page = pagination.page ?? 1;
         const limit = pagination.limit ?? 20;
         const skip = (page - 1) * limit;
@@ -152,17 +167,27 @@ let PeopleService = class PeopleService {
         };
     }
     async findOne(id, user) {
-        const person = await this.prisma.person.findUnique({
-            where: { id },
+        const person = await this.prisma.person.findFirst({
+            where: { id, company: { organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user) } },
             include: {
                 company: true,
                 contacts: true,
                 socials: true,
+                employmentHistory: {
+                    include: {
+                        company: { select: { id: true, legalName: true, brandName: true } },
+                        positions: { orderBy: [{ isCurrent: 'desc' }, { startDate: 'desc' }] },
+                    },
+                    orderBy: { createdAt: 'desc' },
+                },
+                educationHistory: {
+                    include: { university: { select: { id: true, name: true } } },
+                    orderBy: [{ educationDate: 'desc' }, { createdAt: 'desc' }],
+                },
             },
         });
         if (!person)
             throw new common_1.NotFoundException('مخاطب پیدا نشد');
-        await this.validateCompanyAccess(person.companyId, user);
         return this.withDomainAliases(person);
     }
     async create(dto, user) {
@@ -223,8 +248,8 @@ let PeopleService = class PeopleService {
         }).then((person) => this.withDomainAliases(person));
     }
     async update(id, dto, user) {
-        const person = await this.prisma.person.findUnique({
-            where: { id },
+        const person = await this.prisma.person.findFirst({
+            where: { id, company: { organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user) } },
             include: { company: true },
         });
         if (!person)
@@ -241,16 +266,19 @@ let PeopleService = class PeopleService {
         }).then((updated) => this.withDomainAliases(updated));
     }
     async remove(id, user) {
-        const person = await this.prisma.person.findUnique({
-            where: { id },
+        const person = await this.prisma.person.findFirst({
+            where: { id, company: { organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user) } },
             include: { company: true },
         });
         if (!person)
             throw new common_1.NotFoundException('مخاطب پیدا نشد');
         await this.validateCompanyAccess(person.companyId, user);
-        return this.prisma.person.delete({
-            where: { id },
+        const deleted = await this.prisma.person.deleteMany({
+            where: { id, company: { organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user) } },
         });
+        if (!deleted.count)
+            throw new common_1.NotFoundException('Person not found');
+        return person;
     }
     withDomainAliases(person) {
         return {
@@ -260,28 +288,10 @@ let PeopleService = class PeopleService {
         };
     }
     async validateCompanyAccess(companyId, user) {
-        const company = await this.prisma.company.findUnique({
-            where: { id: companyId },
-            select: { ownerId: true, owner: { select: { team: true } } },
-        });
-        if (!company) {
-            throw new common_1.NotFoundException('شرکت پیدا نشد');
-        }
-        if (user.role === client_1.UserRole.ADMIN)
-            return;
-        if (user.role === client_1.UserRole.MANAGER) {
-            const companyTeam = company.owner?.team;
-            if (!companyTeam || companyTeam !== user.team) {
-                throw new common_1.ForbiddenException('شما به این شرکت دسترسی ندارید');
-            }
-            return;
-        }
-        if (user.role === client_1.UserRole.REP && company.ownerId !== user.userId) {
-            throw new common_1.ForbiddenException('شما به این شرکت دسترسی ندارید');
-        }
-        if (user.role === client_1.UserRole.BOARDS) {
-            throw new common_1.ForbiddenException('شما دسترسی به مخاطبین را ندارید');
-        }
+        await this.companyAccess.assertCompanyMutable(companyId, user);
+    }
+    async assertCompanyReadable(companyId, user) {
+        await this.companyAccess.assertCompanyReadable(companyId, user);
     }
     async resolveContactTypeReference(typeOptionId, type, required = false) {
         if (typeOptionId) {
@@ -397,6 +407,6 @@ let PeopleService = class PeopleService {
 exports.PeopleService = PeopleService;
 exports.PeopleService = PeopleService = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [prisma_service_1.PrismaService])
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService, company_access_service_1.CompanyAccessService])
 ], PeopleService);
 //# sourceMappingURL=people.service.js.map

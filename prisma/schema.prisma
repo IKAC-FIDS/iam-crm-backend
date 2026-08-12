@@ -27,6 +27,11 @@ enum PlatformRole {
   PLATFORM_ADMIN
 }
 
+enum RoleScope {
+  SYSTEM
+  TENANT
+}
+
 enum SsoProviderType {
   OIDC
   SAML
@@ -394,7 +399,8 @@ model Organization {
   timezone String @default("Asia/Tehran")
   locale   String @default("fa-IR")
 
-  settings Json?
+  settings             Json?
+  authorizationVersion Int   @default(1)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -415,6 +421,7 @@ model Organization {
   tenantSettings      OrganizationSettings?
   branding            OrganizationBranding?
   domains             OrganizationDomain[]
+  tenantRoles         Role[]                   @relation("TenantRoles")
 
   @@index([status])
   @@index([createdAt])
@@ -1817,6 +1824,10 @@ model Role {
   baseRole                UserRole                 @default(REP)
   isSystem                Boolean                  @default(false)
   isActive                Boolean                  @default(true)
+  scope                   RoleScope                @default(SYSTEM)
+  organizationId          String?
+  organization            Organization?            @relation("TenantRoles", fields: [organizationId], references: [id], onDelete: Restrict)
+  normalizedCode          String?
   createdAt               DateTime                 @default(now())
   updatedAt               DateTime                 @updatedAt
   users                   User[]
@@ -1824,7 +1835,9 @@ model Role {
   organizationMemberships OrganizationMembership[]
   ssoGroupMappings        SsoGroupRoleMapping[]
 
+  @@unique([organizationId, normalizedCode])
   @@index([isActive])
+  @@index([scope, organizationId, isActive])
   @@map("roles")
 }
 

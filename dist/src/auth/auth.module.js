@@ -19,6 +19,7 @@ const sessions_controller_1 = require("./sessions.controller");
 const sessions_service_1 = require("./sessions.service");
 const account_security_controller_1 = require("./account-security.controller");
 const account_security_service_1 = require("./account-security.service");
+const organization_memberships_module_1 = require("../organization-memberships/organization-memberships.module");
 let AuthModule = class AuthModule {
 };
 exports.AuthModule = AuthModule;
@@ -26,6 +27,7 @@ exports.AuthModule = AuthModule = __decorate([
     (0, common_1.Module)({
         imports: [
             passport_1.PassportModule,
+            organization_memberships_module_1.OrganizationMembershipsModule,
             jwt_1.JwtModule.registerAsync({
                 imports: [config_1.ConfigModule],
                 useFactory: (configService) => ({

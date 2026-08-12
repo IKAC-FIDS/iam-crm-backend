@@ -18,9 +18,13 @@ let AuditRequestContextMiddleware = class AuditRequestContextMiddleware {
         this.requestContext = requestContext;
     }
     use(req, res, next) {
-        const requestId = this.resolveHeaderValue(req.headers['x-request-id']) || (0, node_crypto_1.randomUUID)();
+        const requestWithId = req;
+        const requestId = requestWithId.requestId ||
+            this.resolveHeaderValue(req.headers['x-request-id']) ||
+            (0, node_crypto_1.randomUUID)();
         const userAgent = this.resolveHeaderValue(req.headers['user-agent']);
         const ipAddress = this.resolveClientIp(req);
+        requestWithId.requestId = requestId;
         res.setHeader('x-request-id', requestId);
         this.requestContext.run({
             requestId,

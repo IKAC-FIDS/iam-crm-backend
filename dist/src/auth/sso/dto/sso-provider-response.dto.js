@@ -3,8 +3,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.toSsoProviderResponse = toSsoProviderResponse;
 exports.toPublicSsoProviderResponse = toPublicSsoProviderResponse;
 function toSsoProviderResponse(provider) {
+    if (!provider.organizationId)
+        throw new Error("Tenant-owned SSO provider is required");
     return {
         id: provider.id,
+        organizationId: provider.organizationId,
         name: provider.name,
         type: provider.type,
         isActive: provider.isActive,
@@ -20,14 +23,24 @@ function toSsoProviderResponse(provider) {
         scopes: provider.scopes,
         entityId: provider.entityId,
         ssoUrl: provider.ssoUrl,
-        x509Certificate: provider.x509Certificate,
+        certificateConfigured: Boolean(provider.x509Certificate),
         signRequests: provider.signRequests,
         wantAssertionsSigned: provider.wantAssertionsSigned,
         wantResponseSigned: provider.wantResponseSigned,
         emailAttribute: provider.emailAttribute,
         nameAttribute: provider.nameAttribute,
         groupsAttribute: provider.groupsAttribute,
-        hasClientSecret: Boolean(provider.clientSecretEnc),
+        secretConfigured: Boolean(provider.clientSecretEnc),
+        routingDomains: provider.routes
+            ?.filter((route) => route.kind === "DOMAIN")
+            .map((route) => route.value) ?? [],
+        routingSubdomains: provider.routes
+            ?.filter((route) => route.kind === "SUBDOMAIN")
+            .map((route) => route.value) ?? [],
+        groupRoleMappings: provider.groupRoleMappings?.map((mapping) => ({
+            group: mapping.normalizedGroup,
+            roleId: mapping.roleId,
+        })) ?? [],
         createdAt: provider.createdAt,
         updatedAt: provider.updatedAt,
     };

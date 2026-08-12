@@ -19,9 +19,29 @@ let RefreshTokenService = class RefreshTokenService {
         this.prisma = prisma;
         this.config = config;
     }
-    async createSession(userId, req, tx) {
+    async getActiveUser(refreshToken) {
+        return (await this.getActiveSession(refreshToken)).user;
+    }
+    async getActiveSession(refreshToken) {
+        const session = await this.prisma.refreshSession.findUnique({
+            where: { refreshTokenHash: this.hashRefreshToken(refreshToken) },
+            include: { user: true },
+        });
+        if (!session ||
+            session.revokedAt ||
+            session.expiresAt <= new Date() ||
+            !session.user.isActive) {
+            throw new common_1.UnauthorizedException('Invalid refresh token');
+        }
+        return {
+            user: session.user,
+            refreshSessionId: session.id,
+            tenantContext: this.parseTenantContext(refreshToken),
+        };
+    }
+    async createSession(userId, req, tx, tenantContext) {
         const prisma = tx ?? this.prisma;
-        const refreshToken = this.generateRefreshToken();
+        const refreshToken = this.generateRefreshToken(tenantContext);
         const refreshTokenHash = this.hashRefreshToken(refreshToken);
         const refreshTokenMaxAgeMs = this.getRefreshTokenTtlMs();
         const refreshTokenExpiresAt = new Date(Date.now() + refreshTokenMaxAgeMs);
@@ -39,9 +59,10 @@ let RefreshTokenService = class RefreshTokenService {
             refreshTokenMaxAgeMs,
             refreshTokenExpiresAt,
             refreshSessionId: session.id,
+            tenantContext: tenantContext ?? null,
         };
     }
-    async rotateRefreshToken(refreshToken, req) {
+    async rotateRefreshToken(refreshToken, req, nextTenantContext) {
         const oldHash = this.hashRefreshToken(refreshToken);
         const existingSession = await this.prisma.refreshSession.findUnique({
             where: { refreshTokenHash: oldHash },
@@ -70,7 +91,9 @@ let RefreshTokenService = class RefreshTokenService {
         if (!existingSession.user.isActive) {
             throw new common_1.UnauthorizedException('User is inactive');
         }
-        const newRefreshToken = this.generateRefreshToken();
+        const currentTenantContext = this.parseTenantContext(refreshToken);
+        const tenantContext = nextTenantContext ?? currentTenantContext;
+        const newRefreshToken = this.generateRefreshToken(tenantContext);
         const newRefreshTokenHash = this.hashRefreshToken(newRefreshToken);
         const refreshTokenMaxAgeMs = this.getRefreshTokenTtlMs();
         const refreshTokenExpiresAt = new Date(Date.now() + refreshTokenMaxAgeMs);
@@ -117,6 +140,7 @@ let RefreshTokenService = class RefreshTokenService {
             refreshTokenMaxAgeMs,
             refreshTokenExpiresAt,
             refreshSessionId: result.id,
+            tenantContext,
         };
     }
     async revokeByToken(refreshToken, reason = 'LOGOUT') {
@@ -239,8 +263,45 @@ let RefreshTokenService = class RefreshTokenService {
             },
         });
     }
-    generateRefreshToken() {
-        return (0, crypto_1.randomBytes)(64).toString('base64url');
+    generateRefreshToken(tenantContext) {
+        const random = (0, crypto_1.randomBytes)(64).toString('base64url');
+        if (!tenantContext)
+            return random;
+        if ('platformOnly' in tenantContext) {
+            const payload = Buffer.from(JSON.stringify({ v: 3, platformOnly: true }), 'utf8').toString('base64url');
+            return `rt3.${payload}.${random}`;
+        }
+        const payload = Buffer.from(JSON.stringify({
+            v: 2,
+            activeOrganizationId: tenantContext.activeOrganizationId,
+            membershipId: tenantContext.membershipId,
+        }), 'utf8').toString('base64url');
+        return `rt2.${payload}.${random}`;
+    }
+    parseTenantContext(refreshToken) {
+        const parts = refreshToken.split('.');
+        if (parts.length !== 3 || !['rt2', 'rt3'].includes(parts[0]))
+            return null;
+        try {
+            const value = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
+            if (parts[0] === 'rt3' && value.v === 3 && value.platformOnly === true) {
+                return { platformOnly: true };
+            }
+            if (value.v !== 2 ||
+                typeof value.activeOrganizationId !== 'string' ||
+                !value.activeOrganizationId ||
+                typeof value.membershipId !== 'string' ||
+                !value.membershipId) {
+                return null;
+            }
+            return {
+                activeOrganizationId: value.activeOrganizationId,
+                membershipId: value.membershipId,
+            };
+        }
+        catch {
+            return null;
+        }
     }
     hashRefreshToken(refreshToken) {
         return (0, crypto_1.createHash)('sha256').update(refreshToken).digest('hex');

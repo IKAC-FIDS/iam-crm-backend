@@ -12,31 +12,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.CompanySocialChannelsService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../prisma/prisma.service");
-const client_1 = require("@prisma/client");
+const company_access_service_1 = require("../companies/company-access.service");
 let CompanySocialChannelsService = class CompanySocialChannelsService {
-    constructor(prisma) {
+    constructor(prisma, companyAccess) {
         this.prisma = prisma;
+        this.companyAccess = companyAccess;
     }
     async validateCompanyAccess(companyId, user) {
-        const company = await this.prisma.company.findUnique({
-            where: { id: companyId },
-            select: { ownerId: true, owner: { select: { team: true } } },
-        });
-        if (!company) {
-            throw new common_1.NotFoundException('شرکت پیدا نشد');
-        }
-        if (user.role === client_1.UserRole.ADMIN)
-            return;
-        if (user.role === client_1.UserRole.MANAGER) {
-            const companyTeam = company.owner?.team;
-            if (!companyTeam || companyTeam !== user.team) {
-                throw new common_1.ForbiddenException('شما به این شرکت دسترسی ندارید');
-            }
-            return;
-        }
-        if (user.role === client_1.UserRole.REP && company.ownerId !== user.userId) {
-            throw new common_1.ForbiddenException('شما به این شرکت دسترسی ندارید');
-        }
+        await this.companyAccess.assertCompanyMutable(companyId, user);
     }
     async create(companyId, dto, user) {
         await this.validateCompanyAccess(companyId, user);
@@ -100,6 +83,6 @@ let CompanySocialChannelsService = class CompanySocialChannelsService {
 exports.CompanySocialChannelsService = CompanySocialChannelsService;
 exports.CompanySocialChannelsService = CompanySocialChannelsService = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [prisma_service_1.PrismaService])
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService, company_access_service_1.CompanyAccessService])
 ], CompanySocialChannelsService);
 //# sourceMappingURL=company-social-channels.service.js.map

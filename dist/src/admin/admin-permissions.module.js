@@ -10,13 +10,15 @@ exports.AdminPermissionsModule = void 0;
 const common_1 = require("@nestjs/common");
 const admin_permissions_service_1 = require("./admin-permissions.service");
 const admin_permissions_controller_1 = require("./admin-permissions.controller");
+const rbac_management_controller_1 = require("./rbac-management.controller");
+const rbac_management_service_1 = require("./rbac-management.service");
 let AdminPermissionsModule = class AdminPermissionsModule {
 };
 exports.AdminPermissionsModule = AdminPermissionsModule;
 exports.AdminPermissionsModule = AdminPermissionsModule = __decorate([
     (0, common_1.Module)({
-        providers: [admin_permissions_service_1.AdminPermissionsService],
-        controllers: [admin_permissions_controller_1.AdminPermissionsController],
+        providers: [admin_permissions_service_1.AdminPermissionsService, rbac_management_service_1.RbacManagementService],
+        controllers: [admin_permissions_controller_1.AdminPermissionsController, rbac_management_controller_1.PermissionsManagementController, rbac_management_controller_1.RolesManagementController],
         exports: [admin_permissions_service_1.AdminPermissionsService],
     })
 ], AdminPermissionsModule);

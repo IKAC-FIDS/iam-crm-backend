@@ -19,8 +19,8 @@ let OidcController = class OidcController {
     constructor(oidcService) {
         this.oidcService = oidcService;
     }
-    async login(providerId) {
-        const url = await this.oidcService.buildAuthorizationUrl(providerId);
+    async login(providerId, domain, subdomain) {
+        const url = await this.oidcService.buildAuthorizationUrl(providerId, domain ? "DOMAIN" : "SUBDOMAIN", domain ?? subdomain ?? "");
         return {
             url,
             statusCode: 302,
@@ -36,24 +36,26 @@ let OidcController = class OidcController {
 };
 exports.OidcController = OidcController;
 __decorate([
-    (0, common_1.Get)(':providerId/login'),
+    (0, common_1.Get)(":providerId/login"),
     (0, common_1.Redirect)(),
-    __param(0, (0, common_1.Param)('providerId')),
+    __param(0, (0, common_1.Param)("providerId")),
+    __param(1, (0, common_1.Query)("domain")),
+    __param(2, (0, common_1.Query)("subdomain")),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
+    __metadata("design:paramtypes", [String, String, String]),
     __metadata("design:returntype", Promise)
 ], OidcController.prototype, "login", null);
 __decorate([
-    (0, common_1.Get)(':providerId/callback'),
+    (0, common_1.Get)(":providerId/callback"),
     (0, common_1.Redirect)(),
-    __param(0, (0, common_1.Param)('providerId')),
+    __param(0, (0, common_1.Param)("providerId")),
     __param(1, (0, common_1.Query)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", Promise)
 ], OidcController.prototype, "callback", null);
 exports.OidcController = OidcController = __decorate([
-    (0, common_1.Controller)('auth/oidc'),
+    (0, common_1.Controller)("auth/oidc"),
     __metadata("design:paramtypes", [oidc_service_1.OidcService])
 ], OidcController);
 //# sourceMappingURL=oidc.controller.js.map

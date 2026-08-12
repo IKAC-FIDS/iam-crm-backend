@@ -10,11 +10,13 @@ exports.TeamsModule = void 0;
 const common_1 = require("@nestjs/common");
 const teams_controller_1 = require("./teams.controller");
 const teams_service_1 = require("./teams.service");
+const organization_memberships_module_1 = require("../organization-memberships/organization-memberships.module");
 let TeamsModule = class TeamsModule {
 };
 exports.TeamsModule = TeamsModule;
 exports.TeamsModule = TeamsModule = __decorate([
     (0, common_1.Module)({
+        imports: [organization_memberships_module_1.OrganizationMembershipsModule],
         controllers: [teams_controller_1.TeamsController],
         providers: [teams_service_1.TeamsService],
         exports: [teams_service_1.TeamsService],

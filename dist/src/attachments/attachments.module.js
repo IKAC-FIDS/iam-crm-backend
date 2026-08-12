@@ -34,6 +34,7 @@ exports.AttachmentsModule = AttachmentsModule = __decorate([
                 },
             },
         ],
+        exports: [attachments_service_1.AttachmentsService],
     })
 ], AttachmentsModule);
 //# sourceMappingURL=attachments.module.js.map

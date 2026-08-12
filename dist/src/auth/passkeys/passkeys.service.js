@@ -21,13 +21,15 @@ const node_cache_1 = __importDefault(require("node-cache"));
 const audit_log_service_1 = require("../../audit-log/audit-log.service");
 const prisma_service_1 = require("../../prisma/prisma.service");
 const auth_service_1 = require("../auth.service");
+const tenant_resolver_service_1 = require("../../organization-memberships/tenant-resolver.service");
 const CHALLENGE_TTL_SECONDS = 5 * 60;
 let PasskeysService = class PasskeysService {
-    constructor(prisma, config, authService, audit) {
+    constructor(prisma, config, authService, audit, tenantResolver) {
         this.prisma = prisma;
         this.config = config;
         this.authService = authService;
         this.audit = audit;
+        this.tenantResolver = tenantResolver;
         this.challenges = new node_cache_1.default({ stdTTL: CHALLENGE_TTL_SECONDS, checkperiod: 60 });
     }
     async listMine(user) {
@@ -144,6 +146,16 @@ let PasskeysService = class PasskeysService {
             await this.recordLoginFailure(credentialId);
             throw new common_1.UnauthorizedException('Passkey authentication failed');
         }
+        const tenant = await this.authService.resolveLoginContext(passkey.user.id);
+        if (tenant) {
+            const settings = await this.prisma.organizationSettings.findUnique({
+                where: { organizationId: tenant.organizationId },
+                select: { allowPasskeyLogin: true },
+            });
+            if (settings?.allowPasskeyLogin === false) {
+                throw new common_1.UnauthorizedException('Passkey login is disabled for this Organization');
+            }
+        }
         const verification = await (0, server_1.verifyAuthenticationResponse)({
             response,
             expectedChallenge,
@@ -181,7 +193,7 @@ let PasskeysService = class PasskeysService {
             action: 'passkey.login_success',
             metadata: { credentialId: passkey.credentialId },
         });
-        return this.authService.buildLoginResponse(passkey.user);
+        return this.authService.buildLoginResponse(passkey.user, tenant);
     }
     async listForUser(userId) {
         await this.assertUserExists(userId);
@@ -255,6 +267,7 @@ exports.PasskeysService = PasskeysService = __decorate([
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
         config_1.ConfigService,
         auth_service_1.AuthService,
-        audit_log_service_1.AuditLogService])
+        audit_log_service_1.AuditLogService,
+        tenant_resolver_service_1.TenantResolverService])
 ], PasskeysService);
 //# sourceMappingURL=passkeys.service.js.map

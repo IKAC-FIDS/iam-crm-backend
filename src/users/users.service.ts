@@ -249,6 +249,7 @@ export class UsersService {
         select: safeUserSelect,
       });
       await this.memberships.suspendForUser(tx, id, organizationId);
+      await tx.organization.update({ where: { id: organizationId }, data: { authorizationVersion: { increment: 1 } } });
       return result;
     });
 
@@ -284,6 +285,7 @@ export class UsersService {
         select: safeUserSelect,
       });
       await this.memberships.activateForUser(tx, id, organizationId);
+      await tx.organization.update({ where: { id: organizationId }, data: { authorizationVersion: { increment: 1 } } });
       return result;
     });
 
@@ -362,6 +364,7 @@ export class UsersService {
         nextRoleId,
         teamAssignment.teamId,
       );
+      await tx.organization.update({ where: { id: user.organizationId }, data: { authorizationVersion: { increment: 1 } } });
       return result;
     });
 

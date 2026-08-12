@@ -18,35 +18,30 @@ const current_user_decorator_1 = require("../common/decorators/current-user.deco
 const permissions_decorator_1 = require("../common/decorators/permissions.decorator");
 const jwt_auth_guard_1 = require("../common/guards/jwt-auth.guard");
 const permissions_guard_1 = require("../common/guards/permissions.guard");
-const create_organization_dto_1 = require("./dto/create-organization.dto");
-const find_organizations_dto_1 = require("./dto/find-organizations.dto");
-const update_organization_dto_1 = require("./dto/update-organization.dto");
 const organizations_service_1 = require("./organizations.service");
+const current_tenant_decorator_1 = require("../common/decorators/current-tenant.decorator");
+const organization_configuration_service_1 = require("./organization-configuration.service");
+const update_organization_settings_dto_1 = require("./dto/update-organization-settings.dto");
+const update_organization_branding_dto_1 = require("./dto/update-organization-branding.dto");
+const create_organization_domain_dto_1 = require("./dto/create-organization-domain.dto");
+const update_organization_domain_dto_1 = require("./dto/update-organization-domain.dto");
 let OrganizationsController = class OrganizationsController {
-    constructor(service) {
+    constructor(service, configuration) {
         this.service = service;
+        this.configuration = configuration;
     }
     current(user) {
         return this.service.current(user);
     }
-    findAll(query, user) {
-        return this.service.findAll(query, user);
-    }
-    create(dto, user) {
-        return this.service.create(dto, user);
-    }
-    findOne(id, user) {
-        return this.service.findOne(id, user);
-    }
-    update(id, dto, user) {
-        return this.service.update(id, dto, user);
-    }
-    activate(id, user) {
-        return this.service.activate(id, user);
-    }
-    suspend(id, user) {
-        return this.service.suspend(id, user);
-    }
+    settings(tenant) { return this.configuration.getSettings(tenant); }
+    updateSettings(dto, tenant) { return this.configuration.updateSettings(dto, tenant); }
+    branding(tenant) { return this.configuration.getBranding(tenant); }
+    updateBranding(dto, tenant) { return this.configuration.updateBranding(dto, tenant); }
+    domains(tenant) { return this.configuration.listDomains(tenant); }
+    domain(id, tenant) { return this.configuration.getDomain(id, tenant); }
+    createDomain(dto, tenant) { return this.configuration.createDomain(dto, tenant); }
+    updateDomain(id, dto, tenant) { return this.configuration.updateDomain(id, dto, tenant); }
+    verifyDomain(id, tenant) { return this.configuration.verifyDomain(id, tenant); }
 };
 exports.OrganizationsController = OrganizationsController;
 __decorate([
@@ -58,63 +53,87 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], OrganizationsController.prototype, "current", null);
 __decorate([
-    (0, common_1.Get)('admin/organizations'),
-    (0, permissions_decorator_1.Permissions)('organization:manage'),
-    __param(0, (0, common_1.Query)()),
-    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    (0, common_1.Get)('organization/settings'),
+    (0, permissions_decorator_1.Permissions)('organization:view'),
+    __param(0, (0, current_tenant_decorator_1.CurrentTenant)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [find_organizations_dto_1.FindOrganizationsDto, Object]),
+    __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
-], OrganizationsController.prototype, "findAll", null);
+], OrganizationsController.prototype, "settings", null);
 __decorate([
-    (0, common_1.Post)('admin/organizations'),
+    (0, common_1.Patch)('organization/settings'),
     (0, permissions_decorator_1.Permissions)('organization:manage'),
     __param(0, (0, common_1.Body)()),
-    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, current_tenant_decorator_1.CurrentTenant)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [create_organization_dto_1.CreateOrganizationDto, Object]),
+    __metadata("design:paramtypes", [update_organization_settings_dto_1.UpdateOrganizationSettingsDto, Object]),
     __metadata("design:returntype", void 0)
-], OrganizationsController.prototype, "create", null);
+], OrganizationsController.prototype, "updateSettings", null);
 __decorate([
-    (0, common_1.Get)('admin/organizations/:id'),
+    (0, common_1.Get)('organization/branding'),
+    (0, permissions_decorator_1.Permissions)('organization:view'),
+    __param(0, (0, current_tenant_decorator_1.CurrentTenant)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], OrganizationsController.prototype, "branding", null);
+__decorate([
+    (0, common_1.Patch)('organization/branding'),
     (0, permissions_decorator_1.Permissions)('organization:manage'),
+    __param(0, (0, common_1.Body)()),
+    __param(1, (0, current_tenant_decorator_1.CurrentTenant)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [update_organization_branding_dto_1.UpdateOrganizationBrandingDto, Object]),
+    __metadata("design:returntype", void 0)
+], OrganizationsController.prototype, "updateBranding", null);
+__decorate([
+    (0, common_1.Get)('organization/domains'),
+    (0, permissions_decorator_1.Permissions)('organization:view'),
+    __param(0, (0, current_tenant_decorator_1.CurrentTenant)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], OrganizationsController.prototype, "domains", null);
+__decorate([
+    (0, common_1.Get)('organization/domains/:id'),
+    (0, permissions_decorator_1.Permissions)('organization:view'),
     __param(0, (0, common_1.Param)('id')),
-    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, current_tenant_decorator_1.CurrentTenant)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", void 0)
-], OrganizationsController.prototype, "findOne", null);
+], OrganizationsController.prototype, "domain", null);
 __decorate([
-    (0, common_1.Patch)('admin/organizations/:id'),
+    (0, common_1.Post)('organization/domains'),
+    (0, permissions_decorator_1.Permissions)('organization:manage'),
+    __param(0, (0, common_1.Body)()),
+    __param(1, (0, current_tenant_decorator_1.CurrentTenant)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [create_organization_domain_dto_1.CreateOrganizationDomainDto, Object]),
+    __metadata("design:returntype", void 0)
+], OrganizationsController.prototype, "createDomain", null);
+__decorate([
+    (0, common_1.Patch)('organization/domains/:id'),
     (0, permissions_decorator_1.Permissions)('organization:manage'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
-    __param(2, (0, current_user_decorator_1.CurrentUser)()),
+    __param(2, (0, current_tenant_decorator_1.CurrentTenant)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, update_organization_dto_1.UpdateOrganizationDto, Object]),
+    __metadata("design:paramtypes", [String, update_organization_domain_dto_1.UpdateOrganizationDomainDto, Object]),
     __metadata("design:returntype", void 0)
-], OrganizationsController.prototype, "update", null);
+], OrganizationsController.prototype, "updateDomain", null);
 __decorate([
-    (0, common_1.Patch)('admin/organizations/:id/activate'),
+    (0, common_1.Post)('organization/domains/:id/verify'),
     (0, permissions_decorator_1.Permissions)('organization:manage'),
     __param(0, (0, common_1.Param)('id')),
-    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, current_tenant_decorator_1.CurrentTenant)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", void 0)
-], OrganizationsController.prototype, "activate", null);
-__decorate([
-    (0, common_1.Patch)('admin/organizations/:id/suspend'),
-    (0, permissions_decorator_1.Permissions)('organization:manage'),
-    __param(0, (0, common_1.Param)('id')),
-    __param(1, (0, current_user_decorator_1.CurrentUser)()),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, Object]),
-    __metadata("design:returntype", void 0)
-], OrganizationsController.prototype, "suspend", null);
+], OrganizationsController.prototype, "verifyDomain", null);
 exports.OrganizationsController = OrganizationsController = __decorate([
     (0, common_1.Controller)(),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, permissions_guard_1.PermissionsGuard),
-    __metadata("design:paramtypes", [organizations_service_1.OrganizationsService])
+    __metadata("design:paramtypes", [organizations_service_1.OrganizationsService, organization_configuration_service_1.OrganizationConfigurationService])
 ], OrganizationsController);
 //# sourceMappingURL=organizations.controller.js.map

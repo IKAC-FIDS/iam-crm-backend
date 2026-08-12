@@ -22,30 +22,38 @@ const create_user_dto_1 = require("./dto/create-user.dto");
 const update_user_role_dto_1 = require("./dto/update-user-role.dto");
 const find_users_dto_1 = require("./dto/find-users.dto");
 const current_user_decorator_1 = require("../common/decorators/current-user.decorator");
+const find_owner_options_dto_1 = require("./dto/find-owner-options.dto");
+const find_assignee_options_dto_1 = require("./dto/find-assignee-options.dto");
 let UsersController = class UsersController {
     constructor(usersService) {
         this.usersService = usersService;
     }
     create(dto, actor) {
-        return this.usersService.create(dto, actor.userId);
+        return this.usersService.create(dto, actor);
     }
-    findAll(query) {
-        return this.usersService.findAll(query);
+    findAll(query, actor) {
+        return this.usersService.findAll(query, actor);
     }
     getOwnerOptions(user) {
         return this.usersService.getOwnerOptions(user);
     }
-    findOne(id) {
-        return this.usersService.findOne(id);
+    findOwnerOptions(query, user) {
+        return this.usersService.findOwnerOptions(user, query);
+    }
+    findAssigneeOptions(query, user) {
+        return this.usersService.findAssigneeOptions(user, query);
+    }
+    findOne(id, actor) {
+        return this.usersService.findOne(id, actor);
     }
     deactivate(id, actor) {
-        return this.usersService.deactivate(id, actor.userId);
+        return this.usersService.deactivate(id, actor);
     }
     activate(id, actor) {
-        return this.usersService.activate(id, actor.userId);
+        return this.usersService.activate(id, actor);
     }
     updateUserRole(id, dto, actor) {
-        return this.usersService.updateUserRole(id, dto, actor.userId);
+        return this.usersService.updateUserRole(id, dto, actor);
     }
 };
 exports.UsersController = UsersController;
@@ -62,8 +70,9 @@ __decorate([
     (0, common_1.Get)(),
     (0, permissions_decorator_1.Permissions)('user:view'),
     __param(0, (0, common_1.Query)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [find_users_dto_1.FindUsersDto]),
+    __metadata("design:paramtypes", [find_users_dto_1.FindUsersDto, Object]),
     __metadata("design:returntype", void 0)
 ], UsersController.prototype, "findAll", null);
 __decorate([
@@ -75,11 +84,30 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], UsersController.prototype, "getOwnerOptions", null);
 __decorate([
+    (0, common_1.Get)('owner-options/v2'),
+    (0, permissions_decorator_1.Permissions)('company:assign-owner'),
+    __param(0, (0, common_1.Query)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [find_owner_options_dto_1.FindOwnerOptionsDto, Object]),
+    __metadata("design:returntype", void 0)
+], UsersController.prototype, "findOwnerOptions", null);
+__decorate([
+    (0, common_1.Get)('assignee-options'),
+    (0, permissions_decorator_1.AnyPermission)('meeting:create', 'meeting:update'),
+    __param(0, (0, common_1.Query)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [find_assignee_options_dto_1.FindAssigneeOptionsDto, Object]),
+    __metadata("design:returntype", void 0)
+], UsersController.prototype, "findAssigneeOptions", null);
+__decorate([
     (0, common_1.Get)(':id'),
     (0, permissions_decorator_1.Permissions)('user:view'),
     __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
+    __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", void 0)
 ], UsersController.prototype, "findOne", null);
 __decorate([

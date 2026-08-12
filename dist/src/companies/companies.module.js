@@ -11,14 +11,17 @@ const common_1 = require("@nestjs/common");
 const companies_service_1 = require("./companies.service");
 const companies_controller_1 = require("./companies.controller");
 const pipeline_config_module_1 = require("../admin/pipeline/pipeline-config.module");
+const attachments_module_1 = require("../attachments/attachments.module");
+const company_legal_documents_controller_1 = require("./company-legal-documents.controller");
+const company_legal_documents_service_1 = require("./company-legal-documents.service");
 let CompaniesModule = class CompaniesModule {
 };
 exports.CompaniesModule = CompaniesModule;
 exports.CompaniesModule = CompaniesModule = __decorate([
     (0, common_1.Module)({
-        imports: [pipeline_config_module_1.PipelineConfigModule],
-        providers: [companies_service_1.CompaniesService],
-        controllers: [companies_controller_1.CompaniesController],
+        imports: [pipeline_config_module_1.PipelineConfigModule, attachments_module_1.AttachmentsModule],
+        providers: [companies_service_1.CompaniesService, company_legal_documents_service_1.CompanyLegalDocumentsService],
+        controllers: [companies_controller_1.CompaniesController, company_legal_documents_controller_1.CompanyLegalDocumentsController],
         exports: [companies_service_1.CompaniesService],
     })
 ], CompaniesModule);

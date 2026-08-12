@@ -15,6 +15,9 @@ import type {
   TenantResolutionSource,
 } from '../common/tenant/tenant-context.types';
 import { PrismaService } from '../prisma/prisma.service';
+import NodeCache from 'node-cache';
+
+const permissionCache = new NodeCache({ stdTTL: 600, useClones: false });
 
 export interface TenantClaimPair {
   activeOrganizationId?: string | null;
@@ -156,8 +159,8 @@ export class TenantResolverService {
   }
 
   private readonly membershipInclude = {
-    organization: { select: { id: true, status: true } },
-    role: { select: { id: true, baseRole: true, isActive: true } },
+    organization: { select: { id: true, status: true, authorizationVersion: true } },
+    role: { select: { id: true, baseRole: true, isActive: true, scope: true, organizationId: true } },
     team: {
       select: {
         id: true,
@@ -198,6 +201,17 @@ export class TenantResolverService {
       await this.recordRejection('INACTIVE_MEMBERSHIP_ROLE', user.id, requestId);
       throw new UnauthorizedException('Invalid tenant session context');
     }
+    if (!membership.roleId || !membership.role) {
+      await this.recordRejection('MISSING_MEMBERSHIP_ROLE', user.id, requestId);
+      throw new UnauthorizedException('Invalid tenant session context');
+    }
+    if (
+      (membership.role.scope === 'TENANT' && membership.role.organizationId !== membership.organizationId) ||
+      (membership.role.scope === 'SYSTEM' && membership.role.organizationId !== null)
+    ) {
+      await this.recordRejection('CROSS_TENANT_MEMBERSHIP_ROLE', user.id, requestId);
+      throw new UnauthorizedException('Invalid tenant session context');
+    }
     if (
       membership.team &&
       (!membership.team.isActive ||
@@ -207,14 +221,17 @@ export class TenantResolverService {
       throw new UnauthorizedException('Invalid tenant session context');
     }
 
-    const role = membership.role?.baseRole ?? user.role;
-    const permissionRows = await this.prisma.rolePermission.findMany({
-      where: membership.roleId
-        ? { roleId: membership.roleId, permission: { isActive: true } }
-        : { role, permission: { isActive: true } },
-      include: { permission: true },
-    });
-    const permissions = permissionRows.map((row) => row.permission.action);
+    const role = membership.role.baseRole;
+    const cacheKey = `tenant-authz:${membership.organizationId}:${user.id}:${membership.id}:${membership.organization.authorizationVersion}`;
+    let permissions = permissionCache.get<string[]>(cacheKey);
+    if (!permissions) {
+      const permissionRows = await this.prisma.rolePermission.findMany({
+        where: { roleId: membership.roleId, permission: { isActive: true } },
+        select: { permission: { select: { action: true } } },
+      });
+      permissions = [...new Set(permissionRows.map((row) => row.permission.action))];
+      permissionCache.set(cacheKey, permissions);
+    }
 
     return {
       tenantId: membership.organizationId,
@@ -223,6 +240,7 @@ export class TenantResolverService {
       membershipId: membership.id,
       tenantRole: role,
       permissions,
+      authorizationVersion: membership.organization.authorizationVersion,
       platformAdmin: false,
       membershipStatus: 'active',
       resolutionSource: source,

@@ -11,44 +11,37 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.PersonSocialsService = void 0;
 const common_1 = require("@nestjs/common");
-const client_1 = require("@prisma/client");
+const tenant_scope_util_1 = require("../common/tenant/tenant-scope.util");
 const prisma_service_1 = require("../prisma/prisma.service");
 let PersonSocialsService = class PersonSocialsService {
     constructor(prisma) {
         this.prisma = prisma;
     }
-    async validatePersonAccess(personId, user) {
-        const person = await this.prisma.person.findUnique({
-            where: { id: personId },
-            include: {
+    async assertPersonMutable(personId, user) {
+        const scopedPerson = await this.prisma.person.findFirst({
+            where: { id: personId, company: { organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user), archivedAt: null } },
+            select: { id: true },
+        });
+        if (!scopedPerson)
+            throw new common_1.NotFoundException('Person not found');
+        return;
+    }
+    async assertPersonReadable(personId, user) {
+        const person = await this.prisma.person.findFirst({
+            where: {
+                id: personId,
                 company: {
-                    select: {
-                        ownerId: true,
-                        owner: { select: { team: true } },
-                    },
+                    organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
+                    archivedAt: null,
                 },
             },
+            select: { id: true },
         });
         if (!person)
-            throw new common_1.NotFoundException('مخاطب پیدا نشد');
-        if (user.role === client_1.UserRole.ADMIN)
-            return;
-        if (user.role === client_1.UserRole.MANAGER) {
-            const companyTeam = person.company.owner?.team;
-            if (!companyTeam || companyTeam !== user.team) {
-                throw new common_1.ForbiddenException('شما به این مخاطب دسترسی ندارید');
-            }
-            return;
-        }
-        if (user.role === client_1.UserRole.REP && person.company.ownerId !== user.userId) {
-            throw new common_1.ForbiddenException('شما به این مخاطب دسترسی ندارید');
-        }
-        if (user.role === client_1.UserRole.BOARDS) {
-            throw new common_1.ForbiddenException('شما دسترسی به مخاطبین را ندارید');
-        }
+            throw new common_1.NotFoundException('Person not found');
     }
     async create(personId, dto, user) {
-        await this.validatePersonAccess(personId, user);
+        await this.assertPersonMutable(personId, user);
         const normalizedPlatform = await this.resolveSocialPlatformReference(dto.platformOptionId, dto.platform, true);
         const handle = dto.handle.trim();
         if (!handle) {
@@ -76,7 +69,7 @@ let PersonSocialsService = class PersonSocialsService {
         });
     }
     async findByPerson(personId, user) {
-        await this.validatePersonAccess(personId, user);
+        await this.assertPersonReadable(personId, user);
         return this.prisma.personSocial.findMany({
             where: { personId },
             include: {
@@ -99,7 +92,7 @@ let PersonSocialsService = class PersonSocialsService {
         });
         if (!social)
             throw new common_1.NotFoundException('شبکه اجتماعی پیدا نشد');
-        await this.validatePersonAccess(social.personId, user);
+        await this.assertPersonReadable(social.personId, user);
         return social;
     }
     async update(id, dto, user) {
@@ -112,7 +105,7 @@ let PersonSocialsService = class PersonSocialsService {
         });
         if (!social)
             throw new common_1.NotFoundException('شبکه اجتماعی پیدا نشد');
-        await this.validatePersonAccess(social.personId, user);
+        await this.assertPersonMutable(social.personId, user);
         const updateData = {};
         let nextPlatformOptionId = social.platformOptionId;
         let nextPlatformCode = social.platform;
@@ -167,7 +160,7 @@ let PersonSocialsService = class PersonSocialsService {
         });
         if (!social)
             throw new common_1.NotFoundException('شبکه اجتماعی پیدا نشد');
-        await this.validatePersonAccess(social.personId, user);
+        await this.assertPersonMutable(social.personId, user);
         return this.prisma.personSocial.delete({
             where: { id },
         });

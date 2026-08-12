@@ -18,6 +18,7 @@ const current_user_decorator_1 = require("../../common/decorators/current-user.d
 const permissions_decorator_1 = require("../../common/decorators/permissions.decorator");
 const jwt_auth_guard_1 = require("../../common/guards/jwt-auth.guard");
 const permissions_guard_1 = require("../../common/guards/permissions.guard");
+const current_tenant_decorator_1 = require("../../common/decorators/current-tenant.decorator");
 const create_sso_provider_dto_1 = require("./dto/create-sso-provider.dto");
 const update_sso_provider_dto_1 = require("./dto/update-sso-provider.dto");
 const sso_provider_service_1 = require("./sso-provider.service");
@@ -25,81 +26,100 @@ let SsoAdminController = class SsoAdminController {
     constructor(service) {
         this.service = service;
     }
-    listProviders() {
-        return this.service.listProviders();
+    listProviders(tenant) {
+        return this.service.listProviders(tenant);
     }
-    getProvider(id) {
-        return this.service.getProvider(id);
+    getProvider(id, tenant) {
+        return this.service.getProvider(id, tenant);
     }
-    createProvider(dto, actor) {
-        return this.service.createProvider(dto, actor.userId);
+    createProvider(dto, actor, tenant) {
+        return this.service.createProvider(dto, tenant, actor.userId);
     }
-    updateProvider(id, dto, actor) {
-        return this.service.updateProvider(id, dto, actor.userId);
+    updateProvider(id, dto, actor, tenant) {
+        return this.service.updateProvider(id, dto, tenant, actor.userId);
     }
-    disableProvider(id, actor) {
-        return this.service.disableProvider(id, actor.userId);
+    disableProvider(id, actor, tenant) {
+        return this.service.disableProvider(id, tenant, actor.userId);
     }
-    deleteProvider(id, actor) {
-        return this.service.deleteProvider(id, actor.userId);
+    deleteProvider(id, actor, tenant) {
+        return this.service.deleteProvider(id, tenant, actor.userId);
+    }
+    testConnection(id, tenant, actor) {
+        return this.service.testConnection(id, tenant, actor.userId);
     }
 };
 exports.SsoAdminController = SsoAdminController;
 __decorate([
     (0, common_1.Get)(),
-    (0, permissions_decorator_1.Permissions)('sso-provider:view'),
+    (0, permissions_decorator_1.Permissions)("sso-provider:view"),
+    __param(0, (0, current_tenant_decorator_1.CurrentTenant)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
+    __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
 ], SsoAdminController.prototype, "listProviders", null);
 __decorate([
-    (0, common_1.Get)(':id'),
-    (0, permissions_decorator_1.Permissions)('sso-provider:view'),
-    __param(0, (0, common_1.Param)('id')),
+    (0, common_1.Get)(":id"),
+    (0, permissions_decorator_1.Permissions)("sso-provider:view"),
+    __param(0, (0, common_1.Param)("id")),
+    __param(1, (0, current_tenant_decorator_1.CurrentTenant)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
+    __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", void 0)
 ], SsoAdminController.prototype, "getProvider", null);
 __decorate([
     (0, common_1.Post)(),
-    (0, permissions_decorator_1.Permissions)('sso-provider:manage'),
+    (0, permissions_decorator_1.Permissions)("sso-provider:manage"),
     __param(0, (0, common_1.Body)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __param(2, (0, current_tenant_decorator_1.CurrentTenant)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [create_sso_provider_dto_1.CreateSsoProviderDto, Object]),
+    __metadata("design:paramtypes", [create_sso_provider_dto_1.CreateSsoProviderDto, Object, Object]),
     __metadata("design:returntype", void 0)
 ], SsoAdminController.prototype, "createProvider", null);
 __decorate([
-    (0, common_1.Patch)(':id'),
-    (0, permissions_decorator_1.Permissions)('sso-provider:manage'),
-    __param(0, (0, common_1.Param)('id')),
+    (0, common_1.Patch)(":id"),
+    (0, permissions_decorator_1.Permissions)("sso-provider:manage"),
+    __param(0, (0, common_1.Param)("id")),
     __param(1, (0, common_1.Body)()),
     __param(2, (0, current_user_decorator_1.CurrentUser)()),
+    __param(3, (0, current_tenant_decorator_1.CurrentTenant)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, update_sso_provider_dto_1.UpdateSsoProviderDto, Object]),
+    __metadata("design:paramtypes", [String, update_sso_provider_dto_1.UpdateSsoProviderDto, Object, Object]),
     __metadata("design:returntype", void 0)
 ], SsoAdminController.prototype, "updateProvider", null);
 __decorate([
-    (0, common_1.Patch)(':id/disable'),
-    (0, permissions_decorator_1.Permissions)('sso-provider:manage'),
-    __param(0, (0, common_1.Param)('id')),
+    (0, common_1.Patch)(":id/disable"),
+    (0, permissions_decorator_1.Permissions)("sso-provider:manage"),
+    __param(0, (0, common_1.Param)("id")),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __param(2, (0, current_tenant_decorator_1.CurrentTenant)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:paramtypes", [String, Object, Object]),
     __metadata("design:returntype", void 0)
 ], SsoAdminController.prototype, "disableProvider", null);
 __decorate([
-    (0, common_1.Delete)(':id'),
-    (0, permissions_decorator_1.Permissions)('sso-provider:manage'),
-    __param(0, (0, common_1.Param)('id')),
+    (0, common_1.Delete)(":id"),
+    (0, permissions_decorator_1.Permissions)("sso-provider:manage"),
+    __param(0, (0, common_1.Param)("id")),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __param(2, (0, current_tenant_decorator_1.CurrentTenant)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:paramtypes", [String, Object, Object]),
     __metadata("design:returntype", void 0)
 ], SsoAdminController.prototype, "deleteProvider", null);
+__decorate([
+    (0, common_1.Post)(":id/test-connection"),
+    (0, permissions_decorator_1.Permissions)("sso-provider:manage"),
+    __param(0, (0, common_1.Param)("id")),
+    __param(1, (0, current_tenant_decorator_1.CurrentTenant)()),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object, Object]),
+    __metadata("design:returntype", void 0)
+], SsoAdminController.prototype, "testConnection", null);
 exports.SsoAdminController = SsoAdminController = __decorate([
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, permissions_guard_1.PermissionsGuard),
-    (0, common_1.Controller)('admin/sso-providers'),
+    (0, common_1.Controller)("admin/sso-providers"),
     __metadata("design:paramtypes", [sso_provider_service_1.SsoProviderService])
 ], SsoAdminController);
 //# sourceMappingURL=sso-admin.controller.js.map

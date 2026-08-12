@@ -352,14 +352,11 @@ let CompaniesService = class CompaniesService {
         if (!company)
             throw new common_1.NotFoundException('شرکت پیدا نشد');
         await this.companyAccess.assertCompanyMutable(id, user);
-        const newOwner = await this.prisma.user.findUnique({
-            where: { id: dto.newOwnerId },
+        const newOwner = await this.prisma.user.findFirst({
+            where: { id: dto.newOwnerId, ...tenant_scope_util_1.tenantScope.activeMembership(user) },
         });
         if (!newOwner)
             throw new common_1.NotFoundException('کاربر جدید پیدا نشد');
-        if (newOwner.organizationId !== (0, tenant_scope_util_1.getCurrentOrganizationId)(user)) {
-            throw new common_1.BadRequestException('New owner must belong to the current organization');
-        }
         if (newOwner.role !== client_1.UserRole.REP && newOwner.role !== client_1.UserRole.MANAGER) {
             throw new common_1.BadRequestException('کاربر جدید باید نقش REP یا MANAGER داشته باشد');
         }
@@ -451,16 +448,13 @@ let CompaniesService = class CompaniesService {
         if (user.role === client_1.UserRole.BOARDS) {
             throw new common_1.ForbiddenException('شما اجازه تغییر مالکیت گروهی شرکت‌ها را ندارید');
         }
-        const newOwner = await this.prisma.user.findUnique({
-            where: { id: dto.newOwnerId },
+        const newOwner = await this.prisma.user.findFirst({
+            where: { id: dto.newOwnerId, ...tenant_scope_util_1.tenantScope.activeMembership(user) },
         });
         if (!newOwner)
             throw new common_1.NotFoundException('کاربر جدید پیدا نشد');
         if (newOwner.role !== client_1.UserRole.REP && newOwner.role !== client_1.UserRole.MANAGER) {
             throw new common_1.BadRequestException('کاربر جدید باید نقش REP یا MANAGER داشته باشد');
-        }
-        if (newOwner.organizationId !== (0, tenant_scope_util_1.getCurrentOrganizationId)(user)) {
-            throw new common_1.BadRequestException('New owner must belong to the current organization');
         }
         const companies = await this.prisma.company.findMany({
             where: {
@@ -512,7 +506,7 @@ let CompaniesService = class CompaniesService {
         const owner = await this.prisma.user.findFirst({
             where: {
                 id: ownerId,
-                organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
+                ...tenant_scope_util_1.tenantScope.activeMembership(user),
                 isActive: true,
             },
         });

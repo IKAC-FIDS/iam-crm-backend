@@ -44,21 +44,18 @@ let RbacManagementService = class RbacManagementService {
     roles() { return this.prisma.role.findMany({ include: { _count: { select: { users: true, permissions: true } } }, orderBy: { code: 'asc' } }); }
     async role(id) { const item = await this.prisma.role.findUnique({ where: { id }, include: { permissions: { include: { permission: true } }, _count: { select: { users: true } } } }); if (!item)
         throw new common_1.NotFoundException('Role not found'); return item; }
-    async createRole(dto) { try {
-        return await this.prisma.role.create({ data: { ...dto, baseRole: dto.baseRole ?? client_1.UserRole.REP, isSystem: false, isActive: dto.isActive ?? true } });
-    }
-    catch {
-        throw new common_1.ConflictException('Role code already exists');
-    } }
-    async updateRole(id, dto) { const current = await this.role(id); if (current.isSystem && dto.baseRole && dto.baseRole !== current.baseRole)
-        throw new common_1.ForbiddenException('System role base scope cannot be changed'); if (current.isSystem && dto.isActive === false)
-        throw new common_1.ForbiddenException('System roles cannot be deactivated'); return this.prisma.role.update({ where: { id }, data: dto }); }
-    async deleteRole(id) { const current = await this.role(id); if (current.isSystem)
+    async createRole(_dto) { throw new common_1.ForbiddenException('Create roles through the tenant-scoped role API'); }
+    async updateRole(id, dto) { const current = await this.role(id); if (current.scope === client_1.RoleScope.SYSTEM)
+        throw new common_1.ForbiddenException('System role definitions are operator controlled'); return this.prisma.role.update({ where: { id }, data: dto }); }
+    async deleteRole(id) { const current = await this.role(id); if (current.scope === client_1.RoleScope.SYSTEM)
         throw new common_1.ForbiddenException('System roles cannot be deleted'); if (current._count.users)
-        throw new common_1.ConflictException('Role is assigned to users'); return this.prisma.role.delete({ where: { id } }); }
+        throw new common_1.ConflictException('Role is assigned to users'); const membershipCount = await this.prisma.organizationMembership.count({ where: { roleId: id } }); if (membershipCount)
+        throw new common_1.ConflictException('Role is assigned to organization memberships'); return this.prisma.role.delete({ where: { id } }); }
     async rolePermissions(id) { const role = await this.role(id); const permissions = await this.prisma.permission.findMany({ where: { isActive: true }, orderBy: { action: 'asc' } }); const assigned = new Set(role.permissions.map((item) => item.permissionId)); return { role: { id: role.id, code: role.code, name: role.name }, assignedPermissionIds: [...assigned], assignedActions: role.permissions.map((item) => item.permission.action), permissions: permissions.map((item) => ({ ...item, assigned: assigned.has(item.id) })) }; }
     async replaceRolePermissions(id, dto) {
         const role = await this.role(id);
+        if (role.scope === client_1.RoleScope.SYSTEM)
+            throw new common_1.ForbiddenException('System role definitions are operator controlled');
         const permissions = await this.prisma.permission.findMany({ where: { id: { in: dto.permissionIds }, isActive: true } });
         if (permissions.length !== dto.permissionIds.length)
             throw new common_1.BadRequestException('One or more permissions do not exist or are inactive');

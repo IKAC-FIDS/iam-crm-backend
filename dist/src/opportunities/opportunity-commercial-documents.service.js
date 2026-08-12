@@ -13,6 +13,8 @@ exports.OpportunityCommercialDocumentsService = void 0;
 const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
 const audit_log_service_1 = require("../audit-log/audit-log.service");
+const attachments_service_1 = require("../attachments/attachments.service");
+const team_scope_util_1 = require("../common/tenant/team-scope.util");
 const prisma_service_1 = require("../prisma/prisma.service");
 const api_date_util_1 = require("../common/dates/api-date.util");
 const commercialDocumentInclude = {
@@ -32,10 +34,20 @@ const commercialDocumentInclude = {
         },
     },
 };
+const allowedCommercialDocumentMimeTypes = new Set([
+    'application/pdf',
+    'image/png',
+    'image/jpeg',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+]);
 let OpportunityCommercialDocumentsService = class OpportunityCommercialDocumentsService {
-    constructor(prisma, audit) {
+    constructor(prisma, audit, attachments) {
         this.prisma = prisma;
         this.audit = audit;
+        this.attachments = attachments;
     }
     async findAll(opportunityId, query, user) {
         await this.getOpportunityForView(opportunityId, user);
@@ -139,6 +151,28 @@ let OpportunityCommercialDocumentsService = class OpportunityCommercialDocuments
             },
         });
         return document;
+    }
+    async createWithFile(opportunityId, dto, file, user) {
+        this.assertUploadFile(file);
+        const createDto = this.normalizeUploadDto(dto);
+        const document = await this.create(opportunityId, createDto, user);
+        try {
+            const fileAttachment = await this.attachments.upload({
+                entityType: client_1.FileAttachmentEntityType.COMMERCIAL_DOCUMENT,
+                entityId: document.id,
+                description: createDto.description,
+            }, file, user);
+            return {
+                ...document,
+                fileAttachment,
+            };
+        }
+        catch (error) {
+            await this.prisma.opportunityCommercialDocument.delete({
+                where: { id: document.id },
+            });
+            throw error;
+        }
     }
     async update(opportunityId, documentId, dto, user) {
         const opportunity = await this.getOpportunityForMutation(opportunityId, user);
@@ -324,6 +358,44 @@ let OpportunityCommercialDocumentsService = class OpportunityCommercialDocuments
                     : undefined,
         };
     }
+    assertUploadFile(file) {
+        if (!file) {
+            throw new common_1.BadRequestException('Document file is required.');
+        }
+        if (!allowedCommercialDocumentMimeTypes.has(file.mimetype)) {
+            throw new common_1.BadRequestException('Unsupported document file type.');
+        }
+    }
+    normalizeUploadDto(dto) {
+        const type = dto.type ?? dto.documentType;
+        if (!type || !Object.values(client_1.CommercialDocumentType).includes(type)) {
+            throw new common_1.BadRequestException('Invalid commercial document type.');
+        }
+        const title = (dto.title ?? dto.name)?.trim();
+        if (!title) {
+            throw new common_1.BadRequestException('Document title is required.');
+        }
+        return {
+            type,
+            status: dto.status ??
+                (dto.isSigned === true ? client_1.CommercialDocumentStatus.SIGNED : undefined),
+            number: dto.number,
+            version: dto.version,
+            title,
+            description: dto.description,
+            amount: dto.amount,
+            currency: dto.currency,
+            validUntil: dto.validUntil ?? dto.expiresAt ?? dto.dueDate,
+            issuedAt: dto.issuedAt ?? dto.issueDate,
+            sentAt: dto.sentAt,
+            acceptedAt: dto.acceptedAt,
+            rejectedAt: dto.rejectedAt,
+            signedAt: dto.signedAt,
+            fileUrl: dto.fileUrl ?? dto.externalUrl,
+            externalRef: dto.externalRef,
+            notes: dto.notes,
+        };
+    }
     async getOpportunityForView(opportunityId, user) {
         const opportunity = await this.prisma.opportunity.findFirst({
             where: {
@@ -353,8 +425,8 @@ let OpportunityCommercialDocumentsService = class OpportunityCommercialDocuments
             return {};
         }
         if (user.role === client_1.UserRole.MANAGER) {
-            return user.team
-                ? { company: { owner: { team: user.team } } }
+            return user.teamId || user.team
+                ? { company: { owner: (0, team_scope_util_1.userTeamScopeWhere)(user) } }
                 : { id: { in: [] } };
         }
         return {
@@ -369,6 +441,7 @@ exports.OpportunityCommercialDocumentsService = OpportunityCommercialDocumentsSe
 exports.OpportunityCommercialDocumentsService = OpportunityCommercialDocumentsService = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
-        audit_log_service_1.AuditLogService])
+        audit_log_service_1.AuditLogService,
+        attachments_service_1.AttachmentsService])
 ], OpportunityCommercialDocumentsService);
 //# sourceMappingURL=opportunity-commercial-documents.service.js.map

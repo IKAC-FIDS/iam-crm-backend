@@ -12,6 +12,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.CreateProductCatalogItemDto = void 0;
 const class_validator_1 = require("class-validator");
 const class_transformer_1 = require("class-transformer");
+const client_1 = require("@prisma/client");
+const decimalString = ({ value }) => value === undefined || value === null ? value : String(value);
 class CreateProductCatalogItemDto {
 }
 exports.CreateProductCatalogItemDto = CreateProductCatalogItemDto;
@@ -43,10 +45,10 @@ __decorate([
     __metadata("design:type", String)
 ], CreateProductCatalogItemDto.prototype, "unit", void 0);
 __decorate([
-    (0, class_transformer_1.Type)(() => Number),
-    (0, class_validator_1.IsNumber)({ maxDecimalPlaces: 2 }),
-    (0, class_validator_1.Min)(0),
-    __metadata("design:type", Number)
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Transform)(decimalString),
+    (0, class_validator_1.IsDecimal)({ decimal_digits: '0,6', force_decimal: false }),
+    __metadata("design:type", String)
 ], CreateProductCatalogItemDto.prototype, "defaultUnitPrice", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
@@ -54,6 +56,35 @@ __decorate([
     (0, class_validator_1.MaxLength)(10),
     __metadata("design:type", String)
 ], CreateProductCatalogItemDto.prototype, "currency", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsEnum)(client_1.PricingCurrency),
+    __metadata("design:type", String)
+], CreateProductCatalogItemDto.prototype, "pricingCurrency", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Transform)(decimalString),
+    (0, class_validator_1.IsDecimal)({ decimal_digits: '0,6', force_decimal: false }),
+    __metadata("design:type", String)
+], CreateProductCatalogItemDto.prototype, "inPersonInputPrice", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Transform)(decimalString),
+    (0, class_validator_1.IsDecimal)({ decimal_digits: '0,6', force_decimal: false }),
+    __metadata("design:type", String)
+], CreateProductCatalogItemDto.prototype, "digikalaInputPrice", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Transform)(decimalString),
+    (0, class_validator_1.IsDecimal)({ decimal_digits: '0,3', force_decimal: false }),
+    __metadata("design:type", String)
+], CreateProductCatalogItemDto.prototype, "inPersonProfitPercent", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Transform)(decimalString),
+    (0, class_validator_1.IsDecimal)({ decimal_digits: '0,3', force_decimal: false }),
+    __metadata("design:type", String)
+], CreateProductCatalogItemDto.prototype, "digikalaProfitPercent", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsBoolean)(),

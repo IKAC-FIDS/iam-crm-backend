@@ -11,12 +11,13 @@ const common_1 = require("@nestjs/common");
 const auth_module_1 = require("../auth.module");
 const passkeys_controller_1 = require("./passkeys.controller");
 const passkeys_service_1 = require("./passkeys.service");
+const organization_memberships_module_1 = require("../../organization-memberships/organization-memberships.module");
 let PasskeysModule = class PasskeysModule {
 };
 exports.PasskeysModule = PasskeysModule;
 exports.PasskeysModule = PasskeysModule = __decorate([
     (0, common_1.Module)({
-        imports: [auth_module_1.AuthModule],
+        imports: [auth_module_1.AuthModule, organization_memberships_module_1.OrganizationMembershipsModule],
         controllers: [passkeys_controller_1.MyPasskeysController, passkeys_controller_1.AuthPasskeysController, passkeys_controller_1.AdminUserPasskeysController],
         providers: [passkeys_service_1.PasskeysService],
     })

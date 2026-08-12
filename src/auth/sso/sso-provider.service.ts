@@ -81,7 +81,7 @@ export class SsoProviderService {
     actorId?: string,
   ): Promise<SsoProviderResponseDto> {
     this.validateInput(dto.type, dto);
-    await this.validateMappings(dto.groupRoleMappings);
+    await this.validateMappings(dto.groupRoleMappings, tenant.organizationId);
     try {
       const provider = await this.prisma.ssoProvider.create({
         data: {
@@ -116,7 +116,7 @@ export class SsoProviderService {
   ): Promise<SsoProviderResponseDto> {
     const existing = await this.tenantProvider(id, tenant.organizationId);
     this.validateInput(dto.type ?? existing.type, dto);
-    await this.validateMappings(dto.groupRoleMappings);
+    await this.validateMappings(dto.groupRoleMappings, tenant.organizationId);
     const existingDomains = existing.routes
       .filter((route) => route.kind === SsoRoutingKind.DOMAIN)
       .map((route) => route.value);
@@ -352,6 +352,7 @@ export class SsoProviderService {
 
   private async validateMappings(
     mappings?: Array<{ group: string; roleId: string }>,
+    organizationId?: string,
   ) {
     if (!mappings?.length) return;
     const normalized = mappings.map((item) => item.group.trim().toLowerCase());
@@ -361,6 +362,10 @@ export class SsoProviderService {
       where: {
         id: { in: mappings.map((item) => item.roleId) },
         isActive: true,
+        OR: [
+          { scope: 'SYSTEM', organizationId: null },
+          { scope: 'TENANT', organizationId },
+        ],
       },
       select: { id: true },
     });

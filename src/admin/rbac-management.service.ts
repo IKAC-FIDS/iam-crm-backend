@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
+import { RoleScope, UserRole } from '@prisma/client';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateManagedPermissionDto, CreateRoleDto, ReplaceRolePermissionsDto, UpdateManagedPermissionDto, UpdateRoleDto } from './dto/rbac-management.dto';
@@ -16,12 +16,12 @@ export class RbacManagementService {
 
   roles() { return this.prisma.role.findMany({ include: { _count: { select: { users: true, permissions: true } } }, orderBy: { code: 'asc' } }); }
   async role(id: string) { const item = await this.prisma.role.findUnique({ where: { id }, include: { permissions: { include: { permission: true } }, _count: { select: { users: true } } } }); if (!item) throw new NotFoundException('Role not found'); return item; }
-  async createRole(dto: CreateRoleDto) { try { return await this.prisma.role.create({ data: { ...dto, baseRole: dto.baseRole ?? UserRole.REP, isSystem: false, isActive: dto.isActive ?? true } }); } catch { throw new ConflictException('Role code already exists'); } }
-  async updateRole(id: string, dto: UpdateRoleDto) { const current = await this.role(id); if (current.isSystem && dto.baseRole && dto.baseRole !== current.baseRole) throw new ForbiddenException('System role base scope cannot be changed'); if (current.isSystem && dto.isActive === false) throw new ForbiddenException('System roles cannot be deactivated'); return this.prisma.role.update({ where: { id }, data: dto }); }
-  async deleteRole(id: string) { const current = await this.role(id); if (current.isSystem) throw new ForbiddenException('System roles cannot be deleted'); if (current._count.users) throw new ConflictException('Role is assigned to users'); const membershipCount = await this.prisma.organizationMembership.count({ where: { roleId: id } }); if (membershipCount) throw new ConflictException('Role is assigned to organization memberships'); return this.prisma.role.delete({ where: { id } }); }
+  async createRole(_dto: CreateRoleDto) { throw new ForbiddenException('Create roles through the tenant-scoped role API'); }
+  async updateRole(id: string, dto: UpdateRoleDto) { const current = await this.role(id); if (current.scope === RoleScope.SYSTEM) throw new ForbiddenException('System role definitions are operator controlled'); return this.prisma.role.update({ where: { id }, data: dto }); }
+  async deleteRole(id: string) { const current = await this.role(id); if (current.scope === RoleScope.SYSTEM) throw new ForbiddenException('System roles cannot be deleted'); if (current._count.users) throw new ConflictException('Role is assigned to users'); const membershipCount = await this.prisma.organizationMembership.count({ where: { roleId: id } }); if (membershipCount) throw new ConflictException('Role is assigned to organization memberships'); return this.prisma.role.delete({ where: { id } }); }
   async rolePermissions(id: string) { const role = await this.role(id); const permissions = await this.prisma.permission.findMany({ where: { isActive: true }, orderBy: { action: 'asc' } }); const assigned = new Set(role.permissions.map((item) => item.permissionId)); return { role: { id: role.id, code: role.code, name: role.name }, assignedPermissionIds: [...assigned], assignedActions: role.permissions.map((item) => item.permission.action), permissions: permissions.map((item) => ({ ...item, assigned: assigned.has(item.id) })) }; }
   async replaceRolePermissions(id: string, dto: ReplaceRolePermissionsDto) {
-    const role = await this.role(id); const permissions = await this.prisma.permission.findMany({ where: { id: { in: dto.permissionIds }, isActive: true } });
+    const role = await this.role(id); if (role.scope === RoleScope.SYSTEM) throw new ForbiddenException('System role definitions are operator controlled'); const permissions = await this.prisma.permission.findMany({ where: { id: { in: dto.permissionIds }, isActive: true } });
     if (permissions.length !== dto.permissionIds.length) throw new BadRequestException('One or more permissions do not exist or are inactive');
     const actions = new Set(permissions.map((item) => item.action));
     if (role.code === UserRole.ADMIN && ADMIN_REQUIRED.some((action) => !actions.has(action))) throw new ForbiddenException('ADMIN must retain permission:manage and role:manage');

@@ -4,7 +4,10 @@ exports.REFRESH_TOKEN_COOKIE_NAME = void 0;
 exports.getRefreshTokenFromRequest = getRefreshTokenFromRequest;
 exports.setRefreshTokenCookie = setRefreshTokenCookie;
 exports.clearRefreshTokenCookie = clearRefreshTokenCookie;
+const common_1 = require("@nestjs/common");
 exports.REFRESH_TOKEN_COOKIE_NAME = 'refreshToken';
+const logger = new common_1.Logger('RefreshTokenCookie');
+let unsafeSameSiteWarningLogged = false;
 function getRefreshTokenFromRequest(req) {
     return req.cookies?.[exports.REFRESH_TOKEN_COOKIE_NAME];
 }
@@ -19,12 +22,30 @@ function clearRefreshTokenCookie(res) {
 }
 function buildRefreshTokenCookieOptions() {
     const isProduction = process.env.NODE_ENV === 'production';
+    const secure = parseSecureCookieSetting(process.env.REFRESH_TOKEN_COOKIE_SECURE, isProduction);
+    const sameSite = parseSameSiteCookieSetting(process.env.REFRESH_TOKEN_COOKIE_SAME_SITE, isProduction ? 'none' : 'lax');
+    if (sameSite === 'none' && !secure && !unsafeSameSiteWarningLogged) {
+        logger.warn('REFRESH_TOKEN_COOKIE_SAME_SITE=none is configured with REFRESH_TOKEN_COOKIE_SECURE=false; browsers require Secure for SameSite=None and may reject the refresh token cookie.');
+        unsafeSameSiteWarningLogged = true;
+    }
     return {
         httpOnly: true,
-        secure: isProduction,
-        sameSite: isProduction ? 'none' : 'lax',
-        path: '/api/auth',
+        secure,
+        sameSite,
+        path: process.env.REFRESH_TOKEN_COOKIE_PATH ?? '/api/auth',
     };
+}
+function parseSecureCookieSetting(value, defaultValue) {
+    if (value === undefined) {
+        return defaultValue;
+    }
+    return value === 'true';
+}
+function parseSameSiteCookieSetting(value, defaultValue) {
+    if (value === 'lax' || value === 'strict' || value === 'none') {
+        return value;
+    }
+    return defaultValue;
 }
 function buildRefreshTokenClearCookieOptions() {
     return buildRefreshTokenCookieOptions();

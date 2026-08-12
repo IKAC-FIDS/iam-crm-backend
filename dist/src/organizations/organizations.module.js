@@ -10,14 +10,19 @@ exports.OrganizationsModule = void 0;
 const common_1 = require("@nestjs/common");
 const organizations_controller_1 = require("./organizations.controller");
 const organizations_service_1 = require("./organizations.service");
+const platform_authority_module_1 = require("../platform-authority/platform-authority.module");
+const platform_organizations_controller_1 = require("./platform-organizations.controller");
+const organization_configuration_service_1 = require("./organization-configuration.service");
+const organization_domain_verification_service_1 = require("./organization-domain-verification.service");
 let OrganizationsModule = class OrganizationsModule {
 };
 exports.OrganizationsModule = OrganizationsModule;
 exports.OrganizationsModule = OrganizationsModule = __decorate([
     (0, common_1.Module)({
-        controllers: [organizations_controller_1.OrganizationsController],
-        providers: [organizations_service_1.OrganizationsService],
-        exports: [organizations_service_1.OrganizationsService],
+        imports: [platform_authority_module_1.PlatformAuthorityModule],
+        controllers: [organizations_controller_1.OrganizationsController, platform_organizations_controller_1.PlatformOrganizationsController],
+        providers: [organizations_service_1.OrganizationsService, organization_configuration_service_1.OrganizationConfigurationService, organization_domain_verification_service_1.OrganizationDomainVerificationService],
+        exports: [organizations_service_1.OrganizationsService, organization_configuration_service_1.OrganizationConfigurationService],
     })
 ], OrganizationsModule);
 //# sourceMappingURL=organizations.module.js.map

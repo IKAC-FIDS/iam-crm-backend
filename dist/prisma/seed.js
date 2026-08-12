@@ -34,16 +34,26 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 const client_1 = require("@prisma/client");
+const UNIVERSITY_LIBRARY_PERMISSIONS = {
+    view: 'library:university:view',
+    manage: 'library:university:manage',
+};
 const bcrypt = __importStar(require("bcryptjs"));
 const prisma = new client_1.PrismaClient();
 async function upsertPermission(permission) {
     return prisma.permission.upsert({
         where: { action: permission.action },
-        update: { description: permission.description },
-        create: permission,
+        update: { description: permission.description, isSystem: true, isActive: true },
+        create: { ...permission, isSystem: true, isActive: true },
     });
 }
 async function syncRolePermissions(role, actions) {
+    const databaseRole = await prisma.role.upsert({
+        where: { code: role },
+        update: { name: role, baseRole: role, isSystem: true, isActive: true },
+        create: { code: role, name: role, baseRole: role, isSystem: true, isActive: true },
+    });
+    await prisma.user.updateMany({ where: { role, roleId: null }, data: { roleId: databaseRole.id } });
     for (const action of actions) {
         const permission = await prisma.permission.findUnique({
             where: { action },
@@ -59,9 +69,10 @@ async function syncRolePermissions(role, actions) {
                     permissionId: permission.id,
                 },
             },
-            update: {},
+            update: { roleId: databaseRole.id },
             create: {
                 role,
+                roleId: databaseRole.id,
                 permissionId: permission.id,
             },
         });
@@ -167,6 +178,33 @@ async function main() {
             organizationId: defaultOrganization.id,
         },
     });
+    const defaultTeams = [
+        { code: 'ENTERPRISE_SALES', name: 'فروش سازمانی' },
+        { code: 'BANKING_SALES', name: 'فروش بانک‌ها' },
+        { code: 'PUBLIC_SECTOR_SALES', name: 'فروش سازمان‌های دولتی' },
+        { code: 'PARTNER_SALES', name: 'فروش از طریق شرکا' },
+    ];
+    for (const team of defaultTeams) {
+        await prisma.team.upsert({
+            where: {
+                organizationId_code: {
+                    organizationId: defaultOrganization.id,
+                    code: team.code,
+                },
+            },
+            update: {
+                name: team.name,
+                isActive: true,
+                organizationId: defaultOrganization.id,
+            },
+            create: {
+                code: team.code,
+                name: team.name,
+                organizationId: defaultOrganization.id,
+            },
+        });
+    }
+    console.log('✅ تیم‌های پیش‌فرض آماده شدند.');
     const personas = [
         {
             titlePattern: 'CIO',
@@ -683,9 +721,13 @@ async function main() {
         { action: 'user:passkey:manage', description: 'مدیریت Passkeyهای کاربران توسط ادمین' },
         { action: 'permission:view', description: 'مشاهده ماتریس مجوزها' },
         { action: 'permission:manage', description: 'مدیریت مجوزهای نقش‌ها' },
+        { action: 'role:view', description: 'مشاهده نقش‌ها' },
+        { action: 'role:manage', description: 'مدیریت نقش‌ها' },
         { action: 'audit-log:view', description: 'مشاهده لاگ ممیزی' },
         { action: 'organization:view', description: 'View current organization' },
         { action: 'organization:manage', description: 'Manage organizations' },
+        { action: 'team:view', description: 'مشاهده تیم‌ها' },
+        { action: 'team:manage', description: 'مدیریت تیم‌ها' },
         { action: 'company:view', description: 'مشاهده شرکت‌ها' },
         { action: 'company:create', description: 'ایجاد شرکت' },
         { action: 'company:update', description: 'ویرایش شرکت' },
@@ -732,6 +774,8 @@ async function main() {
         { action: 'library:use-case:manage', description: 'مدیریت کاربردها' },
         { action: 'library:lead-source:view', description: 'مشاهده منابع جذب' },
         { action: 'library:lead-source:manage', description: 'مدیریت منابع جذب' },
+        { action: UNIVERSITY_LIBRARY_PERMISSIONS.view, description: 'مشاهده دانشگاه‌ها' },
+        { action: UNIVERSITY_LIBRARY_PERMISSIONS.manage, description: 'مدیریت دانشگاه‌ها' },
         { action: 'lookup:view', description: 'مشاهده گزینه‌های پایه' },
         { action: 'lookup:manage', description: 'مدیریت گزینه‌های پایه' },
         { action: 'pipeline:config:view', description: 'مشاهده تنظیمات مراحل پایپ‌لاین' },
@@ -745,6 +789,8 @@ async function main() {
         { action: 'session:manage', description: 'مدیریت نشست‌های کاربران' },
         { action: 'product:view', description: 'مشاهده کاتالوگ محصولات و سرویس‌ها' },
         { action: 'product:manage', description: 'مدیریت کاتالوگ محصولات و سرویس‌ها' },
+        { action: 'exchange-rate:view', description: 'View USD to IRR exchange-rate history' },
+        { action: 'exchange-rate:manage', description: 'Create USD to IRR exchange rates' },
         { action: 'opportunity-line-item:view', description: 'مشاهده آیتم‌های مالی فرصت فروش' },
         { action: 'opportunity-line-item:manage', description: 'مدیریت آیتم‌های مالی فرصت فروش' },
         { action: 'commercial-document:view', description: 'مشاهده اسناد تجاری فرصت فروش' },
@@ -759,6 +805,11 @@ async function main() {
         { action: 'task:assign', description: 'ارجاع کار به کاربر دیگر' },
         { action: 'task:complete', description: 'تکمیل کار' },
         { action: 'task:delete', description: 'حذف کار' },
+        { action: 'meeting:view', description: 'View meetings' },
+        { action: 'meeting:create', description: 'Create meetings' },
+        { action: 'meeting:update', description: 'Update meetings' },
+        { action: 'meeting:complete', description: 'Complete meetings' },
+        { action: 'meeting:cancel', description: 'Cancel meetings' },
         { action: 'notification:view', description: 'مشاهده اعلان‌ها' },
         { action: 'notification:manage', description: 'مدیریت اعلان‌های شخصی' },
         { action: 'notification:send', description: 'ارسال اعلان داخلی' },
@@ -807,6 +858,7 @@ async function main() {
         'library:pain-point:view',
         'library:use-case:view',
         'library:lead-source:view',
+        UNIVERSITY_LIBRARY_PERMISSIONS.view,
         'lookup:view',
         'session:view',
         'session:revoke',
@@ -825,10 +877,12 @@ async function main() {
         'task:assign',
         'task:complete',
         'task:delete',
+        'meeting:view', 'meeting:create', 'meeting:update', 'meeting:complete', 'meeting:cancel',
         'notification:view',
         'notification:manage',
         'notification:send',
         'organization:view',
+        'team:view',
     ];
     const repActions = [
         'company:view',
@@ -856,6 +910,7 @@ async function main() {
         'library:pain-point:view',
         'library:use-case:view',
         'library:lead-source:view',
+        UNIVERSITY_LIBRARY_PERMISSIONS.view,
         'lookup:view',
         'session:view',
         'session:revoke',
@@ -872,6 +927,7 @@ async function main() {
         'task:create',
         'task:update',
         'task:complete',
+        'meeting:view', 'meeting:create', 'meeting:update', 'meeting:complete', 'meeting:cancel',
         'notification:view',
         'notification:manage',
         'organization:view',
@@ -884,11 +940,13 @@ async function main() {
         'library:pain-point:view',
         'library:use-case:view',
         'library:lead-source:view',
+        UNIVERSITY_LIBRARY_PERMISSIONS.view,
         'lookup:view',
         'commercial-document:view',
         'payment:view',
         'attachment:view',
         'task:view',
+        'meeting:view',
         'notification:view',
         'organization:view',
     ];
