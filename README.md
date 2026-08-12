@@ -262,28 +262,28 @@ The permission system is designed to be **dynamic** and manageable from the admi
 
 ### Passkeys
 
-| Method   | Path                                             | Description                                      |
-| -------- | ------------------------------------------------ | ------------------------------------------------ |
-| `GET`    | `/api/me/passkeys`                               | List current user's registered passkeys          |
-| `POST`   | `/api/me/passkeys/registration/options`          | Start authenticated passkey registration         |
-| `POST`   | `/api/me/passkeys/registration/verify`           | Verify and save a new passkey                    |
-| `DELETE` | `/api/me/passkeys/:id`                           | Delete current user's passkey                    |
-| `POST`   | `/api/auth/passkeys/authentication/options`      | Start usernameless passkey login                 |
-| `POST`   | `/api/auth/passkeys/authentication/verify`       | Verify passkey login and return JWT login shape  |
-| `GET`    | `/api/admin/users/:id/passkeys`                  | Admin list of a user's passkeys                  |
-| `DELETE` | `/api/admin/users/:id/passkeys/:passkeyId`       | Admin delete/reset of a user's passkey           |
+| Method   | Path                                        | Description                                     |
+| -------- | ------------------------------------------- | ----------------------------------------------- |
+| `GET`    | `/api/me/passkeys`                          | List current user's registered passkeys         |
+| `POST`   | `/api/me/passkeys/registration/options`     | Start authenticated passkey registration        |
+| `POST`   | `/api/me/passkeys/registration/verify`      | Verify and save a new passkey                   |
+| `DELETE` | `/api/me/passkeys/:id`                      | Delete current user's passkey                   |
+| `POST`   | `/api/auth/passkeys/authentication/options` | Start usernameless passkey login                |
+| `POST`   | `/api/auth/passkeys/authentication/verify`  | Verify passkey login and return JWT login shape |
+| `GET`    | `/api/admin/users/:id/passkeys`             | Admin list of a user's passkeys                 |
+| `DELETE` | `/api/admin/users/:id/passkeys/:passkeyId`  | Admin delete/reset of a user's passkey          |
 
 ### Users
 
-| Method  | Path                        | Description                                     |
-| ------- | --------------------------- | ----------------------------------------------- |
-| `GET`   | `/api/users`                | List users with pagination and optional filters |
-| `POST`  | `/api/users`                | Create user                                     |
-| `GET`   | `/api/users/:id`            | Get user by ID                                  |
-| `PATCH` | `/api/users/:id/role`       | Update user role/team                           |
-| `PATCH` | `/api/users/:id/deactivate` | Deactivate user                                 |
-| `PATCH` | `/api/users/:id/activate`   | Activate user                                   |
-| `GET`   | `/api/users/owner-options`  | Get scoped active REP/MANAGER owner candidates  |
+| Method  | Path                          | Description                                                                                      |
+| ------- | ----------------------------- | ------------------------------------------------------------------------------------------------ |
+| `GET`   | `/api/users`                  | List users with pagination and optional filters                                                  |
+| `POST`  | `/api/users`                  | Create user                                                                                      |
+| `GET`   | `/api/users/:id`              | Get user by ID                                                                                   |
+| `PATCH` | `/api/users/:id/role`         | Update user role/team                                                                            |
+| `PATCH` | `/api/users/:id/deactivate`   | Deactivate user                                                                                  |
+| `PATCH` | `/api/users/:id/activate`     | Activate user                                                                                    |
+| `GET`   | `/api/users/owner-options`    | Get scoped active REP/MANAGER owner candidates                                                   |
 | `GET`   | `/api/users/owner-options/v2` | Paginated, searchable owner candidates with explicit team filtering and selected-value hydration |
 
 User list filters, if enabled:
@@ -487,19 +487,19 @@ Body: form-data → Key: file (Type: File)
 
 ### Recognized Columns in the Excel File
 
-| Accepted Excel Header | English Meaning | Internal Field |
-| --------------------- | --------------- | -------------- |
-| `نام شرکت`            | Company Legal Name | `legalName` |
-| `نام تجاری`           | Brand Name | `brandName` |
-| `صنعت`                | Industry | `industry` |
-| `وبسایت`              | Website | `website` |
-| `شهر`                 | Head Office City | `headOfficeCity` |
-| `اولویت`              | Priority | `priority` |
-| `نام مخاطب`           | Contact Name | `personName` |
-| `سمت`                 | Job Title | `title` |
-| `ایمیل`               | Email | `email` |
-| `تلفن`                | Phone | `phone` |
-| `نقش (Persona)`       | Persona Role | `personaTag` |
+| Accepted Excel Header | English Meaning    | Internal Field   |
+| --------------------- | ------------------ | ---------------- |
+| `نام شرکت`            | Company Legal Name | `legalName`      |
+| `نام تجاری`           | Brand Name         | `brandName`      |
+| `صنعت`                | Industry           | `industry`       |
+| `وبسایت`              | Website            | `website`        |
+| `شهر`                 | Head Office City   | `headOfficeCity` |
+| `اولویت`              | Priority           | `priority`       |
+| `نام مخاطب`           | Contact Name       | `personName`     |
+| `سمت`                 | Job Title          | `title`          |
+| `ایمیل`               | Email              | `email`          |
+| `تلفن`                | Phone              | `phone`          |
+| `نقش (Persona)`       | Persona Role       | `personaTag`     |
 
 ---
 
@@ -530,18 +530,18 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 
 ## 📦 Main Dependencies
 
-| Library           | Purpose                               |
-| ----------------- | ------------------------------------- |
-| NestJS 10         | Main backend framework                |
-| Prisma 5          | ORM and database migration management |
-| PostgreSQL 16     | Main relational database              |
-| JWT + Passport    | Authentication                        |
-| class-validator   | DTO validation                        |
-| multer + xlsx     | Excel upload and processing           |
-| @nestjs/throttler | Rate limiting                         |
-| joi               | Environment validation                |
-| node-cache        | Permission cache                      |
-| @simplewebauthn/server | WebAuthn/passkey verification     |
+| Library                | Purpose                               |
+| ---------------------- | ------------------------------------- |
+| NestJS 10              | Main backend framework                |
+| Prisma 5               | ORM and database migration management |
+| PostgreSQL 16          | Main relational database              |
+| JWT + Passport         | Authentication                        |
+| class-validator        | DTO validation                        |
+| multer + xlsx          | Excel upload and processing           |
+| @nestjs/throttler      | Rate limiting                         |
+| joi                    | Environment validation                |
+| node-cache             | Permission cache                      |
+| @simplewebauthn/server | WebAuthn/passkey verification         |
 
 ---
 
@@ -555,6 +555,7 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 - [ ] Optional advanced dashboard visualizations
 
 ---
+
 ## Changelog
 
 ### fix 000001 - Activity lifecycle backend
@@ -2218,6 +2219,16 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 - Restore and validation: the fix 000088 isolated restore was reverified and its Membership backfill applied only there (`5` created, then `0` on retry, validation passed), satisfying the schema safety gate with two Organizations, five Users/Memberships, a Team, Roles, AuditLog, Platform authority schema, migration history and ENABLE/FORCE Notification RLS. Detailed migration SQL analysis, non-Production validation, deployment/smoke and rollback procedures are in `docs/organization-lifecycle-fix-000089.md`.
 - Tests and files: focused lifecycle/Platform/resolver/session/switch/reminder tests passed 7 suites/61 tests; full, coverage and CI test runs each passed 46 suites/298 tests. Coverage was 34.13% statements, 30.21% branches, 31.72% functions and 35.39% lines. `npm ci`, Prisma format/validate/generate, migration scanner/inventory, representative and empty migration chains, runtime-image tooling, lint, build, CI and `git diff --check` passed. Lint retained 0 errors/7 pre-existing warnings; the advisory scanner reported 505 review findings (112 critical/181 high/212 medium); npm reported 27 dependency findings and no audit fix was run. Important files are `prisma/schema.prisma`, the fix 000089 migration, `src/organizations/*`, `src/meetings/meeting-reminder.service.ts`, `test/organization-lifecycle.spec.ts`, reminder tests, `package.json`, the operator document and this README.
 - Deployment and rollback boundary: operator ordering is backup/isolated restore, exact-SHA review, new-image preflight, API-only maintenance stop, owner-operated migration, validation, then API-only recreation. A pre-000089 image does not understand newly created `PENDING_SETUP` Tenants and is unsafe for them; routine rollback must quarantine new Tenants and retain additive schema. Database restore is incident recovery. Deferred work includes explicit legacy Owner remediation, Owner transfer/removal APIs and broader RLS expansion.
+
+### fix 000090 — Tenant-scoped SSO Providers
+
+- Objective and architecture: removed global SSO Provider access by introducing additive Organization ownership and requiring authoritative `TenantContext` predicates for Provider CRUD/test operations. Public discovery and authentication start use exact normalized globally unique DOMAIN/SUBDOMAIN routing records; arbitrary Organization IDs, guessed Provider UUIDs, suffix matches and ambiguous routes cannot select a Tenant. Platform authority remains separate and grants no Tenant SSO/business bypass.
+- Uniqueness and migration: Provider name is unique per Organization/type after normalization; issuer, client ID and SAML entity ID are unique per Organization while identical identifiers remain possible across Tenants. Routing values are globally unique by kind because pre-auth routing must be unambiguous. Migration `20260812100000_tenant_scoped_sso_providers` adds nullable ownership for expand-and-contract compatibility, routing/mapping/auth-transaction tables, FKs and indexes without updating or deleting Providers. NOT NULL tightening is deferred until rollout validation.
+- Backfill and compatibility: compiled `sso-tenant:preflight`, dry-run/backfill and validate commands require an exact active Organization ID. They report Provider/identity/secret/duplicate conflicts, preserve Provider/identity IDs and configuration, normalize names, and convert existing allowed domains to exact discovery routes. Apply requires `--confirm-apply`; a second run is a no-op. No schema default, guessed Organization, Provider recreation or seed is used.
+- Authentication and provisioning: OIDC state is hashed, short-lived, persisted, one-time consumed and bound to Organization/Provider/redirect; nonce and PKCE verifier are AES-256-GCM encrypted and authorization uses S256. SAML uses persisted one-time RelayState plus required InResponseTo validation. Callback path Provider IDs must equal trusted state. Ticket exchange revalidates active Provider/Organization and selects that exact active Membership. Auto-provision creates/reuses only a non-default Membership in the Provider Organization; inactive Users and suspended/missing non-provisionable Memberships fail closed.
+- Role and secret safety: normalized external groups can map only through explicit Provider allowlist rows to existing active internal Roles; unknown groups receive the safe REP/no-dynamic-role behavior and conflicting mapped roles fail. IdP claims never assign Tenant Owner, global ADMIN or Platform Admin. Client secrets remain encrypted at rest; encryption-key diagnostics were removed. APIs expose only `secretConfigured`/`certificateConfigured`, never encrypted/plain secrets or certificate material.
+- Network and audit: SSO URLs require public HTTPS without credentials. DNS/IP checks block localhost, loopback, link-local, private/reserved and cloud-metadata destinations. Fetches use five-second timeout, one-MiB bounds and reject redirects; issuer origin consistency is checked. Tenant-scoped test-connection returns only reachability/status/origin. Provider CRUD/disable/delete/test, backfill and categorized auth outcomes are audited without credentials, codes, tokens, state, nonce or PKCE material.
+- RLS, validation and deployment: Notification RLS remains ENABLE/FORCE and runtime remains `NOSUPERUSER/NOBYPASSRLS`. Provider RLS is deferred because pre-auth discovery/callback need a separately designed bootstrap policy; application scoping is fail-closed meanwhile. A fresh isolated restore and empty database accepted all 47 migrations; representative synthetic legacy Provider/ExternalIdentity backfill preserved IDs/config, created one route, and the second apply changed zero rows. Focused SSO/tenant tests passed 29/29; the full suite and CI passed 316/316 across 47 suites; coverage passed at 33.85% statements, 29.75% branches, 30.82% functions and 35.51% lines. Prisma format/validate/generate, lint (zero errors; seven pre-existing warnings), build, Docker runtime-image build and migration scan all completed successfully. `npm ci` reported 27 dependency vulnerabilities (3 low, 14 moderate, 10 high) without dependency mutation. Operator deployment/smoke/rollback instructions are in `docs/tenant-scoped-sso-fix-000090.md`.
 
 ---
 

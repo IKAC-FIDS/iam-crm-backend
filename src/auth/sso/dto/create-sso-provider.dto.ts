@@ -7,8 +7,10 @@ import {
   IsString,
   IsUrl,
   MinLength,
-} from 'class-validator';
-import { SsoProviderType, UserRole } from '@prisma/client';
+  ValidateNested,
+} from "class-validator";
+import { Type } from "class-transformer";
+import { SsoProviderType, UserRole } from "@prisma/client";
 
 export class CreateSsoProviderDto {
   @IsString()
@@ -35,6 +37,25 @@ export class CreateSsoProviderDto {
   @ArrayMaxSize(50)
   @IsString({ each: true })
   allowedDomains?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(20)
+  @IsString({ each: true })
+  routingDomains?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(20)
+  @IsString({ each: true })
+  routingSubdomains?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(50)
+  @ValidateNested({ each: true })
+  @Type(() => SsoGroupRoleMappingDto)
+  groupRoleMappings?: SsoGroupRoleMappingDto[];
 
   // OIDC configuration
   @IsOptional()
@@ -112,4 +133,14 @@ export class CreateSsoProviderDto {
   @IsOptional()
   @IsString()
   groupsAttribute?: string;
+}
+
+export class SsoGroupRoleMappingDto {
+  @IsString()
+  @MinLength(1)
+  group!: string;
+
+  @IsString()
+  @MinLength(1)
+  roleId!: string;
 }

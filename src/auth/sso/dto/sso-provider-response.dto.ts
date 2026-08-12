@@ -1,7 +1,8 @@
-import { SsoProvider, SsoProviderType, UserRole } from '@prisma/client';
+import { SsoProvider, SsoProviderType, UserRole } from "@prisma/client";
 
 export interface SsoProviderResponseDto {
   id: string;
+  organizationId: string;
   name: string;
   type: SsoProviderType;
   isActive: boolean;
@@ -20,7 +21,7 @@ export interface SsoProviderResponseDto {
 
   entityId: string | null;
   ssoUrl: string | null;
-  x509Certificate: string | null;
+  certificateConfigured: boolean;
   signRequests: boolean;
   wantAssertionsSigned: boolean;
   wantResponseSigned: boolean;
@@ -29,7 +30,10 @@ export interface SsoProviderResponseDto {
   nameAttribute: string | null;
   groupsAttribute: string | null;
 
-  hasClientSecret: boolean;
+  secretConfigured: boolean;
+  routingDomains: string[];
+  routingSubdomains: string[];
+  groupRoleMappings: Array<{ group: string; roleId: string }>;
 
   createdAt: Date;
   updatedAt: Date;
@@ -41,11 +45,19 @@ export interface PublicSsoProviderResponseDto {
   type: SsoProviderType;
 }
 
+type ProviderResponseSource = SsoProvider & {
+  routes?: Array<{ kind: "DOMAIN" | "SUBDOMAIN"; value: string }>;
+  groupRoleMappings?: Array<{ normalizedGroup: string; roleId: string }>;
+};
+
 export function toSsoProviderResponse(
-  provider: SsoProvider,
+  provider: ProviderResponseSource,
 ): SsoProviderResponseDto {
+  if (!provider.organizationId)
+    throw new Error("Tenant-owned SSO provider is required");
   return {
     id: provider.id,
+    organizationId: provider.organizationId,
     name: provider.name,
     type: provider.type,
     isActive: provider.isActive,
@@ -64,7 +76,7 @@ export function toSsoProviderResponse(
 
     entityId: provider.entityId,
     ssoUrl: provider.ssoUrl,
-    x509Certificate: provider.x509Certificate,
+    certificateConfigured: Boolean(provider.x509Certificate),
     signRequests: provider.signRequests,
     wantAssertionsSigned: provider.wantAssertionsSigned,
     wantResponseSigned: provider.wantResponseSigned,
@@ -73,7 +85,20 @@ export function toSsoProviderResponse(
     nameAttribute: provider.nameAttribute,
     groupsAttribute: provider.groupsAttribute,
 
-    hasClientSecret: Boolean(provider.clientSecretEnc),
+    secretConfigured: Boolean(provider.clientSecretEnc),
+    routingDomains:
+      provider.routes
+        ?.filter((route) => route.kind === "DOMAIN")
+        .map((route) => route.value) ?? [],
+    routingSubdomains:
+      provider.routes
+        ?.filter((route) => route.kind === "SUBDOMAIN")
+        .map((route) => route.value) ?? [],
+    groupRoleMappings:
+      provider.groupRoleMappings?.map((mapping) => ({
+        group: mapping.normalizedGroup,
+        roleId: mapping.roleId,
+      })) ?? [],
 
     createdAt: provider.createdAt,
     updatedAt: provider.updatedAt,
@@ -81,7 +106,7 @@ export function toSsoProviderResponse(
 }
 
 export function toPublicSsoProviderResponse(
-  provider: Pick<SsoProvider, 'id' | 'name' | 'type'>,
+  provider: Pick<SsoProvider, "id" | "name" | "type">,
 ): PublicSsoProviderResponseDto {
   return {
     id: provider.id,

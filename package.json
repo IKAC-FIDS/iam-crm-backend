@@ -36,6 +36,10 @@
     "platform-admin:validate": "node dist/src/platform-authority/platform-authority-maintenance.js validate",
     "tenant-onboarding:preflight": "node dist/src/organizations/tenant-onboarding-maintenance.js preflight",
     "tenant-onboarding:validate": "node dist/src/organizations/tenant-onboarding-maintenance.js validate",
+    "sso-tenant:preflight": "node dist/src/auth/sso/sso-tenant-maintenance.js preflight",
+    "sso-tenant:backfill:dry-run": "node dist/src/auth/sso/sso-tenant-maintenance.js backfill",
+    "sso-tenant:backfill": "node dist/src/auth/sso/sso-tenant-maintenance.js backfill",
+    "sso-tenant:validate": "node dist/src/auth/sso/sso-tenant-maintenance.js validate",
     "ci": "npm run prisma:generate && npm run lint && npm run test && npm run build"
   },
   "dependencies": {

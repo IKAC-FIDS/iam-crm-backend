@@ -7,69 +7,85 @@ import {
   Patch,
   Post,
   UseGuards,
-} from '@nestjs/common';
+} from "@nestjs/common";
 import {
   CurrentUser,
   CurrentUserPayload,
-} from '../../common/decorators/current-user.decorator';
-import { Permissions } from '../../common/decorators/permissions.decorator';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { PermissionsGuard } from '../../common/guards/permissions.guard';
-import { CreateSsoProviderDto } from './dto/create-sso-provider.dto';
-import { UpdateSsoProviderDto } from './dto/update-sso-provider.dto';
-import { SsoProviderService } from './sso-provider.service';
+} from "../../common/decorators/current-user.decorator";
+import { Permissions } from "../../common/decorators/permissions.decorator";
+import { JwtAuthGuard } from "../../common/guards/jwt-auth.guard";
+import { PermissionsGuard } from "../../common/guards/permissions.guard";
+import { CurrentTenant } from "../../common/decorators/current-tenant.decorator";
+import type { TenantContext } from "../../common/tenant/tenant-context.types";
+import { CreateSsoProviderDto } from "./dto/create-sso-provider.dto";
+import { UpdateSsoProviderDto } from "./dto/update-sso-provider.dto";
+import { SsoProviderService } from "./sso-provider.service";
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
-@Controller('admin/sso-providers')
+@Controller("admin/sso-providers")
 export class SsoAdminController {
   constructor(private readonly service: SsoProviderService) {}
 
   @Get()
-  @Permissions('sso-provider:view')
-  listProviders() {
-    return this.service.listProviders();
+  @Permissions("sso-provider:view")
+  listProviders(@CurrentTenant() tenant: TenantContext) {
+    return this.service.listProviders(tenant);
   }
 
-  @Get(':id')
-  @Permissions('sso-provider:view')
-  getProvider(@Param('id') id: string) {
-    return this.service.getProvider(id);
+  @Get(":id")
+  @Permissions("sso-provider:view")
+  getProvider(@Param("id") id: string, @CurrentTenant() tenant: TenantContext) {
+    return this.service.getProvider(id, tenant);
   }
 
   @Post()
-  @Permissions('sso-provider:manage')
+  @Permissions("sso-provider:manage")
   createProvider(
     @Body() dto: CreateSsoProviderDto,
     @CurrentUser() actor: CurrentUserPayload,
+    @CurrentTenant() tenant: TenantContext,
   ) {
-    return this.service.createProvider(dto, actor.userId);
+    return this.service.createProvider(dto, tenant, actor.userId);
   }
 
-  @Patch(':id')
-  @Permissions('sso-provider:manage')
+  @Patch(":id")
+  @Permissions("sso-provider:manage")
   updateProvider(
-    @Param('id') id: string,
+    @Param("id") id: string,
     @Body() dto: UpdateSsoProviderDto,
     @CurrentUser() actor: CurrentUserPayload,
+    @CurrentTenant() tenant: TenantContext,
   ) {
-    return this.service.updateProvider(id, dto, actor.userId);
+    return this.service.updateProvider(id, dto, tenant, actor.userId);
   }
 
-  @Patch(':id/disable')
-  @Permissions('sso-provider:manage')
+  @Patch(":id/disable")
+  @Permissions("sso-provider:manage")
   disableProvider(
-    @Param('id') id: string,
+    @Param("id") id: string,
     @CurrentUser() actor: CurrentUserPayload,
+    @CurrentTenant() tenant: TenantContext,
   ) {
-    return this.service.disableProvider(id, actor.userId);
+    return this.service.disableProvider(id, tenant, actor.userId);
   }
 
-  @Delete(':id')
-  @Permissions('sso-provider:manage')
+  @Delete(":id")
+  @Permissions("sso-provider:manage")
   deleteProvider(
-    @Param('id') id: string,
+    @Param("id") id: string,
+    @CurrentUser() actor: CurrentUserPayload,
+    @CurrentTenant() tenant: TenantContext,
+  ) {
+    return this.service.deleteProvider(id, tenant, actor.userId);
+  }
+
+  @Post(":id/test-connection")
+  @Permissions("sso-provider:manage")
+  testConnection(
+    @Param("id") id: string,
+    @CurrentTenant() tenant: TenantContext,
     @CurrentUser() actor: CurrentUserPayload,
   ) {
-    return this.service.deleteProvider(id, actor.userId);
+    return this.service.testConnection(id, tenant, actor.userId);
   }
 }

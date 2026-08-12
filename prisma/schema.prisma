@@ -32,6 +32,11 @@ enum SsoProviderType {
   SAML
 }
 
+enum SsoRoutingKind {
+  DOMAIN
+  SUBDOMAIN
+}
+
 enum LegacyPipelineStage {
   LEAD
   CONTACTED
@@ -367,16 +372,19 @@ model Organization {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users           User[]
-  teams           Team[]
-  companies       Company[]
-  opportunities   Opportunity[]
-  tasks           Task[]
-  notifications   Notification[]
-  fileAttachments FileAttachment[]
-  auditLogs       AuditLog[]
-  meetings        Meeting[]
-  memberships     OrganizationMembership[]
+  users               User[]
+  teams               Team[]
+  companies           Company[]
+  opportunities       Opportunity[]
+  tasks               Task[]
+  notifications       Notification[]
+  fileAttachments     FileAttachment[]
+  auditLogs           AuditLog[]
+  meetings            Meeting[]
+  memberships         OrganizationMembership[]
+  ssoProviders        SsoProvider[]
+  ssoRoutes           SsoProviderRoute[]
+  ssoAuthTransactions SsoAuthTransaction[]
 
   @@index([status])
   @@index([createdAt])
@@ -407,6 +415,10 @@ model SsoProvider {
   name     String
   type     SsoProviderType
   isActive Boolean         @default(true)
+
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  normalizedName String?
 
   autoProvision  Boolean   @default(false)
   defaultRole    UserRole?
@@ -440,10 +452,70 @@ model SsoProvider {
 
   externalIdentities ExternalIdentity[]
   loginTickets       SsoLoginTicket[]
+  routes             SsoProviderRoute[]
+  groupRoleMappings  SsoGroupRoleMapping[]
+  authTransactions   SsoAuthTransaction[]
 
+  @@unique([organizationId, type, normalizedName])
+  @@unique([organizationId, issuer])
+  @@unique([organizationId, clientId])
+  @@unique([organizationId, entityId])
   @@index([type])
   @@index([isActive])
+  @@index([organizationId, isActive])
   @@map("sso_providers")
+}
+
+model SsoProviderRoute {
+  id             String         @id @default(uuid())
+  organizationId String
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  providerId     String
+  provider       SsoProvider    @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  kind           SsoRoutingKind
+  value          String
+  createdAt      DateTime       @default(now())
+
+  @@unique([kind, value])
+  @@unique([providerId, kind, value])
+  @@index([organizationId])
+  @@index([providerId])
+  @@map("sso_provider_routes")
+}
+
+model SsoGroupRoleMapping {
+  id              String      @id @default(uuid())
+  providerId      String
+  provider        SsoProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  normalizedGroup String
+  roleId          String
+  role            Role        @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@unique([providerId, normalizedGroup])
+  @@index([roleId])
+  @@map("sso_group_role_mappings")
+}
+
+model SsoAuthTransaction {
+  id              String       @id @default(uuid())
+  stateHash       String       @unique
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  providerId      String
+  provider        SsoProvider  @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  nonceEnc        String?
+  pkceVerifierEnc String?
+  redirectTarget  String
+  expiresAt       DateTime
+  consumedAt      DateTime?
+  createdAt       DateTime     @default(now())
+
+  @@index([providerId, expiresAt])
+  @@index([organizationId, expiresAt])
+  @@index([consumedAt])
+  @@map("sso_auth_transactions")
 }
 
 model ExternalIdentity {
@@ -1657,6 +1729,7 @@ model Role {
   users                   User[]
   permissions             RolePermission[]
   organizationMemberships OrganizationMembership[]
+  ssoGroupMappings        SsoGroupRoleMapping[]
 
   @@index([isActive])
   @@map("roles")

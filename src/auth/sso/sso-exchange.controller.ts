@@ -5,25 +5,25 @@ import {
   Req,
   Res,
   UnauthorizedException,
-} from '@nestjs/common';
-import type { Request, Response } from 'express';
-import { AuthService } from '../auth.service';
-import {
-  setRefreshTokenCookie,
-} from '../../common/cookies/refresh-token-cookie';
-import { ExchangeSsoTicketDto } from './dto/exchange-sso-ticket.dto';
-import { PrismaService } from '../../prisma/prisma.service';
-import { SsoTicketService } from './sso-ticket.service';
+} from "@nestjs/common";
+import type { Request, Response } from "express";
+import { AuthService } from "../auth.service";
+import { setRefreshTokenCookie } from "../../common/cookies/refresh-token-cookie";
+import { ExchangeSsoTicketDto } from "./dto/exchange-sso-ticket.dto";
+import { PrismaService } from "../../prisma/prisma.service";
+import { SsoTicketService } from "./sso-ticket.service";
+import { TenantResolverService } from "../../organization-memberships/tenant-resolver.service";
 
-@Controller('auth/sso')
+@Controller("auth/sso")
 export class SsoExchangeController {
   constructor(
     private readonly ticketService: SsoTicketService,
     private readonly prisma: PrismaService,
     private readonly authService: AuthService,
+    private readonly tenantResolver: TenantResolverService,
   ) {}
 
-  @Post('exchange')
+  @Post("exchange")
   async exchange(
     @Body() dto: ExchangeSsoTicketDto,
     @Req() req: Request,
@@ -36,10 +36,35 @@ export class SsoExchangeController {
     });
 
     if (!user || !user.isActive) {
-      throw new UnauthorizedException('SSO user is not active');
+      throw new UnauthorizedException("SSO user is not active");
     }
 
-    const result = await this.authService.buildSessionLoginResponse(user, req);
+    if (!consumed.providerId)
+      throw new UnauthorizedException("SSO provider context is missing");
+    const provider = await this.prisma.ssoProvider.findUnique({
+      where: { id: consumed.providerId },
+      select: {
+        organizationId: true,
+        isActive: true,
+        organization: { select: { status: true } },
+      },
+    });
+    if (
+      !provider?.organizationId ||
+      !provider.isActive ||
+      provider.organization?.status !== "ACTIVE"
+    )
+      throw new UnauthorizedException("SSO provider is not operational");
+    const tenant = await this.tenantResolver.selectTenant(
+      user.id,
+      provider.organizationId,
+    );
+
+    const result = await this.authService.buildSessionLoginResponse(
+      user,
+      req,
+      tenant,
+    );
 
     setRefreshTokenCookie(
       res,
