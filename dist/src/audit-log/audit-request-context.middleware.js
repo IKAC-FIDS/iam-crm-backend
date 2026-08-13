@@ -41,15 +41,7 @@ let AuditRequestContextMiddleware = class AuditRequestContextMiddleware {
         return value?.trim() || null;
     }
     resolveClientIp(req) {
-        const forwardedFor = this.resolveHeaderValue(req.headers['x-forwarded-for']);
-        if (forwardedFor) {
-            return forwardedFor.split(',')[0]?.trim() || null;
-        }
-        const realIp = this.resolveHeaderValue(req.headers['x-real-ip']);
-        if (realIp) {
-            return realIp;
-        }
-        return req.ip || req.socket?.remoteAddress || null;
+        return (req.ip || req.socket?.remoteAddress || null)?.slice(0, 64) || null;
     }
 };
 exports.AuditRequestContextMiddleware = AuditRequestContextMiddleware;

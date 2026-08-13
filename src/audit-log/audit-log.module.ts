@@ -5,10 +5,13 @@ import { AuditRequestContextMiddleware } from "./audit-request-context.middlewar
 import { AuditRequestContextService } from "./audit-request-context.service";
 import { AuditLogService } from "./audit-log.service";
 import { ReportExportService } from "../common/export/report-export.service";
+import { PlatformAuditLogController } from "./platform-audit-log.controller";
+import { PlatformAuthorityModule } from "../platform-authority/platform-authority.module";
 
 @Global()
 @Module({
-  controllers: [AuditLogController],
+  imports: [PlatformAuthorityModule],
+  controllers: [AuditLogController, PlatformAuditLogController],
   providers: [
     AuditLogService,
     AuditRequestContextService,

@@ -3,7 +3,14 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { Prisma } from "@prisma/client";
+import {
+  AuditActorType,
+  AuditResult,
+  AuditScope,
+  AuditSource,
+  Prisma,
+} from "@prisma/client";
+import type { PlatformScopeContext } from "../common/tenant/tenant-context.types";
 import { CurrentUserPayload } from "../common/decorators/current-user.decorator";
 import { parseApiDateRange } from "../common/dates/api-date.util";
 import { ReportExportService } from "../common/export/report-export.service";
@@ -26,6 +33,13 @@ export interface RecordAuditInput {
   requestMethod?: string | null;
   requestPath?: string | null;
   organizationId?: string | null;
+  scope?: AuditScope;
+  actorType?: AuditActorType;
+  actorMembershipId?: string | null;
+  source?: AuditSource;
+  result?: AuditResult;
+  durationMs?: number | null;
+  errorCode?: string | null;
 }
 @Injectable()
 export class AuditLogService {
@@ -36,31 +50,75 @@ export class AuditLogService {
   ) {}
   record(input: RecordAuditInput) {
     const context = this.requestContext.getContext();
+    const organizationId =
+      input.organizationId !== undefined
+        ? input.organizationId
+        : context?.organizationId ?? null;
+    const scope = input.scope ?? (organizationId ? AuditScope.TENANT : AuditScope.SYSTEM);
+    if (scope === AuditScope.TENANT && !organizationId)
+      throw new BadRequestException("Tenant audit events require organizationId");
+    if (scope === AuditScope.PLATFORM && input.actorMembershipId)
+      throw new BadRequestException("Platform audit events cannot use Tenant membership");
+    const durationMs = input.durationMs ?? null;
+    if (durationMs !== null && (!Number.isSafeInteger(durationMs) || durationMs < 0))
+      throw new BadRequestException("durationMs must be a non-negative integer");
     return this.prisma.auditLog.create({
       data: {
-        actorId: input.actorId ?? null,
+        actorId: input.actorId ?? context?.actorUserId ?? null,
+        actorType:
+          input.actorType ??
+          (input.actorId ?? context?.actorUserId
+            ? AuditActorType.USER
+            : AuditActorType.SYSTEM),
+        actorMembershipId:
+          scope === AuditScope.TENANT
+            ? input.actorMembershipId ?? context?.actorMembershipId ?? null
+            : null,
+        scope,
+        source:
+          input.source ??
+          (context?.requestMethod ? AuditSource.API : AuditSource.SYSTEM),
+        result: input.result ?? AuditResult.SUCCESS,
+        durationMs,
+        errorCode: this.boundString(input.errorCode, 120),
         entityType: input.entityType,
         entityId: input.entityId ?? null,
         action: input.action,
         requestId: input.requestId ?? context?.requestId ?? null,
         ipAddress: input.ipAddress ?? context?.ipAddress ?? null,
-        userAgent: input.userAgent ?? context?.userAgent ?? null,
+        userAgent: this.boundString(input.userAgent ?? context?.userAgent, 512),
         requestMethod: input.requestMethod ?? context?.requestMethod ?? null,
         requestPath: input.requestPath ?? context?.requestPath ?? null,
-        organizationId:
-          input.organizationId !== undefined
-            ? input.organizationId
-            : context?.organizationId ?? null,
+        organizationId,
         ...(input.before !== undefined && {
-          before: this.sanitize(input.before) as Prisma.InputJsonValue,
+          before: this.sanitizeForStorage(input.before),
         }),
         ...(input.after !== undefined && {
-          after: this.sanitize(input.after) as Prisma.InputJsonValue,
+          after: this.sanitizeForStorage(input.after),
         }),
         ...(input.metadata !== undefined && {
-          metadata: this.sanitize(input.metadata) as Prisma.InputJsonValue,
+          metadata: this.sanitizeForStorage(input.metadata),
         }),
       },
+    });
+  }
+
+  recordTenantEvent(input: Omit<RecordAuditInput, "scope">) {
+    return this.record({ ...input, scope: AuditScope.TENANT });
+  }
+
+  recordPlatformEvent(
+    platform: PlatformScopeContext,
+    input: Omit<RecordAuditInput, "scope" | "actorId" | "actorType" | "actorMembershipId">,
+  ) {
+    return this.record({
+      ...input,
+      scope: AuditScope.PLATFORM,
+      actorId: platform.userId,
+      actorType: AuditActorType.PLATFORM_ADMIN,
+      actorMembershipId: null,
+      source: input.source ?? AuditSource.PLATFORM,
+      requestId: input.requestId ?? platform.requestId,
     });
   }
   async findAll(query: FindAuditLogsDto, user: CurrentUserPayload) {
@@ -70,7 +128,7 @@ export class AuditLogService {
     const [rows, total] = await Promise.all([
       this.prisma.auditLog.findMany({
         where,
-        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        orderBy: this.orderBy(query),
         skip: (page - 1) * limit,
         take: limit,
       }),
@@ -83,9 +141,27 @@ export class AuditLogService {
   }
   async findOne(id: string, user: CurrentUserPayload) {
     const row = await this.prisma.auditLog.findFirst({
-      where: { id, organizationId: getCurrentOrganizationId(user) },
+      where: { id, organizationId: getCurrentOrganizationId(user), scope: AuditScope.TENANT },
     });
     if (!row) throw new NotFoundException("Audit log not found");
+    return (await this.present([row], false))[0];
+  }
+
+  async findAllPlatform(query: FindAuditLogsDto) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const where = this.platformWhere(query);
+    const orderBy = this.orderBy(query);
+    const [rows, total] = await Promise.all([
+      this.prisma.auditLog.findMany({ where, orderBy, skip: (page - 1) * limit, take: limit }),
+      this.prisma.auditLog.count({ where }),
+    ]);
+    return { data: await this.present(rows, Boolean(query.compact)), meta: this.meta(total, page, limit) };
+  }
+
+  async findOnePlatform(id: string) {
+    const row = await this.prisma.auditLog.findFirst({ where: { id, scope: AuditScope.PLATFORM } });
+    if (!row) throw new NotFoundException("Platform audit log not found");
     return (await this.present([row], false))[0];
   }
   async summary(query: FindAuditLogsDto, user: CurrentUserPayload) {
@@ -158,7 +234,7 @@ export class AuditLogService {
       });
     const rows = await this.prisma.auditLog.findMany({
       where,
-      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        orderBy: this.orderBy(query),
       take: max,
     });
     const data = await this.present(rows, !query.includePayload);
@@ -182,12 +258,9 @@ export class AuditLogService {
           }
         : {}),
     }));
-    const file = this.exporter.create(
-      format,
-      "audit-logs",
-      [{ name: "Audit Logs", rows: flat }],
-      max,
-    );
+    const file = format === "json"
+      ? this.jsonExport("audit-logs", data)
+      : this.exporter.create(format, "audit-logs", [{ name: "Audit Logs", rows: flat }], max);
     await this.record({
       actorId: user.userId,
       organizationId: getCurrentOrganizationId(user),
@@ -199,6 +272,25 @@ export class AuditLogService {
         filters: this.filterSummary(query),
       },
     });
+    return file;
+  }
+  async exportPlatform(query: FindAuditLogsDto, platform: PlatformScopeContext) {
+    const format = query.format ?? "csv";
+    const max = query.includePayload ? 5000 : 50000;
+    const where = this.platformWhere(query);
+    const total = await this.prisma.auditLog.count({ where });
+    if (total > max) throw new BadRequestException({ code: "EXPORT_ROW_LIMIT_EXCEEDED", maxRows: max, totalRows: total });
+    const rows = await this.prisma.auditLog.findMany({ where, orderBy: this.orderBy(query), take: max });
+    const data = await this.present(rows, !query.includePayload);
+    const flat = data.map((row: any) => ({
+      id: row.id, createdAt: row.createdAt, scope: row.scope, organizationId: rows.find((item) => item.id === row.id)?.organizationId,
+      actorId: row.actorId, actorMembershipId: row.actorMembershipId, entityType: row.entityType, entityId: row.entityId,
+      action: row.action, source: row.source, result: row.result, durationMs: row.durationMs, requestId: row.request?.requestId,
+    }));
+    const file = format === "json"
+      ? this.jsonExport("platform-audit-logs", data)
+      : this.exporter.create(format, "platform-audit-logs", [{ name: "Platform Audit Logs", rows: flat }], max);
+    await this.recordPlatformEvent(platform, { entityType: "audit-log", action: "audit-log.exported", metadata: { format, rowCount: file.rowCount, filters: this.filterSummary(query) } });
     return file;
   }
   private where(
@@ -220,6 +312,10 @@ export class AuditLogService {
         (q.requestMethod ? [q.requestMethod.toUpperCase()] : undefined);
     return {
       organizationId: getCurrentOrganizationId(user),
+      scope: AuditScope.TENANT,
+      ...(q.actorMembershipId && { actorMembershipId: q.actorMembershipId }),
+      ...(q.source && { source: q.source }),
+      ...(q.result && { result: q.result }),
       ...(actorIds && { actorId: { in: actorIds } }),
       ...(entityTypes && { entityType: { in: entityTypes } }),
       ...(q.entityId && { entityId: q.entityId }),
@@ -244,6 +340,29 @@ export class AuditLogService {
       }),
     };
   }
+  private platformWhere(q: FindAuditLogsDto): Prisma.AuditLogWhereInput {
+    return { ...this.baseWhere(q), scope: AuditScope.PLATFORM, ...(q.organizationId && { organizationId: q.organizationId }) };
+  }
+  private baseWhere(q: FindAuditLogsDto): Prisma.AuditLogWhereInput {
+    const range = parseApiDateRange(q.startDate, q.endDate, "startDate", "endDate");
+    return {
+      ...(q.actorId && { actorId: q.actorId }),
+      ...(q.actorMembershipId && { actorMembershipId: q.actorMembershipId }),
+      ...(q.requestId && { requestId: q.requestId }),
+      ...(q.entityType && { entityType: q.entityType }),
+      ...(q.entityId && { entityId: q.entityId }),
+      ...(q.action && { action: q.actionPrefix ? { startsWith: q.action, mode: "insensitive" } : q.action }),
+      ...(q.source && { source: q.source }),
+      ...(q.result && { result: q.result }),
+      ...(q.ipAddress && { ipAddress: { contains: q.ipAddress, mode: "insensitive" } }),
+      ...(range && { createdAt: range }),
+    };
+  }
+  private orderBy(q: FindAuditLogsDto): Prisma.AuditLogOrderByWithRelationInput[] {
+    const field = q.sortBy ?? "createdAt";
+    const direction = q.sortOrder ?? "desc";
+    return [{ [field]: direction }, { id: "desc" }];
+  }
   private async present(rows: any[], compact: boolean) {
     const actorMap = await this.actors(rows.map((r) => r.actorId));
     return rows.map((row) => {
@@ -252,11 +371,19 @@ export class AuditLogService {
         metadata = this.sanitize(row.metadata),
         base = {
           id: row.id,
+          organizationId: row.organizationId,
           actorId: row.actorId,
           actor: row.actorId ? (actorMap.get(row.actorId) ?? null) : null,
           entityType: row.entityType,
           entityId: row.entityId,
           action: row.action,
+          scope: row.scope,
+          actorType: row.actorType,
+          actorMembershipId: row.actorMembershipId,
+          source: row.source,
+          result: row.result,
+          durationMs: row.durationMs,
+          errorCode: row.errorCode,
           createdAt: row.createdAt,
           changedFields: this.changed(before, after),
           request: {
@@ -280,25 +407,28 @@ export class AuditLogService {
       : [];
     return new Map(rows.map((r) => [r.id, r]));
   }
-  sanitize(value: unknown): unknown {
+  sanitize(value: unknown, depth = 0): unknown {
+    if (depth > 6) return "[TRUNCATED_DEPTH]";
     if (value instanceof Date) return value.toISOString();
     if (typeof value === "bigint") return value.toString();
-    if (Array.isArray(value)) return value.map((v) => this.sanitize(v));
+    if (Array.isArray(value)) return value.slice(0, 100).map((v) => this.sanitize(v, depth + 1));
     if (value && typeof value === "object") {
       const json = value as { toJSON?: () => unknown };
       if (typeof json.toJSON === "function")
-        return this.sanitize(json.toJSON());
+        return this.sanitize(json.toJSON(), depth + 1);
       return Object.fromEntries(
         Object.entries(value)
+          .slice(0, 100)
           .filter(
             ([key]) =>
               !/(password|hash|token|secret|authorization|cookie|credential|session|private.?key)/i.test(
                 key,
               ),
           )
-          .map(([key, item]) => [key, this.sanitize(item)]),
+          .map(([key, item]) => [key, this.sanitize(item, depth + 1)]),
       );
     }
+    if (typeof value === "string") return value.length > 4000 ? `${value.slice(0, 4000)}...[TRUNCATED]` : value;
     return value;
   }
   private changed(before: unknown, after: unknown) {
@@ -378,6 +508,28 @@ export class AuditLogService {
       requestMethods: q.requestMethods,
       requestId: q.requestId,
       entityId: q.entityId,
+    };
+  }
+  private boundString(value: string | null | undefined, max: number) {
+    if (!value) return null;
+    return value.trim().slice(0, max) || null;
+  }
+  private sanitizeForStorage(value: unknown): Prisma.InputJsonValue {
+    const sanitized = this.sanitize(value) as Prisma.InputJsonValue;
+    const serialized = JSON.stringify(sanitized);
+    if (serialized.length <= 32768) return sanitized;
+    return {
+      truncated: true,
+      originalSizeBytes: Buffer.byteLength(serialized, "utf8"),
+      preview: serialized.slice(0, 30000),
+    };
+  }
+  private jsonExport(filename: string, rows: unknown[]) {
+    return {
+      buffer: Buffer.from(JSON.stringify(rows), "utf8"),
+      rowCount: rows.length,
+      contentType: "application/json; charset=utf-8",
+      contentDisposition: `attachment; filename="${filename}.json"`,
     };
   }
 }

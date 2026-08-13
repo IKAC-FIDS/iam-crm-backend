@@ -15,6 +15,7 @@ const class_transformer_1 = require("class-transformer");
 const class_validator_1 = require("class-validator");
 const pagination_dto_1 = require("../../common/dto/pagination.dto");
 const api_date_string_validator_1 = require("../../common/validators/api-date-string.validator");
+const client_1 = require("@prisma/client");
 const csv = ({ value }) => value == null || value === ""
     ? undefined
     : (Array.isArray(value) ? value : String(value).split(","))
@@ -23,7 +24,7 @@ const csv = ({ value }) => value == null || value === ""
         .filter(Boolean);
 class FindAuditLogsDto extends pagination_dto_1.PaginationDto {
     static _OPENAPI_METADATA_FACTORY() {
-        return { actorId: { required: false, type: () => String }, actorIds: { required: false, type: () => [String] }, entityType: { required: false, type: () => String }, entityTypes: { required: false, type: () => [String] }, entityId: { required: false, type: () => String }, action: { required: false, type: () => String }, actions: { required: false, type: () => [String] }, requestId: { required: false, type: () => String }, ipAddress: { required: false, type: () => String }, requestMethod: { required: false, type: () => String }, requestMethods: { required: false, type: () => [String] }, requestPath: { required: false, type: () => String }, search: { required: false, type: () => String }, startDate: { required: false, type: () => String }, endDate: { required: false, type: () => String }, compact: { required: false, type: () => Boolean }, includePayload: { required: false, type: () => Boolean }, format: { required: false, type: () => Object, enum: ["csv", "xlsx"] } };
+        return { actorId: { required: false, type: () => String }, actorMembershipId: { required: false, type: () => String }, organizationId: { required: false, type: () => String }, actorIds: { required: false, type: () => [String] }, entityType: { required: false, type: () => String }, entityTypes: { required: false, type: () => [String] }, entityId: { required: false, type: () => String }, action: { required: false, type: () => String }, actionPrefix: { required: false, type: () => Boolean }, source: { required: false, type: () => Object }, result: { required: false, type: () => Object }, actions: { required: false, type: () => [String] }, requestId: { required: false, type: () => String }, ipAddress: { required: false, type: () => String }, requestMethod: { required: false, type: () => String }, requestMethods: { required: false, type: () => [String] }, requestPath: { required: false, type: () => String }, search: { required: false, type: () => String }, startDate: { required: false, type: () => String }, endDate: { required: false, type: () => String }, compact: { required: false, type: () => Boolean }, includePayload: { required: false, type: () => Boolean }, format: { required: false, type: () => Object, enum: ["csv", "json", "xlsx"] }, sortBy: { required: false, type: () => Object, enum: ["createdAt", "durationMs"] }, sortOrder: { required: false, type: () => Object, enum: ["asc", "desc"] } };
     }
 }
 exports.FindAuditLogsDto = FindAuditLogsDto;
@@ -32,6 +33,16 @@ __decorate([
     (0, class_validator_1.IsUUID)(),
     __metadata("design:type", String)
 ], FindAuditLogsDto.prototype, "actorId", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsUUID)(),
+    __metadata("design:type", String)
+], FindAuditLogsDto.prototype, "actorMembershipId", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsUUID)(),
+    __metadata("design:type", String)
+], FindAuditLogsDto.prototype, "organizationId", void 0);
 __decorate([
     (0, class_transformer_1.Transform)(csv),
     (0, class_validator_1.IsOptional)(),
@@ -61,6 +72,22 @@ __decorate([
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], FindAuditLogsDto.prototype, "action", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Type)(() => Boolean),
+    (0, class_validator_1.IsBoolean)(),
+    __metadata("design:type", Boolean)
+], FindAuditLogsDto.prototype, "actionPrefix", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsEnum)(client_1.AuditSource),
+    __metadata("design:type", String)
+], FindAuditLogsDto.prototype, "source", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsEnum)(client_1.AuditResult),
+    __metadata("design:type", String)
+], FindAuditLogsDto.prototype, "result", void 0);
 __decorate([
     (0, class_transformer_1.Transform)(csv),
     (0, class_validator_1.IsOptional)(),
@@ -124,7 +151,17 @@ __decorate([
 ], FindAuditLogsDto.prototype, "includePayload", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsIn)(["csv", "xlsx"]),
+    (0, class_validator_1.IsIn)(["csv", "json", "xlsx"]),
     __metadata("design:type", String)
 ], FindAuditLogsDto.prototype, "format", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsIn)(["createdAt", "durationMs"]),
+    __metadata("design:type", String)
+], FindAuditLogsDto.prototype, "sortBy", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsIn)(["asc", "desc"]),
+    __metadata("design:type", String)
+], FindAuditLogsDto.prototype, "sortOrder", void 0);
 //# sourceMappingURL=find-audit-logs.dto.js.map

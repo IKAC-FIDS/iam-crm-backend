@@ -101,6 +101,10 @@ export async function grantPlatformAuthority(
       await tx.auditLog.create({
         data: {
           actorId: null,
+          actorType: 'SYSTEM',
+          scope: 'PLATFORM',
+          source: 'SYSTEM',
+          result: 'SUCCESS',
           organizationId: null,
           entityType: 'platform-authority',
           entityId: userId,
@@ -132,6 +136,10 @@ export async function revokePlatformAuthority(
       await tx.auditLog.create({
         data: {
           actorId: null,
+          actorType: 'SYSTEM',
+          scope: 'PLATFORM',
+          source: 'SYSTEM',
+          result: 'SUCCESS',
           organizationId: null,
           entityType: 'platform-authority',
           entityId: userId,

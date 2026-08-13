@@ -2,6 +2,7 @@ import { Transform, Type } from "class-transformer";
 import {
   IsArray,
   IsBoolean,
+  IsEnum,
   IsIn,
   IsOptional,
   IsString,
@@ -9,6 +10,7 @@ import {
 } from "class-validator";
 import { PaginationDto } from "../../common/dto/pagination.dto";
 import { IsApiDateString } from "../../common/validators/api-date-string.validator";
+import { AuditResult, AuditSource } from "@prisma/client";
 
 const csv = ({ value }: { value: unknown }) =>
   value == null || value === ""
@@ -19,6 +21,8 @@ const csv = ({ value }: { value: unknown }) =>
         .filter(Boolean);
 export class FindAuditLogsDto extends PaginationDto {
   @IsOptional() @IsUUID() actorId?: string;
+  @IsOptional() @IsUUID() actorMembershipId?: string;
+  @IsOptional() @IsUUID() organizationId?: string;
   @Transform(csv)
   @IsOptional()
   @IsArray()
@@ -32,6 +36,9 @@ export class FindAuditLogsDto extends PaginationDto {
   entityTypes?: string[];
   @IsOptional() @IsString() entityId?: string;
   @IsOptional() @IsString() action?: string;
+  @IsOptional() @Type(() => Boolean) @IsBoolean() actionPrefix?: boolean;
+  @IsOptional() @IsEnum(AuditSource) source?: AuditSource;
+  @IsOptional() @IsEnum(AuditResult) result?: AuditResult;
   @Transform(csv)
   @IsOptional()
   @IsArray()
@@ -51,5 +58,7 @@ export class FindAuditLogsDto extends PaginationDto {
   @IsOptional() @IsApiDateString() endDate?: string;
   @IsOptional() @Type(() => Boolean) @IsBoolean() compact?: boolean;
   @IsOptional() @Type(() => Boolean) @IsBoolean() includePayload?: boolean;
-  @IsOptional() @IsIn(["csv", "xlsx"]) format?: "csv" | "xlsx";
+  @IsOptional() @IsIn(["csv", "json", "xlsx"]) format?: "csv" | "json" | "xlsx";
+  @IsOptional() @IsIn(["createdAt", "durationMs"]) sortBy?: "createdAt" | "durationMs";
+  @IsOptional() @IsIn(["asc", "desc"]) sortOrder?: "asc" | "desc";
 }

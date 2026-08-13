@@ -259,6 +259,10 @@ export class OrganizationsService {
     await tx.auditLog.create({
       data: {
         actorId: platform.userId,
+        actorType: 'PLATFORM_ADMIN',
+        scope: 'PLATFORM',
+        source: 'PLATFORM',
+        result: 'SUCCESS',
         organizationId: null,
         entityType: 'organization',
         entityId: organizationId,

@@ -87,6 +87,10 @@ async function grantPlatformAuthority(prisma, userId, confirmApply) {
             await tx.auditLog.create({
                 data: {
                     actorId: null,
+                    actorType: 'SYSTEM',
+                    scope: 'PLATFORM',
+                    source: 'SYSTEM',
+                    result: 'SUCCESS',
                     organizationId: null,
                     entityType: 'platform-authority',
                     entityId: userId,
@@ -116,6 +120,10 @@ async function revokePlatformAuthority(prisma, userId, confirmApply) {
             await tx.auditLog.create({
                 data: {
                     actorId: null,
+                    actorType: 'SYSTEM',
+                    scope: 'PLATFORM',
+                    source: 'SYSTEM',
+                    result: 'SUCCESS',
                     organizationId: null,
                     entityType: 'platform-authority',
                     entityId: userId,

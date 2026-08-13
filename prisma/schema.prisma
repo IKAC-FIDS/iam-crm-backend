@@ -1755,6 +1755,39 @@ model LookupOption {
   @@map("lookup_options")
 }
 
+enum AuditScope {
+  TENANT
+  PLATFORM
+  SYSTEM
+}
+
+enum AuditActorType {
+  USER
+  PLATFORM_ADMIN
+  ANONYMOUS
+  SYSTEM
+  LEGACY
+}
+
+enum AuditSource {
+  WEB
+  API
+  AUTH
+  BACKGROUND_JOB
+  SCHEDULER
+  PLATFORM
+  SYSTEM
+  LEGACY
+}
+
+enum AuditResult {
+  SUCCESS
+  FAILURE
+  DENIED
+  ERROR
+  LEGACY
+}
+
 model AuditLog {
   id         String  @id @default(uuid())
   actorId    String?
@@ -1764,6 +1797,14 @@ model AuditLog {
   before     Json?
   after      Json?
   metadata   Json?
+
+  scope             AuditScope?
+  actorType         AuditActorType?
+  actorMembershipId String?
+  source            AuditSource?
+  result            AuditResult?
+  durationMs        Int?
+  errorCode         String?
 
   requestId     String?
   ipAddress     String?
@@ -1784,7 +1825,62 @@ model AuditLog {
   @@index([requestMethod])
   @@index([createdAt])
   @@index([organizationId])
+  @@index([scope, createdAt])
+  @@index([organizationId, scope, createdAt])
+  @@index([actorMembershipId, createdAt])
+  @@index([actorId, createdAt])
+  @@index([action, createdAt])
+  @@index([source, result, createdAt])
   @@map("audit_logs")
+}
+
+model AuditLogArchive {
+  id                 String          @id @default(uuid())
+  originalAuditLogId String          @unique
+  scope              AuditScope?
+  organizationId     String?
+  actorId            String?
+  actorType          AuditActorType?
+  actorMembershipId  String?
+  requestId          String?
+  entityType         String
+  entityId           String?
+  action             String
+  before             Json?
+  after              Json?
+  ipAddress          String?
+  userAgent          String?
+  requestMethod      String?
+  requestPath        String?
+  source             AuditSource?
+  result             AuditResult?
+  durationMs         Int?
+  errorCode          String?
+  metadata           Json?
+  originalCreatedAt  DateTime
+  archivedAt         DateTime        @default(now())
+  archiveBatchId     String
+  contentChecksum    String
+
+  @@index([organizationId, scope, originalCreatedAt])
+  @@index([archiveBatchId])
+  @@map("audit_log_archives")
+}
+
+model AuditRetentionPolicy {
+  id                  String     @id @default(uuid())
+  scope               AuditScope
+  organizationId      String?
+  enabled             Boolean    @default(false)
+  retentionDays       Int?
+  archiveBeforeDelete Boolean    @default(true)
+  updatedById         String?
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+
+  @@index([scope, organizationId])
+  @@index([enabled])
+  @@map("audit_retention_policies")
 }
 
 // ============================================================

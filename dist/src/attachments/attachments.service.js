@@ -231,27 +231,22 @@ let AttachmentsService = AttachmentsService_1 = class AttachmentsService {
         }
     }
     async recordDownloadAudit(attachment, user) {
-        try {
-            await this.audit.record({
-                actorId: user.userId,
-                entityType: 'file-attachment',
-                entityId: attachment.id,
-                action: 'attachment.downloaded',
-                metadata: {
-                    attachedToEntityType: attachment.entityType,
-                    attachedToEntityId: attachment.entityId,
-                    originalFileName: attachment.originalFileName,
-                    mimeType: attachment.mimeType,
-                    sizeBytes: attachment.sizeBytes,
-                    storageProvider: attachment.storageProvider,
-                    bucket: attachment.bucket,
-                    objectKey: attachment.objectKey,
-                },
-            });
-        }
-        catch (error) {
-            this.logger.error(`Failed to record download audit for attachment ${attachment.id}`, error instanceof Error ? error.stack : String(error));
-        }
+        await this.audit.record({
+            actorId: user.userId,
+            actorMembershipId: user.membershipId,
+            organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
+            entityType: 'file-attachment',
+            entityId: attachment.id,
+            action: 'attachment.downloaded',
+            metadata: {
+                attachedToEntityType: attachment.entityType,
+                attachedToEntityId: attachment.entityId,
+                originalFileName: attachment.originalFileName,
+                mimeType: attachment.mimeType,
+                sizeBytes: attachment.sizeBytes,
+                storageProvider: attachment.storageProvider,
+            },
+        });
     }
     getAllowedMimeTypes() {
         return this.config

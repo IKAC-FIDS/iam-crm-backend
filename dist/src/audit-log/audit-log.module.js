@@ -14,6 +14,8 @@ const audit_request_context_middleware_1 = require("./audit-request-context.midd
 const audit_request_context_service_1 = require("./audit-request-context.service");
 const audit_log_service_1 = require("./audit-log.service");
 const report_export_service_1 = require("../common/export/report-export.service");
+const platform_audit_log_controller_1 = require("./platform-audit-log.controller");
+const platform_authority_module_1 = require("../platform-authority/platform-authority.module");
 let AuditLogModule = class AuditLogModule {
     configure(consumer) {
         consumer
@@ -25,7 +27,8 @@ exports.AuditLogModule = AuditLogModule;
 exports.AuditLogModule = AuditLogModule = __decorate([
     (0, common_1.Global)(),
     (0, common_1.Module)({
-        controllers: [audit_log_controller_1.AuditLogController],
+        imports: [platform_authority_module_1.PlatformAuthorityModule],
+        controllers: [audit_log_controller_1.AuditLogController, platform_audit_log_controller_1.PlatformAuditLogController],
         providers: [
             audit_log_service_1.AuditLogService,
             audit_request_context_service_1.AuditRequestContextService,

@@ -1,6 +1,7 @@
 import { NotFoundException } from "@nestjs/common";
 import { AuditLogService } from "../src/audit-log/audit-log.service";
 import { tenantUser } from "./helpers/tenant-user";
+import { AuditScope } from "@prisma/client";
 
 describe("AuditLogService organization isolation", () => {
   const user = tenantUser({
@@ -69,7 +70,7 @@ describe("AuditLogService organization isolation", () => {
       NotFoundException,
     );
     expect(prisma.auditLog.findFirst).toHaveBeenCalledWith({
-      where: { id: "foreign", organizationId: "org-1" },
+      where: { id: "foreign", organizationId: "org-1", scope: AuditScope.TENANT },
     });
   });
 });

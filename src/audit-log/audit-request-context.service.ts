@@ -8,6 +8,8 @@ export interface AuditRequestContext {
   requestMethod?: string | null;
   requestPath?: string | null;
   organizationId?: string | null;
+  actorUserId?: string | null;
+  actorMembershipId?: string | null;
 }
 
 @Injectable()
@@ -26,5 +28,13 @@ export class AuditRequestContextService {
   setOrganizationId(organizationId: string): void {
     const context = this.storage.getStore();
     if (context) context.organizationId = organizationId;
+  }
+
+  setActor(actorUserId: string, actorMembershipId?: string | null): void {
+    const context = this.storage.getStore();
+    if (context) {
+      context.actorUserId = actorUserId;
+      context.actorMembershipId = actorMembershipId ?? null;
+    }
   }
 }

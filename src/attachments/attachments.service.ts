@@ -336,9 +336,10 @@ export class AttachmentsService {
     attachment: FileAttachment,
     user: CurrentUserPayload,
   ) {
-    try {
-      await this.audit.record({
+    await this.audit.record({
         actorId: user.userId,
+        actorMembershipId: user.membershipId,
+        organizationId: getCurrentOrganizationId(user),
         entityType: 'file-attachment',
         entityId: attachment.id,
         action: 'attachment.downloaded',
@@ -349,16 +350,8 @@ export class AttachmentsService {
           mimeType: attachment.mimeType,
           sizeBytes: attachment.sizeBytes,
           storageProvider: attachment.storageProvider,
-          bucket: attachment.bucket,
-          objectKey: attachment.objectKey,
         },
       });
-    } catch (error) {
-      this.logger.error(
-        `Failed to record download audit for attachment ${attachment.id}`,
-        error instanceof Error ? error.stack : String(error),
-      );
-    }
   }
 
   private getAllowedMimeTypes() {

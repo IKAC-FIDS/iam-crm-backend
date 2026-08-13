@@ -6,8 +6,9 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { User, UserRole } from '@prisma/client';
+import { AuditActorType, AuditResult, AuditSource, User, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
+import { createHash } from 'node:crypto';
 import type { Request } from 'express';
 import { buildHttpLogContext } from '../common/logging/http-log-context';
 import type { CurrentUserPayload } from '../common/decorators/current-user.decorator';
@@ -87,6 +88,16 @@ export class AuthService {
         user ? 'Login rejected: user is inactive' : 'Login rejected: user not found',
         JSON.stringify(this.buildAuthLogContext(dto.email, req)),
       );
+      await this.audit.record({
+        actorId: user?.id ?? null,
+        actorType: user ? AuditActorType.USER : AuditActorType.ANONYMOUS,
+        entityType: 'authentication',
+        action: 'auth.login.failed',
+        source: AuditSource.AUTH,
+        result: AuditResult.FAILURE,
+        errorCode: user ? 'ACCOUNT_INACTIVE' : 'INVALID_CREDENTIALS',
+        metadata: { identifierFingerprint: this.identifierFingerprint(dto.email) },
+      });
       throw new UnauthorizedException('ایمیل یا رمز عبور نادرست است');
     }
 
@@ -129,7 +140,7 @@ export class AuthService {
         throw new ForbiddenException('Password login is disabled for this Organization');
       }
     }
-    await this.recordSuccessfulLogin(user.id, req);
+    await this.recordSuccessfulLogin(user.id, req, tenant);
 
     return this.buildSessionLoginResponse(user, req, tenant);
   }
@@ -430,11 +441,22 @@ export class AuthService {
           : null,
       },
     });
+    await this.audit.record({
+      actorId: userId,
+      entityType: 'authentication',
+      entityId: userId,
+      action: 'auth.login.failed',
+      source: AuditSource.AUTH,
+      result: AuditResult.FAILURE,
+      errorCode: shouldLock ? 'ACCOUNT_LOCKED' : 'INVALID_CREDENTIALS',
+      metadata: { failedAttemptCount: nextFailedAttempts },
+    });
   }
 
   private async recordSuccessfulLogin(
     userId: string,
     req?: Request,
+    tenant?: ResolvedTenantContext | null,
   ): Promise<void> {
     await this.prisma.user.update({
       where: { id: userId },
@@ -444,6 +466,16 @@ export class AuthService {
         lastLoginAt: new Date(),
         lastLoginIp: this.extractIpAddress(req),
       },
+    });
+    await this.audit.record({
+      actorId: userId,
+      organizationId: tenant?.organizationId ?? null,
+      actorMembershipId: tenant?.membershipId ?? null,
+      entityType: 'authentication',
+      entityId: userId,
+      action: 'auth.login.success',
+      source: AuditSource.AUTH,
+      result: AuditResult.SUCCESS,
     });
   }
 
@@ -473,6 +505,10 @@ export class AuthService {
       origin: context.origin,
       userAgent: context.userAgent,
     };
+  }
+
+  private identifierFingerprint(identifier: string): string {
+    return `sha256:${createHash('sha256').update(identifier.trim().toLowerCase()).digest('hex')}`;
   }
 
   private requestId(req?: Request): string | null {

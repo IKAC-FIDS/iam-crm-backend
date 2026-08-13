@@ -8,6 +8,7 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import type { Response } from "express";
+import { ApiProduces } from "@nestjs/swagger";
 import {
   CurrentUser,
   CurrentUserPayload,
@@ -49,6 +50,7 @@ export class AuditLogController {
   }
 
   @Get("export")
+  @ApiProduces("text/csv", "application/json", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
   async export(
     @Query() query: FindAuditLogsDto,
     @CurrentUser() user: CurrentUserPayload,

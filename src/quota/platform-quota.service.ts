@@ -179,6 +179,10 @@ export class PlatformQuotaService {
     return tx.auditLog.create({
       data: {
         actorId: platform.userId,
+        actorType: 'PLATFORM_ADMIN',
+        scope: 'PLATFORM',
+        source: 'PLATFORM',
+        result: 'SUCCESS',
         organizationId,
         entityType: 'quota',
         entityId,

@@ -15,6 +15,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuditLogController = void 0;
 const openapi = require("@nestjs/swagger");
 const common_1 = require("@nestjs/common");
+const swagger_1 = require("@nestjs/swagger");
 const current_user_decorator_1 = require("../common/decorators/current-user.decorator");
 const permissions_decorator_1 = require("../common/decorators/permissions.decorator");
 const jwt_auth_guard_1 = require("../common/guards/jwt-auth.guard");
@@ -74,6 +75,7 @@ __decorate([
 ], AuditLogController.prototype, "filterOptions", null);
 __decorate([
     (0, common_1.Get)("export"),
+    (0, swagger_1.ApiProduces)("text/csv", "application/json", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
     openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Query)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),

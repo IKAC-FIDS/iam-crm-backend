@@ -48,6 +48,7 @@ let JwtStrategy = class JwtStrategy extends (0, passport_1.PassportStrategy)(pas
             throw new common_1.UnauthorizedException('No active organization membership');
         });
         this.auditRequestContext.setOrganizationId(effective.organizationId);
+        this.auditRequestContext.setActor?.(payload.sub, effective.membershipId);
         return {
             userId: payload.sub,
             email: payload.email,

@@ -11,6 +11,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuditLogService = void 0;
 const common_1 = require("@nestjs/common");
+const client_1 = require("@prisma/client");
 const api_date_util_1 = require("../common/dates/api-date.util");
 const report_export_service_1 = require("../common/export/report-export.service");
 const tenant_scope_util_1 = require("../common/tenant/tenant-scope.util");
@@ -24,30 +25,66 @@ let AuditLogService = class AuditLogService {
     }
     record(input) {
         const context = this.requestContext.getContext();
+        const organizationId = input.organizationId !== undefined
+            ? input.organizationId
+            : context?.organizationId ?? null;
+        const scope = input.scope ?? (organizationId ? client_1.AuditScope.TENANT : client_1.AuditScope.SYSTEM);
+        if (scope === client_1.AuditScope.TENANT && !organizationId)
+            throw new common_1.BadRequestException("Tenant audit events require organizationId");
+        if (scope === client_1.AuditScope.PLATFORM && input.actorMembershipId)
+            throw new common_1.BadRequestException("Platform audit events cannot use Tenant membership");
+        const durationMs = input.durationMs ?? null;
+        if (durationMs !== null && (!Number.isSafeInteger(durationMs) || durationMs < 0))
+            throw new common_1.BadRequestException("durationMs must be a non-negative integer");
         return this.prisma.auditLog.create({
             data: {
-                actorId: input.actorId ?? null,
+                actorId: input.actorId ?? context?.actorUserId ?? null,
+                actorType: input.actorType ??
+                    (input.actorId ?? context?.actorUserId
+                        ? client_1.AuditActorType.USER
+                        : client_1.AuditActorType.SYSTEM),
+                actorMembershipId: scope === client_1.AuditScope.TENANT
+                    ? input.actorMembershipId ?? context?.actorMembershipId ?? null
+                    : null,
+                scope,
+                source: input.source ??
+                    (context?.requestMethod ? client_1.AuditSource.API : client_1.AuditSource.SYSTEM),
+                result: input.result ?? client_1.AuditResult.SUCCESS,
+                durationMs,
+                errorCode: this.boundString(input.errorCode, 120),
                 entityType: input.entityType,
                 entityId: input.entityId ?? null,
                 action: input.action,
                 requestId: input.requestId ?? context?.requestId ?? null,
                 ipAddress: input.ipAddress ?? context?.ipAddress ?? null,
-                userAgent: input.userAgent ?? context?.userAgent ?? null,
+                userAgent: this.boundString(input.userAgent ?? context?.userAgent, 512),
                 requestMethod: input.requestMethod ?? context?.requestMethod ?? null,
                 requestPath: input.requestPath ?? context?.requestPath ?? null,
-                organizationId: input.organizationId !== undefined
-                    ? input.organizationId
-                    : context?.organizationId ?? null,
+                organizationId,
                 ...(input.before !== undefined && {
-                    before: this.sanitize(input.before),
+                    before: this.sanitizeForStorage(input.before),
                 }),
                 ...(input.after !== undefined && {
-                    after: this.sanitize(input.after),
+                    after: this.sanitizeForStorage(input.after),
                 }),
                 ...(input.metadata !== undefined && {
-                    metadata: this.sanitize(input.metadata),
+                    metadata: this.sanitizeForStorage(input.metadata),
                 }),
             },
+        });
+    }
+    recordTenantEvent(input) {
+        return this.record({ ...input, scope: client_1.AuditScope.TENANT });
+    }
+    recordPlatformEvent(platform, input) {
+        return this.record({
+            ...input,
+            scope: client_1.AuditScope.PLATFORM,
+            actorId: platform.userId,
+            actorType: client_1.AuditActorType.PLATFORM_ADMIN,
+            actorMembershipId: null,
+            source: input.source ?? client_1.AuditSource.PLATFORM,
+            requestId: input.requestId ?? platform.requestId,
         });
     }
     async findAll(query, user) {
@@ -55,7 +92,7 @@ let AuditLogService = class AuditLogService {
         const [rows, total] = await Promise.all([
             this.prisma.auditLog.findMany({
                 where,
-                orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+                orderBy: this.orderBy(query),
                 skip: (page - 1) * limit,
                 take: limit,
             }),
@@ -68,10 +105,27 @@ let AuditLogService = class AuditLogService {
     }
     async findOne(id, user) {
         const row = await this.prisma.auditLog.findFirst({
-            where: { id, organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user) },
+            where: { id, organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user), scope: client_1.AuditScope.TENANT },
         });
         if (!row)
             throw new common_1.NotFoundException("Audit log not found");
+        return (await this.present([row], false))[0];
+    }
+    async findAllPlatform(query) {
+        const page = query.page ?? 1;
+        const limit = query.limit ?? 20;
+        const where = this.platformWhere(query);
+        const orderBy = this.orderBy(query);
+        const [rows, total] = await Promise.all([
+            this.prisma.auditLog.findMany({ where, orderBy, skip: (page - 1) * limit, take: limit }),
+            this.prisma.auditLog.count({ where }),
+        ]);
+        return { data: await this.present(rows, Boolean(query.compact)), meta: this.meta(total, page, limit) };
+    }
+    async findOnePlatform(id) {
+        const row = await this.prisma.auditLog.findFirst({ where: { id, scope: client_1.AuditScope.PLATFORM } });
+        if (!row)
+            throw new common_1.NotFoundException("Platform audit log not found");
         return (await this.present([row], false))[0];
     }
     async summary(query, user) {
@@ -139,7 +193,7 @@ let AuditLogService = class AuditLogService {
             });
         const rows = await this.prisma.auditLog.findMany({
             where,
-            orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+            orderBy: this.orderBy(query),
             take: max,
         });
         const data = await this.present(rows, !query.includePayload);
@@ -163,7 +217,9 @@ let AuditLogService = class AuditLogService {
                 }
                 : {}),
         }));
-        const file = this.exporter.create(format, "audit-logs", [{ name: "Audit Logs", rows: flat }], max);
+        const file = format === "json"
+            ? this.jsonExport("audit-logs", data)
+            : this.exporter.create(format, "audit-logs", [{ name: "Audit Logs", rows: flat }], max);
         await this.record({
             actorId: user.userId,
             organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
@@ -177,12 +233,36 @@ let AuditLogService = class AuditLogService {
         });
         return file;
     }
+    async exportPlatform(query, platform) {
+        const format = query.format ?? "csv";
+        const max = query.includePayload ? 5000 : 50000;
+        const where = this.platformWhere(query);
+        const total = await this.prisma.auditLog.count({ where });
+        if (total > max)
+            throw new common_1.BadRequestException({ code: "EXPORT_ROW_LIMIT_EXCEEDED", maxRows: max, totalRows: total });
+        const rows = await this.prisma.auditLog.findMany({ where, orderBy: this.orderBy(query), take: max });
+        const data = await this.present(rows, !query.includePayload);
+        const flat = data.map((row) => ({
+            id: row.id, createdAt: row.createdAt, scope: row.scope, organizationId: rows.find((item) => item.id === row.id)?.organizationId,
+            actorId: row.actorId, actorMembershipId: row.actorMembershipId, entityType: row.entityType, entityId: row.entityId,
+            action: row.action, source: row.source, result: row.result, durationMs: row.durationMs, requestId: row.request?.requestId,
+        }));
+        const file = format === "json"
+            ? this.jsonExport("platform-audit-logs", data)
+            : this.exporter.create(format, "platform-audit-logs", [{ name: "Platform Audit Logs", rows: flat }], max);
+        await this.recordPlatformEvent(platform, { entityType: "audit-log", action: "audit-log.exported", metadata: { format, rowCount: file.rowCount, filters: this.filterSummary(query) } });
+        return file;
+    }
     where(q, user) {
         const range = (0, api_date_util_1.parseApiDateRange)(q.startDate, q.endDate, "startDate", "endDate");
         const actorIds = q.actorIds ?? (q.actorId ? [q.actorId] : undefined), entityTypes = q.entityTypes ?? (q.entityType ? [q.entityType] : undefined), actions = q.actions ?? (q.action ? [q.action] : undefined), methods = q.requestMethods?.map((x) => x.toUpperCase()) ??
             (q.requestMethod ? [q.requestMethod.toUpperCase()] : undefined);
         return {
             organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
+            scope: client_1.AuditScope.TENANT,
+            ...(q.actorMembershipId && { actorMembershipId: q.actorMembershipId }),
+            ...(q.source && { source: q.source }),
+            ...(q.result && { result: q.result }),
             ...(actorIds && { actorId: { in: actorIds } }),
             ...(entityTypes && { entityType: { in: entityTypes } }),
             ...(q.entityId && { entityId: q.entityId }),
@@ -207,16 +287,47 @@ let AuditLogService = class AuditLogService {
             }),
         };
     }
+    platformWhere(q) {
+        return { ...this.baseWhere(q), scope: client_1.AuditScope.PLATFORM, ...(q.organizationId && { organizationId: q.organizationId }) };
+    }
+    baseWhere(q) {
+        const range = (0, api_date_util_1.parseApiDateRange)(q.startDate, q.endDate, "startDate", "endDate");
+        return {
+            ...(q.actorId && { actorId: q.actorId }),
+            ...(q.actorMembershipId && { actorMembershipId: q.actorMembershipId }),
+            ...(q.requestId && { requestId: q.requestId }),
+            ...(q.entityType && { entityType: q.entityType }),
+            ...(q.entityId && { entityId: q.entityId }),
+            ...(q.action && { action: q.actionPrefix ? { startsWith: q.action, mode: "insensitive" } : q.action }),
+            ...(q.source && { source: q.source }),
+            ...(q.result && { result: q.result }),
+            ...(q.ipAddress && { ipAddress: { contains: q.ipAddress, mode: "insensitive" } }),
+            ...(range && { createdAt: range }),
+        };
+    }
+    orderBy(q) {
+        const field = q.sortBy ?? "createdAt";
+        const direction = q.sortOrder ?? "desc";
+        return [{ [field]: direction }, { id: "desc" }];
+    }
     async present(rows, compact) {
         const actorMap = await this.actors(rows.map((r) => r.actorId));
         return rows.map((row) => {
             const before = this.sanitize(row.before), after = this.sanitize(row.after), metadata = this.sanitize(row.metadata), base = {
                 id: row.id,
+                organizationId: row.organizationId,
                 actorId: row.actorId,
                 actor: row.actorId ? (actorMap.get(row.actorId) ?? null) : null,
                 entityType: row.entityType,
                 entityId: row.entityId,
                 action: row.action,
+                scope: row.scope,
+                actorType: row.actorType,
+                actorMembershipId: row.actorMembershipId,
+                source: row.source,
+                result: row.result,
+                durationMs: row.durationMs,
+                errorCode: row.errorCode,
                 createdAt: row.createdAt,
                 changedFields: this.changed(before, after),
                 request: {
@@ -240,21 +351,26 @@ let AuditLogService = class AuditLogService {
             : [];
         return new Map(rows.map((r) => [r.id, r]));
     }
-    sanitize(value) {
+    sanitize(value, depth = 0) {
+        if (depth > 6)
+            return "[TRUNCATED_DEPTH]";
         if (value instanceof Date)
             return value.toISOString();
         if (typeof value === "bigint")
             return value.toString();
         if (Array.isArray(value))
-            return value.map((v) => this.sanitize(v));
+            return value.slice(0, 100).map((v) => this.sanitize(v, depth + 1));
         if (value && typeof value === "object") {
             const json = value;
             if (typeof json.toJSON === "function")
-                return this.sanitize(json.toJSON());
+                return this.sanitize(json.toJSON(), depth + 1);
             return Object.fromEntries(Object.entries(value)
+                .slice(0, 100)
                 .filter(([key]) => !/(password|hash|token|secret|authorization|cookie|credential|session|private.?key)/i.test(key))
-                .map(([key, item]) => [key, this.sanitize(item)]));
+                .map(([key, item]) => [key, this.sanitize(item, depth + 1)]));
         }
+        if (typeof value === "string")
+            return value.length > 4000 ? `${value.slice(0, 4000)}...[TRUNCATED]` : value;
         return value;
     }
     changed(before, after) {
@@ -332,6 +448,30 @@ let AuditLogService = class AuditLogService {
             requestMethods: q.requestMethods,
             requestId: q.requestId,
             entityId: q.entityId,
+        };
+    }
+    boundString(value, max) {
+        if (!value)
+            return null;
+        return value.trim().slice(0, max) || null;
+    }
+    sanitizeForStorage(value) {
+        const sanitized = this.sanitize(value);
+        const serialized = JSON.stringify(sanitized);
+        if (serialized.length <= 32768)
+            return sanitized;
+        return {
+            truncated: true,
+            originalSizeBytes: Buffer.byteLength(serialized, "utf8"),
+            preview: serialized.slice(0, 30000),
+        };
+    }
+    jsonExport(filename, rows) {
+        return {
+            buffer: Buffer.from(JSON.stringify(rows), "utf8"),
+            rowCount: rows.length,
+            contentType: "application/json; charset=utf-8",
+            contentDisposition: `attachment; filename="${filename}.json"`,
         };
     }
 };

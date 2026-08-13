@@ -2265,6 +2265,14 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 - Deployment and rollback: application-only; no Prisma schema or migration change, no DB/MinIO restart and rollback is the previous API image. Architecture, frontend workflow, breaking policy, coverage inventory, tests and the Production operator runbook are documented in `docs/openapi-contract-fix-000094.md`.
 - Validation: 320 operations across 222 paths and 53 controllers are documented with zero unintended omissions. Contract tests, standards validation, deterministic SHA-256 generation, sensitive-response scanning, full 452-test suite, coverage, lint, build, CI and Docker image build passed; exact evidence is retained in the Fix94 document.
 
+### fix 000095 — Audit Log V2
+
+- Dependency/model: follows fixes 000088–000094 and expands the existing audit contract with explicit Tenant/Platform/System scope, actor type, trusted Membership, request correlation, source/result/duration/error semantics while preserving legacy columns, actions, routes and history.
+- Coverage/safety: central typed bounded redaction protects secrets; password login outcomes, existing passkey/SSO flows and successful protected attachment downloads carry structured semantics. Tenant queries fail closed to TenantContext; Platform Audit uses a separate PlatformAdmin route and never becomes a Tenant member.
+- Search/export/operations: bounded advanced search and safe sort/pagination are available. CSV/JSON and compatible XLSX export are capped, sanitized and self-auditing. Retention is disabled/unconfigured and reports `RETENTION_POLICY_REQUIRES_APPROVAL`; PostgreSQL archive is confirmed, checksummed, idempotent, copy-only and never deletes source history.
+- Migration/rollback: additive migration `20260814120000_audit_log_v2` is followed by a confirmation-gated idempotent backfill that derives only reliable legacy facts and preserves unknown origin/result as `LEGACY`; no history is deleted or fabricated. Audit RLS is deferred with service-level fail-closed isolation; Notification RLS is unchanged. Rollback retains the additive schema and uses the previous API image.
+- Files/tests/Production: implementation, maintenance CLI, exact evidence and a 60-step documentation-only Production runbook are in `docs/audit-log-v2-fix-000095.md`. Final validation passed 459 configured tests plus focused/OpenAPI suites, coverage, lint/build/CI, clean 52-migration PostgreSQL deploy, idempotent backfill/archive checks and Docker build. No Production access/deployment, seed, destructive database command or MinIO mutation belongs to this fix.
+
 ---
 
 **Built with ❤️ for the sales team**

@@ -60,6 +60,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       });
 
     this.auditRequestContext.setOrganizationId(effective.organizationId);
+    this.auditRequestContext.setActor?.(payload.sub, effective.membershipId);
 
     return {
       userId: payload.sub,
