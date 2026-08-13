@@ -10,6 +10,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.PeriodComparisonDto = exports.ComparisonMode = void 0;
+const openapi = require("@nestjs/swagger");
 const class_validator_1 = require("class-validator");
 const api_date_string_validator_1 = require("../../common/validators/api-date-string.validator");
 const report_filters_dto_1 = require("./report-filters.dto");
@@ -23,6 +24,9 @@ class PeriodComparisonDto extends report_filters_dto_1.ReportFiltersDto {
     constructor() {
         super(...arguments);
         this.comparisonMode = ComparisonMode.PREVIOUS_PERIOD;
+    }
+    static _OPENAPI_METADATA_FACTORY() {
+        return { comparisonMode: { required: false, default: ComparisonMode.PREVIOUS_PERIOD, enum: require("./period-comparison.dto").ComparisonMode }, compareStartDate: { required: false, type: () => String }, compareEndDate: { required: false, type: () => String } };
     }
 }
 exports.PeriodComparisonDto = PeriodComparisonDto;

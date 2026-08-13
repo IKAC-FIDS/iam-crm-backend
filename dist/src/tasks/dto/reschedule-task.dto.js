@@ -10,9 +10,13 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.RescheduleTaskDto = void 0;
+const openapi = require("@nestjs/swagger");
 const class_validator_1 = require("class-validator");
 const api_date_string_validator_1 = require("../../common/validators/api-date-string.validator");
 class RescheduleTaskDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { dueAt: { required: true, type: () => String }, reminderAt: { required: false, type: () => String } };
+    }
 }
 exports.RescheduleTaskDto = RescheduleTaskDto;
 __decorate([

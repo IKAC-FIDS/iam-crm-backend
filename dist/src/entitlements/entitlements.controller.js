@@ -13,6 +13,7 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TenantEntitlementsController = exports.PlatformSubscriptionTransitionsController = exports.PlatformSubscriptionsController = exports.PlatformPlansController = void 0;
+const openapi = require("@nestjs/swagger");
 const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
 const current_platform_decorator_1 = require("../common/decorators/current-platform.decorator");
@@ -34,12 +35,14 @@ let PlatformPlansController = class PlatformPlansController {
 exports.PlatformPlansController = PlatformPlansController;
 __decorate([
     (0, common_1.Get)(),
+    openapi.ApiResponse({ status: 200, type: [Object] }),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", void 0)
 ], PlatformPlansController.prototype, "list", null);
 __decorate([
     (0, common_1.Post)(),
+    openapi.ApiResponse({ status: 201 }),
     __param(0, (0, common_1.Body)()),
     __param(1, (0, current_platform_decorator_1.CurrentPlatform)()),
     __metadata("design:type", Function),
@@ -48,6 +51,7 @@ __decorate([
 ], PlatformPlansController.prototype, "create", null);
 __decorate([
     (0, common_1.Patch)(':id'),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
     __param(2, (0, current_platform_decorator_1.CurrentPlatform)()),
@@ -57,6 +61,7 @@ __decorate([
 ], PlatformPlansController.prototype, "update", null);
 __decorate([
     (0, common_1.Put)(':id/features/:feature'),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Param)('feature', new common_1.ParseEnumPipe(client_1.FeatureKey))),
     __param(2, (0, common_1.Body)()),
@@ -83,6 +88,7 @@ let PlatformSubscriptionsController = class PlatformSubscriptionsController {
 exports.PlatformSubscriptionsController = PlatformSubscriptionsController;
 __decorate([
     (0, common_1.Get)(':organizationId/subscription'),
+    openapi.ApiResponse({ status: 200, type: Object }),
     __param(0, (0, common_1.Param)('organizationId')),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),
@@ -90,6 +96,7 @@ __decorate([
 ], PlatformSubscriptionsController.prototype, "current", null);
 __decorate([
     (0, common_1.Post)(':organizationId/subscriptions'),
+    openapi.ApiResponse({ status: 201, type: Object }),
     __param(0, (0, common_1.Param)('organizationId')),
     __param(1, (0, common_1.Body)()),
     __param(2, (0, current_platform_decorator_1.CurrentPlatform)()),
@@ -99,6 +106,7 @@ __decorate([
 ], PlatformSubscriptionsController.prototype, "create", null);
 __decorate([
     (0, common_1.Get)(':organizationId/entitlements'),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Param)('organizationId')),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),
@@ -106,6 +114,7 @@ __decorate([
 ], PlatformSubscriptionsController.prototype, "overrides", null);
 __decorate([
     (0, common_1.Put)(':organizationId/entitlements/:feature'),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Param)('organizationId')),
     __param(1, (0, common_1.Param)('feature', new common_1.ParseEnumPipe(client_1.FeatureKey))),
     __param(2, (0, common_1.Body)()),
@@ -116,6 +125,7 @@ __decorate([
 ], PlatformSubscriptionsController.prototype, "set", null);
 __decorate([
     (0, common_1.Delete)(':organizationId/entitlements/:feature'),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Param)('organizationId')),
     __param(1, (0, common_1.Param)('feature', new common_1.ParseEnumPipe(client_1.FeatureKey))),
     __param(2, (0, current_platform_decorator_1.CurrentPlatform)()),
@@ -138,6 +148,7 @@ let PlatformSubscriptionTransitionsController = class PlatformSubscriptionTransi
 exports.PlatformSubscriptionTransitionsController = PlatformSubscriptionTransitionsController;
 __decorate([
     (0, common_1.Patch)(':id'),
+    openapi.ApiResponse({ status: 200, type: Object }),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
     __param(2, (0, current_platform_decorator_1.CurrentPlatform)()),
@@ -147,6 +158,7 @@ __decorate([
 ], PlatformSubscriptionTransitionsController.prototype, "update", null);
 __decorate([
     (0, common_1.Patch)(':id/status'),
+    openapi.ApiResponse({ status: 200, type: Object }),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
     __param(2, (0, current_platform_decorator_1.CurrentPlatform)()),
@@ -168,6 +180,7 @@ let TenantEntitlementsController = class TenantEntitlementsController {
 exports.TenantEntitlementsController = TenantEntitlementsController;
 __decorate([
     (0, common_1.Get)('current'),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, current_tenant_decorator_1.CurrentTenant)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),

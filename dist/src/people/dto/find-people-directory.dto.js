@@ -10,9 +10,13 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.FindPeopleDirectoryDto = void 0;
+const openapi = require("@nestjs/swagger");
 const class_validator_1 = require("class-validator");
 const pagination_dto_1 = require("../../common/dto/pagination.dto");
 class FindPeopleDirectoryDto extends pagination_dto_1.PaginationDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { search: { required: false, type: () => String }, companyId: { required: false, type: () => String }, ownerId: { required: false, type: () => String }, team: { required: false, type: () => String }, department: { required: false, type: () => String }, jobTitle: { required: false, type: () => String }, personaTag: { required: false, type: () => String }, personaRole: { required: false, type: () => String }, seniorityLevel: { required: false, type: () => String }, isPrimaryContact: { required: false, type: () => String }, hasEmail: { required: false, type: () => String }, hasPhone: { required: false, type: () => String } };
+    }
 }
 exports.FindPeopleDirectoryDto = FindPeopleDirectoryDto;
 __decorate([

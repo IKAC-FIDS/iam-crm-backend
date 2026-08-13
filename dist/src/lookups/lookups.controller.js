@@ -13,6 +13,7 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.LookupsController = void 0;
+const openapi = require("@nestjs/swagger");
 const common_1 = require("@nestjs/common");
 const permissions_decorator_1 = require("../common/decorators/permissions.decorator");
 const active_filter_dto_1 = require("../common/dto/active-filter.dto");
@@ -34,6 +35,7 @@ exports.LookupsController = LookupsController;
 __decorate([
     (0, common_1.Get)(':group'),
     (0, permissions_decorator_1.Permissions)('lookup:view'),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Param)('group')),
     __param(1, (0, common_1.Query)()),
     __metadata("design:type", Function),
@@ -43,6 +45,7 @@ __decorate([
 __decorate([
     (0, common_1.Post)(':group'),
     (0, permissions_decorator_1.Permissions)('lookup:manage'),
+    openapi.ApiResponse({ status: 201 }),
     __param(0, (0, common_1.Param)('group')),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
@@ -52,6 +55,7 @@ __decorate([
 __decorate([
     (0, common_1.Patch)(':group/:id'),
     (0, permissions_decorator_1.Permissions)('lookup:manage'),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Param)('group')),
     __param(1, (0, common_1.Param)('id')),
     __param(2, (0, common_1.Body)()),
@@ -62,6 +66,7 @@ __decorate([
 __decorate([
     (0, common_1.Delete)(':group/:id'),
     (0, permissions_decorator_1.Permissions)('lookup:manage'),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Param)('group')),
     __param(1, (0, common_1.Param)('id')),
     __metadata("design:type", Function),

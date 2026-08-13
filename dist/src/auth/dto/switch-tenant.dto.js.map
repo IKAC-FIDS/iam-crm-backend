@@ -1,1 +1,1 @@
-{"version":3,"file":"switch-tenant.dto.js","sourceRoot":"","sources":["../../../../src/auth/dto/switch-tenant.dto.ts"],"names":[],"mappings":";;;;;;;;;;;;AAAA,qDAAyC;AAEzC,MAAa,eAAe;CAG3B;AAHD,0CAGC;AADC;IADC,IAAA,wBAAM,GAAE;;uDACc"}
+{"version":3,"file":"switch-tenant.dto.js","sourceRoot":"","sources":["../../../../src/auth/dto/switch-tenant.dto.ts"],"names":[],"mappings":";;;;;;;;;;;;;AAAA,qDAAyC;AACzC,6CAA8C;AAE9C,MAAa,eAAe;;;;CAI3B;AAJD,0CAIC;AADC;IAFC,IAAA,wBAAM,GAAE;IACR,IAAA,qBAAW,EAAC,EAAE,MAAM,EAAE,MAAM,EAAE,OAAO,EAAE,sCAAsC,EAAE,CAAC;;uDACzD"}

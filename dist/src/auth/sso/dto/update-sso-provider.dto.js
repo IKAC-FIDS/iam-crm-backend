@@ -1,9 +1,13 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.UpdateSsoProviderDto = void 0;
+const openapi = require("@nestjs/swagger");
 const mapped_types_1 = require("@nestjs/mapped-types");
 const create_sso_provider_dto_1 = require("./create-sso-provider.dto");
 class UpdateSsoProviderDto extends (0, mapped_types_1.PartialType)(create_sso_provider_dto_1.CreateSsoProviderDto) {
+    static _OPENAPI_METADATA_FACTORY() {
+        return {};
+    }
 }
 exports.UpdateSsoProviderDto = UpdateSsoProviderDto;
 //# sourceMappingURL=update-sso-provider.dto.js.map

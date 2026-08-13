@@ -13,6 +13,7 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuditLogController = void 0;
+const openapi = require("@nestjs/swagger");
 const common_1 = require("@nestjs/common");
 const current_user_decorator_1 = require("../common/decorators/current-user.decorator");
 const permissions_decorator_1 = require("../common/decorators/permissions.decorator");
@@ -46,6 +47,7 @@ let AuditLogController = class AuditLogController {
 exports.AuditLogController = AuditLogController;
 __decorate([
     (0, common_1.Get)(),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Query)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
@@ -54,6 +56,7 @@ __decorate([
 ], AuditLogController.prototype, "findAll", null);
 __decorate([
     (0, common_1.Get)("summary"),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Query)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
@@ -62,6 +65,7 @@ __decorate([
 ], AuditLogController.prototype, "summary", null);
 __decorate([
     (0, common_1.Get)("filter-options"),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Query)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
@@ -70,6 +74,7 @@ __decorate([
 ], AuditLogController.prototype, "filterOptions", null);
 __decorate([
     (0, common_1.Get)("export"),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Query)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __param(2, (0, common_1.Res)({ passthrough: true })),
@@ -79,6 +84,7 @@ __decorate([
 ], AuditLogController.prototype, "export", null);
 __decorate([
     (0, common_1.Get)(":id"),
+    openapi.ApiResponse({ status: 200, type: Object }),
     __param(0, (0, common_1.Param)("id")),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),

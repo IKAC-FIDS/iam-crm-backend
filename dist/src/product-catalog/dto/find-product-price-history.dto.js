@@ -10,6 +10,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.FindProductPriceHistoryDto = void 0;
+const openapi = require("@nestjs/swagger");
 const client_1 = require("@prisma/client");
 const class_transformer_1 = require("class-transformer");
 const class_validator_1 = require("class-validator");
@@ -17,6 +18,9 @@ class FindProductPriceHistoryDto {
     constructor() {
         this.page = 1;
         this.limit = 20;
+    }
+    static _OPENAPI_METADATA_FACTORY() {
+        return { page: { required: true, type: () => Object, default: 1, minimum: 1 }, limit: { required: true, type: () => Object, default: 20, minimum: 1, maximum: 100 }, reason: { required: false, type: () => Object }, dateFrom: { required: false, type: () => String }, dateTo: { required: false, type: () => String } };
     }
 }
 exports.FindProductPriceHistoryDto = FindProductPriceHistoryDto;

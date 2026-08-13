@@ -10,9 +10,13 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ReadAllNotificationsDto = void 0;
+const openapi = require("@nestjs/swagger");
 const client_1 = require("@prisma/client");
 const class_validator_1 = require("class-validator");
 class ReadAllNotificationsDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { type: { required: false, type: () => Object }, entityType: { required: false, type: () => Object }, entityId: { required: false, type: () => String } };
+    }
 }
 exports.ReadAllNotificationsDto = ReadAllNotificationsDto;
 __decorate([

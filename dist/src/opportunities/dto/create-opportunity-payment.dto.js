@@ -10,11 +10,15 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CreateOpportunityPaymentDto = void 0;
+const openapi = require("@nestjs/swagger");
 const client_1 = require("@prisma/client");
 const class_validator_1 = require("class-validator");
 const class_transformer_1 = require("class-transformer");
 const api_date_string_validator_1 = require("../../common/validators/api-date-string.validator");
 class CreateOpportunityPaymentDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { commercialDocumentId: { required: false, type: () => String }, status: { required: false, type: () => Object }, amount: { required: true, type: () => Number, minimum: 0.01 }, currency: { required: false, type: () => String, maxLength: 10 }, dueDate: { required: false, type: () => String }, paidAt: { required: false, type: () => String }, method: { required: false, type: () => Object }, referenceNumber: { required: false, type: () => String, maxLength: 120 }, description: { required: false, type: () => String }, notes: { required: false, type: () => String } };
+    }
 }
 exports.CreateOpportunityPaymentDto = CreateOpportunityPaymentDto;
 __decorate([

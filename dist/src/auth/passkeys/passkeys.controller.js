@@ -13,6 +13,7 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AdminUserPasskeysController = exports.AuthPasskeysController = exports.MyPasskeysController = void 0;
+const openapi = require("@nestjs/swagger");
 const common_1 = require("@nestjs/common");
 const current_user_decorator_1 = require("../../common/decorators/current-user.decorator");
 const permissions_decorator_1 = require("../../common/decorators/permissions.decorator");
@@ -43,6 +44,7 @@ let MyPasskeysController = class MyPasskeysController {
 exports.MyPasskeysController = MyPasskeysController;
 __decorate([
     (0, common_1.Get)(),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
@@ -51,6 +53,7 @@ __decorate([
 __decorate([
     (0, common_1.Post)('registration/options'),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),
+    openapi.ApiResponse({ status: common_1.HttpStatus.OK, type: Object }),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
@@ -60,6 +63,7 @@ __decorate([
 __decorate([
     (0, common_1.Post)('registration/verify'),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),
+    openapi.ApiResponse({ status: common_1.HttpStatus.OK }),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
@@ -68,6 +72,7 @@ __decorate([
 ], MyPasskeysController.prototype, "verifyRegistration", null);
 __decorate([
     (0, common_1.Delete)(':id'),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __param(1, (0, common_1.Param)('id')),
     __metadata("design:type", Function),
@@ -94,6 +99,7 @@ exports.AuthPasskeysController = AuthPasskeysController;
 __decorate([
     (0, common_1.Post)('authentication/options'),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),
+    openapi.ApiResponse({ status: common_1.HttpStatus.OK }),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [start_passkey_authentication_dto_1.StartPasskeyAuthenticationDto]),
@@ -102,6 +108,7 @@ __decorate([
 __decorate([
     (0, common_1.Post)('authentication/verify'),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),
+    openapi.ApiResponse({ status: common_1.HttpStatus.OK, type: Object }),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [verify_passkey_authentication_dto_1.VerifyPasskeyAuthenticationDto]),
@@ -126,6 +133,7 @@ exports.AdminUserPasskeysController = AdminUserPasskeysController;
 __decorate([
     (0, common_1.Get)(),
     (0, permissions_decorator_1.Permissions)('user:passkey:view'),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Param)('id')),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),
@@ -134,6 +142,7 @@ __decorate([
 __decorate([
     (0, common_1.Delete)(':passkeyId'),
     (0, permissions_decorator_1.Permissions)('user:passkey:manage'),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Param)('passkeyId')),
     __param(2, (0, current_user_decorator_1.CurrentUser)()),

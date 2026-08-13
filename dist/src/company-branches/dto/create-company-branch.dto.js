@@ -10,8 +10,12 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CreateCompanyBranchDto = void 0;
+const openapi = require("@nestjs/swagger");
 const class_validator_1 = require("class-validator");
 class CreateCompanyBranchDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { name: { required: false, type: () => String }, city: { required: false, type: () => String }, address: { required: false, type: () => String }, phone: { required: false, type: () => String } };
+    }
 }
 exports.CreateCompanyBranchDto = CreateCompanyBranchDto;
 __decorate([

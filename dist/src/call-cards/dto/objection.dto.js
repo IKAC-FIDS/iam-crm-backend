@@ -10,8 +10,12 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ObjectionDto = void 0;
+const openapi = require("@nestjs/swagger");
 const class_validator_1 = require("class-validator");
 class ObjectionDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { objection: { required: true, type: () => String }, response: { required: true, type: () => String } };
+    }
 }
 exports.ObjectionDto = ObjectionDto;
 __decorate([

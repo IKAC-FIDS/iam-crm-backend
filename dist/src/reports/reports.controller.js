@@ -13,6 +13,7 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ReportsController = void 0;
+const openapi = require("@nestjs/swagger");
 const common_1 = require("@nestjs/common");
 const current_user_decorator_1 = require("../common/decorators/current-user.decorator");
 const permissions_decorator_1 = require("../common/decorators/permissions.decorator");
@@ -98,6 +99,7 @@ let ReportsController = class ReportsController {
 exports.ReportsController = ReportsController;
 __decorate([
     (0, common_1.Get)("data-quality/issues"),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Query)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
@@ -106,6 +108,7 @@ __decorate([
 ], ReportsController.prototype, "getDataQualityIssues", null);
 __decorate([
     (0, common_1.Get)("data-quality"),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Query)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
@@ -114,6 +117,7 @@ __decorate([
 ], ReportsController.prototype, "getDataQuality", null);
 __decorate([
     (0, common_1.Get)("period-comparison"),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Query)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
@@ -122,6 +126,7 @@ __decorate([
 ], ReportsController.prototype, "getPeriodComparison", null);
 __decorate([
     (0, common_1.Get)("exports/:reportKey"),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Param)("reportKey")),
     __param(1, (0, common_1.Query)()),
     __param(2, (0, current_user_decorator_1.CurrentUser)()),
@@ -132,6 +137,7 @@ __decorate([
 ], ReportsController.prototype, "exportReport", null);
 __decorate([
     (0, common_1.Get)("financial/collections"),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Query)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
@@ -140,6 +146,7 @@ __decorate([
 ], ReportsController.prototype, "getFinancialCollections", null);
 __decorate([
     (0, common_1.Get)("products/performance"),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Query)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
@@ -148,6 +155,7 @@ __decorate([
 ], ReportsController.prototype, "getProductPerformance", null);
 __decorate([
     (0, common_1.Get)("exchange-rates/impact"),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Query)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [advanced_report_filters_dto_1.AdvancedReportFiltersDto]),
@@ -155,6 +163,7 @@ __decorate([
 ], ReportsController.prototype, "getExchangeRateImpact", null);
 __decorate([
     (0, common_1.Get)("opportunities/forecast"),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Query)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
@@ -163,6 +172,7 @@ __decorate([
 ], ReportsController.prototype, "getOpportunityForecast", null);
 __decorate([
     (0, common_1.Get)("opportunities/aging"),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Query)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
@@ -171,6 +181,7 @@ __decorate([
 ], ReportsController.prototype, "getOpportunityAging", null);
 __decorate([
     (0, common_1.Get)("meetings/performance"),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Query)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
@@ -179,6 +190,7 @@ __decorate([
 ], ReportsController.prototype, "getMeetingPerformance", null);
 __decorate([
     (0, common_1.Get)("tasks/performance"),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Query)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
@@ -187,6 +199,7 @@ __decorate([
 ], ReportsController.prototype, "getTaskPerformance", null);
 __decorate([
     (0, common_1.Get)("conversion-rates"),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Query)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
@@ -195,6 +208,7 @@ __decorate([
 ], ReportsController.prototype, "getConversionRates", null);
 __decorate([
     (0, common_1.Get)("stage-durations"),
+    openapi.ApiResponse({ status: 200, type: [Object] }),
     __param(0, (0, common_1.Query)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
@@ -203,6 +217,7 @@ __decorate([
 ], ReportsController.prototype, "getAverageStageDuration", null);
 __decorate([
     (0, common_1.Get)("pipeline-summary"),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Query)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
@@ -211,6 +226,7 @@ __decorate([
 ], ReportsController.prototype, "getPipelineSummary", null);
 __decorate([
     (0, common_1.Get)("activities/by-user"),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Query)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
@@ -219,6 +235,7 @@ __decorate([
 ], ReportsController.prototype, "getActivitiesByUser", null);
 __decorate([
     (0, common_1.Get)("activities"),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Query)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
@@ -227,6 +244,7 @@ __decorate([
 ], ReportsController.prototype, "getActivityReport", null);
 __decorate([
     (0, common_1.Get)("pipeline/by-owner"),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Query)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
@@ -235,6 +253,7 @@ __decorate([
 ], ReportsController.prototype, "getPipelineByOwner", null);
 __decorate([
     (0, common_1.Get)("filter-options"),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),

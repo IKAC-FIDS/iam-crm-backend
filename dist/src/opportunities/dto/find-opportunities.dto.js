@@ -10,12 +10,16 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.FindOpportunitiesDto = void 0;
+const openapi = require("@nestjs/swagger");
 const client_1 = require("@prisma/client");
 const class_validator_1 = require("class-validator");
 const pagination_dto_1 = require("../../common/dto/pagination.dto");
 const api_date_string_validator_1 = require("../../common/validators/api-date-string.validator");
 const ownership_scope_dto_1 = require("../../common/dto/ownership-scope.dto");
 class FindOpportunitiesDto extends pagination_dto_1.PaginationDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { ownershipScope: { required: false, enum: require("../../common/dto/ownership-scope.dto").OwnershipScope }, search: { required: false, type: () => String }, companyId: { required: false, type: () => String }, ownerId: { required: false, type: () => String }, teamId: { required: false, type: () => String }, team: { required: false, type: () => String }, stage: { required: false, type: () => String }, stageId: { required: false, type: () => String }, priority: { required: false, type: () => Object }, source: { required: false, type: () => String }, sourceOptionId: { required: false, type: () => String }, opportunitySource: { required: false, type: () => String }, primaryContactId: { required: false, type: () => String }, expectedCloseFrom: { required: false, type: () => String }, expectedCloseTo: { required: false, type: () => String }, includeArchived: { required: false, type: () => String }, archivedOnly: { required: false, type: () => String }, activeOnly: { required: false, type: () => String } };
+    }
 }
 exports.FindOpportunitiesDto = FindOpportunitiesDto;
 __decorate([

@@ -10,8 +10,12 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.UpsertPersonaDto = void 0;
+const openapi = require("@nestjs/swagger");
 const class_validator_1 = require("class-validator");
 class UpsertPersonaDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { titlePattern: { required: true, type: () => String }, defaultPainPoint: { required: false, type: () => String }, defaultUseCase: { required: false, type: () => String }, notes: { required: false, type: () => String } };
+    }
 }
 exports.UpsertPersonaDto = UpsertPersonaDto;
 __decorate([

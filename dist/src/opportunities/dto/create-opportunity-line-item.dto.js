@@ -10,11 +10,15 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CreateOpportunityLineItemDto = void 0;
+const openapi = require("@nestjs/swagger");
 const class_validator_1 = require("class-validator");
 const class_transformer_1 = require("class-transformer");
 const client_1 = require("@prisma/client");
 const class_validator_2 = require("class-validator");
 class CreateOpportunityLineItemDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { productId: { required: false, type: () => String, nullable: true }, salesChannel: { required: false, type: () => Object }, description: { required: false, type: () => String }, quantity: { required: true, type: () => Number, minimum: 0.01 }, unitPrice: { required: false, type: () => Number, minimum: 0 }, discountAmount: { required: false, type: () => Number, minimum: 0 }, taxAmount: { required: false, type: () => Number, minimum: 0 }, sortOrder: { required: false, type: () => Number } };
+    }
 }
 exports.CreateOpportunityLineItemDto = CreateOpportunityLineItemDto;
 __decorate([

@@ -13,6 +13,7 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TenantQuotaController = exports.PlatformOrganizationQuotaController = exports.PlatformPlanQuotaController = void 0;
+const openapi = require("@nestjs/swagger");
 const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
 const current_platform_decorator_1 = require("../common/decorators/current-platform.decorator");
@@ -36,6 +37,7 @@ let PlatformPlanQuotaController = class PlatformPlanQuotaController {
 exports.PlatformPlanQuotaController = PlatformPlanQuotaController;
 __decorate([
     (0, common_1.Get)(),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Param)('planId')),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),
@@ -43,6 +45,7 @@ __decorate([
 ], PlatformPlanQuotaController.prototype, "list", null);
 __decorate([
     (0, common_1.Put)(':metric'),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Param)('planId')),
     __param(1, (0, common_1.Param)('metric', new common_1.ParseEnumPipe(client_1.QuotaMetric))),
     __param(2, (0, common_1.Body)()),
@@ -73,6 +76,7 @@ let PlatformOrganizationQuotaController = class PlatformOrganizationQuotaControl
 exports.PlatformOrganizationQuotaController = PlatformOrganizationQuotaController;
 __decorate([
     (0, common_1.Get)(),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Param)('organizationId')),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),
@@ -80,6 +84,7 @@ __decorate([
 ], PlatformOrganizationQuotaController.prototype, "list", null);
 __decorate([
     (0, common_1.Put)(':metric'),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Param)('organizationId')),
     __param(1, (0, common_1.Param)('metric', new common_1.ParseEnumPipe(client_1.QuotaMetric))),
     __param(2, (0, common_1.Body)()),
@@ -90,6 +95,7 @@ __decorate([
 ], PlatformOrganizationQuotaController.prototype, "set", null);
 __decorate([
     (0, common_1.Delete)(':metric'),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Param)('organizationId')),
     __param(1, (0, common_1.Param)('metric', new common_1.ParseEnumPipe(client_1.QuotaMetric))),
     __param(2, (0, current_platform_decorator_1.CurrentPlatform)()),
@@ -113,6 +119,7 @@ let TenantQuotaController = class TenantQuotaController {
 exports.TenantQuotaController = TenantQuotaController;
 __decorate([
     (0, common_1.Get)('current'),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, current_tenant_decorator_1.CurrentTenant)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),

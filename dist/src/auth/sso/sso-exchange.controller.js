@@ -13,6 +13,7 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SsoExchangeController = void 0;
+const openapi = require("@nestjs/swagger");
 const common_1 = require("@nestjs/common");
 const auth_service_1 = require("../auth.service");
 const refresh_token_cookie_1 = require("../../common/cookies/refresh-token-cookie");
@@ -58,6 +59,7 @@ let SsoExchangeController = class SsoExchangeController {
 exports.SsoExchangeController = SsoExchangeController;
 __decorate([
     (0, common_1.Post)("exchange"),
+    openapi.ApiResponse({ status: 201, type: Object }),
     __param(0, (0, common_1.Body)()),
     __param(1, (0, common_1.Req)()),
     __param(2, (0, common_1.Res)({ passthrough: true })),

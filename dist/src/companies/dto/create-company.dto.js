@@ -10,6 +10,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CreateCompanyDto = void 0;
+const openapi = require("@nestjs/swagger");
 const class_transformer_1 = require("class-transformer");
 const class_validator_1 = require("class-validator");
 const client_1 = require("@prisma/client");
@@ -21,6 +22,9 @@ const normalizeDigits = (value) => typeof value === 'string'
 const optionalInteger = ({ value }) => value === '' || value == null ? undefined : Number(normalizeDigits(value));
 const optionalText = ({ value }) => value === '' || value == null ? undefined : normalizeDigits(value);
 class CreateCompanyDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { legalName: { required: true, type: () => String }, brandName: { required: false, type: () => String }, industryId: { required: false, type: () => String }, industry: { required: false, type: () => String, description: "Deprecated compatibility input.\nPrefer industryId.\nIf sent, it must match an existing Industry.name." }, ownership: { required: false, type: () => Object }, priority: { required: false, type: () => Object }, ownerId: { required: false, type: () => String }, website: { required: false, type: () => String }, headOfficeCity: { required: false, type: () => String }, centralPhone: { required: false, type: () => String, nullable: true, pattern: "COMPANY_PHONE_PATTERN" }, sourceId: { required: false, type: () => String }, source: { required: false, type: () => String, description: "Deprecated compatibility input.\nPrefer sourceId.\nIf sent, it must match an existing LeadSource.code or LeadSource.name." }, registrationNumber: { required: false, type: () => String, maxLength: 50 }, nationalId: { required: false, type: () => String, maxLength: 50 }, economicCode: { required: false, type: () => String, maxLength: 50 }, establishmentDate: { required: false, type: () => String }, activityStatus: { required: false, type: () => Object }, registeredCapital: { required: false, type: () => String, maxLength: 27, pattern: "/^\\d+(\\.\\d{1,2})?$/" }, employeeCount: { required: false, type: () => Number, minimum: 0 }, parentCompanyIds: { required: false, type: () => [String] }, subsidiaryCompanyIds: { required: false, type: () => [String] } };
+    }
 }
 exports.CreateCompanyDto = CreateCompanyDto;
 __decorate([

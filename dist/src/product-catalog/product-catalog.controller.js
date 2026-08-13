@@ -13,6 +13,7 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ProductCatalogController = void 0;
+const openapi = require("@nestjs/swagger");
 const common_1 = require("@nestjs/common");
 const current_user_decorator_1 = require("../common/decorators/current-user.decorator");
 const permissions_decorator_1 = require("../common/decorators/permissions.decorator");
@@ -55,6 +56,7 @@ exports.ProductCatalogController = ProductCatalogController;
 __decorate([
     (0, common_1.Get)(":id/price-history"),
     (0, permissions_decorator_1.Permissions)("product:view"),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Param)("id")),
     __param(1, (0, common_1.Query)()),
     __metadata("design:type", Function),
@@ -64,6 +66,7 @@ __decorate([
 __decorate([
     (0, common_1.Get)(),
     (0, permissions_decorator_1.Permissions)("product:view"),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Query)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [find_product_catalog_items_dto_1.FindProductCatalogItemsDto]),
@@ -72,6 +75,7 @@ __decorate([
 __decorate([
     (0, common_1.Post)(),
     (0, permissions_decorator_1.Permissions)("product:manage"),
+    openapi.ApiResponse({ status: 201, type: Object }),
     __param(0, (0, common_1.Body)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
@@ -81,6 +85,7 @@ __decorate([
 __decorate([
     (0, common_1.Get)(":id"),
     (0, permissions_decorator_1.Permissions)("product:view"),
+    openapi.ApiResponse({ status: 200, type: Object }),
     __param(0, (0, common_1.Param)("id")),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),
@@ -89,6 +94,7 @@ __decorate([
 __decorate([
     (0, common_1.Patch)(":id"),
     (0, permissions_decorator_1.Permissions)("product:manage"),
+    openapi.ApiResponse({ status: 200, type: Object }),
     __param(0, (0, common_1.Param)("id")),
     __param(1, (0, common_1.Body)()),
     __param(2, (0, current_user_decorator_1.CurrentUser)()),
@@ -99,6 +105,7 @@ __decorate([
 __decorate([
     (0, common_1.Patch)(":id/activate"),
     (0, permissions_decorator_1.Permissions)("product:manage"),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Param)("id")),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
@@ -108,6 +115,7 @@ __decorate([
 __decorate([
     (0, common_1.Patch)(":id/deactivate"),
     (0, permissions_decorator_1.Permissions)("product:manage"),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Param)("id")),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),

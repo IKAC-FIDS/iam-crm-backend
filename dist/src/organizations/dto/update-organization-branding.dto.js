@@ -10,9 +10,13 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.UpdateOrganizationBrandingDto = void 0;
+const openapi = require("@nestjs/swagger");
 const class_validator_1 = require("class-validator");
 const color = /^#[0-9A-Fa-f]{6}$/;
 class UpdateOrganizationBrandingDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { displayTitle: { required: false, type: () => String, nullable: true, maxLength: 120 }, primaryColor: { required: false, type: () => String, nullable: true, pattern: "color" }, secondaryColor: { required: false, type: () => String, nullable: true, pattern: "color" }, accentColor: { required: false, type: () => String, nullable: true, pattern: "color" }, logoAttachmentId: { required: false, type: () => String, nullable: true }, faviconAttachmentId: { required: false, type: () => String, nullable: true } };
+    }
 }
 exports.UpdateOrganizationBrandingDto = UpdateOrganizationBrandingDto;
 __decorate([

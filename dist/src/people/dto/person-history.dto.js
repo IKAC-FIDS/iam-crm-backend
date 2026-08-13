@@ -10,6 +10,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.UpdatePersonEducationHistoryDto = exports.CreatePersonEducationHistoryDto = exports.UpdatePersonEmploymentPositionDto = exports.CreatePersonEmploymentPositionDto = exports.UpdatePersonEmploymentHistoryDto = exports.CreatePersonEmploymentHistoryDto = void 0;
+const openapi = require("@nestjs/swagger");
 const mapped_types_1 = require("@nestjs/mapped-types");
 const client_1 = require("@prisma/client");
 const class_transformer_1 = require("class-transformer");
@@ -17,6 +18,9 @@ const class_validator_1 = require("class-validator");
 const api_date_string_validator_1 = require("../../common/validators/api-date-string.validator");
 const emptyToUndefined = ({ value }) => value === '' || value === null || value === undefined ? undefined : value;
 class CreatePersonEmploymentHistoryDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { companyId: { required: true, type: () => String }, description: { required: false, type: () => String, maxLength: 2000 } };
+    }
 }
 exports.CreatePersonEmploymentHistoryDto = CreatePersonEmploymentHistoryDto;
 __decorate([
@@ -31,9 +35,15 @@ __decorate([
     __metadata("design:type", String)
 ], CreatePersonEmploymentHistoryDto.prototype, "description", void 0);
 class UpdatePersonEmploymentHistoryDto extends (0, mapped_types_1.PartialType)(CreatePersonEmploymentHistoryDto) {
+    static _OPENAPI_METADATA_FACTORY() {
+        return {};
+    }
 }
 exports.UpdatePersonEmploymentHistoryDto = UpdatePersonEmploymentHistoryDto;
 class CreatePersonEmploymentPositionDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { title: { required: true, type: () => String, maxLength: 200 }, startDate: { required: false, type: () => String }, endDate: { required: false, type: () => String }, isCurrent: { required: false, type: () => Boolean }, description: { required: false, type: () => String, maxLength: 2000 } };
+    }
 }
 exports.CreatePersonEmploymentPositionDto = CreatePersonEmploymentPositionDto;
 __decorate([
@@ -66,9 +76,15 @@ __decorate([
     __metadata("design:type", String)
 ], CreatePersonEmploymentPositionDto.prototype, "description", void 0);
 class UpdatePersonEmploymentPositionDto extends (0, mapped_types_1.PartialType)(CreatePersonEmploymentPositionDto) {
+    static _OPENAPI_METADATA_FACTORY() {
+        return {};
+    }
 }
 exports.UpdatePersonEmploymentPositionDto = UpdatePersonEmploymentPositionDto;
 class CreatePersonEducationHistoryDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { degree: { required: false, type: () => Object }, universityId: { required: false, type: () => String }, educationDate: { required: false, type: () => String }, description: { required: false, type: () => String, maxLength: 2000 } };
+    }
 }
 exports.CreatePersonEducationHistoryDto = CreatePersonEducationHistoryDto;
 __decorate([
@@ -97,6 +113,9 @@ __decorate([
     __metadata("design:type", String)
 ], CreatePersonEducationHistoryDto.prototype, "description", void 0);
 class UpdatePersonEducationHistoryDto extends (0, mapped_types_1.PartialType)(CreatePersonEducationHistoryDto) {
+    static _OPENAPI_METADATA_FACTORY() {
+        return {};
+    }
 }
 exports.UpdatePersonEducationHistoryDto = UpdatePersonEducationHistoryDto;
 //# sourceMappingURL=person-history.dto.js.map

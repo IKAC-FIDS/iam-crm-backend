@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.toSsoProviderResponse = toSsoProviderResponse;
 exports.toPublicSsoProviderResponse = toPublicSsoProviderResponse;
+const openapi = require("@nestjs/swagger");
 function toSsoProviderResponse(provider) {
     if (!provider.organizationId)
         throw new Error("Tenant-owned SSO provider is required");

@@ -13,6 +13,7 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SsoPublicController = void 0;
+const openapi = require("@nestjs/swagger");
 const common_1 = require("@nestjs/common");
 const sso_provider_service_1 = require("./sso-provider.service");
 let SsoPublicController = class SsoPublicController {
@@ -28,6 +29,7 @@ let SsoPublicController = class SsoPublicController {
 exports.SsoPublicController = SsoPublicController;
 __decorate([
     (0, common_1.Get)("providers"),
+    openapi.ApiResponse({ status: 200, type: [Object] }),
     __param(0, (0, common_1.Query)("domain")),
     __param(1, (0, common_1.Query)("subdomain")),
     __metadata("design:type", Function),

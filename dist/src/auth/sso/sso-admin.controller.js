@@ -13,6 +13,7 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SsoAdminController = void 0;
+const openapi = require("@nestjs/swagger");
 const common_1 = require("@nestjs/common");
 const current_user_decorator_1 = require("../../common/decorators/current-user.decorator");
 const permissions_decorator_1 = require("../../common/decorators/permissions.decorator");
@@ -55,6 +56,7 @@ exports.SsoAdminController = SsoAdminController;
 __decorate([
     (0, common_1.Get)(),
     (0, permissions_decorator_1.Permissions)("sso-provider:view"),
+    openapi.ApiResponse({ status: 200, type: [Object] }),
     __param(0, (0, current_tenant_decorator_1.CurrentTenant)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
@@ -63,6 +65,7 @@ __decorate([
 __decorate([
     (0, common_1.Get)(":id"),
     (0, permissions_decorator_1.Permissions)("sso-provider:view"),
+    openapi.ApiResponse({ status: 200, type: Object }),
     __param(0, (0, common_1.Param)("id")),
     __param(1, (0, current_tenant_decorator_1.CurrentTenant)()),
     __metadata("design:type", Function),
@@ -72,6 +75,7 @@ __decorate([
 __decorate([
     (0, common_1.Post)(),
     (0, permissions_decorator_1.Permissions)("sso-provider:manage"),
+    openapi.ApiResponse({ status: 201, type: Object }),
     __param(0, (0, common_1.Body)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __param(2, (0, current_tenant_decorator_1.CurrentTenant)()),
@@ -82,6 +86,7 @@ __decorate([
 __decorate([
     (0, common_1.Patch)(":id"),
     (0, permissions_decorator_1.Permissions)("sso-provider:manage"),
+    openapi.ApiResponse({ status: 200, type: Object }),
     __param(0, (0, common_1.Param)("id")),
     __param(1, (0, common_1.Body)()),
     __param(2, (0, current_user_decorator_1.CurrentUser)()),
@@ -93,6 +98,7 @@ __decorate([
 __decorate([
     (0, common_1.Patch)(":id/disable"),
     (0, permissions_decorator_1.Permissions)("sso-provider:manage"),
+    openapi.ApiResponse({ status: 200, type: Object }),
     __param(0, (0, common_1.Param)("id")),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __param(2, (0, current_tenant_decorator_1.CurrentTenant)()),
@@ -103,6 +109,7 @@ __decorate([
 __decorate([
     (0, common_1.Delete)(":id"),
     (0, permissions_decorator_1.Permissions)("sso-provider:manage"),
+    openapi.ApiResponse({ status: 200, type: Object }),
     __param(0, (0, common_1.Param)("id")),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __param(2, (0, current_tenant_decorator_1.CurrentTenant)()),
@@ -113,6 +120,7 @@ __decorate([
 __decorate([
     (0, common_1.Post)(":id/test-connection"),
     (0, permissions_decorator_1.Permissions)("sso-provider:manage"),
+    openapi.ApiResponse({ status: 201 }),
     __param(0, (0, common_1.Param)("id")),
     __param(1, (0, current_tenant_decorator_1.CurrentTenant)()),
     __param(2, (0, current_user_decorator_1.CurrentUser)()),

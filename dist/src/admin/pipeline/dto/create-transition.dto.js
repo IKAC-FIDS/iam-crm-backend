@@ -10,9 +10,13 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CreateTransitionDto = void 0;
+const openapi = require("@nestjs/swagger");
 const client_1 = require("@prisma/client");
 const class_validator_1 = require("class-validator");
 class CreateTransitionDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { fromStageId: { required: false, type: () => String, nullable: true }, toStageId: { required: true, type: () => String }, role: { required: false, type: () => Object, nullable: true }, isAllowed: { required: true, type: () => Boolean } };
+    }
 }
 exports.CreateTransitionDto = CreateTransitionDto;
 __decorate([

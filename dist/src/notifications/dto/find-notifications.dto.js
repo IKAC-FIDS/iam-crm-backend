@@ -10,10 +10,14 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.FindNotificationsDto = void 0;
+const openapi = require("@nestjs/swagger");
 const client_1 = require("@prisma/client");
 const class_validator_1 = require("class-validator");
 const pagination_dto_1 = require("../../common/dto/pagination.dto");
 class FindNotificationsDto extends pagination_dto_1.PaginationDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { type: { required: false, type: () => Object }, priority: { required: false, type: () => Object }, entityType: { required: false, type: () => Object }, entityId: { required: false, type: () => String }, status: { required: false, type: () => Object }, includeArchived: { required: false, type: () => Object }, archivedOnly: { required: false, type: () => Object }, search: { required: false, type: () => String } };
+    }
 }
 exports.FindNotificationsDto = FindNotificationsDto;
 __decorate([

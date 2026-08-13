@@ -10,10 +10,14 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CreateTaskDto = void 0;
+const openapi = require("@nestjs/swagger");
 const client_1 = require("@prisma/client");
 const class_validator_1 = require("class-validator");
 const api_date_string_validator_1 = require("../../common/validators/api-date-string.validator");
 class CreateTaskDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { title: { required: true, type: () => String, maxLength: 200 }, description: { required: false, type: () => String }, status: { required: false, type: () => Object }, priority: { required: false, type: () => Object }, dueAt: { required: false, type: () => String }, reminderAt: { required: false, type: () => String }, companyId: { required: false, type: () => String }, personId: { required: false, type: () => String }, opportunityId: { required: false, type: () => String }, commercialDocumentId: { required: false, type: () => String }, paymentId: { required: false, type: () => String }, assignedToId: { required: false, type: () => String } };
+    }
 }
 exports.CreateTaskDto = CreateTaskDto;
 __decorate([

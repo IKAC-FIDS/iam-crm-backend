@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.OwnershipScope = void 0;
+const openapi = require("@nestjs/swagger");
 var OwnershipScope;
 (function (OwnershipScope) {
     OwnershipScope["ALL"] = "all";

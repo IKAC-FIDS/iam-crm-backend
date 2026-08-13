@@ -13,6 +13,7 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.PlatformOrganizationsController = void 0;
+const openapi = require("@nestjs/swagger");
 const common_1 = require("@nestjs/common");
 const current_platform_decorator_1 = require("../common/decorators/current-platform.decorator");
 const platform_admin_guard_1 = require("../platform-authority/platform-admin.guard");
@@ -59,6 +60,7 @@ let PlatformOrganizationsController = class PlatformOrganizationsController {
 exports.PlatformOrganizationsController = PlatformOrganizationsController;
 __decorate([
     (0, common_1.Get)(),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Query)()),
     __param(1, (0, current_platform_decorator_1.CurrentPlatform)()),
     __metadata("design:type", Function),
@@ -67,6 +69,7 @@ __decorate([
 ], PlatformOrganizationsController.prototype, "findAll", null);
 __decorate([
     (0, common_1.Post)(),
+    openapi.ApiResponse({ status: 201 }),
     __param(0, (0, common_1.Body)()),
     __param(1, (0, current_platform_decorator_1.CurrentPlatform)()),
     __metadata("design:type", Function),
@@ -75,6 +78,7 @@ __decorate([
 ], PlatformOrganizationsController.prototype, "create", null);
 __decorate([
     (0, common_1.Get)(':id'),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, current_platform_decorator_1.CurrentPlatform)()),
     __metadata("design:type", Function),
@@ -83,6 +87,7 @@ __decorate([
 ], PlatformOrganizationsController.prototype, "findOne", null);
 __decorate([
     (0, common_1.Patch)(':id'),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
     __param(2, (0, current_platform_decorator_1.CurrentPlatform)()),
@@ -92,6 +97,7 @@ __decorate([
 ], PlatformOrganizationsController.prototype, "update", null);
 __decorate([
     (0, common_1.Patch)(':id/activate'),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, current_platform_decorator_1.CurrentPlatform)()),
     __metadata("design:type", Function),
@@ -100,6 +106,7 @@ __decorate([
 ], PlatformOrganizationsController.prototype, "activate", null);
 __decorate([
     (0, common_1.Post)(':id/provision'),
+    openapi.ApiResponse({ status: 201 }),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
     __param(2, (0, current_platform_decorator_1.CurrentPlatform)()),
@@ -109,6 +116,7 @@ __decorate([
 ], PlatformOrganizationsController.prototype, "provision", null);
 __decorate([
     (0, common_1.Get)(':id/onboarding'),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, current_platform_decorator_1.CurrentPlatform)()),
     __metadata("design:type", Function),
@@ -117,6 +125,7 @@ __decorate([
 ], PlatformOrganizationsController.prototype, "onboarding", null);
 __decorate([
     (0, common_1.Patch)(':id/suspend'),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, current_platform_decorator_1.CurrentPlatform)()),
     __metadata("design:type", Function),
@@ -125,6 +134,7 @@ __decorate([
 ], PlatformOrganizationsController.prototype, "suspend", null);
 __decorate([
     (0, common_1.Patch)(':id/resume'),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, current_platform_decorator_1.CurrentPlatform)()),
     __metadata("design:type", Function),
@@ -133,6 +143,7 @@ __decorate([
 ], PlatformOrganizationsController.prototype, "resume", null);
 __decorate([
     (0, common_1.Patch)(':id/archive'),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, current_platform_decorator_1.CurrentPlatform)()),
     __metadata("design:type", Function),

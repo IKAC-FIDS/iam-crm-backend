@@ -10,11 +10,15 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CreateProductCatalogItemDto = void 0;
+const openapi = require("@nestjs/swagger");
 const class_validator_1 = require("class-validator");
 const class_transformer_1 = require("class-transformer");
 const client_1 = require("@prisma/client");
 const decimalString = ({ value }) => value === undefined || value === null ? value : String(value);
 class CreateProductCatalogItemDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { code: { required: true, type: () => String, maxLength: 80 }, name: { required: true, type: () => String, maxLength: 200 }, description: { required: false, type: () => String }, category: { required: false, type: () => String, maxLength: 120 }, unit: { required: false, type: () => String, maxLength: 40 }, defaultUnitPrice: { required: false, type: () => String }, currency: { required: false, type: () => String, maxLength: 10 }, pricingCurrency: { required: false, type: () => Object }, inPersonInputPrice: { required: false, type: () => String }, digikalaInputPrice: { required: false, type: () => String }, inPersonProfitPercent: { required: false, type: () => String }, digikalaProfitPercent: { required: false, type: () => String }, isActive: { required: false, type: () => Boolean }, sortOrder: { required: false, type: () => Number } };
+    }
 }
 exports.CreateProductCatalogItemDto = CreateProductCatalogItemDto;
 __decorate([

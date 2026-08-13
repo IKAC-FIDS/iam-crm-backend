@@ -12,6 +12,7 @@ const node_crypto_1 = require("node:crypto");
 const app_module_1 = require("./app.module");
 const api_exception_filter_1 = require("./common/filters/api-exception.filter");
 const api_response_interceptor_1 = require("./common/interceptors/api-response.interceptor");
+const openapi_runtime_1 = require("./openapi/openapi.runtime");
 function parseCorsOrigins(value) {
     return (value ?? '')
         .split(',')
@@ -100,6 +101,8 @@ async function bootstrap() {
     app.useGlobalInterceptors(new api_response_interceptor_1.ApiResponseInterceptor());
     app.useGlobalFilters(new api_exception_filter_1.ApiExceptionFilter());
     app.setGlobalPrefix('api');
+    const runtimeDocsEnabled = config.get('OPENAPI_RUNTIME_ENABLED', false);
+    (0, openapi_runtime_1.configureRuntimeOpenApi)(app, runtimeDocsEnabled);
     const port = config.get('PORT', 3000);
     await app.listen(port);
     console.log(`IAM CRM API is running on port ${port}`);

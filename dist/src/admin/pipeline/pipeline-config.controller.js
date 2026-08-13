@@ -13,6 +13,7 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.PipelineConfigController = void 0;
+const openapi = require("@nestjs/swagger");
 const common_1 = require("@nestjs/common");
 const current_user_decorator_1 = require("../../common/decorators/current-user.decorator");
 const permissions_decorator_1 = require("../../common/decorators/permissions.decorator");
@@ -43,6 +44,7 @@ exports.PipelineConfigController = PipelineConfigController;
 __decorate([
     (0, common_1.Get)('stages'),
     (0, permissions_decorator_1.Permissions)('pipeline:config:view'),
+    openapi.ApiResponse({ status: 200 }),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", void 0)
@@ -50,6 +52,7 @@ __decorate([
 __decorate([
     (0, common_1.Post)('stages'),
     (0, permissions_decorator_1.Permissions)('pipeline:config:manage'),
+    openapi.ApiResponse({ status: 201 }),
     __param(0, (0, common_1.Body)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
@@ -59,6 +62,7 @@ __decorate([
 __decorate([
     (0, common_1.Patch)('stages/reorder'),
     (0, permissions_decorator_1.Permissions)('pipeline:config:manage'),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Body)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
@@ -68,6 +72,7 @@ __decorate([
 __decorate([
     (0, common_1.Get)('stages/:id'),
     (0, permissions_decorator_1.Permissions)('pipeline:config:view'),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Param)('id')),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),
@@ -76,6 +81,7 @@ __decorate([
 __decorate([
     (0, common_1.Patch)('stages/:id'),
     (0, permissions_decorator_1.Permissions)('pipeline:config:manage'),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
     __param(2, (0, current_user_decorator_1.CurrentUser)()),
@@ -86,6 +92,7 @@ __decorate([
 __decorate([
     (0, common_1.Delete)('stages/:id'),
     (0, permissions_decorator_1.Permissions)('pipeline:config:manage'),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Query)('replacementStageId')),
     __param(2, (0, current_user_decorator_1.CurrentUser)()),
@@ -96,6 +103,7 @@ __decorate([
 __decorate([
     (0, common_1.Get)('transitions'),
     (0, permissions_decorator_1.Permissions)('pipeline:transition:view'),
+    openapi.ApiResponse({ status: 200, type: [Object] }),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", void 0)
@@ -103,6 +111,7 @@ __decorate([
 __decorate([
     (0, common_1.Post)('transitions'),
     (0, permissions_decorator_1.Permissions)('pipeline:transition:manage'),
+    openapi.ApiResponse({ status: 201, type: Object }),
     __param(0, (0, common_1.Body)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
@@ -112,6 +121,7 @@ __decorate([
 __decorate([
     (0, common_1.Patch)('transitions/:id'),
     (0, permissions_decorator_1.Permissions)('pipeline:transition:manage'),
+    openapi.ApiResponse({ status: 200, type: Object }),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
     __param(2, (0, current_user_decorator_1.CurrentUser)()),
@@ -122,6 +132,7 @@ __decorate([
 __decorate([
     (0, common_1.Delete)('transitions/:id'),
     (0, permissions_decorator_1.Permissions)('pipeline:transition:manage'),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),

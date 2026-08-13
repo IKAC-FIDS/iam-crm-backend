@@ -10,11 +10,15 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CreatePersonDto = void 0;
+const openapi = require("@nestjs/swagger");
 const class_validator_1 = require("class-validator");
 const class_transformer_1 = require("class-transformer");
 const person_contact_dto_1 = require("./person-contact.dto");
 const person_social_dto_1 = require("./person-social.dto");
 class CreatePersonDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { companyId: { required: true, type: () => String }, fullName: { required: true, type: () => String }, title: { required: false, type: () => String }, jobTitle: { required: false, type: () => String }, department: { required: false, type: () => String }, personaTag: { required: false, type: () => String }, personaRole: { required: false, type: () => String }, seniorityLevel: { required: false, type: () => String }, linkedinUrl: { required: false, type: () => String }, email: { required: false, type: () => String }, phone: { required: false, type: () => String }, isPrimaryContact: { required: false, type: () => Boolean }, isSecondaryContact: { required: false, type: () => Boolean }, contacts: { required: false, type: () => [require("./person-contact.dto").CreatePersonContactDto] }, socials: { required: false, type: () => [require("./person-social.dto").CreatePersonSocialDto] } };
+    }
 }
 exports.CreatePersonDto = CreatePersonDto;
 __decorate([

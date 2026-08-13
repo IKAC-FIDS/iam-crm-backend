@@ -10,6 +10,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.UploadCommercialDocumentDto = void 0;
+const openapi = require("@nestjs/swagger");
 const client_1 = require("@prisma/client");
 const class_transformer_1 = require("class-transformer");
 const class_validator_1 = require("class-validator");
@@ -34,6 +35,9 @@ const optionalBoolean = ({ value }) => {
     return value;
 };
 class UploadCommercialDocumentDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { type: { required: false, type: () => Object }, documentType: { required: false, type: () => Object }, status: { required: false, type: () => Object }, number: { required: false, type: () => String, maxLength: 80 }, version: { required: false, type: () => Number, minimum: 1 }, title: { required: false, type: () => String, maxLength: 200 }, name: { required: false, type: () => String, maxLength: 200 }, description: { required: false, type: () => String }, amount: { required: false, type: () => Number, minimum: 0 }, currency: { required: false, type: () => String, maxLength: 10 }, validUntil: { required: false, type: () => String }, dueDate: { required: false, type: () => String }, expiresAt: { required: false, type: () => String }, issuedAt: { required: false, type: () => String }, issueDate: { required: false, type: () => String }, sentAt: { required: false, type: () => String }, acceptedAt: { required: false, type: () => String }, rejectedAt: { required: false, type: () => String }, signedAt: { required: false, type: () => String }, isSigned: { required: false, type: () => Boolean }, fileUrl: { required: false, type: () => String }, externalUrl: { required: false, type: () => String }, externalRef: { required: false, type: () => String }, notes: { required: false, type: () => String } };
+    }
 }
 exports.UploadCommercialDocumentDto = UploadCommercialDocumentDto;
 __decorate([

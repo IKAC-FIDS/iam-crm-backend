@@ -10,10 +10,14 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CompleteActivityDto = void 0;
+const openapi = require("@nestjs/swagger");
 const class_transformer_1 = require("class-transformer");
 const class_validator_1 = require("class-validator");
 const emptyStringToUndefined = ({ value }) => typeof value === 'string' && value.trim() === '' ? undefined : value;
 class CompleteActivityDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { outcome: { required: false, type: () => String }, completionNote: { required: false, type: () => String } };
+    }
 }
 exports.CompleteActivityDto = CompleteActivityDto;
 __decorate([

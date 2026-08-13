@@ -10,10 +10,14 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SetOrganizationQuotaOverrideDto = exports.SetPlanQuotaDto = void 0;
+const openapi = require("@nestjs/swagger");
 const client_1 = require("@prisma/client");
 const class_validator_1 = require("class-validator");
 const NON_NEGATIVE_INTEGER = /^(0|[1-9]\d*)$/;
 class SetPlanQuotaDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { enabled: { required: true, type: () => Boolean }, isUnlimited: { required: true, type: () => Boolean }, softLimit: { required: false, type: () => String, nullable: true, pattern: "NON_NEGATIVE_INTEGER" }, hardLimit: { required: false, type: () => String, nullable: true, pattern: "NON_NEGATIVE_INTEGER" }, resetPeriod: { required: true, type: () => Object } };
+    }
 }
 exports.SetPlanQuotaDto = SetPlanQuotaDto;
 __decorate([
@@ -39,6 +43,9 @@ __decorate([
     __metadata("design:type", String)
 ], SetPlanQuotaDto.prototype, "resetPeriod", void 0);
 class SetOrganizationQuotaOverrideDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { enabled: { required: false, type: () => Boolean, nullable: true }, isUnlimited: { required: false, type: () => Boolean, nullable: true }, softLimit: { required: false, type: () => String, nullable: true, pattern: "NON_NEGATIVE_INTEGER" }, hardLimit: { required: false, type: () => String, nullable: true, pattern: "NON_NEGATIVE_INTEGER" }, resetPeriod: { required: false, type: () => Object, nullable: true }, reason: { required: false, type: () => String, nullable: true, maxLength: 500 } };
+    }
 }
 exports.SetOrganizationQuotaOverrideDto = SetOrganizationQuotaOverrideDto;
 __decorate([

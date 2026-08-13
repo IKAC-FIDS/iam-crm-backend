@@ -13,6 +13,7 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CompaniesController = void 0;
+const openapi = require("@nestjs/swagger");
 const common_1 = require("@nestjs/common");
 const jwt_auth_guard_1 = require("../common/guards/jwt-auth.guard");
 const permissions_guard_1 = require("../common/guards/permissions.guard");
@@ -85,6 +86,7 @@ exports.CompaniesController = CompaniesController;
 __decorate([
     (0, common_1.Get)(),
     (0, permissions_decorator_1.Permissions)('company:view'),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __param(1, (0, common_1.Query)()),
     __metadata("design:type", Function),
@@ -94,6 +96,7 @@ __decorate([
 __decorate([
     (0, common_1.Get)('options'),
     (0, permissions_decorator_1.Permissions)('company:view'),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __param(1, (0, common_1.Query)()),
     __metadata("design:type", Function),
@@ -103,6 +106,7 @@ __decorate([
 __decorate([
     (0, common_1.Get)('options/:id'),
     (0, permissions_decorator_1.Permissions)('company:view'),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Param)('id', new common_1.ParseUUIDPipe())),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
@@ -112,6 +116,7 @@ __decorate([
 __decorate([
     (0, common_1.Get)(':id'),
     (0, permissions_decorator_1.Permissions)('company:view'),
+    openapi.ApiResponse({ status: 200, type: Object }),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
@@ -121,6 +126,7 @@ __decorate([
 __decorate([
     (0, common_1.Post)(),
     (0, permissions_decorator_1.Permissions)('company:create'),
+    openapi.ApiResponse({ status: 201, type: Object }),
     __param(0, (0, common_1.Body)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
@@ -130,6 +136,7 @@ __decorate([
 __decorate([
     (0, common_1.Patch)(':id'),
     (0, permissions_decorator_1.Permissions)('company:update'),
+    openapi.ApiResponse({ status: 200, type: Object }),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
     __param(2, (0, current_user_decorator_1.CurrentUser)()),
@@ -140,6 +147,7 @@ __decorate([
 __decorate([
     (0, common_1.Patch)(':id/stage'),
     (0, permissions_decorator_1.Permissions)('company:view'),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Param)('id')),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),
@@ -148,6 +156,7 @@ __decorate([
 __decorate([
     (0, common_1.Patch)(':id/archive'),
     (0, permissions_decorator_1.Permissions)('company:archive'),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
     __param(2, (0, current_user_decorator_1.CurrentUser)()),
@@ -158,6 +167,7 @@ __decorate([
 __decorate([
     (0, common_1.Patch)(':id/restore'),
     (0, permissions_decorator_1.Permissions)('company:restore'),
+    openapi.ApiResponse({ status: 200, type: Object }),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
@@ -167,6 +177,7 @@ __decorate([
 __decorate([
     (0, common_1.Patch)('bulk/owner'),
     (0, permissions_decorator_1.Permissions)('company:bulk-change-owner'),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Body)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
@@ -176,6 +187,7 @@ __decorate([
 __decorate([
     (0, common_1.Patch)(':id/owner'),
     (0, permissions_decorator_1.Permissions)('company:change-owner'),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
     __param(2, (0, current_user_decorator_1.CurrentUser)()),

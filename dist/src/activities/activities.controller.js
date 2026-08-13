@@ -13,6 +13,7 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ActivitiesController = void 0;
+const openapi = require("@nestjs/swagger");
 const common_1 = require("@nestjs/common");
 const jwt_auth_guard_1 = require("../common/guards/jwt-auth.guard");
 const permissions_guard_1 = require("../common/guards/permissions.guard");
@@ -52,6 +53,7 @@ exports.ActivitiesController = ActivitiesController;
 __decorate([
     (0, common_1.Get)(),
     (0, permissions_decorator_1.Permissions)('activity:view'),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Query)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
@@ -61,6 +63,7 @@ __decorate([
 __decorate([
     (0, common_1.Get)('follow-ups/due'),
     (0, permissions_decorator_1.Permissions)('activity:view'),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __param(1, (0, common_1.Query)()),
     __metadata("design:type", Function),
@@ -70,6 +73,7 @@ __decorate([
 __decorate([
     (0, common_1.Post)(),
     (0, permissions_decorator_1.Permissions)('activity:create'),
+    openapi.ApiResponse({ status: 201 }),
     __param(0, (0, common_1.Body)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
@@ -79,6 +83,7 @@ __decorate([
 __decorate([
     (0, common_1.Patch)(':activityId'),
     (0, permissions_decorator_1.Permissions)('activity:update'),
+    openapi.ApiResponse({ status: 200, type: Object }),
     __param(0, (0, common_1.Param)('activityId')),
     __param(1, (0, common_1.Body)()),
     __param(2, (0, current_user_decorator_1.CurrentUser)()),
@@ -89,6 +94,7 @@ __decorate([
 __decorate([
     (0, common_1.Patch)(':activityId/complete'),
     (0, permissions_decorator_1.Permissions)('follow-up:complete'),
+    openapi.ApiResponse({ status: 200, type: Object }),
     __param(0, (0, common_1.Param)('activityId')),
     __param(1, (0, common_1.Body)()),
     __param(2, (0, current_user_decorator_1.CurrentUser)()),
@@ -99,6 +105,7 @@ __decorate([
 __decorate([
     (0, common_1.Patch)(':activityId/reschedule'),
     (0, permissions_decorator_1.Permissions)('follow-up:reschedule'),
+    openapi.ApiResponse({ status: 200, type: Object }),
     __param(0, (0, common_1.Param)('activityId')),
     __param(1, (0, common_1.Body)()),
     __param(2, (0, current_user_decorator_1.CurrentUser)()),

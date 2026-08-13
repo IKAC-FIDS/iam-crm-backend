@@ -10,6 +10,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.FindMeetingsDto = void 0;
+const openapi = require("@nestjs/swagger");
 const client_1 = require("@prisma/client");
 const class_transformer_1 = require("class-transformer");
 const class_validator_1 = require("class-validator");
@@ -19,6 +20,9 @@ class FindMeetingsDto {
     constructor() {
         this.page = 1;
         this.limit = 20;
+    }
+    static _OPENAPI_METADATA_FACTORY() {
+        return { page: { required: true, type: () => Object, default: 1, minimum: 1 }, limit: { required: true, type: () => Object, default: 20, minimum: 1, maximum: 100 }, search: { required: false, type: () => String }, companyId: { required: false, type: () => String }, opportunityId: { required: false, type: () => String }, organizerId: { required: false, type: () => String }, assignedUserId: { required: false, type: () => String }, attendeePersonId: { required: false, type: () => String }, status: { required: false, type: () => Object }, mode: { required: false, type: () => Object }, dateFrom: { required: false, type: () => String }, dateTo: { required: false, type: () => String }, upcoming: { required: false, type: () => Boolean }, past: { required: false, type: () => Boolean }, mine: { required: false, type: () => Boolean }, reminderDue: { required: false, type: () => Boolean } };
     }
 }
 exports.FindMeetingsDto = FindMeetingsDto;

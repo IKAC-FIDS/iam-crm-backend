@@ -10,11 +10,15 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CreateCommercialDocumentDto = void 0;
+const openapi = require("@nestjs/swagger");
 const client_1 = require("@prisma/client");
 const class_validator_1 = require("class-validator");
 const class_transformer_1 = require("class-transformer");
 const api_date_string_validator_1 = require("../../common/validators/api-date-string.validator");
 class CreateCommercialDocumentDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { type: { required: true, type: () => Object }, status: { required: false, type: () => Object }, number: { required: false, type: () => String, maxLength: 80 }, version: { required: false, type: () => Number, minimum: 1 }, title: { required: true, type: () => String, maxLength: 200 }, description: { required: false, type: () => String }, amount: { required: false, type: () => Number, minimum: 0 }, currency: { required: false, type: () => String, maxLength: 10 }, validUntil: { required: false, type: () => String }, issuedAt: { required: false, type: () => String }, sentAt: { required: false, type: () => String }, acceptedAt: { required: false, type: () => String }, rejectedAt: { required: false, type: () => String }, signedAt: { required: false, type: () => String }, fileUrl: { required: false, type: () => String }, externalRef: { required: false, type: () => String }, notes: { required: false, type: () => String } };
+    }
 }
 exports.CreateCommercialDocumentDto = CreateCommercialDocumentDto;
 __decorate([

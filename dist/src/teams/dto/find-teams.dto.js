@@ -10,6 +10,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.FindTeamsDto = void 0;
+const openapi = require("@nestjs/swagger");
 const class_transformer_1 = require("class-transformer");
 const class_validator_1 = require("class-validator");
 const pagination_dto_1 = require("../../common/dto/pagination.dto");
@@ -21,6 +22,9 @@ const booleanQuery = ({ value }) => {
     return value;
 };
 class FindTeamsDto extends pagination_dto_1.PaginationDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { search: { required: false, type: () => String }, isActive: { required: false, type: () => Boolean }, includeInactive: { required: false, type: () => Boolean }, managerId: { required: false, type: () => String } };
+    }
 }
 exports.FindTeamsDto = FindTeamsDto;
 __decorate([

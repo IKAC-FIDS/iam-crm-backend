@@ -10,11 +10,15 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.FindCompaniesDto = void 0;
+const openapi = require("@nestjs/swagger");
 const class_validator_1 = require("class-validator");
 const client_1 = require("@prisma/client");
 const pagination_dto_1 = require("../../common/dto/pagination.dto");
 const ownership_scope_dto_1 = require("../../common/dto/ownership-scope.dto");
 class FindCompaniesDto extends pagination_dto_1.PaginationDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { ownershipScope: { required: false, enum: require("../../common/dto/ownership-scope.dto").OwnershipScope }, stage: { required: false, type: () => Object }, priority: { required: false, type: () => Object }, industryId: { required: false, type: () => String }, industry: { required: false, type: () => String, description: "Deprecated compatibility filter.\nPrefer industryId." }, sourceId: { required: false, type: () => String }, source: { required: false, type: () => String, description: "Deprecated compatibility filter.\nPrefer sourceId." }, withoutOwner: { required: false, type: () => String }, search: { required: false, type: () => String }, ownerId: { required: false, type: () => String }, includeArchived: { required: false, type: () => String }, archivedOnly: { required: false, type: () => String } };
+    }
 }
 exports.FindCompaniesDto = FindCompaniesDto;
 __decorate([

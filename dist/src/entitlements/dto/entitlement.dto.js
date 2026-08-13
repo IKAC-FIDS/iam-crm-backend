@@ -10,6 +10,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.FeatureKey = exports.EntitlementMaintenanceDto = exports.SetEntitlementOverrideDto = exports.UpdateSubscriptionDto = exports.TransitionSubscriptionDto = exports.CreateSubscriptionDto = exports.SetPlanFeatureDto = exports.UpdatePlanDto = exports.CreatePlanDto = void 0;
+const openapi = require("@nestjs/swagger");
 const client_1 = require("@prisma/client");
 Object.defineProperty(exports, "FeatureKey", { enumerable: true, get: function () { return client_1.FeatureKey; } });
 const class_transformer_1 = require("class-transformer");
@@ -17,6 +18,9 @@ const class_validator_1 = require("class-validator");
 const trim = ({ value }) => typeof value === 'string' ? value.trim() : value;
 const code = ({ value }) => typeof value === 'string' ? value.trim().toUpperCase() : value;
 class CreatePlanDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { code: { required: true, type: () => String, maxLength: 50, pattern: "/^[A-Z][A-Z0-9_]*$/" }, name: { required: true, type: () => String, maxLength: 200 }, description: { required: false, type: () => String, maxLength: 1000 } };
+    }
 }
 exports.CreatePlanDto = CreatePlanDto;
 __decorate([
@@ -39,6 +43,9 @@ __decorate([
     __metadata("design:type", String)
 ], CreatePlanDto.prototype, "description", void 0);
 class UpdatePlanDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { name: { required: false, type: () => String, maxLength: 200 }, description: { required: false, type: () => String, maxLength: 1000 }, isActive: { required: false, type: () => Boolean } };
+    }
 }
 exports.UpdatePlanDto = UpdatePlanDto;
 __decorate([
@@ -61,6 +68,9 @@ __decorate([
     __metadata("design:type", Boolean)
 ], UpdatePlanDto.prototype, "isActive", void 0);
 class SetPlanFeatureDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { enabled: { required: true, type: () => Boolean }, value: { required: false, type: () => Object } };
+    }
 }
 exports.SetPlanFeatureDto = SetPlanFeatureDto;
 __decorate([
@@ -73,6 +83,9 @@ __decorate([
     __metadata("design:type", Object)
 ], SetPlanFeatureDto.prototype, "value", void 0);
 class CreateSubscriptionDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { planId: { required: true, type: () => String }, type: { required: true, type: () => Object }, status: { required: false, type: () => Object }, startAt: { required: true, type: () => String }, endAt: { required: false, type: () => String }, gracePeriodEndAt: { required: false, type: () => String }, contractReference: { required: false, type: () => String, maxLength: 200 }, internalNote: { required: false, type: () => String, maxLength: 2000 } };
+    }
 }
 exports.CreateSubscriptionDto = CreateSubscriptionDto;
 __decorate([
@@ -117,6 +130,9 @@ __decorate([
     __metadata("design:type", String)
 ], CreateSubscriptionDto.prototype, "internalNote", void 0);
 class TransitionSubscriptionDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { status: { required: true, type: () => Object } };
+    }
 }
 exports.TransitionSubscriptionDto = TransitionSubscriptionDto;
 __decorate([
@@ -124,6 +140,9 @@ __decorate([
     __metadata("design:type", String)
 ], TransitionSubscriptionDto.prototype, "status", void 0);
 class UpdateSubscriptionDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { planId: { required: false, type: () => String }, startAt: { required: false, type: () => String }, endAt: { required: false, type: () => String, nullable: true }, gracePeriodEndAt: { required: false, type: () => String, nullable: true }, contractReference: { required: false, type: () => String, maxLength: 200 }, internalNote: { required: false, type: () => String, maxLength: 2000 } };
+    }
 }
 exports.UpdateSubscriptionDto = UpdateSubscriptionDto;
 __decorate([
@@ -161,6 +180,9 @@ __decorate([
     __metadata("design:type", String)
 ], UpdateSubscriptionDto.prototype, "internalNote", void 0);
 class SetEntitlementOverrideDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { state: { required: true, type: () => Object }, reason: { required: false, type: () => String, maxLength: 1000 } };
+    }
 }
 exports.SetEntitlementOverrideDto = SetEntitlementOverrideDto;
 __decorate([
@@ -175,6 +197,9 @@ __decorate([
     __metadata("design:type", String)
 ], SetEntitlementOverrideDto.prototype, "reason", void 0);
 class EntitlementMaintenanceDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { organizationId: { required: true, type: () => String }, planId: { required: true, type: () => String }, type: { required: false, type: () => Object }, durationDays: { required: false, type: () => Number, minimum: 1 } };
+    }
 }
 exports.EntitlementMaintenanceDto = EntitlementMaintenanceDto;
 __decorate([

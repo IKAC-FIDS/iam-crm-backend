@@ -10,12 +10,18 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SwitchTenantDto = void 0;
+const openapi = require("@nestjs/swagger");
 const class_validator_1 = require("class-validator");
+const swagger_1 = require("@nestjs/swagger");
 class SwitchTenantDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { organizationId: { required: true, type: () => String } };
+    }
 }
 exports.SwitchTenantDto = SwitchTenantDto;
 __decorate([
     (0, class_validator_1.IsUUID)(),
+    (0, swagger_1.ApiProperty)({ format: 'uuid', example: '11111111-1111-4111-8111-111111111111' }),
     __metadata("design:type", String)
 ], SwitchTenantDto.prototype, "organizationId", void 0);
 //# sourceMappingURL=switch-tenant.dto.js.map

@@ -10,9 +10,13 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CreateCompanySocialChannelDto = void 0;
+const openapi = require("@nestjs/swagger");
 const class_validator_1 = require("class-validator");
 const client_1 = require("@prisma/client");
 class CreateCompanySocialChannelDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { platform: { required: true, type: () => Object }, handle: { required: true, type: () => String } };
+    }
 }
 exports.CreateCompanySocialChannelDto = CreateCompanySocialChannelDto;
 __decorate([

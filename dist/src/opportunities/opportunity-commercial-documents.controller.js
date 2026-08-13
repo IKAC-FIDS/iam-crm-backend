@@ -13,6 +13,7 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.OpportunityCommercialDocumentsController = void 0;
+const openapi = require("@nestjs/swagger");
 const common_1 = require("@nestjs/common");
 const platform_express_1 = require("@nestjs/platform-express");
 const multer_1 = require("multer");
@@ -56,6 +57,7 @@ exports.OpportunityCommercialDocumentsController = OpportunityCommercialDocument
 __decorate([
     (0, common_1.Get)(),
     (0, permissions_decorator_1.Permissions)('commercial-document:view'),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Param)('opportunityId')),
     __param(1, (0, common_1.Query)()),
     __param(2, (0, current_user_decorator_1.CurrentUser)()),
@@ -66,6 +68,7 @@ __decorate([
 __decorate([
     (0, common_1.Post)(),
     (0, permissions_decorator_1.Permissions)('commercial-document:manage'),
+    openapi.ApiResponse({ status: 201, type: Object }),
     __param(0, (0, common_1.Param)('opportunityId')),
     __param(1, (0, common_1.Body)()),
     __param(2, (0, current_user_decorator_1.CurrentUser)()),
@@ -82,6 +85,7 @@ __decorate([
             fileSize: 25 * 1024 * 1024,
         },
     })),
+    openapi.ApiResponse({ status: 201 }),
     __param(0, (0, common_1.Param)('opportunityId')),
     __param(1, (0, common_1.Body)()),
     __param(2, (0, common_1.UploadedFile)()),
@@ -93,6 +97,7 @@ __decorate([
 __decorate([
     (0, common_1.Get)(':documentId'),
     (0, permissions_decorator_1.Permissions)('commercial-document:view'),
+    openapi.ApiResponse({ status: 200, type: Object }),
     __param(0, (0, common_1.Param)('opportunityId')),
     __param(1, (0, common_1.Param)('documentId')),
     __param(2, (0, current_user_decorator_1.CurrentUser)()),
@@ -103,6 +108,7 @@ __decorate([
 __decorate([
     (0, common_1.Patch)(':documentId'),
     (0, permissions_decorator_1.Permissions)('commercial-document:manage'),
+    openapi.ApiResponse({ status: 200, type: Object }),
     __param(0, (0, common_1.Param)('opportunityId')),
     __param(1, (0, common_1.Param)('documentId')),
     __param(2, (0, common_1.Body)()),
@@ -114,6 +120,7 @@ __decorate([
 __decorate([
     (0, common_1.Patch)(':documentId/status'),
     (0, permissions_decorator_1.Permissions)('commercial-document:manage'),
+    openapi.ApiResponse({ status: 200, type: Object }),
     __param(0, (0, common_1.Param)('opportunityId')),
     __param(1, (0, common_1.Param)('documentId')),
     __param(2, (0, common_1.Body)()),
@@ -125,6 +132,7 @@ __decorate([
 __decorate([
     (0, common_1.Delete)(':documentId'),
     (0, permissions_decorator_1.Permissions)('commercial-document:manage'),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Param)('opportunityId')),
     __param(1, (0, common_1.Param)('documentId')),
     __param(2, (0, current_user_decorator_1.CurrentUser)()),

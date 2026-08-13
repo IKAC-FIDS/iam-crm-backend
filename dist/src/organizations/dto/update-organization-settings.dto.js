@@ -10,9 +10,13 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.UpdateOrganizationSettingsDto = void 0;
+const openapi = require("@nestjs/swagger");
 const client_1 = require("@prisma/client");
 const class_validator_1 = require("class-validator");
 class UpdateOrganizationSettingsDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { timezone: { required: false, type: () => String }, locale: { required: false, type: () => String }, calendarSystem: { required: false, type: () => Object }, dateFormat: { required: false, type: () => Object }, firstDayOfWeek: { required: false, type: () => Number, minimum: 0, maximum: 6 }, emailSenderDisplayName: { required: false, type: () => String, nullable: true, maxLength: 120 }, allowPasswordLogin: { required: false, type: () => Boolean }, allowPasskeyLogin: { required: false, type: () => Boolean } };
+    }
 }
 exports.UpdateOrganizationSettingsDto = UpdateOrganizationSettingsDto;
 __decorate([

@@ -10,9 +10,13 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CreateStageDto = void 0;
+const openapi = require("@nestjs/swagger");
 const class_validator_1 = require("class-validator");
 const update_stage_config_dto_1 = require("./update-stage-config.dto");
 class CreateStageDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { code: { required: true, type: () => String, pattern: "/^[A-Za-z][A-Za-z0-9_ ]*$/" }, label: { required: true, type: () => String }, description: { required: false, type: () => String }, sortOrder: { required: false, type: () => Number }, color: { required: false, type: () => String }, isActive: { required: false, type: () => Boolean }, isTerminal: { required: false, type: () => Boolean }, terminalType: { required: false, type: () => String, enum: update_stage_config_dto_1.TERMINAL_TYPES }, isDefault: { required: false, type: () => Boolean } };
+    }
 }
 exports.CreateStageDto = CreateStageDto;
 __decorate([

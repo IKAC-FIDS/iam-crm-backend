@@ -10,10 +10,14 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CreateActivityDto = void 0;
+const openapi = require("@nestjs/swagger");
 const class_validator_1 = require("class-validator");
 const client_1 = require("@prisma/client");
 const api_date_string_validator_1 = require("../../common/validators/api-date-string.validator");
 class CreateActivityDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { companyId: { required: true, type: () => String }, personId: { required: false, type: () => String }, type: { required: true, type: () => Object }, notes: { required: false, type: () => String }, outcome: { required: false, type: () => String }, occurredAt: { required: false, type: () => String }, nextActionDate: { required: false, type: () => String }, opportunityId: { required: false, type: () => String } };
+    }
 }
 exports.CreateActivityDto = CreateActivityDto;
 __decorate([

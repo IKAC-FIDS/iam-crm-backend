@@ -10,9 +10,13 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.UpdateStageConfigDto = exports.TERMINAL_TYPES = void 0;
+const openapi = require("@nestjs/swagger");
 const class_validator_1 = require("class-validator");
 exports.TERMINAL_TYPES = ['WON', 'LOST', 'ON_HOLD', 'NONE'];
 class UpdateStageConfigDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { label: { required: false, type: () => String }, description: { required: false, type: () => String, nullable: true }, sortOrder: { required: false, type: () => Number }, color: { required: false, type: () => String, nullable: true }, isActive: { required: false, type: () => Boolean }, isTerminal: { required: false, type: () => Boolean }, terminalType: { required: false, type: () => String, nullable: true, enum: exports.TERMINAL_TYPES }, isDefault: { required: false, type: () => Boolean } };
+    }
 }
 exports.UpdateStageConfigDto = UpdateStageConfigDto;
 __decorate([

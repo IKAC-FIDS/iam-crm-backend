@@ -10,8 +10,12 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CreatePainPointDto = void 0;
+const openapi = require("@nestjs/swagger");
 const class_validator_1 = require("class-validator");
 class CreatePainPointDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { title: { required: true, type: () => String }, description: { required: false, type: () => String }, category: { required: false, type: () => String } };
+    }
 }
 exports.CreatePainPointDto = CreatePainPointDto;
 __decorate([

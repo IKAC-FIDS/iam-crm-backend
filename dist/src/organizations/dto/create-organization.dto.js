@@ -10,8 +10,12 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CreateOrganizationDto = void 0;
+const openapi = require("@nestjs/swagger");
 const class_validator_1 = require("class-validator");
 class CreateOrganizationDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { code: { required: true, type: () => String, maxLength: 80, pattern: "/^[a-z0-9][a-z0-9-_]*$/" }, name: { required: true, type: () => String, maxLength: 200 }, timezone: { required: false, type: () => String, maxLength: 80 }, locale: { required: false, type: () => String, maxLength: 20 }, settings: { required: false, type: () => Object } };
+    }
 }
 exports.CreateOrganizationDto = CreateOrganizationDto;
 __decorate([

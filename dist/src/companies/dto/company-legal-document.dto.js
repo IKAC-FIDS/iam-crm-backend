@@ -10,12 +10,16 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.UpdateCompanyLegalDocumentDto = exports.UploadCompanyLegalDocumentDto = void 0;
+const openapi = require("@nestjs/swagger");
 const client_1 = require("@prisma/client");
 const class_transformer_1 = require("class-transformer");
 const class_validator_1 = require("class-validator");
 const api_date_string_validator_1 = require("../../common/validators/api-date-string.validator");
 const emptyToUndefined = ({ value }) => value === '' || value === null || value === undefined ? undefined : value;
 class UploadCompanyLegalDocumentDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { type: { required: true, type: () => Object }, title: { required: true, type: () => String, maxLength: 200 }, description: { required: false, type: () => String, maxLength: 2000 }, documentDate: { required: false, type: () => String } };
+    }
 }
 exports.UploadCompanyLegalDocumentDto = UploadCompanyLegalDocumentDto;
 __decorate([
@@ -41,6 +45,9 @@ __decorate([
     __metadata("design:type", String)
 ], UploadCompanyLegalDocumentDto.prototype, "documentDate", void 0);
 class UpdateCompanyLegalDocumentDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { type: { required: false, type: () => Object }, title: { required: false, type: () => String, maxLength: 200 }, description: { required: false, type: () => String, maxLength: 2000 }, documentDate: { required: false, type: () => String } };
+    }
 }
 exports.UpdateCompanyLegalDocumentDto = UpdateCompanyLegalDocumentDto;
 __decorate([

@@ -10,8 +10,12 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.BulkChangeOwnerDto = exports.ChangeOwnerDto = void 0;
+const openapi = require("@nestjs/swagger");
 const class_validator_1 = require("class-validator");
 class ChangeOwnerDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { newOwnerId: { required: true, type: () => String } };
+    }
 }
 exports.ChangeOwnerDto = ChangeOwnerDto;
 __decorate([
@@ -20,6 +24,9 @@ __decorate([
     __metadata("design:type", String)
 ], ChangeOwnerDto.prototype, "newOwnerId", void 0);
 class BulkChangeOwnerDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { companyIds: { required: true, type: () => [String] }, newOwnerId: { required: true, type: () => String } };
+    }
 }
 exports.BulkChangeOwnerDto = BulkChangeOwnerDto;
 __decorate([

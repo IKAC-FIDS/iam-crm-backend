@@ -10,8 +10,12 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ChangeOpportunityOwnerDto = void 0;
+const openapi = require("@nestjs/swagger");
 const class_validator_1 = require("class-validator");
 class ChangeOpportunityOwnerDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { ownerId: { required: true, type: () => String, nullable: true } };
+    }
 }
 exports.ChangeOpportunityOwnerDto = ChangeOpportunityOwnerDto;
 __decorate([

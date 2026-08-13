@@ -10,10 +10,14 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SsoGroupRoleMappingDto = exports.CreateSsoProviderDto = void 0;
+const openapi = require("@nestjs/swagger");
 const class_validator_1 = require("class-validator");
 const class_transformer_1 = require("class-transformer");
 const client_1 = require("@prisma/client");
 class CreateSsoProviderDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { name: { required: true, type: () => String, minLength: 2 }, type: { required: true, type: () => Object }, isActive: { required: false, type: () => Boolean }, autoProvision: { required: false, type: () => Boolean }, defaultRole: { required: false, type: () => Object }, allowedDomains: { required: false, type: () => [String] }, routingDomains: { required: false, type: () => [String] }, routingSubdomains: { required: false, type: () => [String] }, groupRoleMappings: { required: false, type: () => [require("./create-sso-provider.dto").SsoGroupRoleMappingDto] }, issuer: { required: false, type: () => String }, clientId: { required: false, type: () => String }, clientSecret: { required: false, type: () => String, description: "Plain secret is accepted only on write.\nIt must be encrypted into clientSecretEnc and must never be returned." }, authorizationUrl: { required: false, type: () => String }, tokenUrl: { required: false, type: () => String }, userInfoUrl: { required: false, type: () => String }, jwksUrl: { required: false, type: () => String }, scopes: { required: false, type: () => [String] }, entityId: { required: false, type: () => String }, ssoUrl: { required: false, type: () => String }, x509Certificate: { required: false, type: () => String }, signRequests: { required: false, type: () => Boolean }, wantAssertionsSigned: { required: false, type: () => Boolean }, wantResponseSigned: { required: false, type: () => Boolean }, emailAttribute: { required: false, type: () => String }, nameAttribute: { required: false, type: () => String }, groupsAttribute: { required: false, type: () => String } };
+    }
 }
 exports.CreateSsoProviderDto = CreateSsoProviderDto;
 __decorate([
@@ -157,6 +161,9 @@ __decorate([
     __metadata("design:type", String)
 ], CreateSsoProviderDto.prototype, "groupsAttribute", void 0);
 class SsoGroupRoleMappingDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { group: { required: true, type: () => String, minLength: 1 }, roleId: { required: true, type: () => String, minLength: 1 } };
+    }
 }
 exports.SsoGroupRoleMappingDto = SsoGroupRoleMappingDto;
 __decorate([

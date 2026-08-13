@@ -10,8 +10,12 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ArchiveOpportunityDto = void 0;
+const openapi = require("@nestjs/swagger");
 const class_validator_1 = require("class-validator");
 class ArchiveOpportunityDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { reason: { required: false, type: () => String } };
+    }
 }
 exports.ArchiveOpportunityDto = ArchiveOpportunityDto;
 __decorate([

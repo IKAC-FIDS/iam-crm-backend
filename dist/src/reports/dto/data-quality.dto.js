@@ -10,6 +10,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.DataQualityIssuesQueryDto = exports.DataQualityQueryDto = exports.ReportingScope = exports.DataQualitySeverity = void 0;
+const openapi = require("@nestjs/swagger");
 const class_transformer_1 = require("class-transformer");
 const class_validator_1 = require("class-validator");
 const report_filters_dto_1 = require("./report-filters.dto");
@@ -36,6 +37,9 @@ class DataQualityQueryDto extends report_filters_dto_1.ReportFiltersDto {
         super(...arguments);
         this.page = 1;
         this.limit = 20;
+    }
+    static _OPENAPI_METADATA_FACTORY() {
+        return { entityTypes: { required: false, type: () => [String] }, severities: { required: false, enum: require("./data-quality.dto").DataQualitySeverity, isArray: true }, ruleKeys: { required: false, type: () => [String] }, page: { required: true, type: () => Object, default: 1, minimum: 1 }, limit: { required: true, type: () => Object, default: 20, minimum: 1, maximum: 100 } };
     }
 }
 exports.DataQualityQueryDto = DataQualityQueryDto;
@@ -80,6 +84,9 @@ class DataQualityIssuesQueryDto extends report_filters_dto_1.ReportFiltersDto {
         super(...arguments);
         this.page = 1;
         this.limit = 20;
+    }
+    static _OPENAPI_METADATA_FACTORY() {
+        return { ruleKey: { required: true, type: () => String }, page: { required: true, type: () => Object, default: 1, minimum: 1 }, limit: { required: true, type: () => Object, default: 20, minimum: 1, maximum: 100 } };
     }
 }
 exports.DataQualityIssuesQueryDto = DataQualityIssuesQueryDto;

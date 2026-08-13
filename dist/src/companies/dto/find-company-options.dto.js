@@ -10,6 +10,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.FindCompanyOptionsDto = void 0;
+const openapi = require("@nestjs/swagger");
 const class_transformer_1 = require("class-transformer");
 const class_validator_1 = require("class-validator");
 const emptyToUndefined = ({ value }) => typeof value === 'string' && value.trim() === '' ? undefined : value;
@@ -27,6 +28,9 @@ class FindCompanyOptionsDto {
         this.page = 1;
         this.limit = 25;
         this.includeArchived = false;
+    }
+    static _OPENAPI_METADATA_FACTORY() {
+        return { search: { required: false, type: () => String }, page: { required: false, type: () => Number, default: 1, minimum: 1 }, limit: { required: false, type: () => Number, default: 25, minimum: 1, maximum: 50 }, excludeId: { required: false, type: () => String }, selectedId: { required: false, type: () => String }, includeArchived: { required: false, type: () => Boolean, default: false } };
     }
 }
 exports.FindCompanyOptionsDto = FindCompanyOptionsDto;

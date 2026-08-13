@@ -10,11 +10,15 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.UpsertCallCardDto = void 0;
+const openapi = require("@nestjs/swagger");
 const class_validator_1 = require("class-validator");
 const class_transformer_1 = require("class-transformer");
 const discovery_question_dto_1 = require("./discovery-question.dto");
 const objection_dto_1 = require("./objection.dto");
 class UpsertCallCardDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { primaryContactId: { required: false, type: () => String }, secondaryContactId: { required: false, type: () => String }, entryAngle: { required: false, type: () => String }, painPoint: { required: false, type: () => String }, useCase: { required: false, type: () => String }, openingLine: { required: false, type: () => String }, firstEmail: { required: false, type: () => String }, linkedinMsg: { required: false, type: () => String }, discoveryQs: { required: false, type: () => [require("./discovery-question.dto").DiscoveryQuestionDto] }, objections: { required: false, type: () => [require("./objection.dto").ObjectionDto] }, meetingAsk: { required: false, type: () => String }, callGoal: { required: false, type: () => String }, qualificationCriteria: { required: false, type: () => String }, disqualificationCriteria: { required: false, type: () => String }, followUpNoResponseAt: { required: false, type: () => String }, followUpInterestAt: { required: false, type: () => String } };
+    }
 }
 exports.UpsertCallCardDto = UpsertCallCardDto;
 __decorate([

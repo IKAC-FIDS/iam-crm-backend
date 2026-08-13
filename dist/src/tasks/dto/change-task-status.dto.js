@@ -10,9 +10,13 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ChangeTaskStatusDto = void 0;
+const openapi = require("@nestjs/swagger");
 const client_1 = require("@prisma/client");
 const class_validator_1 = require("class-validator");
 class ChangeTaskStatusDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { status: { required: true, type: () => Object }, note: { required: false, type: () => String } };
+    }
 }
 exports.ChangeTaskStatusDto = ChangeTaskStatusDto;
 __decorate([

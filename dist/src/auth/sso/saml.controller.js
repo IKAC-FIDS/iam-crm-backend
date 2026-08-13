@@ -13,6 +13,7 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SamlController = void 0;
+const openapi = require("@nestjs/swagger");
 const common_1 = require("@nestjs/common");
 const saml_service_1 = require("./saml.service");
 let SamlController = class SamlController {
@@ -40,6 +41,7 @@ exports.SamlController = SamlController;
 __decorate([
     (0, common_1.Get)(":providerId/login"),
     (0, common_1.Redirect)(),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Param)("providerId")),
     __param(1, (0, common_1.Query)("domain")),
     __param(2, (0, common_1.Query)("subdomain")),
@@ -49,6 +51,7 @@ __decorate([
 ], SamlController.prototype, "login", null);
 __decorate([
     (0, common_1.Post)(":providerId/acs"),
+    openapi.ApiResponse({ status: 201 }),
     __param(0, (0, common_1.Param)("providerId")),
     __param(1, (0, common_1.Req)()),
     __param(2, (0, common_1.Res)()),
@@ -58,6 +61,7 @@ __decorate([
 ], SamlController.prototype, "acs", null);
 __decorate([
     (0, common_1.Get)(":providerId/metadata"),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Param)("providerId")),
     __param(1, (0, common_1.Query)("domain")),
     __param(2, (0, common_1.Query)("subdomain")),

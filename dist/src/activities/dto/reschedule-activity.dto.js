@@ -10,11 +10,15 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.RescheduleActivityDto = void 0;
+const openapi = require("@nestjs/swagger");
 const class_transformer_1 = require("class-transformer");
 const class_validator_1 = require("class-validator");
 const api_date_string_validator_1 = require("../../common/validators/api-date-string.validator");
 const emptyStringToUndefined = ({ value }) => typeof value === 'string' && value.trim() === '' ? undefined : value;
 class RescheduleActivityDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { nextActionDate: { required: true, type: () => String }, note: { required: false, type: () => String } };
+    }
 }
 exports.RescheduleActivityDto = RescheduleActivityDto;
 __decorate([

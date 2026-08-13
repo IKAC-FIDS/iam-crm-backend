@@ -13,6 +13,7 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.OrganizationsController = void 0;
+const openapi = require("@nestjs/swagger");
 const common_1 = require("@nestjs/common");
 const current_user_decorator_1 = require("../common/decorators/current-user.decorator");
 const permissions_decorator_1 = require("../common/decorators/permissions.decorator");
@@ -47,6 +48,7 @@ exports.OrganizationsController = OrganizationsController;
 __decorate([
     (0, common_1.Get)('organizations/current'),
     (0, permissions_decorator_1.Permissions)('organization:view'),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
@@ -55,6 +57,7 @@ __decorate([
 __decorate([
     (0, common_1.Get)('organization/settings'),
     (0, permissions_decorator_1.Permissions)('organization:view'),
+    openapi.ApiResponse({ status: 200, type: Object }),
     __param(0, (0, current_tenant_decorator_1.CurrentTenant)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
@@ -63,6 +66,7 @@ __decorate([
 __decorate([
     (0, common_1.Patch)('organization/settings'),
     (0, permissions_decorator_1.Permissions)('organization:manage'),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Body)()),
     __param(1, (0, current_tenant_decorator_1.CurrentTenant)()),
     __metadata("design:type", Function),
@@ -72,6 +76,7 @@ __decorate([
 __decorate([
     (0, common_1.Get)('organization/branding'),
     (0, permissions_decorator_1.Permissions)('organization:view'),
+    openapi.ApiResponse({ status: 200, type: Object }),
     __param(0, (0, current_tenant_decorator_1.CurrentTenant)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
@@ -80,6 +85,7 @@ __decorate([
 __decorate([
     (0, common_1.Patch)('organization/branding'),
     (0, permissions_decorator_1.Permissions)('organization:manage'),
+    openapi.ApiResponse({ status: 200, type: Object }),
     __param(0, (0, common_1.Body)()),
     __param(1, (0, current_tenant_decorator_1.CurrentTenant)()),
     __metadata("design:type", Function),
@@ -89,6 +95,7 @@ __decorate([
 __decorate([
     (0, common_1.Get)('organization/domains'),
     (0, permissions_decorator_1.Permissions)('organization:view'),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, current_tenant_decorator_1.CurrentTenant)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
@@ -97,6 +104,7 @@ __decorate([
 __decorate([
     (0, common_1.Get)('organization/domains/:id'),
     (0, permissions_decorator_1.Permissions)('organization:view'),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, current_tenant_decorator_1.CurrentTenant)()),
     __metadata("design:type", Function),
@@ -106,6 +114,7 @@ __decorate([
 __decorate([
     (0, common_1.Post)('organization/domains'),
     (0, permissions_decorator_1.Permissions)('organization:manage'),
+    openapi.ApiResponse({ status: 201 }),
     __param(0, (0, common_1.Body)()),
     __param(1, (0, current_tenant_decorator_1.CurrentTenant)()),
     __metadata("design:type", Function),
@@ -115,6 +124,7 @@ __decorate([
 __decorate([
     (0, common_1.Patch)('organization/domains/:id'),
     (0, permissions_decorator_1.Permissions)('organization:manage'),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
     __param(2, (0, current_tenant_decorator_1.CurrentTenant)()),
@@ -125,6 +135,7 @@ __decorate([
 __decorate([
     (0, common_1.Post)('organization/domains/:id/verify'),
     (0, permissions_decorator_1.Permissions)('organization:manage'),
+    openapi.ApiResponse({ status: 201 }),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, current_tenant_decorator_1.CurrentTenant)()),
     __metadata("design:type", Function),

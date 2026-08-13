@@ -10,9 +10,13 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AssignPermissionDto = void 0;
+const openapi = require("@nestjs/swagger");
 const class_validator_1 = require("class-validator");
 const client_1 = require("@prisma/client");
 class AssignPermissionDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { role: { required: true, type: () => Object }, action: { required: true, type: () => String } };
+    }
 }
 exports.AssignPermissionDto = AssignPermissionDto;
 __decorate([

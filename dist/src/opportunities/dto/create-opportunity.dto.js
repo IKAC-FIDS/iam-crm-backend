@@ -10,11 +10,15 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CreateOpportunityDto = void 0;
+const openapi = require("@nestjs/swagger");
 const class_transformer_1 = require("class-transformer");
 const client_1 = require("@prisma/client");
 const class_validator_1 = require("class-validator");
 const api_date_string_validator_1 = require("../../common/validators/api-date-string.validator");
 class CreateOpportunityDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { companyId: { required: true, type: () => String }, title: { required: true, type: () => String }, description: { required: false, type: () => String }, ownerId: { required: false, type: () => String }, stageId: { required: false, type: () => String }, stage: { required: false, type: () => String }, priority: { required: false, type: () => Object }, estimatedValue: { required: false, type: () => Number, minimum: 0 }, expectedCloseDate: { required: false, type: () => String }, source: { required: false, type: () => String }, sourceOptionId: { required: false, type: () => String }, opportunitySource: { required: false, type: () => String }, primaryContactId: { required: false, type: () => String }, probability: { required: false, type: () => Number, minimum: 0, maximum: 100 }, competitor: { required: false, type: () => String } };
+    }
 }
 exports.CreateOpportunityDto = CreateOpportunityDto;
 __decorate([

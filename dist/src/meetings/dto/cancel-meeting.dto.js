@@ -10,8 +10,12 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CancelMeetingDto = void 0;
+const openapi = require("@nestjs/swagger");
 const class_validator_1 = require("class-validator");
 class CancelMeetingDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { cancellationReason: { required: false, type: () => String } };
+    }
 }
 exports.CancelMeetingDto = CancelMeetingDto;
 __decorate([

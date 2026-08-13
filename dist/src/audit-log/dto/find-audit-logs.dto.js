@@ -10,6 +10,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.FindAuditLogsDto = void 0;
+const openapi = require("@nestjs/swagger");
 const class_transformer_1 = require("class-transformer");
 const class_validator_1 = require("class-validator");
 const pagination_dto_1 = require("../../common/dto/pagination.dto");
@@ -21,6 +22,9 @@ const csv = ({ value }) => value == null || value === ""
         .map((v) => v.trim())
         .filter(Boolean);
 class FindAuditLogsDto extends pagination_dto_1.PaginationDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { actorId: { required: false, type: () => String }, actorIds: { required: false, type: () => [String] }, entityType: { required: false, type: () => String }, entityTypes: { required: false, type: () => [String] }, entityId: { required: false, type: () => String }, action: { required: false, type: () => String }, actions: { required: false, type: () => [String] }, requestId: { required: false, type: () => String }, ipAddress: { required: false, type: () => String }, requestMethod: { required: false, type: () => String }, requestMethods: { required: false, type: () => [String] }, requestPath: { required: false, type: () => String }, search: { required: false, type: () => String }, startDate: { required: false, type: () => String }, endDate: { required: false, type: () => String }, compact: { required: false, type: () => Boolean }, includePayload: { required: false, type: () => Boolean }, format: { required: false, type: () => Object, enum: ["csv", "xlsx"] } };
+    }
 }
 exports.FindAuditLogsDto = FindAuditLogsDto;
 __decorate([

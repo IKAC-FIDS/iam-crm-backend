@@ -13,6 +13,7 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ExchangeRatesController = void 0;
+const openapi = require("@nestjs/swagger");
 const common_1 = require("@nestjs/common");
 const current_user_decorator_1 = require("../../common/decorators/current-user.decorator");
 const permissions_decorator_1 = require("../../common/decorators/permissions.decorator");
@@ -33,6 +34,7 @@ exports.ExchangeRatesController = ExchangeRatesController;
 __decorate([
     (0, common_1.Get)('current'),
     (0, permissions_decorator_1.Permissions)('exchange-rate:view'),
+    openapi.ApiResponse({ status: 200, type: Object }),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", void 0)
@@ -40,6 +42,7 @@ __decorate([
 __decorate([
     (0, common_1.Get)(),
     (0, permissions_decorator_1.Permissions)('exchange-rate:view'),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Query)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [find_exchange_rates_dto_1.FindExchangeRatesDto]),
@@ -48,6 +51,7 @@ __decorate([
 __decorate([
     (0, common_1.Post)(),
     (0, permissions_decorator_1.Permissions)('exchange-rate:manage'),
+    openapi.ApiResponse({ status: 201 }),
     __param(0, (0, common_1.Body)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),

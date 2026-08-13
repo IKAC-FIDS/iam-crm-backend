@@ -10,10 +10,14 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CreateLeadSourceDto = void 0;
+const openapi = require("@nestjs/swagger");
 const class_transformer_1 = require("class-transformer");
 const class_validator_1 = require("class-validator");
 const trim = ({ value }) => typeof value === 'string' ? value.trim() : value;
 class CreateLeadSourceDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { code: { required: true, type: () => String }, name: { required: true, type: () => String }, description: { required: false, type: () => String }, isActive: { required: false, type: () => Boolean }, sortOrder: { required: false, type: () => Number } };
+    }
 }
 exports.CreateLeadSourceDto = CreateLeadSourceDto;
 __decorate([

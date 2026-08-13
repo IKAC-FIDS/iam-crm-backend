@@ -10,6 +10,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ReportFiltersDto = void 0;
+const openapi = require("@nestjs/swagger");
 const class_transformer_1 = require("class-transformer");
 const client_1 = require("@prisma/client");
 const class_validator_1 = require("class-validator");
@@ -24,6 +25,9 @@ const csv = ({ value }) => {
     return values.length ? values : undefined;
 };
 class ReportFiltersDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { ownershipScope: { required: false, enum: require("../../common/dto/ownership-scope.dto").OwnershipScope }, startDate: { required: false, type: () => String }, endDate: { required: false, type: () => String }, userIds: { required: false, type: () => [String] }, ownerIds: { required: false, type: () => [String] }, companyIds: { required: false, type: () => [String] }, teams: { required: false, type: () => [String] }, stages: { required: false, type: () => [String] }, priorities: { required: false, type: () => [Object] }, industries: { required: false, type: () => [String] }, sources: { required: false, type: () => [String] }, activityTypes: { required: false, type: () => [Object] } };
+    }
 }
 exports.ReportFiltersDto = ReportFiltersDto;
 __decorate([

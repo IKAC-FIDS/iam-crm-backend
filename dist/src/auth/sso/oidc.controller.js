@@ -13,6 +13,7 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.OidcController = void 0;
+const openapi = require("@nestjs/swagger");
 const common_1 = require("@nestjs/common");
 const oidc_service_1 = require("./oidc.service");
 let OidcController = class OidcController {
@@ -38,6 +39,7 @@ exports.OidcController = OidcController;
 __decorate([
     (0, common_1.Get)(":providerId/login"),
     (0, common_1.Redirect)(),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Param)("providerId")),
     __param(1, (0, common_1.Query)("domain")),
     __param(2, (0, common_1.Query)("subdomain")),
@@ -48,6 +50,7 @@ __decorate([
 __decorate([
     (0, common_1.Get)(":providerId/callback"),
     (0, common_1.Redirect)(),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Param)("providerId")),
     __param(1, (0, common_1.Query)()),
     __metadata("design:type", Function),

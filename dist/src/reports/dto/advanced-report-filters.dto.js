@@ -10,6 +10,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AdvancedReportFiltersDto = void 0;
+const openapi = require("@nestjs/swagger");
 const class_transformer_1 = require("class-transformer");
 const class_validator_1 = require("class-validator");
 const client_1 = require("@prisma/client");
@@ -25,6 +26,9 @@ class AdvancedReportFiltersDto extends report_filters_dto_1.ReportFiltersDto {
         super(...arguments);
         this.page = 1;
         this.limit = 20;
+    }
+    static _OPENAPI_METADATA_FACTORY() {
+        return { meetingStatuses: { required: false, type: () => [Object] }, meetingModes: { required: false, type: () => [Object] }, taskStatuses: { required: false, type: () => [Object] }, productIds: { required: false, type: () => [String] }, salesChannels: { required: false, type: () => [Object] }, categories: { required: false, type: () => [String] }, page: { required: true, type: () => Object, default: 1, minimum: 1 }, limit: { required: true, type: () => Object, default: 20, minimum: 1, maximum: 100 }, trend: { required: false, type: () => String } };
     }
 }
 exports.AdvancedReportFiltersDto = AdvancedReportFiltersDto;

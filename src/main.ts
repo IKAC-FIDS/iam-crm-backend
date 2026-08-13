@@ -8,6 +8,7 @@ import { randomUUID } from 'node:crypto';
 import { AppModule } from './app.module';
 import { ApiExceptionFilter } from './common/filters/api-exception.filter';
 import { ApiResponseInterceptor } from './common/interceptors/api-response.interceptor';
+import { configureRuntimeOpenApi } from './openapi/openapi.runtime';
 
 function parseCorsOrigins(value?: string): string[] {
   return (value ?? '')
@@ -124,6 +125,12 @@ async function bootstrap() {
   app.useGlobalFilters(new ApiExceptionFilter());
 
   app.setGlobalPrefix('api');
+
+  const runtimeDocsEnabled = config.get<boolean>(
+    'OPENAPI_RUNTIME_ENABLED',
+    false,
+  );
+  configureRuntimeOpenApi(app, runtimeDocsEnabled);
 
   const port = config.get<number>('PORT', 3000);
   await app.listen(port);

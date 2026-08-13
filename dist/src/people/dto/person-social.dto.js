@@ -10,8 +10,12 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.UpdatePersonSocialDto = exports.CreatePersonSocialDto = void 0;
+const openapi = require("@nestjs/swagger");
 const class_validator_1 = require("class-validator");
 class CreatePersonSocialDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { platformOptionId: { required: false, type: () => String }, platform: { required: false, type: () => String, description: "Deprecated compatibility input.\nPrefer platformOptionId.\nIf sent, it must match LookupOption.code or LookupOption.label in group = social_types." }, handle: { required: true, type: () => String }, isPrimary: { required: false, type: () => Boolean }, note: { required: false, type: () => String } };
+    }
 }
 exports.CreatePersonSocialDto = CreatePersonSocialDto;
 __decorate([
@@ -39,6 +43,9 @@ __decorate([
     __metadata("design:type", String)
 ], CreatePersonSocialDto.prototype, "note", void 0);
 class UpdatePersonSocialDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { platformOptionId: { required: false, type: () => String }, platform: { required: false, type: () => String, description: "Deprecated compatibility input.\nPrefer platformOptionId." }, handle: { required: false, type: () => String }, isPrimary: { required: false, type: () => Boolean }, note: { required: false, type: () => String } };
+    }
 }
 exports.UpdatePersonSocialDto = UpdatePersonSocialDto;
 __decorate([

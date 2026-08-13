@@ -10,12 +10,16 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CreateMeetingDto = void 0;
+const openapi = require("@nestjs/swagger");
 const client_1 = require("@prisma/client");
 const class_transformer_1 = require("class-transformer");
 const class_validator_1 = require("class-validator");
 const api_date_string_validator_1 = require("../../common/validators/api-date-string.validator");
 const trim = ({ value }) => typeof value === 'string' ? value.trim() : value;
 class CreateMeetingDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { companyId: { required: true, type: () => String }, opportunityId: { required: false, type: () => String }, title: { required: true, type: () => String, maxLength: 200 }, agenda: { required: false, type: () => String }, description: { required: false, type: () => String }, mode: { required: true, type: () => Object }, location: { required: false, type: () => String }, meetingUrl: { required: false, type: () => String }, startAt: { required: true, type: () => String }, endAt: { required: true, type: () => String }, reminderAt: { required: false, type: () => String }, assigneeUserIds: { required: false, type: () => [String] }, attendeePersonIds: { required: false, type: () => [String] } };
+    }
 }
 exports.CreateMeetingDto = CreateMeetingDto;
 __decorate([

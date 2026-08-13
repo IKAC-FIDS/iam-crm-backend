@@ -10,6 +10,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.FindAssigneeOptionsDto = void 0;
+const openapi = require("@nestjs/swagger");
 const class_transformer_1 = require("class-transformer");
 const class_validator_1 = require("class-validator");
 const bool = ({ value }) => value === true || value === 'true';
@@ -18,6 +19,9 @@ class FindAssigneeOptionsDto {
         this.page = 1;
         this.limit = 25;
         this.activeOnly = true;
+    }
+    static _OPENAPI_METADATA_FACTORY() {
+        return { search: { required: false, type: () => String }, page: { required: true, type: () => Object, default: 1, minimum: 1 }, limit: { required: true, type: () => Object, default: 25, minimum: 1, maximum: 100 }, selectedId: { required: false, type: () => String }, activeOnly: { required: true, type: () => Object, default: true } };
     }
 }
 exports.FindAssigneeOptionsDto = FindAssigneeOptionsDto;

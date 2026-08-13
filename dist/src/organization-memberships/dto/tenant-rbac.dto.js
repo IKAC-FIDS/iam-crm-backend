@@ -10,12 +10,16 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AssignMembershipRoleDto = exports.ReplaceTenantRolePermissionsDto = exports.UpdateTenantRoleDto = exports.CreateTenantRoleDto = void 0;
+const openapi = require("@nestjs/swagger");
 const client_1 = require("@prisma/client");
 const class_transformer_1 = require("class-transformer");
 const class_validator_1 = require("class-validator");
 const trim = ({ value }) => typeof value === 'string' ? value.trim() : value;
 const normalizeCode = ({ value }) => typeof value === 'string' ? value.trim().toUpperCase().replace(/[\s-]+/g, '_') : value;
 class CreateTenantRoleDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { code: { required: true, type: () => String, maxLength: 50, pattern: "/^[A-Z][A-Z0-9_]*$/" }, name: { required: true, type: () => String, maxLength: 200 }, description: { required: false, type: () => String, maxLength: 1000 }, baseRole: { required: false, type: () => Object } };
+    }
 }
 exports.CreateTenantRoleDto = CreateTenantRoleDto;
 __decorate([
@@ -44,6 +48,9 @@ __decorate([
     __metadata("design:type", String)
 ], CreateTenantRoleDto.prototype, "baseRole", void 0);
 class UpdateTenantRoleDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { name: { required: false, type: () => String, maxLength: 200 }, description: { required: false, type: () => String, maxLength: 1000 }, isActive: { required: false, type: () => Boolean } };
+    }
 }
 exports.UpdateTenantRoleDto = UpdateTenantRoleDto;
 __decorate([
@@ -66,6 +73,9 @@ __decorate([
     __metadata("design:type", Boolean)
 ], UpdateTenantRoleDto.prototype, "isActive", void 0);
 class ReplaceTenantRolePermissionsDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { permissionIds: { required: true, type: () => [String] } };
+    }
 }
 exports.ReplaceTenantRolePermissionsDto = ReplaceTenantRolePermissionsDto;
 __decorate([
@@ -75,6 +85,9 @@ __decorate([
     __metadata("design:type", Array)
 ], ReplaceTenantRolePermissionsDto.prototype, "permissionIds", void 0);
 class AssignMembershipRoleDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { roleId: { required: true, type: () => String } };
+    }
 }
 exports.AssignMembershipRoleDto = AssignMembershipRoleDto;
 __decorate([

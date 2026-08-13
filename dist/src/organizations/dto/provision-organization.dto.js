@@ -10,11 +10,15 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ProvisionOrganizationDto = void 0;
+const openapi = require("@nestjs/swagger");
 const class_validator_1 = require("class-validator");
 class ProvisionOrganizationDto {
     constructor() {
         this.defaultTeamCode = 'default';
         this.defaultTeamName = 'Default Team';
+    }
+    static _OPENAPI_METADATA_FACTORY() {
+        return { ownerUserId: { required: true, type: () => String }, defaultTeamCode: { required: true, type: () => String, default: "default", maxLength: 80, pattern: "/^[a-z0-9][a-z0-9-_]*$/" }, defaultTeamName: { required: true, type: () => String, default: "Default Team", maxLength: 200 } };
     }
 }
 exports.ProvisionOrganizationDto = ProvisionOrganizationDto;

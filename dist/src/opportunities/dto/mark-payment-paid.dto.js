@@ -10,10 +10,14 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.MarkPaymentPaidDto = void 0;
+const openapi = require("@nestjs/swagger");
 const client_1 = require("@prisma/client");
 const class_validator_1 = require("class-validator");
 const api_date_string_validator_1 = require("../../common/validators/api-date-string.validator");
 class MarkPaymentPaidDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { paidAt: { required: false, type: () => String }, method: { required: false, type: () => Object }, referenceNumber: { required: false, type: () => String, maxLength: 120 }, notes: { required: false, type: () => String } };
+    }
 }
 exports.MarkPaymentPaidDto = MarkPaymentPaidDto;
 __decorate([
