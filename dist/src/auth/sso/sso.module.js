@@ -21,12 +21,13 @@ const saml_controller_1 = require("./saml.controller");
 const saml_service_1 = require("./saml.service");
 const organization_memberships_module_1 = require("../../organization-memberships/organization-memberships.module");
 const sso_network_security_service_1 = require("./sso-network-security.service");
+const entitlements_module_1 = require("../../entitlements/entitlements.module");
 let SsoModule = class SsoModule {
 };
 exports.SsoModule = SsoModule;
 exports.SsoModule = SsoModule = __decorate([
     (0, common_1.Module)({
-        imports: [auth_module_1.AuthModule, organization_memberships_module_1.OrganizationMembershipsModule],
+        imports: [auth_module_1.AuthModule, organization_memberships_module_1.OrganizationMembershipsModule, entitlements_module_1.EntitlementsModule],
         controllers: [
             sso_public_controller_1.SsoPublicController,
             sso_admin_controller_1.SsoAdminController,

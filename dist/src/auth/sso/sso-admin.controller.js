@@ -22,6 +22,9 @@ const current_tenant_decorator_1 = require("../../common/decorators/current-tena
 const create_sso_provider_dto_1 = require("./dto/create-sso-provider.dto");
 const update_sso_provider_dto_1 = require("./dto/update-sso-provider.dto");
 const sso_provider_service_1 = require("./sso-provider.service");
+const client_1 = require("@prisma/client");
+const feature_guard_1 = require("../../entitlements/feature.guard");
+const require_feature_decorator_1 = require("../../entitlements/require-feature.decorator");
 let SsoAdminController = class SsoAdminController {
     constructor(service) {
         this.service = service;
@@ -118,7 +121,8 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], SsoAdminController.prototype, "testConnection", null);
 exports.SsoAdminController = SsoAdminController = __decorate([
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, permissions_guard_1.PermissionsGuard),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, permissions_guard_1.PermissionsGuard, feature_guard_1.FeatureGuard),
+    (0, require_feature_decorator_1.RequireFeature)(client_1.FeatureKey.SSO),
     (0, common_1.Controller)("admin/sso-providers"),
     __metadata("design:paramtypes", [sso_provider_service_1.SsoProviderService])
 ], SsoAdminController);

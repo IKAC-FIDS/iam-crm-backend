@@ -42,6 +42,7 @@ import { ScheduleModule } from "@nestjs/schedule";
 import { MeetingsModule } from "./meetings/meetings.module";
 import { ExchangeRatesModule } from "./admin/exchange-rates/exchange-rates.module";
 import { DashboardModule } from "./dashboard/dashboard.module";
+import { EntitlementsModule } from "./entitlements/entitlements.module";
 
 @Module({
   imports: [
@@ -100,6 +101,7 @@ import { DashboardModule } from "./dashboard/dashboard.module";
     MeetingsModule,
     ExchangeRatesModule,
     DashboardModule,
+    EntitlementsModule,
   ],
   providers: [
     {

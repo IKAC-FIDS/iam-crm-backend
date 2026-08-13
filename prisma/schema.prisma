@@ -32,6 +32,35 @@ enum RoleScope {
   TENANT
 }
 
+enum FeatureKey {
+  SSO
+  PASSKEY
+  ADVANCED_RBAC
+  CUSTOM_DOMAINS
+  BRANDING
+  AUDIT
+  REPORTING
+}
+
+enum SubscriptionType {
+  STANDARD
+  TRIAL
+  MANUAL_CONTRACT
+}
+
+enum SubscriptionStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  CANCELLED
+  EXPIRED
+}
+
+enum EntitlementOverrideState {
+  ENABLED
+  DISABLED
+}
+
 enum SsoProviderType {
   OIDC
   SAML
@@ -401,6 +430,7 @@ model Organization {
 
   settings             Json?
   authorizationVersion Int   @default(1)
+  entitlementVersion   Int   @default(1)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -421,7 +451,9 @@ model Organization {
   tenantSettings      OrganizationSettings?
   branding            OrganizationBranding?
   domains             OrganizationDomain[]
-  tenantRoles         Role[]                   @relation("TenantRoles")
+  tenantRoles         Role[]                    @relation("TenantRoles")
+  subscriptions       Subscription[]
+  entitlements        OrganizationEntitlement[]
 
   @@index([status])
   @@index([createdAt])
@@ -1899,6 +1931,76 @@ model RolePermission {
   @@unique([roleId, permissionId])
   @@index([roleId])
   @@map("role_permissions")
+}
+
+model Plan {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  name        String
+  description String?
+  revision    Int      @default(1)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  features      PlanFeature[]
+  subscriptions Subscription[]
+
+  @@index([isActive])
+  @@map("plans")
+}
+
+model PlanFeature {
+  id        String     @id @default(uuid())
+  planId    String
+  plan      Plan       @relation(fields: [planId], references: [id], onDelete: Restrict)
+  feature   FeatureKey
+  enabled   Boolean    @default(false)
+  value     Json?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@unique([planId, feature])
+  @@index([feature])
+  @@map("plan_features")
+}
+
+model Subscription {
+  id                String             @id @default(uuid())
+  organizationId    String
+  organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  planId            String
+  plan              Plan               @relation(fields: [planId], references: [id], onDelete: Restrict)
+  type              SubscriptionType
+  status            SubscriptionStatus @default(PENDING)
+  startAt           DateTime
+  endAt             DateTime?
+  gracePeriodEndAt  DateTime?
+  contractReference String?
+  internalNote      String?
+  createdById       String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  @@index([organizationId, status, startAt, endAt])
+  @@index([planId])
+  @@map("subscriptions")
+}
+
+model OrganizationEntitlement {
+  id             String                   @id @default(uuid())
+  organizationId String
+  organization   Organization             @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  feature        FeatureKey
+  state          EntitlementOverrideState
+  reason         String?
+  createdById    String?
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+
+  @@unique([organizationId, feature])
+  @@index([feature])
+  @@map("organization_entitlements")
 }
 
 model FileAttachment {

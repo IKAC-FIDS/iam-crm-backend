@@ -48,6 +48,12 @@
     "tenant-rbac:backfill:dry-run": "node dist/src/organization-memberships/tenant-rbac-maintenance.js backfill --dry-run",
     "tenant-rbac:backfill": "node dist/src/organization-memberships/tenant-rbac-maintenance.js backfill --confirm-apply",
     "tenant-rbac:validate": "node dist/src/organization-memberships/tenant-rbac-maintenance.js validate",
+    "entitlements:preflight": "node dist/src/entitlements/entitlement-maintenance.js preflight",
+    "entitlements:bootstrap:dry-run": "node dist/src/entitlements/entitlement-maintenance.js bootstrap",
+    "entitlements:bootstrap": "node dist/src/entitlements/entitlement-maintenance.js bootstrap --confirm-apply",
+    "entitlements:backfill:dry-run": "node dist/src/entitlements/entitlement-maintenance.js backfill",
+    "entitlements:backfill": "node dist/src/entitlements/entitlement-maintenance.js backfill --confirm-apply",
+    "entitlements:validate": "node dist/src/entitlements/entitlement-maintenance.js validate",
     "ci": "npm run prisma:generate && npm run lint && npm run test && npm run build"
   },
   "dependencies": {

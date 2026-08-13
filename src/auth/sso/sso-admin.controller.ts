@@ -20,8 +20,12 @@ import type { TenantContext } from "../../common/tenant/tenant-context.types";
 import { CreateSsoProviderDto } from "./dto/create-sso-provider.dto";
 import { UpdateSsoProviderDto } from "./dto/update-sso-provider.dto";
 import { SsoProviderService } from "./sso-provider.service";
+import { FeatureKey } from "@prisma/client";
+import { FeatureGuard } from "../../entitlements/feature.guard";
+import { RequireFeature } from "../../entitlements/require-feature.decorator";
 
-@UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard, FeatureGuard)
+@RequireFeature(FeatureKey.SSO)
 @Controller("admin/sso-providers")
 export class SsoAdminController {
   constructor(private readonly service: SsoProviderService) {}

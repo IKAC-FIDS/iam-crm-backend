@@ -51,6 +51,7 @@ const schedule_1 = require("@nestjs/schedule");
 const meetings_module_1 = require("./meetings/meetings.module");
 const exchange_rates_module_1 = require("./admin/exchange-rates/exchange-rates.module");
 const dashboard_module_1 = require("./dashboard/dashboard.module");
+const entitlements_module_1 = require("./entitlements/entitlements.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -112,6 +113,7 @@ exports.AppModule = AppModule = __decorate([
             meetings_module_1.MeetingsModule,
             exchange_rates_module_1.ExchangeRatesModule,
             dashboard_module_1.DashboardModule,
+            entitlements_module_1.EntitlementsModule,
         ],
         providers: [
             {
