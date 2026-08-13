@@ -1,8 +1,12 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AttachmentStorageProvider } from '@prisma/client';
 import { createReadStream } from 'node:fs';
-import { access, mkdir, writeFile } from 'node:fs/promises';
+import { access, mkdir, unlink, writeFile } from 'node:fs/promises';
 import { join, resolve, sep } from 'node:path';
 import type {
   AttachmentStorageService,
@@ -42,13 +46,18 @@ export class LocalAttachmentStorageService implements AttachmentStorageService {
     return createReadStream(absolutePath);
   }
 
+  async delete(objectKey: string) {
+    try {
+      await unlink(this.resolveStoragePath(objectKey));
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    }
+  }
+
   private getStorageRoot() {
     return resolve(
       process.cwd(),
-      this.config.get<string>(
-        'ATTACHMENT_STORAGE_ROOT',
-        'storage/attachments',
-      ),
+      this.config.get<string>('ATTACHMENT_STORAGE_ROOT', 'storage/attachments'),
     );
   }
 

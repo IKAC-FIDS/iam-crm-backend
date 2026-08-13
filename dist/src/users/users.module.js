@@ -11,12 +11,13 @@ const common_1 = require("@nestjs/common");
 const users_service_1 = require("./users.service");
 const users_controller_1 = require("./users.controller");
 const organization_memberships_module_1 = require("../organization-memberships/organization-memberships.module");
+const quota_module_1 = require("../quota/quota.module");
 let UsersModule = class UsersModule {
 };
 exports.UsersModule = UsersModule;
 exports.UsersModule = UsersModule = __decorate([
     (0, common_1.Module)({
-        imports: [organization_memberships_module_1.OrganizationMembershipsModule],
+        imports: [organization_memberships_module_1.OrganizationMembershipsModule, quota_module_1.QuotaModule],
         providers: [users_service_1.UsersService],
         controllers: [users_controller_1.UsersController],
         exports: [users_service_1.UsersService],

@@ -61,6 +61,33 @@ enum EntitlementOverrideState {
   DISABLED
 }
 
+enum QuotaMetric {
+  ACTIVE_USERS
+  COMPANIES
+  OPPORTUNITIES
+  FILES
+  STORAGE_BYTES
+  API_CALLS
+  WORKFLOW_RUNS
+  WEBHOOK_DELIVERIES
+  EMAIL_SENDS
+  AI_REQUESTS
+}
+
+enum QuotaResetPeriod {
+  NONE
+  DAILY
+  MONTHLY
+  SUBSCRIPTION_TERM
+}
+
+enum UsageReservationStatus {
+  RESERVED
+  COMMITTED
+  RELEASED
+  EXPIRED
+}
+
 enum SsoProviderType {
   OIDC
   SAML
@@ -451,9 +478,15 @@ model Organization {
   tenantSettings      OrganizationSettings?
   branding            OrganizationBranding?
   domains             OrganizationDomain[]
-  tenantRoles         Role[]                    @relation("TenantRoles")
+  tenantRoles         Role[]                      @relation("TenantRoles")
   subscriptions       Subscription[]
   entitlements        OrganizationEntitlement[]
+  quotaOverrides      OrganizationQuotaOverride[]
+  usageCounters       UsageCounter[]
+  usageSnapshots      UsageSnapshot[]
+  quotaThresholds     QuotaThresholdEvent[]
+  usageReservations   UsageReservation[]
+  usageEvents         UsageEvent[]
 
   @@index([status])
   @@index([createdAt])
@@ -1944,6 +1977,7 @@ model Plan {
   updatedAt   DateTime @updatedAt
 
   features      PlanFeature[]
+  quotas        PlanQuota[]
   subscriptions Subscription[]
 
   @@index([isActive])
@@ -2001,6 +2035,138 @@ model OrganizationEntitlement {
   @@unique([organizationId, feature])
   @@index([feature])
   @@map("organization_entitlements")
+}
+
+model PlanQuota {
+  id          String           @id @default(uuid())
+  planId      String
+  plan        Plan             @relation(fields: [planId], references: [id], onDelete: Restrict)
+  metric      QuotaMetric
+  enabled     Boolean          @default(false)
+  isUnlimited Boolean          @default(false)
+  softLimit   BigInt?
+  hardLimit   BigInt?
+  resetPeriod QuotaResetPeriod @default(MONTHLY)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@unique([planId, metric])
+  @@index([metric])
+  @@map("plan_quotas")
+}
+
+model OrganizationQuotaOverride {
+  id             String            @id @default(uuid())
+  organizationId String
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  metric         QuotaMetric
+  enabled        Boolean?
+  isUnlimited    Boolean?
+  softLimit      BigInt?
+  hardLimit      BigInt?
+  resetPeriod    QuotaResetPeriod?
+  reason         String?
+  createdById    String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@unique([organizationId, metric])
+  @@index([metric])
+  @@map("organization_quota_overrides")
+}
+
+model UsageCounter {
+  id                 String           @id @default(uuid())
+  organizationId     String
+  organization       Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  metric             QuotaMetric
+  periodStart        DateTime
+  periodEnd          DateTime?
+  currentValue       BigInt           @default(0)
+  effectiveSoftLimit BigInt?
+  effectiveHardLimit BigInt?
+  resetPeriod        QuotaResetPeriod
+  configurationState String
+  version            Int              @default(1)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  reservations UsageReservation[]
+
+  @@unique([organizationId, metric, periodStart])
+  @@index([organizationId, metric, periodEnd])
+  @@map("usage_counters")
+}
+
+model UsageSnapshot {
+  id                 String       @id @default(uuid())
+  organizationId     String
+  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  metric             QuotaMetric
+  periodStart        DateTime
+  periodEnd          DateTime?
+  finalUsage         BigInt
+  softLimit          BigInt?
+  hardLimit          BigInt?
+  percentageBasisPts Int?
+  exceeded           Boolean
+  capturedAt         DateTime     @default(now())
+
+  @@unique([organizationId, metric, periodStart])
+  @@index([organizationId, capturedAt])
+  @@map("usage_snapshots")
+}
+
+model QuotaThresholdEvent {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  metric         QuotaMetric
+  periodStart    DateTime
+  threshold      Int
+  usageValue     BigInt
+  limitValue     BigInt
+  createdAt      DateTime     @default(now())
+
+  @@unique([organizationId, metric, periodStart, threshold])
+  @@index([organizationId, createdAt])
+  @@map("quota_threshold_events")
+}
+
+model UsageReservation {
+  id             String                 @id @default(uuid())
+  organizationId String
+  organization   Organization           @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  counterId      String
+  counter        UsageCounter           @relation(fields: [counterId], references: [id], onDelete: Restrict)
+  metric         QuotaMetric
+  idempotencyKey String
+  amount         BigInt
+  status         UsageReservationStatus @default(RESERVED)
+  expiresAt      DateTime?
+  committedAt    DateTime?
+  releasedAt     DateTime?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  @@unique([organizationId, metric, idempotencyKey])
+  @@index([organizationId, status, expiresAt])
+  @@map("usage_reservations")
+}
+
+model UsageEvent {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  metric         QuotaMetric
+  idempotencyKey String
+  amount         BigInt
+  periodStart    DateTime
+  createdAt      DateTime     @default(now())
+
+  @@unique([organizationId, metric, idempotencyKey])
+  @@index([organizationId, metric, periodStart])
+  @@map("usage_events")
 }
 
 model FileAttachment {

@@ -10,9 +10,10 @@ import { OpportunityPaymentsController } from './opportunity-payments.controller
 import { OpportunityPaymentsService } from './opportunity-payments.service';
 import { OpportunitiesController } from './opportunities.controller';
 import { OpportunitiesService } from './opportunities.service';
+import { QuotaModule } from '../quota/quota.module';
 
 @Module({
-  imports: [PipelineConfigModule, AttachmentsModule],
+  imports: [PipelineConfigModule, AttachmentsModule, QuotaModule],
   controllers: [
     OpportunitiesController,
     CompanyOpportunitiesController,
@@ -26,8 +27,6 @@ import { OpportunitiesService } from './opportunities.service';
     OpportunityCommercialDocumentsService,
     OpportunityPaymentsService,
   ],
-  exports: [
-    OpportunitiesService,
-  ],
+  exports: [OpportunitiesService],
 })
 export class OpportunitiesModule {}

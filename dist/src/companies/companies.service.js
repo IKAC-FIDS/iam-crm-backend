@@ -12,6 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.CompaniesService = void 0;
 const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
+const node_crypto_1 = require("node:crypto");
 const audit_log_service_1 = require("../audit-log/audit-log.service");
 const ownership_scope_dto_1 = require("../common/dto/ownership-scope.dto");
 const tenant_scope_util_1 = require("../common/tenant/tenant-scope.util");
@@ -19,6 +20,7 @@ const api_date_util_1 = require("../common/dates/api-date.util");
 const team_scope_util_1 = require("../common/tenant/team-scope.util");
 const prisma_service_1 = require("../prisma/prisma.service");
 const company_access_service_1 = require("./company-access.service");
+const quota_service_1 = require("../quota/quota.service");
 const company_phone_util_1 = require("./company-phone.util");
 const companyOptionSelect = {
     id: true,
@@ -30,10 +32,11 @@ const companyOptionSelect = {
     parentCompanyId: true,
 };
 let CompaniesService = class CompaniesService {
-    constructor(prisma, audit, companyAccess) {
+    constructor(prisma, audit, companyAccess, quota) {
         this.prisma = prisma;
         this.audit = audit;
         this.companyAccess = companyAccess;
+        this.quota = quota;
     }
     async findOptions(user, query) {
         const page = query.page ?? 1;
@@ -232,7 +235,9 @@ let CompaniesService = class CompaniesService {
                 opportunities: {
                     include: {
                         stage: true,
-                        owner: { select: { id: true, fullName: true, email: true, team: true } },
+                        owner: {
+                            select: { id: true, fullName: true, email: true, team: true },
+                        },
                     },
                     orderBy: { updatedAt: 'desc' },
                 },
@@ -261,20 +266,46 @@ let CompaniesService = class CompaniesService {
             await this.assertOwnerInOrganization(dto.ownerId, user);
         }
         const organizationId = (0, tenant_scope_util_1.getCurrentOrganizationId)(user);
-        await this.validateRelatedCompanies([...new Set([...(parentCompanyIds ?? []), ...(subsidiaryCompanyIds ?? [])])], organizationId);
-        const company = await this.prisma.$transaction(async (tx) => {
-            const created = await tx.company.create({ data: {
-                    ...companyData,
-                    centralPhone: (0, company_phone_util_1.normalizeCompanyPhone)(centralPhone),
-                    establishmentDate: establishmentDate ? (0, api_date_util_1.parseApiDate)(establishmentDate, 'establishmentDate') : undefined,
-                    registeredCapital: registeredCapital !== undefined ? new client_1.Prisma.Decimal(registeredCapital) : undefined,
-                    industryId: normalizedRefs.industryId, industry: normalizedRefs.industryName,
-                    sourceId: normalizedRefs.sourceId, source: normalizedRefs.sourceCode,
-                    ownerId: dto.ownerId ?? null, organizationId,
-                } });
-            await this.replaceHierarchy(tx, created.id, parentCompanyIds ?? [], subsidiaryCompanyIds ?? []);
-            return tx.company.findUniqueOrThrow({ where: { id: created.id }, include: this.companySummaryInclude() });
-        });
+        await this.validateRelatedCompanies([
+            ...new Set([
+                ...(parentCompanyIds ?? []),
+                ...(subsidiaryCompanyIds ?? []),
+            ]),
+        ], organizationId);
+        const reservation = await this.quota.reserve(organizationId, client_1.QuotaMetric.COMPANIES, 1n, `company:create:${(0, node_crypto_1.randomUUID)()}`, new Date(), user.userId, user.tenantContext?.requestId);
+        let company;
+        try {
+            company = await this.prisma.$transaction(async (tx) => {
+                const created = await tx.company.create({
+                    data: {
+                        ...companyData,
+                        centralPhone: (0, company_phone_util_1.normalizeCompanyPhone)(centralPhone),
+                        establishmentDate: establishmentDate
+                            ? (0, api_date_util_1.parseApiDate)(establishmentDate, 'establishmentDate')
+                            : undefined,
+                        registeredCapital: registeredCapital !== undefined
+                            ? new client_1.Prisma.Decimal(registeredCapital)
+                            : undefined,
+                        industryId: normalizedRefs.industryId,
+                        industry: normalizedRefs.industryName,
+                        sourceId: normalizedRefs.sourceId,
+                        source: normalizedRefs.sourceCode,
+                        ownerId: dto.ownerId ?? null,
+                        organizationId,
+                    },
+                });
+                await this.replaceHierarchy(tx, created.id, parentCompanyIds ?? [], subsidiaryCompanyIds ?? []);
+                return tx.company.findUniqueOrThrow({
+                    where: { id: created.id },
+                    include: this.companySummaryInclude(),
+                });
+            });
+        }
+        catch (error) {
+            await this.quota.releaseReservation(reservation.reservationId);
+            throw error;
+        }
+        await this.quota.commitReservation(reservation.reservationId);
         await this.audit.record({
             actorId: user.userId,
             organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
@@ -300,7 +331,9 @@ let CompaniesService = class CompaniesService {
             ...companyData,
         };
         if (establishmentDate !== undefined)
-            updateData.establishmentDate = establishmentDate ? (0, api_date_util_1.parseApiDate)(establishmentDate, 'establishmentDate') : null;
+            updateData.establishmentDate = establishmentDate
+                ? (0, api_date_util_1.parseApiDate)(establishmentDate, 'establishmentDate')
+                : null;
         if (registeredCapital !== undefined)
             updateData.registeredCapital = new client_1.Prisma.Decimal(registeredCapital);
         if (centralPhone !== undefined) {
@@ -317,18 +350,35 @@ let CompaniesService = class CompaniesService {
             updateData.source = normalizedSource.sourceCode;
         }
         const organizationId = (0, tenant_scope_util_1.getCurrentOrganizationId)(user);
-        const relationIds = [...new Set([...(parentCompanyIds ?? []), ...(subsidiaryCompanyIds ?? [])])];
+        const relationIds = [
+            ...new Set([
+                ...(parentCompanyIds ?? []),
+                ...(subsidiaryCompanyIds ?? []),
+            ]),
+        ];
         if (relationIds.includes(id))
             throw new common_1.BadRequestException('A company cannot be related to itself');
         await this.validateRelatedCompanies(relationIds, organizationId);
         const updated = await this.prisma.$transaction(async (tx) => {
             await tx.company.update({ where: { id }, data: updateData });
-            if (parentCompanyIds !== undefined || subsidiaryCompanyIds !== undefined) {
-                const currentParents = parentCompanyIds ?? (await tx.companyHierarchyRelation.findMany({ where: { subsidiaryCompanyId: id }, select: { parentCompanyId: true } })).map((item) => item.parentCompanyId);
-                const currentSubsidiaries = subsidiaryCompanyIds ?? (await tx.companyHierarchyRelation.findMany({ where: { parentCompanyId: id }, select: { subsidiaryCompanyId: true } })).map((item) => item.subsidiaryCompanyId);
+            if (parentCompanyIds !== undefined ||
+                subsidiaryCompanyIds !== undefined) {
+                const currentParents = parentCompanyIds ??
+                    (await tx.companyHierarchyRelation.findMany({
+                        where: { subsidiaryCompanyId: id },
+                        select: { parentCompanyId: true },
+                    })).map((item) => item.parentCompanyId);
+                const currentSubsidiaries = subsidiaryCompanyIds ??
+                    (await tx.companyHierarchyRelation.findMany({
+                        where: { parentCompanyId: id },
+                        select: { subsidiaryCompanyId: true },
+                    })).map((item) => item.subsidiaryCompanyId);
                 await this.replaceHierarchy(tx, id, currentParents, currentSubsidiaries);
             }
-            return tx.company.findUniqueOrThrow({ where: { id }, include: this.companySummaryInclude() });
+            return tx.company.findUniqueOrThrow({
+                where: { id },
+                include: this.companySummaryInclude(),
+            });
         });
         await this.audit.record({
             actorId: user.userId,
@@ -361,11 +411,12 @@ let CompaniesService = class CompaniesService {
             throw new common_1.BadRequestException('کاربر جدید باید نقش REP یا MANAGER داشته باشد');
         }
         if (newOwner.role === client_1.UserRole.MANAGER) {
-            if (company.owner && !(0, team_scope_util_1.userMatchesTeam)(newOwner, {
-                ...user,
-                teamId: company.owner.teamId,
-                team: company.owner.team,
-            })) {
+            if (company.owner &&
+                !(0, team_scope_util_1.userMatchesTeam)(newOwner, {
+                    ...user,
+                    teamId: company.owner.teamId,
+                    team: company.owner.team,
+                })) {
                 throw new common_1.BadRequestException('مدیر فروش باید در همان تیم شرکت باشد');
             }
         }
@@ -403,6 +454,10 @@ let CompaniesService = class CompaniesService {
                 archiveReason: dto.reason,
             },
         });
+        await Promise.all([
+            this.quota.synchronizeInventory((0, tenant_scope_util_1.getCurrentOrganizationId)(user), client_1.QuotaMetric.COMPANIES),
+            this.quota.synchronizeInventory((0, tenant_scope_util_1.getCurrentOrganizationId)(user), client_1.QuotaMetric.OPPORTUNITIES),
+        ]);
         await this.audit.record({
             actorId: user.userId,
             organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
@@ -421,18 +476,51 @@ let CompaniesService = class CompaniesService {
         });
         if (!company)
             throw new common_1.NotFoundException('شرکت پیدا نشد');
-        await this.companyAccess.assertCompanyMutable(id, user, { allowArchived: true });
+        await this.companyAccess.assertCompanyMutable(id, user, {
+            allowArchived: true,
+        });
         if (!company.archivedAt) {
             throw new common_1.BadRequestException('شرکت بایگانی نشده است');
         }
-        const restored = await this.prisma.company.update({
-            where: { id },
-            data: {
+        const reservation = await this.quota.reserve((0, tenant_scope_util_1.getCurrentOrganizationId)(user), client_1.QuotaMetric.COMPANIES, 1n, `company:restore:${id}`, new Date(), user.userId, user.tenantContext?.requestId);
+        const opportunityCount = BigInt(await this.prisma.opportunity.count({
+            where: {
+                organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
+                companyId: id,
                 archivedAt: null,
-                archivedById: null,
-                archiveReason: null,
             },
-        });
+        }));
+        let opportunityReservation = null;
+        try {
+            if (opportunityCount > 0n)
+                opportunityReservation = await this.quota.reserve((0, tenant_scope_util_1.getCurrentOrganizationId)(user), client_1.QuotaMetric.OPPORTUNITIES, opportunityCount, `company:restore:opportunities:${id}`, new Date(), user.userId, user.tenantContext?.requestId);
+        }
+        catch (error) {
+            await this.quota.releaseReservation(reservation.reservationId);
+            throw error;
+        }
+        let restored;
+        try {
+            restored = await this.prisma.company.update({
+                where: { id },
+                data: {
+                    archivedAt: null,
+                    archivedById: null,
+                    archiveReason: null,
+                },
+            });
+        }
+        catch (error) {
+            await Promise.all([
+                this.quota.releaseReservation(reservation.reservationId),
+                this.quota.releaseReservation(opportunityReservation?.reservationId ?? null),
+            ]);
+            throw error;
+        }
+        await this.quota.commitReservations([
+            reservation.reservationId,
+            opportunityReservation?.reservationId ?? null,
+        ]);
         await this.audit.record({
             actorId: user.userId,
             organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
@@ -471,11 +559,12 @@ let CompaniesService = class CompaniesService {
         }
         if (newOwner.role === client_1.UserRole.MANAGER) {
             for (const company of companies) {
-                if (company.owner && !(0, team_scope_util_1.userMatchesTeam)(newOwner, {
-                    ...user,
-                    teamId: company.owner.teamId,
-                    team: company.owner.team,
-                })) {
+                if (company.owner &&
+                    !(0, team_scope_util_1.userMatchesTeam)(newOwner, {
+                        ...user,
+                        teamId: company.owner.teamId,
+                        team: company.owner.team,
+                    })) {
                     throw new common_1.BadRequestException(`شرکت ${company.legalName} در تیم دیگری است و مدیر جدید عضو همان تیم نیست`);
                 }
             }
@@ -629,7 +718,8 @@ let CompaniesService = class CompaniesService {
         return {
             ...company,
             parentCompanies: company.parentRelations?.map((item) => item.parentCompany) ?? [],
-            subsidiaryCompanies: company.subsidiaryRelations?.map((item) => item.subsidiaryCompany) ?? [],
+            subsidiaryCompanies: company.subsidiaryRelations?.map((item) => item.subsidiaryCompany) ??
+                [],
         };
     }
     async validateRelatedCompanies(ids, organizationId) {
@@ -660,19 +750,33 @@ let CompaniesService = class CompaniesService {
             where: {
                 OR: [
                     { parentCompanyId: companyId, subsidiaryCompanyId: { in: parents } },
-                    { parentCompanyId: { in: subsidiaries }, subsidiaryCompanyId: companyId },
+                    {
+                        parentCompanyId: { in: subsidiaries },
+                        subsidiaryCompanyId: companyId,
+                    },
                 ],
             },
         });
         if (reverse)
             throw new common_1.BadRequestException('Reverse company hierarchy relation already exists');
         await tx.companyHierarchyRelation.deleteMany({
-            where: { OR: [{ parentCompanyId: companyId }, { subsidiaryCompanyId: companyId }] },
+            where: {
+                OR: [
+                    { parentCompanyId: companyId },
+                    { subsidiaryCompanyId: companyId },
+                ],
+            },
         });
         await tx.companyHierarchyRelation.createMany({
             data: [
-                ...parents.map((parentCompanyId) => ({ parentCompanyId, subsidiaryCompanyId: companyId })),
-                ...subsidiaries.map((subsidiaryCompanyId) => ({ parentCompanyId: companyId, subsidiaryCompanyId })),
+                ...parents.map((parentCompanyId) => ({
+                    parentCompanyId,
+                    subsidiaryCompanyId: companyId,
+                })),
+                ...subsidiaries.map((subsidiaryCompanyId) => ({
+                    parentCompanyId: companyId,
+                    subsidiaryCompanyId,
+                })),
             ],
             skipDuplicates: true,
         });
@@ -680,10 +784,12 @@ let CompaniesService = class CompaniesService {
     async assertHierarchyAcyclic(tx, companyId, parents, subsidiaries) {
         const relations = await tx.companyHierarchyRelation.findMany({
             where: {
-                parentCompany: { organizationId: (await tx.company.findUniqueOrThrow({
+                parentCompany: {
+                    organizationId: (await tx.company.findUniqueOrThrow({
                         where: { id: companyId },
                         select: { organizationId: true },
-                    })).organizationId },
+                    })).organizationId,
+                },
             },
             select: { parentCompanyId: true, subsidiaryCompanyId: true },
         });
@@ -694,7 +800,8 @@ let CompaniesService = class CompaniesService {
             graph.set(parent, children);
         };
         for (const relation of relations) {
-            if (relation.parentCompanyId !== companyId && relation.subsidiaryCompanyId !== companyId) {
+            if (relation.parentCompanyId !== companyId &&
+                relation.subsidiaryCompanyId !== companyId) {
                 addEdge(relation.parentCompanyId, relation.subsidiaryCompanyId);
             }
         }
@@ -728,6 +835,7 @@ exports.CompaniesService = CompaniesService = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
         audit_log_service_1.AuditLogService,
-        company_access_service_1.CompanyAccessService])
+        company_access_service_1.CompanyAccessService,
+        quota_service_1.QuotaService])
 ], CompaniesService);
 //# sourceMappingURL=companies.service.js.map

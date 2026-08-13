@@ -19,6 +19,11 @@ export interface SavedAttachmentObject {
 
 export interface AttachmentStorageService {
   save(input: SaveAttachmentInput): Promise<SavedAttachmentObject>;
+  delete(
+    objectKey: string,
+    storagePath?: string | null,
+    bucket?: string | null,
+  ): Promise<void>;
   getStream(
     objectKey: string,
     storagePath?: string | null,

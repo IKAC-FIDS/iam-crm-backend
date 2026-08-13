@@ -54,6 +54,14 @@
     "entitlements:backfill:dry-run": "node dist/src/entitlements/entitlement-maintenance.js backfill",
     "entitlements:backfill": "node dist/src/entitlements/entitlement-maintenance.js backfill --confirm-apply",
     "entitlements:validate": "node dist/src/entitlements/entitlement-maintenance.js validate",
+    "quota:preflight": "node dist/src/quota/quota-maintenance.js preflight",
+    "quota:bootstrap:dry-run": "node dist/src/quota/quota-maintenance.js bootstrap",
+    "quota:bootstrap": "node dist/src/quota/quota-maintenance.js bootstrap --confirm-apply",
+    "quota:backfill:dry-run": "node dist/src/quota/quota-maintenance.js backfill",
+    "quota:backfill": "node dist/src/quota/quota-maintenance.js backfill --confirm-apply",
+    "quota:reconcile:dry-run": "node dist/src/quota/quota-maintenance.js reconcile",
+    "quota:reconcile": "node dist/src/quota/quota-maintenance.js reconcile --confirm-apply",
+    "quota:validate": "node dist/src/quota/quota-maintenance.js validate",
     "ci": "npm run prisma:generate && npm run lint && npm run test && npm run build"
   },
   "dependencies": {

@@ -9,6 +9,7 @@ import { ConfigService } from '@nestjs/config';
 import { AttachmentStorageProvider } from '@prisma/client';
 import {
   GetObjectCommand,
+  DeleteObjectCommand,
   NoSuchKey,
   PutObjectCommand,
   S3Client,
@@ -133,6 +134,19 @@ export class MinioAttachmentStorageService implements AttachmentStorageService {
     }
   }
 
+  async delete(
+    objectKey: string,
+    _storagePath?: string | null,
+    bucket?: string | null,
+  ) {
+    await this.client.send(
+      new DeleteObjectCommand({
+        Bucket: bucket || this.bucket,
+        Key: objectKey,
+      }),
+    );
+  }
+
   private isObjectNotFoundError(error: unknown) {
     if (!error || typeof error !== 'object') {
       return false;
@@ -147,9 +161,8 @@ export class MinioAttachmentStorageService implements AttachmentStorageService {
     const code = candidate.name ?? candidate.Code ?? candidate.code;
 
     return (
-      error instanceof S3ServiceException &&
-        error.$metadata?.httpStatusCode === 404
-    ) || (
+      (error instanceof S3ServiceException &&
+        error.$metadata?.httpStatusCode === 404) ||
       code === 'NoSuchKey' ||
       code === 'NotFound' ||
       code === 'NoSuchBucket' ||

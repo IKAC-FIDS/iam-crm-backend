@@ -5,9 +5,10 @@ import { PipelineConfigModule } from '../admin/pipeline/pipeline-config.module';
 import { AttachmentsModule } from '../attachments/attachments.module';
 import { CompanyLegalDocumentsController } from './company-legal-documents.controller';
 import { CompanyLegalDocumentsService } from './company-legal-documents.service';
+import { QuotaModule } from '../quota/quota.module';
 
 @Module({
-  imports: [PipelineConfigModule, AttachmentsModule],
+  imports: [PipelineConfigModule, AttachmentsModule, QuotaModule],
   providers: [CompaniesService, CompanyLegalDocumentsService],
   controllers: [CompaniesController, CompanyLegalDocumentsController],
   exports: [CompaniesService],

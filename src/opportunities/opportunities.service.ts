@@ -4,7 +4,8 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { ActivityType, Prisma, UserRole } from '@prisma/client';
+import { ActivityType, Prisma, QuotaMetric, UserRole } from '@prisma/client';
+import { randomUUID } from 'node:crypto';
 import { PipelineConfigService } from '../admin/pipeline/pipeline-config.service';
 import { AuditLogService } from '../audit-log/audit-log.service';
 import { CurrentUserPayload } from '../common/decorators/current-user.decorator';
@@ -15,105 +16,108 @@ import { ChangeOpportunityStageDto } from './dto/change-opportunity-stage.dto';
 import { CreateOpportunityDto } from './dto/create-opportunity.dto';
 import { FindOpportunitiesDto } from './dto/find-opportunities.dto';
 import { UpdateOpportunityDto } from './dto/update-opportunity.dto';
-import { getCurrentOrganizationId, tenantScope } from '../common/tenant/tenant-scope.util';
-import { userMatchesTeam, userTeamScopeWhere } from '../common/tenant/team-scope.util';
+import {
+  getCurrentOrganizationId,
+  tenantScope,
+} from '../common/tenant/tenant-scope.util';
+import {
+  userMatchesTeam,
+  userTeamScopeWhere,
+} from '../common/tenant/team-scope.util';
 import { parseApiDate, parseApiDateRange } from '../common/dates/api-date.util';
 import { OwnershipScope } from '../common/dto/ownership-scope.dto';
 import { activeOpportunityStateWhere } from '../common/opportunities/active-opportunity-scope';
+import { QuotaService } from '../quota/quota.service';
 
 const opportunityInclude = {
   company: {
-      select: {
-        id: true,
-        legalName: true,
-        brandName: true,
-        industry: true,
-      },
+    select: {
+      id: true,
+      legalName: true,
+      brandName: true,
+      industry: true,
     },
-    owner: {
-      select: {
-        id: true,
-        fullName: true,
-        email: true,
-        team: true,
-      },
+  },
+  owner: {
+    select: {
+      id: true,
+      fullName: true,
+      email: true,
+      team: true,
     },
-    stage: {
-      select: {
-        id: true,
-        code: true,
-        label: true,
-        sortOrder: true,
-        color: true,
-        isTerminal: true,
-        terminalType: true,
-      },
+  },
+  stage: {
+    select: {
+      id: true,
+      code: true,
+      label: true,
+      sortOrder: true,
+      color: true,
+      isTerminal: true,
+      terminalType: true,
     },
-    sourceOption: {
-      select: {
-        id: true,
-        code: true,
-        label: true,
-      },
+  },
+  sourceOption: {
+    select: {
+      id: true,
+      code: true,
+      label: true,
     },
-    primaryContact: {
-      select: {
-        id: true,
-        fullName: true,
-        title: true,
-        department: true,
-        email: true,
-        phone: true,
-        isPrimaryContact: true,
-      },
+  },
+  primaryContact: {
+    select: {
+      id: true,
+      fullName: true,
+      title: true,
+      department: true,
+      email: true,
+      phone: true,
+      isPrimaryContact: true,
     },
-    _count: {
-      select: {
-        lineItems: true,
-        commercialDocuments: true,
-        payments: true,
-        tasks: true,
-      },
+  },
+  _count: {
+    select: {
+      lineItems: true,
+      commercialDocuments: true,
+      payments: true,
+      tasks: true,
     },
-commercialDocuments: {
-          orderBy: [
-            { createdAt: 'desc' },
-          ],
-          include: {
-            payments: {
-              select: {
-                id: true,
-                status: true,
-                amount: true,
-                currency: true,
-                dueDate: true,
-                paidAt: true,
-                method: true,
-                referenceNumber: true,
-              },
-              orderBy: {
-                createdAt: 'desc',
-              },
-            },
-          },
+  },
+  commercialDocuments: {
+    orderBy: [{ createdAt: 'desc' }],
+    include: {
+      payments: {
+        select: {
+          id: true,
+          status: true,
+          amount: true,
+          currency: true,
+          dueDate: true,
+          paidAt: true,
+          method: true,
+          referenceNumber: true,
         },
+        orderBy: {
+          createdAt: 'desc',
+        },
+      },
+    },
+  },
 
-        payments: {
-          orderBy: [
-            { createdAt: 'desc' },
-          ],
-          include: {
-            commercialDocument: {
-              select: {
-                id: true,
-                type: true,
-                status: true,
-                number: true,
-                title: true,
-              },
-            },
-          },
+  payments: {
+    orderBy: [{ createdAt: 'desc' }],
+    include: {
+      commercialDocument: {
+        select: {
+          id: true,
+          type: true,
+          status: true,
+          number: true,
+          title: true,
         },
+      },
+    },
+  },
 } satisfies Prisma.OpportunityInclude;
 
 @Injectable()
@@ -122,6 +126,7 @@ export class OpportunitiesService {
     private prisma: PrismaService,
     private pipelineConfig: PipelineConfigService,
     private audit: AuditLogService,
+    private quota: QuotaService,
   ) {}
 
   async findAll(query: FindOpportunitiesDto, user: CurrentUserPayload) {
@@ -168,10 +173,7 @@ export class OpportunitiesService {
   async findOne(id: string, user: CurrentUserPayload) {
     const opportunity = await this.prisma.opportunity.findFirst({
       where: {
-        AND: [
-          { id },
-          { organizationId: getCurrentOrganizationId(user) },
-        ],
+        AND: [{ id }, { organizationId: getCurrentOrganizationId(user) }],
       },
       include: {
         ...opportunityInclude,
@@ -220,16 +222,11 @@ export class OpportunitiesService {
               },
             },
           },
-          orderBy: [
-            { sortOrder: 'asc' },
-            { createdAt: 'asc' },
-          ],
+          orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
         },
 
         commercialDocuments: {
-          orderBy: [
-            { createdAt: 'desc' },
-          ],
+          orderBy: [{ createdAt: 'desc' }],
           include: {
             payments: {
               select: {
@@ -250,9 +247,7 @@ export class OpportunitiesService {
         },
 
         payments: {
-          orderBy: [
-            { createdAt: 'desc' },
-          ],
+          orderBy: [{ createdAt: 'desc' }],
           include: {
             commercialDocument: {
               select: {
@@ -285,10 +280,7 @@ export class OpportunitiesService {
               },
             },
           },
-          orderBy: [
-            { dueAt: 'asc' },
-            { createdAt: 'desc' },
-          ],
+          orderBy: [{ dueAt: 'asc' }, { createdAt: 'desc' }],
         },
       },
     });
@@ -318,36 +310,52 @@ export class OpportunitiesService {
       await this.validatePrimaryContact(dto.primaryContactId, company.id);
     }
 
-    const opportunity = await this.prisma.opportunity.create({
-      data: {
-        organizationId: company.organizationId,
-        companyId: company.id,
-        ownerId,
-        title: dto.title.trim(),
-        description: dto.description,
-        stageId: stage.id,
-        priority: dto.priority,
-        estimatedValue: dto.estimatedValue,
-        expectedCloseDate: dto.expectedCloseDate
-          ? parseApiDate(dto.expectedCloseDate, 'expectedCloseDate')
-          : undefined,
-        sourceOptionId: source.sourceOptionId,
-        source: source.source,
-        primaryContactId: dto.primaryContactId,
-        probability: dto.probability,
-        competitor: dto.competitor?.trim() || undefined,
-        wonAt: stage.terminalType === 'WON' ? new Date() : undefined,
-        lostAt: stage.terminalType === 'LOST' ? new Date() : undefined,
-        stageHistories: {
-          create: {
-            fromStageId: null,
-            toStageId: stage.id,
-            changedById: user.userId,
+    const reservation = await this.quota.reserve(
+      company.organizationId,
+      QuotaMetric.OPPORTUNITIES,
+      1n,
+      `opportunity:create:${randomUUID()}`,
+      new Date(),
+      user.userId,
+      user.tenantContext?.requestId,
+    );
+    let opportunity;
+    try {
+      opportunity = await this.prisma.opportunity.create({
+        data: {
+          organizationId: company.organizationId,
+          companyId: company.id,
+          ownerId,
+          title: dto.title.trim(),
+          description: dto.description,
+          stageId: stage.id,
+          priority: dto.priority,
+          estimatedValue: dto.estimatedValue,
+          expectedCloseDate: dto.expectedCloseDate
+            ? parseApiDate(dto.expectedCloseDate, 'expectedCloseDate')
+            : undefined,
+          sourceOptionId: source.sourceOptionId,
+          source: source.source,
+          primaryContactId: dto.primaryContactId,
+          probability: dto.probability,
+          competitor: dto.competitor?.trim() || undefined,
+          wonAt: stage.terminalType === 'WON' ? new Date() : undefined,
+          lostAt: stage.terminalType === 'LOST' ? new Date() : undefined,
+          stageHistories: {
+            create: {
+              fromStageId: null,
+              toStageId: stage.id,
+              changedById: user.userId,
+            },
           },
         },
-      },
-      include: opportunityInclude,
-    });
+        include: opportunityInclude,
+      });
+    } catch (error) {
+      await this.quota.releaseReservation(reservation.reservationId);
+      throw error;
+    }
+    await this.quota.commitReservation(reservation.reservationId);
 
     await this.audit.record({
       actorId: user.userId,
@@ -360,7 +368,11 @@ export class OpportunitiesService {
     return opportunity;
   }
 
-  async update(id: string, dto: UpdateOpportunityDto, user: CurrentUserPayload) {
+  async update(
+    id: string,
+    dto: UpdateOpportunityDto,
+    user: CurrentUserPayload,
+  ) {
     const current = await this.getForMutation(id, user);
     const source =
       dto.sourceOptionId !== undefined ||
@@ -374,7 +386,10 @@ export class OpportunitiesService {
         : undefined;
 
     if (dto.primaryContactId) {
-      await this.validatePrimaryContact(dto.primaryContactId, current.companyId);
+      await this.validatePrimaryContact(
+        dto.primaryContactId,
+        current.companyId,
+      );
     }
 
     const {
@@ -397,7 +412,10 @@ export class OpportunitiesService {
           title: dto.title.trim(),
         }),
         ...(dto.expectedCloseDate !== undefined && {
-          expectedCloseDate: parseApiDate(dto.expectedCloseDate, 'expectedCloseDate'),
+          expectedCloseDate: parseApiDate(
+            dto.expectedCloseDate,
+            'expectedCloseDate',
+          ),
         }),
         ...(source !== undefined && {
           sourceOptionId: source.sourceOptionId,
@@ -412,7 +430,6 @@ export class OpportunitiesService {
       },
       include: opportunityInclude,
     });
-
     await this.audit.record({
       actorId: user.userId,
       entityType: 'opportunity',
@@ -433,7 +450,9 @@ export class OpportunitiesService {
     const current = await this.getForMutation(id, user);
 
     if (current.archivedAt) {
-      throw new BadRequestException('Archived opportunities cannot change stage');
+      throw new BadRequestException(
+        'Archived opportunities cannot change stage',
+      );
     }
 
     if (!dto.stageId && !dto.stage) {
@@ -559,6 +578,10 @@ export class OpportunitiesService {
       },
       include: opportunityInclude,
     });
+    await this.quota.synchronizeInventory(
+      getCurrentOrganizationId(user),
+      QuotaMetric.OPPORTUNITIES,
+    );
 
     await this.audit.record({
       actorId: user.userId,
@@ -579,15 +602,31 @@ export class OpportunitiesService {
       throw new BadRequestException('Opportunity is not archived');
     }
 
-    const updated = await this.prisma.opportunity.update({
-      where: { id },
-      data: {
-        archivedAt: null,
-        archivedById: null,
-        archiveReason: null,
-      },
-      include: opportunityInclude,
-    });
+    const reservation = await this.quota.reserve(
+      getCurrentOrganizationId(user),
+      QuotaMetric.OPPORTUNITIES,
+      1n,
+      `opportunity:restore:${id}`,
+      new Date(),
+      user.userId,
+      user.tenantContext?.requestId,
+    );
+    let updated;
+    try {
+      updated = await this.prisma.opportunity.update({
+        where: { id },
+        data: {
+          archivedAt: null,
+          archivedById: null,
+          archiveReason: null,
+        },
+        include: opportunityInclude,
+      });
+    } catch (error) {
+      await this.quota.releaseReservation(reservation.reservationId);
+      throw error;
+    }
+    await this.quota.commitReservation(reservation.reservationId);
 
     await this.audit.record({
       actorId: user.userId,
@@ -606,7 +645,9 @@ export class OpportunitiesService {
     user: CurrentUserPayload,
   ): Prisma.OpportunityWhereInput {
     if (query.activeOnly === 'true' && query.archivedOnly === 'true') {
-      throw new BadRequestException('activeOnly=true cannot be combined with archivedOnly=true');
+      throw new BadRequestException(
+        'activeOnly=true cannot be combined with archivedOnly=true',
+      );
     }
     const and: Prisma.OpportunityWhereInput[] = [
       {
@@ -645,8 +686,16 @@ export class OpportunitiesService {
         owner: {
           OR: [
             { team: query.team.trim() },
-            { teamRef: { code: { equals: query.team.trim(), mode: 'insensitive' } } },
-            { teamRef: { name: { equals: query.team.trim(), mode: 'insensitive' } } },
+            {
+              teamRef: {
+                code: { equals: query.team.trim(), mode: 'insensitive' },
+              },
+            },
+            {
+              teamRef: {
+                name: { equals: query.team.trim(), mode: 'insensitive' },
+              },
+            },
           ],
         },
       });
@@ -795,10 +844,7 @@ export class OpportunitiesService {
     switch (scope ?? OwnershipScope.ALL) {
       case OwnershipScope.MINE:
         return {
-          OR: [
-            { ownerId: user.userId },
-            { company: { ownerId: user.userId } },
-          ],
+          OR: [{ ownerId: user.userId }, { company: { ownerId: user.userId } }],
         };
       case OwnershipScope.TEAM:
         return { owner: userTeamScopeWhere(user) };
@@ -809,7 +855,9 @@ export class OpportunitiesService {
     }
   }
 
-  private mutationScopeWhere(user: CurrentUserPayload): Prisma.OpportunityWhereInput {
+  private mutationScopeWhere(
+    user: CurrentUserPayload,
+  ): Prisma.OpportunityWhereInput {
     if (user.role === UserRole.ADMIN || user.role === UserRole.BOARDS) {
       return {};
     }
@@ -865,10 +913,7 @@ export class OpportunitiesService {
     return item;
   }
 
-  private async getCompanyInScope(
-    companyId: string,
-    user: CurrentUserPayload,
-  ) {
+  private async getCompanyInScope(companyId: string, user: CurrentUserPayload) {
     const company = await this.prisma.company.findFirst({
       where: {
         id: companyId,
@@ -913,10 +958,7 @@ export class OpportunitiesService {
       throw new ForbiddenException('REP can only assign opportunities to self');
     }
 
-    if (
-      user.role === UserRole.MANAGER &&
-      !userMatchesTeam(owner, user)
-    ) {
+    if (user.role === UserRole.MANAGER && !userMatchesTeam(owner, user)) {
       throw new ForbiddenException('Owner must belong to the manager team');
     }
   }

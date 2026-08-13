@@ -2,9 +2,10 @@ import { Module } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { UsersController } from './users.controller';
 import { OrganizationMembershipsModule } from '../organization-memberships/organization-memberships.module';
+import { QuotaModule } from '../quota/quota.module';
 
 @Module({
-  imports: [OrganizationMembershipsModule],
+  imports: [OrganizationMembershipsModule, QuotaModule],
   providers: [UsersService],
   controllers: [UsersController],
   exports: [UsersService],

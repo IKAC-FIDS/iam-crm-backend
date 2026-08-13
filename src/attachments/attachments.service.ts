@@ -12,6 +12,7 @@ import {
   FileAttachmentEntityType,
   MeetingStatus,
   Prisma,
+  QuotaMetric,
   UserRole,
 } from '@prisma/client';
 import { getCurrentOrganizationId } from '../common/tenant/tenant-scope.util';
@@ -27,6 +28,7 @@ import {
   ATTACHMENT_STORAGE,
   AttachmentStorageService,
 } from './storage/attachment-storage.types';
+import { QuotaService } from '../quota/quota.service';
 
 @Injectable()
 export class AttachmentsService {
@@ -38,6 +40,7 @@ export class AttachmentsService {
     private readonly audit: AuditLogService,
     @Inject(ATTACHMENT_STORAGE)
     private readonly storage: AttachmentStorageService,
+    private readonly quota: QuotaService,
   ) {}
 
   async findAll(query: FindAttachmentsDto, user: CurrentUserPayload) {
@@ -115,31 +118,77 @@ export class AttachmentsService {
     const relativeDirectory = join(year, month);
     const sha256 = createHash('sha256').update(file.buffer).digest('hex');
 
-    const stored = await this.storage.save({
-      buffer: file.buffer,
-      storedFileName,
-      relativeDirectory,
-      mimeType: file.mimetype,
-    });
-
-    const attachment = await this.prisma.fileAttachment.create({
-      data: {
-        organizationId: getCurrentOrganizationId(user),
-        entityType: dto.entityType,
-        entityId: dto.entityId,
-        storageProvider: stored.storageProvider,
-        bucket: stored.bucket,
-        objectKey: stored.objectKey,
-        storagePath: stored.storagePath,
-        originalFileName,
+    const organizationId = getCurrentOrganizationId(user);
+    const fileReservation = await this.quota.reserve(
+      organizationId,
+      QuotaMetric.FILES,
+      1n,
+      `attachment:file:${storedFileName}`,
+      now,
+      user.userId,
+      user.tenantContext?.requestId,
+    );
+    let byteReservation;
+    try {
+      byteReservation = await this.quota.reserve(
+        organizationId,
+        QuotaMetric.STORAGE_BYTES,
+        BigInt(file.size),
+        `attachment:bytes:${storedFileName}`,
+        now,
+        user.userId,
+        user.tenantContext?.requestId,
+      );
+    } catch (error) {
+      await this.quota.releaseReservation(fileReservation.reservationId);
+      throw error;
+    }
+    let stored: Awaited<ReturnType<AttachmentStorageService['save']>> | null =
+      null;
+    let attachment: FileAttachment | null = null;
+    try {
+      stored = await this.storage.save({
+        buffer: file.buffer,
         storedFileName,
+        relativeDirectory,
         mimeType: file.mimetype,
-        sizeBytes: file.size,
-        sha256,
-        description: dto.description?.trim() || undefined,
-        uploadedById: user.userId,
-      },
-    });
+      });
+
+      attachment = await this.prisma.fileAttachment.create({
+        data: {
+          organizationId,
+          entityType: dto.entityType,
+          entityId: dto.entityId,
+          storageProvider: stored.storageProvider,
+          bucket: stored.bucket,
+          objectKey: stored.objectKey,
+          storagePath: stored.storagePath,
+          originalFileName,
+          storedFileName,
+          mimeType: file.mimetype,
+          sizeBytes: file.size,
+          sha256,
+          description: dto.description?.trim() || undefined,
+          uploadedById: user.userId,
+        },
+      });
+    } catch (error) {
+      if (stored && !attachment)
+        await this.storage.delete(
+          stored.objectKey,
+          stored.storagePath,
+          stored.bucket,
+        );
+      await Promise.all([
+        this.quota.releaseReservation(fileReservation.reservationId),
+        this.quota.releaseReservation(byteReservation.reservationId),
+      ]);
+      throw error;
+    }
+    await this.quota.commitReservations([
+      fileReservation.reservationId,
+      byteReservation.reservationId,
+    ]);
 
     await this.audit.record({
       actorId: user.userId,
@@ -208,6 +257,16 @@ export class AttachmentsService {
         deletedById: user.userId,
       },
     });
+    await Promise.all([
+      this.quota.synchronizeInventory(
+        getCurrentOrganizationId(user),
+        QuotaMetric.FILES,
+      ),
+      this.quota.synchronizeInventory(
+        getCurrentOrganizationId(user),
+        QuotaMetric.STORAGE_BYTES,
+      ),
+    ]);
 
     await this.audit.record({
       actorId: user.userId,
@@ -325,7 +384,17 @@ export class AttachmentsService {
   }
 
   private sanitizeFileName(fileName: string) {
-    const unsafeCharacters = new Set(['<', '>', ':', '"', '/', '\\', '|', '?', '*']);
+    const unsafeCharacters = new Set([
+      '<',
+      '>',
+      ':',
+      '"',
+      '/',
+      '\\',
+      '|',
+      '?',
+      '*',
+    ]);
     const cleanName = Array.from(basename(fileName))
       .map((char) =>
         unsafeCharacters.has(char) || char.charCodeAt(0) < 32 ? '_' : char,
@@ -381,20 +450,21 @@ export class AttachmentsService {
     }
 
     if (entityType === FileAttachmentEntityType.COMMERCIAL_DOCUMENT) {
-      const document = await this.prisma.opportunityCommercialDocument.findFirst({
-        where: {
-          id: entityId,
-          opportunity: {
-            AND: [
-              { organizationId: getCurrentOrganizationId(user) },
-              this.opportunityScopeWhere(user),
-            ],
+      const document =
+        await this.prisma.opportunityCommercialDocument.findFirst({
+          where: {
+            id: entityId,
+            opportunity: {
+              AND: [
+                { organizationId: getCurrentOrganizationId(user) },
+                this.opportunityScopeWhere(user),
+              ],
+            },
           },
-        },
-        include: {
-          opportunity: true,
-        },
-      });
+          include: {
+            opportunity: true,
+          },
+        });
 
       if (!document) {
         throw new NotFoundException('Commercial document not found');

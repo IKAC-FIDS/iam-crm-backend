@@ -5,6 +5,7 @@ import { normalizeCompanyPhone } from '../src/companies/company-phone.util';
 import { CreateCompanyDto } from '../src/companies/dto/create-company.dto';
 import { UpdateCompanyDto } from '../src/companies/dto/update-company.dto';
 import { tenantUser } from './helpers/tenant-user';
+import { quotaMock } from './helpers/quota';
 
 const organizationId = '00000000-0000-4000-8000-000000000001';
 const companyId = '00000000-0000-4000-8000-000000000010';
@@ -68,6 +69,7 @@ function setup() {
       prisma as any,
       audit as any,
       companyAccess as any,
+      quotaMock() as any,
     ),
   };
 }
@@ -84,9 +86,7 @@ describe('company central phone normalization', () => {
 
   it('preserves leading zero and an optional leading plus sign', () => {
     expect(normalizeCompanyPhone(' 021 57985000 ')).toBe('02157985000');
-    expect(normalizeCompanyPhone(' +98 (21) 57985000 ')).toBe(
-      '+982157985000',
-    );
+    expect(normalizeCompanyPhone(' +98 (21) 57985000 ')).toBe('+982157985000');
   });
 
   it('rejects an alphabetic phone through the create contract', async () => {
@@ -140,7 +140,9 @@ describe('CompaniesService central phone persistence', () => {
   it('leaves an omitted create phone unset so PostgreSQL stores null', async () => {
     const { service, tx } = setup();
     await service.create({ legalName: 'شرکت نمونه' }, user);
-    expect(tx.company.create.mock.calls[0][0].data.centralPhone).toBeUndefined();
+    expect(
+      tx.company.create.mock.calls[0][0].data.centralPhone,
+    ).toBeUndefined();
   });
 
   it('changes, retains, and clears centralPhone according to update presence', async () => {
@@ -153,7 +155,9 @@ describe('CompaniesService central phone persistence', () => {
 
     tx.company.update.mockClear();
     await service.update(companyId, { legalName: 'نام جدید' }, user);
-    expect(tx.company.update.mock.calls[0][0].data.centralPhone).toBeUndefined();
+    expect(
+      tx.company.update.mock.calls[0][0].data.centralPhone,
+    ).toBeUndefined();
 
     tx.company.update.mockClear();
     await service.update(companyId, { centralPhone: null }, user);

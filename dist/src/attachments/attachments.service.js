@@ -24,12 +24,14 @@ const node_path_1 = require("node:path");
 const audit_log_service_1 = require("../audit-log/audit-log.service");
 const prisma_service_1 = require("../prisma/prisma.service");
 const attachment_storage_types_1 = require("./storage/attachment-storage.types");
+const quota_service_1 = require("../quota/quota.service");
 let AttachmentsService = AttachmentsService_1 = class AttachmentsService {
-    constructor(prisma, config, audit, storage) {
+    constructor(prisma, config, audit, storage, quota) {
         this.prisma = prisma;
         this.config = config;
         this.audit = audit;
         this.storage = storage;
+        this.quota = quota;
         this.logger = new common_1.Logger(AttachmentsService_1.name);
     }
     async findAll(query, user) {
@@ -85,30 +87,57 @@ let AttachmentsService = AttachmentsService_1 = class AttachmentsService {
         const storedFileName = `${(0, node_crypto_1.randomUUID)()}${extension}`;
         const relativeDirectory = (0, node_path_1.join)(year, month);
         const sha256 = (0, node_crypto_1.createHash)('sha256').update(file.buffer).digest('hex');
-        const stored = await this.storage.save({
-            buffer: file.buffer,
-            storedFileName,
-            relativeDirectory,
-            mimeType: file.mimetype,
-        });
-        const attachment = await this.prisma.fileAttachment.create({
-            data: {
-                organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
-                entityType: dto.entityType,
-                entityId: dto.entityId,
-                storageProvider: stored.storageProvider,
-                bucket: stored.bucket,
-                objectKey: stored.objectKey,
-                storagePath: stored.storagePath,
-                originalFileName,
+        const organizationId = (0, tenant_scope_util_1.getCurrentOrganizationId)(user);
+        const fileReservation = await this.quota.reserve(organizationId, client_1.QuotaMetric.FILES, 1n, `attachment:file:${storedFileName}`, now, user.userId, user.tenantContext?.requestId);
+        let byteReservation;
+        try {
+            byteReservation = await this.quota.reserve(organizationId, client_1.QuotaMetric.STORAGE_BYTES, BigInt(file.size), `attachment:bytes:${storedFileName}`, now, user.userId, user.tenantContext?.requestId);
+        }
+        catch (error) {
+            await this.quota.releaseReservation(fileReservation.reservationId);
+            throw error;
+        }
+        let stored = null;
+        let attachment = null;
+        try {
+            stored = await this.storage.save({
+                buffer: file.buffer,
                 storedFileName,
+                relativeDirectory,
                 mimeType: file.mimetype,
-                sizeBytes: file.size,
-                sha256,
-                description: dto.description?.trim() || undefined,
-                uploadedById: user.userId,
-            },
-        });
+            });
+            attachment = await this.prisma.fileAttachment.create({
+                data: {
+                    organizationId,
+                    entityType: dto.entityType,
+                    entityId: dto.entityId,
+                    storageProvider: stored.storageProvider,
+                    bucket: stored.bucket,
+                    objectKey: stored.objectKey,
+                    storagePath: stored.storagePath,
+                    originalFileName,
+                    storedFileName,
+                    mimeType: file.mimetype,
+                    sizeBytes: file.size,
+                    sha256,
+                    description: dto.description?.trim() || undefined,
+                    uploadedById: user.userId,
+                },
+            });
+        }
+        catch (error) {
+            if (stored && !attachment)
+                await this.storage.delete(stored.objectKey, stored.storagePath, stored.bucket);
+            await Promise.all([
+                this.quota.releaseReservation(fileReservation.reservationId),
+                this.quota.releaseReservation(byteReservation.reservationId),
+            ]);
+            throw error;
+        }
+        await this.quota.commitReservations([
+            fileReservation.reservationId,
+            byteReservation.reservationId,
+        ]);
         await this.audit.record({
             actorId: user.userId,
             entityType: 'file-attachment',
@@ -151,6 +180,10 @@ let AttachmentsService = AttachmentsService_1 = class AttachmentsService {
                 deletedById: user.userId,
             },
         });
+        await Promise.all([
+            this.quota.synchronizeInventory((0, tenant_scope_util_1.getCurrentOrganizationId)(user), client_1.QuotaMetric.FILES),
+            this.quota.synchronizeInventory((0, tenant_scope_util_1.getCurrentOrganizationId)(user), client_1.QuotaMetric.STORAGE_BYTES),
+        ]);
         await this.audit.record({
             actorId: user.userId,
             entityType: 'file-attachment',
@@ -239,7 +272,17 @@ let AttachmentsService = AttachmentsService_1 = class AttachmentsService {
             .filter(Boolean);
     }
     sanitizeFileName(fileName) {
-        const unsafeCharacters = new Set(['<', '>', ':', '"', '/', '\\', '|', '?', '*']);
+        const unsafeCharacters = new Set([
+            '<',
+            '>',
+            ':',
+            '"',
+            '/',
+            '\\',
+            '|',
+            '?',
+            '*',
+        ]);
         const cleanName = Array.from((0, node_path_1.basename)(fileName))
             .map((char) => unsafeCharacters.has(char) || char.charCodeAt(0) < 32 ? '_' : char)
             .join('')
@@ -393,6 +436,6 @@ exports.AttachmentsService = AttachmentsService = AttachmentsService_1 = __decor
     __param(3, (0, common_1.Inject)(attachment_storage_types_1.ATTACHMENT_STORAGE)),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
         config_1.ConfigService,
-        audit_log_service_1.AuditLogService, Object])
+        audit_log_service_1.AuditLogService, Object, quota_service_1.QuotaService])
 ], AttachmentsService);
 //# sourceMappingURL=attachments.service.js.map

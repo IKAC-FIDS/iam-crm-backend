@@ -2,9 +2,13 @@ import { NotFoundException } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { ActivitiesService } from '../src/activities/activities.service';
 import { AttachmentsService } from '../src/attachments/attachments.service';
+import { quotaMock } from './helpers/quota';
 import { AuditLogService } from '../src/audit-log/audit-log.service';
 import { CompanyAccessService } from '../src/companies/company-access.service';
-import { getCurrentOrganizationId, tenantScope } from '../src/common/tenant/tenant-scope.util';
+import {
+  getCurrentOrganizationId,
+  tenantScope,
+} from '../src/common/tenant/tenant-scope.util';
 import { MeetingsService } from '../src/meetings/meetings.service';
 import { NotificationsService } from '../src/notifications/notifications.service';
 import { PeopleService } from '../src/people/people.service';
@@ -42,19 +46,16 @@ describe('fix 000085 Tenant Scope enforcement', () => {
       AND: [{ id: 'record-a' }, { organizationId: 'tenant-a' }],
     });
     expect(tenantScope.throughCompany(tenantA, { id: 'child-a' })).toEqual({
-      AND: [
-        { id: 'child-a' },
-        { company: { organizationId: 'tenant-a' } },
-      ],
+      AND: [{ id: 'child-a' }, { company: { organizationId: 'tenant-a' } }],
     });
   });
 
   it('returns non-enumerating not-found for a foreign Company ID', async () => {
     const findFirst = jest.fn().mockResolvedValue(null);
     const service = new CompanyAccessService({ company: { findFirst } } as any);
-    await expect(service.assertCompanyMutable('company-b', tenantA)).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(
+      service.assertCompanyMutable('company-b', tenantA),
+    ).rejects.toBeInstanceOf(NotFoundException);
     expect(findFirst).toHaveBeenCalledWith({
       where: { id: 'company-b', organizationId: 'tenant-a', archivedAt: null },
     });
@@ -67,8 +68,13 @@ describe('fix 000085 Tenant Scope enforcement', () => {
         count: jest.fn().mockResolvedValue(0),
       },
     };
-    await new PeopleService(peoplePrisma as any, {} as any).findDirectory({}, tenantA);
-    expect(peoplePrisma.person.findMany.mock.calls[0][0].where.AND).toContainEqual({
+    await new PeopleService(peoplePrisma as any, {} as any).findDirectory(
+      {},
+      tenantA,
+    );
+    expect(
+      peoplePrisma.person.findMany.mock.calls[0][0].where.AND,
+    ).toContainEqual({
       company: { organizationId: 'tenant-a', archivedAt: null },
     });
 
@@ -78,8 +84,14 @@ describe('fix 000085 Tenant Scope enforcement', () => {
         count: jest.fn().mockResolvedValue(0),
       },
     };
-    await new ActivitiesService(activityPrisma as any, {} as any, {} as any).findAll({}, tenantA);
-    expect(activityPrisma.activity.findMany.mock.calls[0][0].where.AND).toContainEqual({
+    await new ActivitiesService(
+      activityPrisma as any,
+      {} as any,
+      {} as any,
+    ).findAll({}, tenantA);
+    expect(
+      activityPrisma.activity.findMany.mock.calls[0][0].where.AND,
+    ).toContainEqual({
       company: { organizationId: 'tenant-a', archivedAt: null },
     });
   });
@@ -87,9 +99,14 @@ describe('fix 000085 Tenant Scope enforcement', () => {
   it('blocks cross-Tenant create relations before child creation', async () => {
     const create = jest.fn();
     const companyAccess = {
-      assertCompanyMutable: jest.fn().mockRejectedValue(new NotFoundException('Company not found')),
+      assertCompanyMutable: jest
+        .fn()
+        .mockRejectedValue(new NotFoundException('Company not found')),
     };
-    const service = new PeopleService({ person: { create } } as any, companyAccess as any);
+    const service = new PeopleService(
+      { person: { create } } as any,
+      companyAccess as any,
+    );
     await expect(
       service.create(
         { companyId: 'company-b', fullName: 'Foreign relation' } as any,
@@ -108,9 +125,9 @@ describe('fix 000085 Tenant Scope enforcement', () => {
       },
     };
     const service = new PeopleService(prisma as any, {} as any);
-    await expect(service.update('person-b', { fullName: 'Changed' } as any, tenantA)).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(
+      service.update('person-b', { fullName: 'Changed' } as any, tenantA),
+    ).rejects.toBeInstanceOf(NotFoundException);
     await expect(service.remove('person-b', tenantA)).rejects.toBeInstanceOf(
       NotFoundException,
     );
@@ -128,26 +145,38 @@ describe('fix 000085 Tenant Scope enforcement', () => {
 
   it('blocks foreign attachment download before object storage access', async () => {
     const storage = { getStream: jest.fn() };
-    const prisma = { fileAttachment: { findFirst: jest.fn().mockResolvedValue(null) } };
+    const prisma = {
+      fileAttachment: { findFirst: jest.fn().mockResolvedValue(null) },
+    };
     const service = new AttachmentsService(
       prisma as any,
       { get: jest.fn() } as any,
       { record: jest.fn() } as any,
       storage as any,
+      quotaMock() as any,
     );
-    await expect(service.getDownloadStream('attachment-b', tenantA)).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(
+      service.getDownloadStream('attachment-b', tenantA),
+    ).rejects.toBeInstanceOf(NotFoundException);
     expect(prisma.fileAttachment.findFirst).toHaveBeenCalledWith({
-      where: { id: 'attachment-b', organizationId: 'tenant-a', deletedAt: null },
+      where: {
+        id: 'attachment-b',
+        organizationId: 'tenant-a',
+        deletedAt: null,
+      },
     });
     expect(storage.getStream).not.toHaveBeenCalled();
   });
 
   it('scopes Meeting and Notification ID/list access directly', async () => {
-    const meetingPrisma = { meeting: { findFirst: jest.fn().mockResolvedValue(null) } };
+    const meetingPrisma = {
+      meeting: { findFirst: jest.fn().mockResolvedValue(null) },
+    };
     await expect(
-      new MeetingsService(meetingPrisma as any, {} as any).findOne('meeting-b', tenantA),
+      new MeetingsService(meetingPrisma as any, {} as any).findOne(
+        'meeting-b',
+        tenantA,
+      ),
     ).rejects.toBeInstanceOf(NotFoundException);
     expect(meetingPrisma.meeting.findFirst.mock.calls[0][0].where).toEqual({
       id: 'meeting-b',
@@ -164,8 +193,13 @@ describe('fix 000085 Tenant Scope enforcement', () => {
       async (_context: unknown, callback: (tx: unknown) => unknown) =>
         callback(notificationPrisma),
     );
-    await new NotificationsService(notificationPrisma as any, {} as any).findAll({}, tenantA);
-    expect(notificationPrisma.notification.findMany.mock.calls[0][0].where.AND[0]).toEqual({
+    await new NotificationsService(
+      notificationPrisma as any,
+      {} as any,
+    ).findAll({}, tenantA);
+    expect(
+      notificationPrisma.notification.findMany.mock.calls[0][0].where.AND[0],
+    ).toEqual({
       organizationId: 'tenant-a',
       recipientId: 'user-a',
     });
@@ -189,7 +223,9 @@ describe('fix 000085 Tenant Scope enforcement', () => {
       { getContext: jest.fn() } as any,
       {} as any,
     ).findAll({}, tenantA);
-    expect(prisma.auditLog.findMany.mock.calls[0][0].where.organizationId).toBe('tenant-a');
+    expect(prisma.auditLog.findMany.mock.calls[0][0].where.organizationId).toBe(
+      'tenant-a',
+    );
   });
 
   it('requires active Membership scope for cross-user relationships', () => {

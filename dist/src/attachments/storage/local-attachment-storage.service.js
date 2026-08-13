@@ -43,6 +43,15 @@ let LocalAttachmentStorageService = class LocalAttachmentStorageService {
         }
         return (0, node_fs_1.createReadStream)(absolutePath);
     }
+    async delete(objectKey) {
+        try {
+            await (0, promises_1.unlink)(this.resolveStoragePath(objectKey));
+        }
+        catch (error) {
+            if (error.code !== 'ENOENT')
+                throw error;
+        }
+    }
     getStorageRoot() {
         return (0, node_path_1.resolve)(process.cwd(), this.config.get('ATTACHMENT_STORAGE_ROOT', 'storage/attachments'));
     }

@@ -52,6 +52,7 @@ const meetings_module_1 = require("./meetings/meetings.module");
 const exchange_rates_module_1 = require("./admin/exchange-rates/exchange-rates.module");
 const dashboard_module_1 = require("./dashboard/dashboard.module");
 const entitlements_module_1 = require("./entitlements/entitlements.module");
+const quota_module_1 = require("./quota/quota.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -69,8 +70,8 @@ exports.AppModule = AppModule = __decorate([
                 useFactory: (config) => ({
                     throttlers: [
                         {
-                            ttl: config.get("THROTTLE_TTL", 60000),
-                            limit: config.get("THROTTLE_LIMIT", 100),
+                            ttl: config.get('THROTTLE_TTL', 60000),
+                            limit: config.get('THROTTLE_LIMIT', 100),
                         },
                     ],
                 }),
@@ -114,6 +115,7 @@ exports.AppModule = AppModule = __decorate([
             exchange_rates_module_1.ExchangeRatesModule,
             dashboard_module_1.DashboardModule,
             entitlements_module_1.EntitlementsModule,
+            quota_module_1.QuotaModule,
         ],
         providers: [
             {

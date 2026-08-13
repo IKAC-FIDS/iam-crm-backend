@@ -14,12 +14,13 @@ const pipeline_config_module_1 = require("../admin/pipeline/pipeline-config.modu
 const attachments_module_1 = require("../attachments/attachments.module");
 const company_legal_documents_controller_1 = require("./company-legal-documents.controller");
 const company_legal_documents_service_1 = require("./company-legal-documents.service");
+const quota_module_1 = require("../quota/quota.module");
 let CompaniesModule = class CompaniesModule {
 };
 exports.CompaniesModule = CompaniesModule;
 exports.CompaniesModule = CompaniesModule = __decorate([
     (0, common_1.Module)({
-        imports: [pipeline_config_module_1.PipelineConfigModule, attachments_module_1.AttachmentsModule],
+        imports: [pipeline_config_module_1.PipelineConfigModule, attachments_module_1.AttachmentsModule, quota_module_1.QuotaModule],
         providers: [companies_service_1.CompaniesService, company_legal_documents_service_1.CompanyLegalDocumentsService],
         controllers: [companies_controller_1.CompaniesController, company_legal_documents_controller_1.CompanyLegalDocumentsController],
         exports: [companies_service_1.CompaniesService],

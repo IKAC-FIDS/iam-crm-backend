@@ -11,6 +11,7 @@ import {
 } from '@prisma/client';
 import { Readable } from 'node:stream';
 import { AttachmentsService } from '../src/attachments/attachments.service';
+import { quotaMock } from './helpers/quota';
 import { tenantUser } from './helpers/tenant-user';
 
 const organizationId = '00000000-0000-4000-8000-000000000001';
@@ -68,14 +69,22 @@ function setup(meetingStatus: MeetingStatus | null = MeetingStatus.COMPLETED) {
         deletedById: user.userId,
       }),
     },
-    opportunity: { findFirst: jest.fn().mockResolvedValue({ archivedAt: null }) },
+    opportunity: {
+      findFirst: jest.fn().mockResolvedValue({ archivedAt: null }),
+    },
     opportunityCommercialDocument: {
-      findFirst: jest.fn().mockResolvedValue({ opportunity: { archivedAt: null } }),
+      findFirst: jest
+        .fn()
+        .mockResolvedValue({ opportunity: { archivedAt: null } }),
     },
     opportunityPayment: {
-      findFirst: jest.fn().mockResolvedValue({ opportunity: { archivedAt: null } }),
+      findFirst: jest
+        .fn()
+        .mockResolvedValue({ opportunity: { archivedAt: null } }),
     },
-    companyLegalDocument: { findFirst: jest.fn().mockResolvedValue({ id: 'legal-1' }) },
+    companyLegalDocument: {
+      findFirst: jest.fn().mockResolvedValue({ id: 'legal-1' }),
+    },
   };
   const audit = { record: jest.fn().mockResolvedValue(undefined) };
   const storage = {
@@ -87,7 +96,9 @@ function setup(meetingStatus: MeetingStatus | null = MeetingStatus.COMPLETED) {
     }),
     getStream: jest.fn().mockResolvedValue(Readable.from('minutes')),
   };
-  const config = { get: jest.fn((_key: string, fallback: unknown) => fallback) };
+  const config = {
+    get: jest.fn((_key: string, fallback: unknown) => fallback),
+  };
   return {
     prisma,
     audit,
@@ -97,6 +108,7 @@ function setup(meetingStatus: MeetingStatus | null = MeetingStatus.COMPLETED) {
       config as any,
       audit as any,
       storage as any,
+      quotaMock() as any,
     ),
   };
 }
@@ -262,6 +274,8 @@ describe('AttachmentsService meeting attachments', () => {
     const { service } = setup();
     await expect(
       (service as any).assertEntityAccess('UNSUPPORTED', meetingId, user),
-    ).rejects.toThrow(new BadRequestException('Unsupported attachment entity type'));
+    ).rejects.toThrow(
+      new BadRequestException('Unsupported attachment entity type'),
+    );
   });
 });

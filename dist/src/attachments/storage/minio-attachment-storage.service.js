@@ -92,14 +92,21 @@ let MinioAttachmentStorageService = MinioAttachmentStorageService_1 = class Mini
             });
         }
     }
+    async delete(objectKey, _storagePath, bucket) {
+        await this.client.send(new client_s3_1.DeleteObjectCommand({
+            Bucket: bucket || this.bucket,
+            Key: objectKey,
+        }));
+    }
     isObjectNotFoundError(error) {
         if (!error || typeof error !== 'object') {
             return false;
         }
         const candidate = error;
         const code = candidate.name ?? candidate.Code ?? candidate.code;
-        return (error instanceof client_s3_1.S3ServiceException &&
-            error.$metadata?.httpStatusCode === 404) || (code === 'NoSuchKey' ||
+        return ((error instanceof client_s3_1.S3ServiceException &&
+            error.$metadata?.httpStatusCode === 404) ||
+            code === 'NoSuchKey' ||
             code === 'NotFound' ||
             code === 'NoSuchBucket' ||
             code === 'NotFoundError' ||

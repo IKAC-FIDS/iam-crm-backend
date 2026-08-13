@@ -45,19 +45,30 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.UsersService = void 0;
 const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
+const node_crypto_1 = require("node:crypto");
 const bcrypt = __importStar(require("bcryptjs"));
 const audit_log_service_1 = require("../audit-log/audit-log.service");
 const tenant_scope_util_1 = require("../common/tenant/tenant-scope.util");
 const prisma_service_1 = require("../prisma/prisma.service");
 const permissions_guard_1 = require("../common/guards/permissions.guard");
 const organization_memberships_service_1 = require("../organization-memberships/organization-memberships.service");
+const quota_service_1 = require("../quota/quota.service");
 const safeUserSelect = {
     id: true,
     fullName: true,
     email: true,
     role: true,
     roleId: true,
-    assignedRole: { select: { id: true, code: true, name: true, baseRole: true, isSystem: true, isActive: true } },
+    assignedRole: {
+        select: {
+            id: true,
+            code: true,
+            name: true,
+            baseRole: true,
+            isSystem: true,
+            isActive: true,
+        },
+    },
     team: true,
     teamId: true,
     teamRef: {
@@ -83,29 +94,47 @@ const ownerOptionSelect = {
     teamRef: { select: { id: true, code: true, name: true } },
 };
 let UsersService = class UsersService {
-    constructor(prisma, audit, memberships) {
+    constructor(prisma, audit, memberships, quota) {
         this.prisma = prisma;
         this.audit = audit;
         this.memberships = memberships;
+        this.quota = quota;
     }
     async create(dto, actor) {
         const passwordHash = await bcrypt.hash(dto.password, 10);
         const teamAssignment = await this.resolveTeamAssignment(dto.teamId, dto.team, actor);
-        const user = await this.prisma.$transaction(async (tx) => {
-            const created = await tx.user.create({
-                data: {
-                    fullName: dto.fullName,
-                    email: dto.email,
-                    passwordHash,
-                    role: dto.role,
-                    team: teamAssignment.team,
-                    teamId: teamAssignment.teamId,
-                    organizationId: actor ? (0, tenant_scope_util_1.getCurrentOrganizationId)(actor) : undefined,
-                },
+        const organizationId = actor ? (0, tenant_scope_util_1.getCurrentOrganizationId)(actor) : null;
+        const reservation = organizationId
+            ? await this.quota.reserve(organizationId, client_1.QuotaMetric.ACTIVE_USERS, 1n, `user:create:${(0, node_crypto_1.randomUUID)()}`, new Date(), actor?.userId, actor?.tenantContext?.requestId)
+            : null;
+        let user;
+        try {
+            user = await this.prisma.$transaction(async (tx) => {
+                const created = await tx.user.create({
+                    data: {
+                        fullName: dto.fullName,
+                        email: dto.email,
+                        passwordHash,
+                        role: dto.role,
+                        team: teamAssignment.team,
+                        teamId: teamAssignment.teamId,
+                        organizationId: actor ? (0, tenant_scope_util_1.getCurrentOrganizationId)(actor) : undefined,
+                    },
+                });
+                await this.memberships.createInitialMembership(tx, created);
+                return tx.user.findUniqueOrThrow({
+                    where: { id: created.id },
+                    select: safeUserSelect,
+                });
             });
-            await this.memberships.createInitialMembership(tx, created);
-            return tx.user.findUniqueOrThrow({ where: { id: created.id }, select: safeUserSelect });
-        });
+        }
+        catch (error) {
+            if (reservation)
+                await this.quota.releaseReservation(reservation.reservationId);
+            throw error;
+        }
+        if (reservation)
+            await this.quota.commitReservation(reservation.reservationId);
         await this.audit.record({
             actorId: actor?.userId,
             entityType: 'user',
@@ -234,11 +263,42 @@ let UsersService = class UsersService {
     }
     async findAssigneeOptions(user, query) {
         const page = query.page ?? 1, limit = query.limit ?? 25, search = query.search?.trim();
-        const where = { organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user), isActive: true,
-            ...(query.selectedId ? { id: query.selectedId } : search ? { OR: [{ fullName: { contains: search, mode: 'insensitive' } }, { email: { contains: search, mode: 'insensitive' } }] } : {}) };
-        const [data, total] = await Promise.all([this.prisma.user.findMany({ where, select: ownerOptionSelect, orderBy: [{ fullName: 'asc' }, { email: 'asc' }], skip: (page - 1) * limit, take: limit }), this.prisma.user.count({ where })]);
+        const where = {
+            organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
+            isActive: true,
+            ...(query.selectedId
+                ? { id: query.selectedId }
+                : search
+                    ? {
+                        OR: [
+                            { fullName: { contains: search, mode: 'insensitive' } },
+                            { email: { contains: search, mode: 'insensitive' } },
+                        ],
+                    }
+                    : {}),
+        };
+        const [data, total] = await Promise.all([
+            this.prisma.user.findMany({
+                where,
+                select: ownerOptionSelect,
+                orderBy: [{ fullName: 'asc' }, { email: 'asc' }],
+                skip: (page - 1) * limit,
+                take: limit,
+            }),
+            this.prisma.user.count({ where }),
+        ]);
         const totalPages = Math.ceil(total / limit);
-        return { data, meta: { total, page, limit, totalPages, hasNext: page < totalPages, hasPrevious: page > 1 } };
+        return {
+            data,
+            meta: {
+                total,
+                page,
+                limit,
+                totalPages,
+                hasNext: page < totalPages,
+                hasPrevious: page > 1,
+            },
+        };
     }
     async findOne(id, actor) {
         const user = await this.prisma.user.findFirst({
@@ -252,7 +312,9 @@ let UsersService = class UsersService {
     }
     async deactivate(id, actor) {
         const organizationId = (0, tenant_scope_util_1.getCurrentOrganizationId)(actor);
-        const user = await this.prisma.user.findFirst({ where: { id, organizationId } });
+        const user = await this.prisma.user.findFirst({
+            where: { id, organizationId },
+        });
         if (!user) {
             throw new common_1.NotFoundException('User not found');
         }
@@ -263,9 +325,13 @@ let UsersService = class UsersService {
                 select: safeUserSelect,
             });
             await this.memberships.suspendForUser(tx, id, organizationId);
-            await tx.organization.update({ where: { id: organizationId }, data: { authorizationVersion: { increment: 1 } } });
+            await tx.organization.update({
+                where: { id: organizationId },
+                data: { authorizationVersion: { increment: 1 } },
+            });
             return result;
         });
+        await this.quota.synchronizeInventory(organizationId, client_1.QuotaMetric.ACTIVE_USERS);
         await this.audit.record({
             actorId: actor.userId,
             organizationId,
@@ -279,23 +345,37 @@ let UsersService = class UsersService {
     }
     async activate(id, actor) {
         const organizationId = (0, tenant_scope_util_1.getCurrentOrganizationId)(actor);
-        const user = await this.prisma.user.findFirst({ where: { id, organizationId } });
+        const user = await this.prisma.user.findFirst({
+            where: { id, organizationId },
+        });
         if (!user) {
             throw new common_1.NotFoundException('User not found');
         }
         if (user.isActive) {
             throw new common_1.BadRequestException('User is already active');
         }
-        const updated = await this.prisma.$transaction(async (tx) => {
-            const result = await tx.user.update({
-                where: { id },
-                data: { isActive: true },
-                select: safeUserSelect,
+        const reservation = await this.quota.reserve(organizationId, client_1.QuotaMetric.ACTIVE_USERS, 1n, `user:activate:${id}`, new Date(), actor.userId, actor.tenantContext?.requestId);
+        let updated;
+        try {
+            updated = await this.prisma.$transaction(async (tx) => {
+                const result = await tx.user.update({
+                    where: { id },
+                    data: { isActive: true },
+                    select: safeUserSelect,
+                });
+                await this.memberships.activateForUser(tx, id, organizationId);
+                await tx.organization.update({
+                    where: { id: organizationId },
+                    data: { authorizationVersion: { increment: 1 } },
+                });
+                return result;
             });
-            await this.memberships.activateForUser(tx, id, organizationId);
-            await tx.organization.update({ where: { id: organizationId }, data: { authorizationVersion: { increment: 1 } } });
-            return result;
-        });
+        }
+        catch (error) {
+            await this.quota.releaseReservation(reservation.reservationId);
+            throw error;
+        }
+        await this.quota.commitReservation(reservation.reservationId);
         await this.audit.record({
             actorId: actor.userId,
             organizationId,
@@ -320,7 +400,10 @@ let UsersService = class UsersService {
             throw new common_1.NotFoundException('User not found');
         }
         const assignedRole = dto.roleId
-            ? await this.prisma.role.findFirst({ where: { id: dto.roleId, isActive: true }, include: { permissions: { include: { permission: true } } } })
+            ? await this.prisma.role.findFirst({
+                where: { id: dto.roleId, isActive: true },
+                include: { permissions: { include: { permission: true } } },
+            })
             : null;
         if (dto.roleId && !assignedRole)
             throw new common_1.BadRequestException('Role does not exist or is inactive');
@@ -353,7 +436,10 @@ let UsersService = class UsersService {
                 select: safeUserSelect,
             });
             await this.memberships.syncDefaultAssignment(tx, id, user.organizationId, nextRoleId, teamAssignment.teamId);
-            await tx.organization.update({ where: { id: user.organizationId }, data: { authorizationVersion: { increment: 1 } } });
+            await tx.organization.update({
+                where: { id: user.organizationId },
+                data: { authorizationVersion: { increment: 1 } },
+            });
             return result;
         });
         permissions_guard_1.PermissionsGuard.clearCache(nextBaseRole);
@@ -411,6 +497,7 @@ exports.UsersService = UsersService = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
         audit_log_service_1.AuditLogService,
-        organization_memberships_service_1.OrganizationMembershipsService])
+        organization_memberships_service_1.OrganizationMembershipsService,
+        quota_service_1.QuotaService])
 ], UsersService);
 //# sourceMappingURL=users.service.js.map
