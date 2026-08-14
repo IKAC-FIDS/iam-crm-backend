@@ -2273,6 +2273,12 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 - Migration/rollback: additive migration `20260814120000_audit_log_v2` is followed by a confirmation-gated idempotent backfill that derives only reliable legacy facts and preserves unknown origin/result as `LEGACY`; no history is deleted or fabricated. Audit RLS is deferred with service-level fail-closed isolation; Notification RLS is unchanged. Rollback retains the additive schema and uses the previous API image.
 - Files/tests/Production: implementation, maintenance CLI, exact evidence and a 60-step documentation-only Production runbook are in `docs/audit-log-v2-fix-000095.md`. Final validation passed 459 configured tests plus focused/OpenAPI suites, coverage, lint/build/CI, clean 52-migration PostgreSQL deploy, idempotent backfill/archive checks and Docker build. No Production access/deployment, seed, destructive database command or MinIO mutation belongs to this fix.
 
+### fix 000095-B — Add Typed OpenAPI Response Contracts
+
+- Contract fidelity: replaced the generic successful-response fallback for the bounded Companies and Tasks scope with reusable concrete schemas that reflect the existing success envelope, pure-pagination lifting, entity relations, enums, UTC date-time strings, nullable fields, Decimal/BigInt serialization, and the Tasks DELETE 200 body. Runtime payloads, operation IDs, authorization and Tenant behavior are unchanged.
+- Shared contracts and quality gates: the existing pagination and error envelopes remain canonical; representative validation/error, enum and nullable behavior is contract-tested. `openapi:response-coverage` now reports typed, generic, no-content and missing-schema successful responses and lists remaining generic debt without blocking phased cleanup.
+- Scope and operations: the canonical `openapi/openapi.json`, focused tests and `docs/openapi-response-contracts-fix-000095-B.md` provide the frontend handoff and phased migration plan. This is an application/documentation-only change: Prisma schema and migrations are unchanged, and rollback is code-only.
+
 ---
 
 **Built with ❤️ for the sales team**

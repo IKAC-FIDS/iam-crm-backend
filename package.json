@@ -73,7 +73,8 @@
     "openapi:validate": "redocly lint openapi/openapi.json --config redocly.yaml",
     "openapi:check": "npm run openapi:generate && npm run openapi:validate && npm run test:contract",
     "openapi:breaking": "node tools/openapi/check-breaking.cjs",
-    "test:contract": "jest --runInBand test/openapi-contract.spec.ts test/openapi-determinism.spec.ts test/openapi-breaking-change.spec.ts",
+    "openapi:response-coverage": "node tools/openapi/response-coverage.cjs",
+    "test:contract": "jest --runInBand test/openapi-contract.spec.ts test/openapi-determinism.spec.ts test/openapi-breaking-change.spec.ts test/openapi-typed-responses.spec.ts",
     "ci": "npm run prisma:generate && npm run lint && npm run test && npm run build && npm run openapi:generate && npm run openapi:validate && npm run test:contract"
   },
   "dependencies": {

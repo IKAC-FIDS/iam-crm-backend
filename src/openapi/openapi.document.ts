@@ -2,6 +2,7 @@ import { INestApplication } from '@nestjs/common';
 import { DocumentBuilder, OpenAPIObject, SwaggerModule } from '@nestjs/swagger';
 import { FeatureKey, OrganizationStatus, QuotaMetric, SubscriptionStatus, UserRole } from '@prisma/client';
 import { OPENAPI_TITLE, OPENAPI_VERSION } from './openapi.constants';
+import { RESPONSE_CONTRACT_SCHEMAS, TYPED_SUCCESS_PAYLOADS } from './response-contract.schemas';
 
 type JsonObject = Record<string, any>;
 
@@ -119,14 +120,17 @@ function normalizeResponses(operation: JsonObject, path: string, method: string)
     return;
   }
   const successCode = operation.responses?.['201'] ? '201' : method === 'post' ? '201' : '200';
+  const typed = TYPED_SUCCESS_PAYLOADS[`${method.toUpperCase()} ${path}`];
   const dataSchema = path === '/api/quota/current'
     ? { $ref: '#/components/schemas/QuotaSummary' }
+    : typed
+      ? typed.schema
     : { type: 'object', additionalProperties: true, description: 'Explicit public response payload; never a published Prisma model.' };
   operation.responses = {
     [successCode]: {
       description: 'Successful response',
       headers: { 'x-request-id': { $ref: '#/components/headers/RequestId' } },
-      content: { 'application/json': { schema: successEnvelope(dataSchema) } },
+      content: { 'application/json': { schema: typed?.paginated ? paginatedSuccessEnvelope(dataSchema) : successEnvelope(dataSchema) } },
     },
     '400': errorResponse('Bad request or validation failure'),
     '401': errorResponse('Authentication required or invalid'),
@@ -135,6 +139,15 @@ function normalizeResponses(operation: JsonObject, path: string, method: string)
     '409': errorResponse('Conflict'),
     '429': errorResponse('Rate or quota limit exceeded; quota failures use code QUOTA_EXCEEDED'),
     '500': errorResponse('Internal server error'),
+  };
+}
+
+function paginatedSuccessEnvelope(itemSchema: JsonObject): JsonObject {
+  return {
+    allOf: [
+      { $ref: '#/components/schemas/SuccessEnvelope' },
+      { type: 'object', required: ['data', 'meta'], properties: { data: { type: 'array', items: itemSchema }, meta: { $ref: '#/components/schemas/PaginationMeta' } } },
+    ],
   };
 }
 
@@ -158,6 +171,7 @@ function errorResponse(description: string) {
 function addCanonicalComponents(document: OpenAPIObject) {
   const schemas = (document.components ??= {}).schemas ??= {};
   Object.assign(schemas, {
+    ...RESPONSE_CONTRACT_SCHEMAS,
     SuccessEnvelope: {
       type: 'object', required: ['success', 'data', 'requestId', 'timestamp'],
       properties: {

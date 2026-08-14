@@ -167,6 +167,917 @@
         ],
         "type": "object"
       },
+      "CompanyListItem": {
+        "properties": {
+          "activityGroup": {
+            "nullable": true,
+            "type": "string"
+          },
+          "activityStatus": {
+            "enum": [
+              "ACTIVE",
+              "INACTIVE",
+              "MERGED",
+              "UNKNOWN"
+            ],
+            "type": "string"
+          },
+          "annualRevenue": {
+            "description": "BigInt serialized as a decimal string.",
+            "nullable": true,
+            "pattern": "^[0-9]+$",
+            "type": "string"
+          },
+          "archivedAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "archivedById": {
+            "format": "uuid",
+            "nullable": true,
+            "type": "string"
+          },
+          "archiveReason": {
+            "nullable": true,
+            "type": "string"
+          },
+          "brandName": {
+            "nullable": true,
+            "type": "string"
+          },
+          "centralPhone": {
+            "nullable": true,
+            "type": "string"
+          },
+          "companyType": {
+            "nullable": true,
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "economicCode": {
+            "nullable": true,
+            "type": "string"
+          },
+          "employeeCount": {
+            "nullable": true,
+            "type": "integer"
+          },
+          "establishmentDate": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "foundedYear": {
+            "nullable": true,
+            "type": "integer"
+          },
+          "headOfficeAddress": {
+            "nullable": true,
+            "type": "string"
+          },
+          "headOfficeCity": {
+            "nullable": true,
+            "type": "string"
+          },
+          "headOfficeProvince": {
+            "nullable": true,
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "industry": {
+            "nullable": true,
+            "type": "string"
+          },
+          "industryId": {
+            "format": "uuid",
+            "nullable": true,
+            "type": "string"
+          },
+          "industryRef": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/IndustrySummary"
+              }
+            ],
+            "nullable": true,
+            "type": "object"
+          },
+          "leadCode": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "legalName": {
+            "type": "string"
+          },
+          "marketSize": {
+            "nullable": true,
+            "type": "string"
+          },
+          "nationalId": {
+            "nullable": true,
+            "type": "string"
+          },
+          "nextActionDate": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "organizationId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "owner": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserSummary"
+              }
+            ],
+            "nullable": true,
+            "type": "object"
+          },
+          "ownerId": {
+            "format": "uuid",
+            "nullable": true,
+            "type": "string"
+          },
+          "ownership": {
+            "enum": [
+              "PRIVATE",
+              "STATE",
+              "SEMI_STATE",
+              "PUBLIC_LISTED",
+              "BANK",
+              "HOLDING"
+            ],
+            "nullable": true,
+            "type": "string"
+          },
+          "parentCompanyId": {
+            "format": "uuid",
+            "nullable": true,
+            "type": "string"
+          },
+          "postalCode": {
+            "nullable": true,
+            "type": "string"
+          },
+          "priority": {
+            "enum": [
+              "LOW",
+              "MEDIUM",
+              "HIGH",
+              "STRATEGIC"
+            ],
+            "type": "string"
+          },
+          "publicEmail": {
+            "nullable": true,
+            "type": "string"
+          },
+          "registeredCapital": {
+            "description": "Prisma Decimal serialized as a decimal string.",
+            "nullable": true,
+            "type": "string"
+          },
+          "registrationNo": {
+            "nullable": true,
+            "type": "string"
+          },
+          "registrationNumber": {
+            "nullable": true,
+            "type": "string"
+          },
+          "researchCompletion": {
+            "nullable": true,
+            "type": "object"
+          },
+          "source": {
+            "nullable": true,
+            "type": "string"
+          },
+          "sourceId": {
+            "format": "uuid",
+            "nullable": true,
+            "type": "string"
+          },
+          "sourceRef": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LeadSourceSummary"
+              }
+            ],
+            "nullable": true,
+            "type": "object"
+          },
+          "stage": {
+            "enum": [
+              "LEAD",
+              "CONTACTED",
+              "INTERESTED",
+              "QUALIFIED",
+              "NEEDS_ASSESSMENT",
+              "PENDING_PRE_INVOICE_APPROVAL",
+              "POC_PILOT_SCHEDULED",
+              "POC_PILOT_IN_PROGRESS",
+              "PENDING_POC_PILOT_APPROVAL",
+              "PENDING_PAYMENT_INVOICE_APPROVAL",
+              "INSTALLATION_SCHEDULED",
+              "INSTALLATION_IN_PROGRESS",
+              "PENDING_CUSTOMER_ACCEPTANCE",
+              "DONE",
+              "ON_HOLD",
+              "LOST",
+              "NO_RESPONSE"
+            ],
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "website": {
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "leadCode",
+          "legalName",
+          "brandName",
+          "registrationNo",
+          "registrationNumber",
+          "nationalId",
+          "economicCode",
+          "establishmentDate",
+          "foundedYear",
+          "companyType",
+          "ownership",
+          "activityStatus",
+          "activityGroup",
+          "marketSize",
+          "industryId",
+          "industry",
+          "parentCompanyId",
+          "website",
+          "publicEmail",
+          "headOfficeProvince",
+          "headOfficeCity",
+          "headOfficeAddress",
+          "postalCode",
+          "centralPhone",
+          "registeredCapital",
+          "employeeCount",
+          "annualRevenue",
+          "ownerId",
+          "priority",
+          "stage",
+          "sourceId",
+          "source",
+          "nextActionDate",
+          "archivedAt",
+          "archivedById",
+          "archiveReason",
+          "researchCompletion",
+          "createdAt",
+          "updatedAt",
+          "organizationId",
+          "owner",
+          "industryRef",
+          "sourceRef"
+        ],
+        "type": "object"
+      },
+      "CompanyResponse": {
+        "properties": {
+          "activities": {
+            "items": {
+              "$ref": "#/components/schemas/RelatedEntity"
+            },
+            "type": "array"
+          },
+          "activityGroup": {
+            "nullable": true,
+            "type": "string"
+          },
+          "activityStatus": {
+            "enum": [
+              "ACTIVE",
+              "INACTIVE",
+              "MERGED",
+              "UNKNOWN"
+            ],
+            "type": "string"
+          },
+          "annualRevenue": {
+            "description": "BigInt serialized as a decimal string.",
+            "nullable": true,
+            "pattern": "^[0-9]+$",
+            "type": "string"
+          },
+          "archivedAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "archivedById": {
+            "format": "uuid",
+            "nullable": true,
+            "type": "string"
+          },
+          "archiveReason": {
+            "nullable": true,
+            "type": "string"
+          },
+          "branches": {
+            "items": {
+              "$ref": "#/components/schemas/RelatedEntity"
+            },
+            "type": "array"
+          },
+          "brandName": {
+            "nullable": true,
+            "type": "string"
+          },
+          "callCard": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RelatedEntity"
+              }
+            ],
+            "nullable": true,
+            "type": "object"
+          },
+          "centralPhone": {
+            "nullable": true,
+            "type": "string"
+          },
+          "companyType": {
+            "nullable": true,
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "economicCode": {
+            "nullable": true,
+            "type": "string"
+          },
+          "employeeCount": {
+            "nullable": true,
+            "type": "integer"
+          },
+          "establishmentDate": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "foundedYear": {
+            "nullable": true,
+            "type": "integer"
+          },
+          "headOfficeAddress": {
+            "nullable": true,
+            "type": "string"
+          },
+          "headOfficeCity": {
+            "nullable": true,
+            "type": "string"
+          },
+          "headOfficeProvince": {
+            "nullable": true,
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "industry": {
+            "nullable": true,
+            "type": "string"
+          },
+          "industryId": {
+            "format": "uuid",
+            "nullable": true,
+            "type": "string"
+          },
+          "industryRef": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/IndustrySummary"
+              }
+            ],
+            "nullable": true,
+            "type": "object"
+          },
+          "leadCode": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "legalDocuments": {
+            "items": {
+              "$ref": "#/components/schemas/RelatedEntity"
+            },
+            "type": "array"
+          },
+          "legalName": {
+            "type": "string"
+          },
+          "marketSize": {
+            "nullable": true,
+            "type": "string"
+          },
+          "nationalId": {
+            "nullable": true,
+            "type": "string"
+          },
+          "nextActionDate": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "opportunities": {
+            "items": {
+              "$ref": "#/components/schemas/RelatedEntity"
+            },
+            "type": "array"
+          },
+          "organizationId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "owner": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserSummary"
+              }
+            ],
+            "nullable": true,
+            "type": "object"
+          },
+          "ownerId": {
+            "format": "uuid",
+            "nullable": true,
+            "type": "string"
+          },
+          "ownership": {
+            "enum": [
+              "PRIVATE",
+              "STATE",
+              "SEMI_STATE",
+              "PUBLIC_LISTED",
+              "BANK",
+              "HOLDING"
+            ],
+            "nullable": true,
+            "type": "string"
+          },
+          "parentCompanies": {
+            "items": {
+              "$ref": "#/components/schemas/CompanyScalar"
+            },
+            "type": "array"
+          },
+          "parentCompanyId": {
+            "format": "uuid",
+            "nullable": true,
+            "type": "string"
+          },
+          "parentRelations": {
+            "items": {
+              "$ref": "#/components/schemas/RelatedEntity"
+            },
+            "type": "array"
+          },
+          "people": {
+            "items": {
+              "$ref": "#/components/schemas/RelatedEntity"
+            },
+            "type": "array"
+          },
+          "postalCode": {
+            "nullable": true,
+            "type": "string"
+          },
+          "priority": {
+            "enum": [
+              "LOW",
+              "MEDIUM",
+              "HIGH",
+              "STRATEGIC"
+            ],
+            "type": "string"
+          },
+          "publicEmail": {
+            "nullable": true,
+            "type": "string"
+          },
+          "registeredCapital": {
+            "description": "Prisma Decimal serialized as a decimal string.",
+            "nullable": true,
+            "type": "string"
+          },
+          "registrationNo": {
+            "nullable": true,
+            "type": "string"
+          },
+          "registrationNumber": {
+            "nullable": true,
+            "type": "string"
+          },
+          "researchCompletion": {
+            "nullable": true,
+            "type": "object"
+          },
+          "socialChannels": {
+            "items": {
+              "$ref": "#/components/schemas/RelatedEntity"
+            },
+            "type": "array"
+          },
+          "source": {
+            "nullable": true,
+            "type": "string"
+          },
+          "sourceId": {
+            "format": "uuid",
+            "nullable": true,
+            "type": "string"
+          },
+          "sourceRef": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LeadSourceSummary"
+              }
+            ],
+            "nullable": true,
+            "type": "object"
+          },
+          "stage": {
+            "enum": [
+              "LEAD",
+              "CONTACTED",
+              "INTERESTED",
+              "QUALIFIED",
+              "NEEDS_ASSESSMENT",
+              "PENDING_PRE_INVOICE_APPROVAL",
+              "POC_PILOT_SCHEDULED",
+              "POC_PILOT_IN_PROGRESS",
+              "PENDING_POC_PILOT_APPROVAL",
+              "PENDING_PAYMENT_INVOICE_APPROVAL",
+              "INSTALLATION_SCHEDULED",
+              "INSTALLATION_IN_PROGRESS",
+              "PENDING_CUSTOMER_ACCEPTANCE",
+              "DONE",
+              "ON_HOLD",
+              "LOST",
+              "NO_RESPONSE"
+            ],
+            "type": "string"
+          },
+          "stageHistory": {
+            "items": {
+              "$ref": "#/components/schemas/RelatedEntity"
+            },
+            "type": "array"
+          },
+          "subsidiaryCompanies": {
+            "items": {
+              "$ref": "#/components/schemas/CompanyScalar"
+            },
+            "type": "array"
+          },
+          "subsidiaryRelations": {
+            "items": {
+              "$ref": "#/components/schemas/RelatedEntity"
+            },
+            "type": "array"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "website": {
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "leadCode",
+          "legalName",
+          "brandName",
+          "registrationNo",
+          "registrationNumber",
+          "nationalId",
+          "economicCode",
+          "establishmentDate",
+          "foundedYear",
+          "companyType",
+          "ownership",
+          "activityStatus",
+          "activityGroup",
+          "marketSize",
+          "industryId",
+          "industry",
+          "parentCompanyId",
+          "website",
+          "publicEmail",
+          "headOfficeProvince",
+          "headOfficeCity",
+          "headOfficeAddress",
+          "postalCode",
+          "centralPhone",
+          "registeredCapital",
+          "employeeCount",
+          "annualRevenue",
+          "ownerId",
+          "priority",
+          "stage",
+          "sourceId",
+          "source",
+          "nextActionDate",
+          "archivedAt",
+          "archivedById",
+          "archiveReason",
+          "researchCompletion",
+          "createdAt",
+          "updatedAt",
+          "organizationId",
+          "owner",
+          "industryRef",
+          "sourceRef",
+          "parentCompanies",
+          "subsidiaryCompanies"
+        ],
+        "type": "object"
+      },
+      "CompanyScalar": {
+        "properties": {
+          "activityGroup": {
+            "nullable": true,
+            "type": "string"
+          },
+          "activityStatus": {
+            "enum": [
+              "ACTIVE",
+              "INACTIVE",
+              "MERGED",
+              "UNKNOWN"
+            ],
+            "type": "string"
+          },
+          "annualRevenue": {
+            "description": "BigInt serialized as a decimal string.",
+            "nullable": true,
+            "pattern": "^[0-9]+$",
+            "type": "string"
+          },
+          "archivedAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "archivedById": {
+            "format": "uuid",
+            "nullable": true,
+            "type": "string"
+          },
+          "archiveReason": {
+            "nullable": true,
+            "type": "string"
+          },
+          "brandName": {
+            "nullable": true,
+            "type": "string"
+          },
+          "centralPhone": {
+            "nullable": true,
+            "type": "string"
+          },
+          "companyType": {
+            "nullable": true,
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "economicCode": {
+            "nullable": true,
+            "type": "string"
+          },
+          "employeeCount": {
+            "nullable": true,
+            "type": "integer"
+          },
+          "establishmentDate": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "foundedYear": {
+            "nullable": true,
+            "type": "integer"
+          },
+          "headOfficeAddress": {
+            "nullable": true,
+            "type": "string"
+          },
+          "headOfficeCity": {
+            "nullable": true,
+            "type": "string"
+          },
+          "headOfficeProvince": {
+            "nullable": true,
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "industry": {
+            "nullable": true,
+            "type": "string"
+          },
+          "industryId": {
+            "format": "uuid",
+            "nullable": true,
+            "type": "string"
+          },
+          "leadCode": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "legalName": {
+            "type": "string"
+          },
+          "marketSize": {
+            "nullable": true,
+            "type": "string"
+          },
+          "nationalId": {
+            "nullable": true,
+            "type": "string"
+          },
+          "nextActionDate": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "organizationId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "ownerId": {
+            "format": "uuid",
+            "nullable": true,
+            "type": "string"
+          },
+          "ownership": {
+            "enum": [
+              "PRIVATE",
+              "STATE",
+              "SEMI_STATE",
+              "PUBLIC_LISTED",
+              "BANK",
+              "HOLDING"
+            ],
+            "nullable": true,
+            "type": "string"
+          },
+          "parentCompanyId": {
+            "format": "uuid",
+            "nullable": true,
+            "type": "string"
+          },
+          "postalCode": {
+            "nullable": true,
+            "type": "string"
+          },
+          "priority": {
+            "enum": [
+              "LOW",
+              "MEDIUM",
+              "HIGH",
+              "STRATEGIC"
+            ],
+            "type": "string"
+          },
+          "publicEmail": {
+            "nullable": true,
+            "type": "string"
+          },
+          "registeredCapital": {
+            "description": "Prisma Decimal serialized as a decimal string.",
+            "nullable": true,
+            "type": "string"
+          },
+          "registrationNo": {
+            "nullable": true,
+            "type": "string"
+          },
+          "registrationNumber": {
+            "nullable": true,
+            "type": "string"
+          },
+          "researchCompletion": {
+            "nullable": true,
+            "type": "object"
+          },
+          "source": {
+            "nullable": true,
+            "type": "string"
+          },
+          "sourceId": {
+            "format": "uuid",
+            "nullable": true,
+            "type": "string"
+          },
+          "stage": {
+            "enum": [
+              "LEAD",
+              "CONTACTED",
+              "INTERESTED",
+              "QUALIFIED",
+              "NEEDS_ASSESSMENT",
+              "PENDING_PRE_INVOICE_APPROVAL",
+              "POC_PILOT_SCHEDULED",
+              "POC_PILOT_IN_PROGRESS",
+              "PENDING_POC_PILOT_APPROVAL",
+              "PENDING_PAYMENT_INVOICE_APPROVAL",
+              "INSTALLATION_SCHEDULED",
+              "INSTALLATION_IN_PROGRESS",
+              "PENDING_CUSTOMER_ACCEPTANCE",
+              "DONE",
+              "ON_HOLD",
+              "LOST",
+              "NO_RESPONSE"
+            ],
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "website": {
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "leadCode",
+          "legalName",
+          "brandName",
+          "registrationNo",
+          "registrationNumber",
+          "nationalId",
+          "economicCode",
+          "establishmentDate",
+          "foundedYear",
+          "companyType",
+          "ownership",
+          "activityStatus",
+          "activityGroup",
+          "marketSize",
+          "industryId",
+          "industry",
+          "parentCompanyId",
+          "website",
+          "publicEmail",
+          "headOfficeProvince",
+          "headOfficeCity",
+          "headOfficeAddress",
+          "postalCode",
+          "centralPhone",
+          "registeredCapital",
+          "employeeCount",
+          "annualRevenue",
+          "ownerId",
+          "priority",
+          "stage",
+          "sourceId",
+          "source",
+          "nextActionDate",
+          "archivedAt",
+          "archivedById",
+          "archiveReason",
+          "researchCompletion",
+          "createdAt",
+          "updatedAt",
+          "organizationId"
+        ],
+        "type": "object"
+      },
       "CompleteActivityDto": {
         "properties": {
           "completionNote": {
@@ -1478,6 +2389,144 @@
         "pattern": "^-?[0-9]+$",
         "type": "string"
       },
+      "DeletedTaskResponse": {
+        "properties": {
+          "assignedToId": {
+            "format": "uuid",
+            "nullable": true,
+            "type": "string"
+          },
+          "cancelledAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "cancelReason": {
+            "nullable": true,
+            "type": "string"
+          },
+          "commercialDocumentId": {
+            "format": "uuid",
+            "nullable": true,
+            "type": "string"
+          },
+          "companyId": {
+            "format": "uuid",
+            "nullable": true,
+            "type": "string"
+          },
+          "completedAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "completedById": {
+            "format": "uuid",
+            "nullable": true,
+            "type": "string"
+          },
+          "completionNote": {
+            "nullable": true,
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdById": {
+            "format": "uuid",
+            "nullable": true,
+            "type": "string"
+          },
+          "description": {
+            "nullable": true,
+            "type": "string"
+          },
+          "dueAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "opportunityId": {
+            "format": "uuid",
+            "nullable": true,
+            "type": "string"
+          },
+          "organizationId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "paymentId": {
+            "format": "uuid",
+            "nullable": true,
+            "type": "string"
+          },
+          "personId": {
+            "format": "uuid",
+            "nullable": true,
+            "type": "string"
+          },
+          "priority": {
+            "enum": [
+              "LOW",
+              "MEDIUM",
+              "HIGH",
+              "STRATEGIC"
+            ],
+            "type": "string"
+          },
+          "reminderAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "TODO",
+              "IN_PROGRESS",
+              "DONE",
+              "CANCELLED"
+            ],
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "description",
+          "status",
+          "priority",
+          "dueAt",
+          "reminderAt",
+          "companyId",
+          "personId",
+          "opportunityId",
+          "commercialDocumentId",
+          "paymentId",
+          "assignedToId",
+          "createdById",
+          "completedAt",
+          "completedById",
+          "completionNote",
+          "cancelledAt",
+          "cancelReason",
+          "createdAt",
+          "updatedAt",
+          "organizationId"
+        ],
+        "type": "object"
+      },
       "DiscoveryQuestionDto": {
         "properties": {
           "question": {
@@ -1627,6 +2676,56 @@
         "required": [
           "companiesCreated",
           "peopleCreated"
+        ],
+        "type": "object"
+      },
+      "IndustrySummary": {
+        "properties": {
+          "description": {
+            "nullable": true,
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description"
+        ],
+        "type": "object"
+      },
+      "LeadSourceSummary": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "description": {
+            "nullable": true,
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "description",
+          "isActive"
         ],
         "type": "object"
       },
@@ -1840,6 +2939,18 @@
             "type": "object"
           }
         },
+        "type": "object"
+      },
+      "RelatedEntity": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
         "type": "object"
       },
       "ReorderStageItemDto": {
@@ -2112,6 +3223,389 @@
         },
         "required": [
           "organizationId"
+        ],
+        "type": "object"
+      },
+      "TaskCommercialDocumentSummary": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "number": {
+            "nullable": true,
+            "type": "string"
+          },
+          "opportunityId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "status",
+          "number",
+          "title",
+          "opportunityId"
+        ],
+        "type": "object"
+      },
+      "TaskCompanySummary": {
+        "properties": {
+          "brandName": {
+            "nullable": true,
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "legalName": {
+            "type": "string"
+          },
+          "ownerId": {
+            "format": "uuid",
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "legalName",
+          "brandName",
+          "ownerId"
+        ],
+        "type": "object"
+      },
+      "TaskOpportunitySummary": {
+        "properties": {
+          "archivedAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "companyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "ownerId": {
+            "format": "uuid",
+            "nullable": true,
+            "type": "string"
+          },
+          "priority": {
+            "enum": [
+              "LOW",
+              "MEDIUM",
+              "HIGH",
+              "STRATEGIC"
+            ],
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "companyId",
+          "ownerId",
+          "priority",
+          "archivedAt"
+        ],
+        "type": "object"
+      },
+      "TaskPaymentSummary": {
+        "properties": {
+          "amount": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "dueDate": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "opportunityId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "amount",
+          "currency",
+          "dueDate",
+          "opportunityId"
+        ],
+        "type": "object"
+      },
+      "TaskPersonSummary": {
+        "properties": {
+          "companyId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "title": {
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "fullName",
+          "title",
+          "companyId"
+        ],
+        "type": "object"
+      },
+      "TaskResponse": {
+        "properties": {
+          "assignedTo": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserSummary"
+              }
+            ],
+            "nullable": true,
+            "type": "object"
+          },
+          "assignedToId": {
+            "format": "uuid",
+            "nullable": true,
+            "type": "string"
+          },
+          "cancelledAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "cancelReason": {
+            "nullable": true,
+            "type": "string"
+          },
+          "commercialDocument": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TaskCommercialDocumentSummary"
+              }
+            ],
+            "nullable": true,
+            "type": "object"
+          },
+          "commercialDocumentId": {
+            "format": "uuid",
+            "nullable": true,
+            "type": "string"
+          },
+          "company": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TaskCompanySummary"
+              }
+            ],
+            "nullable": true,
+            "type": "object"
+          },
+          "companyId": {
+            "format": "uuid",
+            "nullable": true,
+            "type": "string"
+          },
+          "completedAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "completedBy": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserSummary"
+              }
+            ],
+            "nullable": true,
+            "type": "object"
+          },
+          "completedById": {
+            "format": "uuid",
+            "nullable": true,
+            "type": "string"
+          },
+          "completionNote": {
+            "nullable": true,
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserSummary"
+              }
+            ],
+            "nullable": true,
+            "type": "object"
+          },
+          "createdById": {
+            "format": "uuid",
+            "nullable": true,
+            "type": "string"
+          },
+          "description": {
+            "nullable": true,
+            "type": "string"
+          },
+          "dueAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "opportunity": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TaskOpportunitySummary"
+              }
+            ],
+            "nullable": true,
+            "type": "object"
+          },
+          "opportunityId": {
+            "format": "uuid",
+            "nullable": true,
+            "type": "string"
+          },
+          "organizationId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "payment": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TaskPaymentSummary"
+              }
+            ],
+            "nullable": true,
+            "type": "object"
+          },
+          "paymentId": {
+            "format": "uuid",
+            "nullable": true,
+            "type": "string"
+          },
+          "person": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TaskPersonSummary"
+              }
+            ],
+            "nullable": true,
+            "type": "object"
+          },
+          "personId": {
+            "format": "uuid",
+            "nullable": true,
+            "type": "string"
+          },
+          "priority": {
+            "enum": [
+              "LOW",
+              "MEDIUM",
+              "HIGH",
+              "STRATEGIC"
+            ],
+            "type": "string"
+          },
+          "reminderAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "TODO",
+              "IN_PROGRESS",
+              "DONE",
+              "CANCELLED"
+            ],
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "description",
+          "status",
+          "priority",
+          "dueAt",
+          "reminderAt",
+          "companyId",
+          "personId",
+          "opportunityId",
+          "commercialDocumentId",
+          "paymentId",
+          "assignedToId",
+          "createdById",
+          "completedAt",
+          "completedById",
+          "completionNote",
+          "cancelledAt",
+          "cancelReason",
+          "createdAt",
+          "updatedAt",
+          "organizationId",
+          "company",
+          "person",
+          "opportunity",
+          "commercialDocument",
+          "payment",
+          "assignedTo",
+          "createdBy",
+          "completedBy"
         ],
         "type": "object"
       },
@@ -2822,6 +4316,33 @@
           "BOARDS"
         ],
         "type": "string"
+      },
+      "UserSummary": {
+        "properties": {
+          "email": {
+            "format": "email",
+            "type": "string"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "team": {
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "fullName"
+        ],
+        "type": "object"
       },
       "VerifyPasskeyAuthenticationDto": {
         "properties": {
@@ -20630,13 +22151,18 @@
                     {
                       "properties": {
                         "data": {
-                          "additionalProperties": true,
-                          "description": "Explicit public response payload; never a published Prisma model.",
-                          "type": "object"
+                          "items": {
+                            "$ref": "#/components/schemas/CompanyListItem"
+                          },
+                          "type": "array"
+                        },
+                        "meta": {
+                          "$ref": "#/components/schemas/PaginationMeta"
                         }
                       },
                       "required": [
-                        "data"
+                        "data",
+                        "meta"
                       ],
                       "type": "object"
                     }
@@ -20802,9 +22328,7 @@
                     {
                       "properties": {
                         "data": {
-                          "additionalProperties": true,
-                          "description": "Explicit public response payload; never a published Prisma model.",
-                          "type": "object"
+                          "$ref": "#/components/schemas/CompanyResponse"
                         }
                       },
                       "required": [
@@ -24531,9 +26055,7 @@
                     {
                       "properties": {
                         "data": {
-                          "additionalProperties": true,
-                          "description": "Explicit public response payload; never a published Prisma model.",
-                          "type": "object"
+                          "$ref": "#/components/schemas/CompanyResponse"
                         }
                       },
                       "required": [
@@ -24711,9 +26233,7 @@
                     {
                       "properties": {
                         "data": {
-                          "additionalProperties": true,
-                          "description": "Explicit public response payload; never a published Prisma model.",
-                          "type": "object"
+                          "$ref": "#/components/schemas/CompanyResponse"
                         }
                       },
                       "required": [
@@ -55309,13 +56829,18 @@
                     {
                       "properties": {
                         "data": {
-                          "additionalProperties": true,
-                          "description": "Explicit public response payload; never a published Prisma model.",
-                          "type": "object"
+                          "items": {
+                            "$ref": "#/components/schemas/TaskResponse"
+                          },
+                          "type": "array"
+                        },
+                        "meta": {
+                          "$ref": "#/components/schemas/PaginationMeta"
                         }
                       },
                       "required": [
-                        "data"
+                        "data",
+                        "meta"
                       ],
                       "type": "object"
                     }
@@ -55481,9 +57006,7 @@
                     {
                       "properties": {
                         "data": {
-                          "additionalProperties": true,
-                          "description": "Explicit public response payload; never a published Prisma model.",
-                          "type": "object"
+                          "$ref": "#/components/schemas/TaskResponse"
                         }
                       },
                       "required": [
@@ -55653,9 +57176,7 @@
                     {
                       "properties": {
                         "data": {
-                          "additionalProperties": true,
-                          "description": "Explicit public response payload; never a published Prisma model.",
-                          "type": "object"
+                          "$ref": "#/components/schemas/DeletedTaskResponse"
                         }
                       },
                       "required": [
@@ -55823,9 +57344,7 @@
                     {
                       "properties": {
                         "data": {
-                          "additionalProperties": true,
-                          "description": "Explicit public response payload; never a published Prisma model.",
-                          "type": "object"
+                          "$ref": "#/components/schemas/TaskResponse"
                         }
                       },
                       "required": [
@@ -56003,9 +57522,7 @@
                     {
                       "properties": {
                         "data": {
-                          "additionalProperties": true,
-                          "description": "Explicit public response payload; never a published Prisma model.",
-                          "type": "object"
+                          "$ref": "#/components/schemas/TaskResponse"
                         }
                       },
                       "required": [
