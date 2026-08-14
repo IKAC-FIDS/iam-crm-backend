@@ -1,6 +1,7 @@
 import { INestApplication } from '@nestjs/common';
 import { DocumentBuilder, OpenAPIObject, SwaggerModule } from '@nestjs/swagger';
-import { FeatureKey, OrganizationStatus, QuotaMetric, SubscriptionStatus, UserRole } from '@prisma/client';
+import { FeatureKey, OrganizationStatus, QuotaMetric, QuotaResetPeriod, SubscriptionStatus, UserRole } from '@prisma/client';
+import { QUOTA_CONFIGURATION_STATES } from '../quota/quota-resolver.service';
 import { OPENAPI_TITLE, OPENAPI_VERSION } from './openapi.constants';
 import { RESPONSE_CONTRACT_SCHEMAS, TYPED_SUCCESS_PAYLOADS } from './response-contract.schemas';
 
@@ -198,13 +199,22 @@ function addCanonicalComponents(document: OpenAPIObject) {
     SearchFilter: { type: 'object', properties: { search: { type: 'string', description: 'Domain-specific textual search when supported.' } } },
     UserRole: enumSchema(UserRole), OrganizationStatus: enumSchema(OrganizationStatus),
     FeatureKey: enumSchema(FeatureKey), SubscriptionStatus: enumSchema(SubscriptionStatus), QuotaMetric: enumSchema(QuotaMetric),
+    QuotaResetPeriod: enumSchema(QuotaResetPeriod),
+    QuotaConfigurationState: { type: 'string', enum: [...QUOTA_CONFIGURATION_STATES] },
     DecimalIntegerString: { type: 'string', pattern: '^-?[0-9]+$', example: '1000', description: 'Integer value serialized as a decimal string to preserve BigInt precision.' },
-    QuotaSummary: {
-      type: 'object', required: ['organizationId', 'quotas'],
+    QuotaSummaryMetric: {
+      type: 'object', required: ['metric', 'state', 'current', 'softLimit', 'hardLimit', 'resetPeriod', 'resetAt', 'threshold'],
       properties: {
-        organizationId: { type: 'string', format: 'uuid' },
-        quotas: { type: 'array', items: { type: 'object', properties: { metric: { $ref: '#/components/schemas/QuotaMetric' }, state: { type: 'string', enum: ['ACTIVE', 'UNLIMITED', 'DISABLED', 'UNCONFIGURED', 'LEGACY_COMPATIBILITY', 'ORGANIZATION_INACTIVE'] }, current: { $ref: '#/components/schemas/DecimalIntegerString' }, softLimit: { type: 'string', pattern: '^-?[0-9]+$', nullable: true, description: 'Nullable decimal BigInt string.' }, hardLimit: { type: 'string', pattern: '^-?[0-9]+$', nullable: true, description: 'Nullable decimal BigInt string.' } } } },
+        metric: { $ref: '#/components/schemas/QuotaMetric' }, state: { $ref: '#/components/schemas/QuotaConfigurationState' },
+        current: { $ref: '#/components/schemas/DecimalIntegerString' },
+        softLimit: { type: 'string', pattern: '^[0-9]+$', nullable: true }, hardLimit: { type: 'string', pattern: '^[0-9]+$', nullable: true },
+        resetPeriod: { $ref: '#/components/schemas/QuotaResetPeriod' }, resetAt: { type: 'string', format: 'date-time', nullable: true },
+        threshold: { type: 'number', nullable: true, enum: [80, 90] },
       },
+    },
+    QuotaSummary: {
+      type: 'object', required: ['organizationId', 'generatedAt', 'metrics'],
+      properties: { organizationId: { type: 'string', format: 'uuid' }, generatedAt: { type: 'string', format: 'date-time' }, metrics: { type: 'array', items: { $ref: '#/components/schemas/QuotaSummaryMetric' } } },
     },
   });
   (document.components ??= {}).headers = {

@@ -7,6 +7,7 @@ describe('OpenAPI artifact determinism', () => {
     const text = artifact.toString('utf8');
     expect(createHash('sha256').update(artifact).digest('hex')).toMatch(/^[a-f0-9]{64}$/);
     expect(text).not.toMatch(/[A-Z]:\\|\/Users\/|\/home\//);
-    expect(text).not.toMatch(/buildTimestamp|generatedAt|APP_COMMIT_SHA/);
+    expect(text).not.toMatch(/buildTimestamp|APP_COMMIT_SHA/);
+    expect(text).not.toMatch(/"generatedAt"\s*:\s*"\d{4}-\d{2}-\d{2}T/);
   });
 });

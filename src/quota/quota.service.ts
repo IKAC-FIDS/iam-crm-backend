@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { QUOTA_RESERVATION_TTL_MS, QUOTA_THRESHOLDS } from './quota.constants';
 import { QuotaExceededException } from './quota-exceeded.exception';
 import { EffectiveQuota, QuotaResolverService } from './quota-resolver.service';
+import type { QuotaSummaryDto } from './dto/quota-summary-response.dto';
 
 type Tx = Prisma.TransactionClient;
 export interface UsageReservationResult {
@@ -308,7 +309,7 @@ export class QuotaService {
     };
   }
 
-  async summaryForTenant(tenant: TenantContext, now = new Date()) {
+  async summaryForTenant(tenant: TenantContext, now = new Date()): Promise<QuotaSummaryDto> {
     const metrics = Object.values(QuotaMetric);
     return {
       organizationId: tenant.organizationId,

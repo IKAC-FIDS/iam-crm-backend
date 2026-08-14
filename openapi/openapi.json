@@ -2862,6 +2862,18 @@
         ],
         "type": "object"
       },
+      "QuotaConfigurationState": {
+        "enum": [
+          "ENFORCED",
+          "UNLIMITED",
+          "DISABLED",
+          "UNCONFIGURED",
+          "LEGACY_COMPATIBILITY",
+          "INACTIVE_ORGANIZATION",
+          "INACTIVE_SUBSCRIPTION"
+        ],
+        "type": "string"
+      },
       "QuotaMetric": {
         "enum": [
           "ACTIVE_USERS",
@@ -2877,53 +2889,161 @@
         ],
         "type": "string"
       },
+      "QuotaResetPeriod": {
+        "enum": [
+          "NONE",
+          "DAILY",
+          "MONTHLY",
+          "SUBSCRIPTION_TERM"
+        ],
+        "type": "string"
+      },
       "QuotaSummary": {
         "properties": {
+          "generatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "metrics": {
+            "items": {
+              "$ref": "#/components/schemas/QuotaSummaryMetric"
+            },
+            "type": "array"
+          },
           "organizationId": {
             "format": "uuid",
             "type": "string"
-          },
-          "quotas": {
-            "items": {
-              "properties": {
-                "current": {
-                  "$ref": "#/components/schemas/DecimalIntegerString"
-                },
-                "hardLimit": {
-                  "description": "Nullable decimal BigInt string.",
-                  "nullable": true,
-                  "pattern": "^-?[0-9]+$",
-                  "type": "string"
-                },
-                "metric": {
-                  "$ref": "#/components/schemas/QuotaMetric"
-                },
-                "softLimit": {
-                  "description": "Nullable decimal BigInt string.",
-                  "nullable": true,
-                  "pattern": "^-?[0-9]+$",
-                  "type": "string"
-                },
-                "state": {
-                  "enum": [
-                    "ACTIVE",
-                    "UNLIMITED",
-                    "DISABLED",
-                    "UNCONFIGURED",
-                    "LEGACY_COMPATIBILITY",
-                    "ORGANIZATION_INACTIVE"
-                  ],
-                  "type": "string"
-                }
-              },
-              "type": "object"
-            },
-            "type": "array"
           }
         },
         "required": [
           "organizationId",
-          "quotas"
+          "generatedAt",
+          "metrics"
+        ],
+        "type": "object"
+      },
+      "QuotaSummaryDto": {
+        "properties": {
+          "generatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "metrics": {
+            "items": {
+              "$ref": "#/components/schemas/QuotaSummaryMetricDto"
+            },
+            "type": "array"
+          },
+          "organizationId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "organizationId",
+          "generatedAt",
+          "metrics"
+        ],
+        "type": "object"
+      },
+      "QuotaSummaryMetric": {
+        "properties": {
+          "current": {
+            "$ref": "#/components/schemas/DecimalIntegerString"
+          },
+          "hardLimit": {
+            "nullable": true,
+            "pattern": "^[0-9]+$",
+            "type": "string"
+          },
+          "metric": {
+            "$ref": "#/components/schemas/QuotaMetric"
+          },
+          "resetAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "resetPeriod": {
+            "$ref": "#/components/schemas/QuotaResetPeriod"
+          },
+          "softLimit": {
+            "nullable": true,
+            "pattern": "^[0-9]+$",
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/QuotaConfigurationState"
+          },
+          "threshold": {
+            "enum": [
+              80,
+              90
+            ],
+            "nullable": true,
+            "type": "number"
+          }
+        },
+        "required": [
+          "metric",
+          "state",
+          "current",
+          "softLimit",
+          "hardLimit",
+          "resetPeriod",
+          "resetAt",
+          "threshold"
+        ],
+        "type": "object"
+      },
+      "QuotaSummaryMetricDto": {
+        "properties": {
+          "current": {
+            "pattern": "^(0|[1-9]\\d*)$",
+            "type": "string"
+          },
+          "hardLimit": {
+            "nullable": true,
+            "pattern": "^(0|[1-9]\\d*)$",
+            "type": "string"
+          },
+          "metric": {
+            "$ref": "#/components/schemas/QuotaMetric"
+          },
+          "resetAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "resetPeriod": {
+            "$ref": "#/components/schemas/QuotaResetPeriod"
+          },
+          "softLimit": {
+            "nullable": true,
+            "pattern": "^(0|[1-9]\\d*)$",
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/QuotaConfigurationState"
+          },
+          "threshold": {
+            "enum": [
+              80,
+              90
+            ],
+            "nullable": true,
+            "type": "number"
+          }
+        },
+        "required": [
+          "metric",
+          "state",
+          "current",
+          "softLimit",
+          "hardLimit",
+          "resetPeriod",
+          "resetAt",
+          "threshold"
         ],
         "type": "object"
       },

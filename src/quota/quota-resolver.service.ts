@@ -9,14 +9,16 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 
 type Db = PrismaService | Prisma.TransactionClient;
-export type QuotaConfigurationState =
-  | 'ENFORCED'
-  | 'UNLIMITED'
-  | 'DISABLED'
-  | 'UNCONFIGURED'
-  | 'LEGACY_COMPATIBILITY'
-  | 'INACTIVE_ORGANIZATION'
-  | 'INACTIVE_SUBSCRIPTION';
+export const QUOTA_CONFIGURATION_STATES = [
+  'ENFORCED',
+  'UNLIMITED',
+  'DISABLED',
+  'UNCONFIGURED',
+  'LEGACY_COMPATIBILITY',
+  'INACTIVE_ORGANIZATION',
+  'INACTIVE_SUBSCRIPTION',
+] as const;
+export type QuotaConfigurationState = (typeof QUOTA_CONFIGURATION_STATES)[number];
 export interface EffectiveQuota {
   organizationId: string;
   metric: QuotaMetric;

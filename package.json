@@ -74,7 +74,7 @@
     "openapi:check": "npm run openapi:generate && npm run openapi:validate && npm run test:contract",
     "openapi:breaking": "node tools/openapi/check-breaking.cjs",
     "openapi:response-coverage": "node tools/openapi/response-coverage.cjs",
-    "test:contract": "jest --runInBand test/openapi-contract.spec.ts test/openapi-determinism.spec.ts test/openapi-breaking-change.spec.ts test/openapi-typed-responses.spec.ts",
+    "test:contract": "jest --runInBand test/openapi-contract.spec.ts test/openapi-determinism.spec.ts test/openapi-breaking-change.spec.ts test/openapi-typed-responses.spec.ts test/quota-openapi-contract.spec.ts",
     "ci": "npm run prisma:generate && npm run lint && npm run test && npm run build && npm run openapi:generate && npm run openapi:validate && npm run test:contract"
   },
   "dependencies": {

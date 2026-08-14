@@ -73,6 +73,30 @@ function setup(currentValue = 0n, reserved = 0n) {
   return { prisma, resolver, tx, service: new QuotaService(prisma, resolver) };
 }
 describe('QuotaService fix 000093 enforcement', () => {
+  it('returns metrics and generatedAt using the authoritative runtime shape', async () => {
+    const { service, prisma } = setup();
+    prisma.usageCounter.findUnique.mockResolvedValue({ currentValue: 8n });
+    const generatedAt = new Date('2026-08-14T08:30:00.000Z');
+
+    const result = await service.summaryForTenant(
+      { organizationId: 'org-a' } as any,
+      generatedAt,
+    );
+
+    expect(result).toMatchObject({
+      organizationId: 'org-a',
+      generatedAt: generatedAt.toISOString(),
+      metrics: expect.any(Array),
+    });
+    expect(result).not.toHaveProperty('quotas');
+    expect(result.metrics[0]).toEqual(
+      expect.objectContaining({
+        current: '8', softLimit: '8', hardLimit: '10',
+        resetPeriod: QuotaResetPeriod.MONTHLY,
+        resetAt: '2026-09-01T00:00:00.000Z', threshold: 80,
+      }),
+    );
+  });
   it('allows exactly the hard limit and takes the tenant+metric advisory lock', async () => {
     const { service, tx } = setup(9n);
     await expect(

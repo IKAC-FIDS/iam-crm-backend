@@ -2279,6 +2279,11 @@ Production should use the actual HTTPS origin and domain, for example `WEBAUTHN_
 - Shared contracts and quality gates: the existing pagination and error envelopes remain canonical; representative validation/error, enum and nullable behavior is contract-tested. `openapi:response-coverage` now reports typed, generic, no-content and missing-schema successful responses and lists remaining generic debt without blocking phased cleanup.
 - Scope and operations: the canonical `openapi/openapi.json`, focused tests and `docs/openapi-response-contracts-fix-000095-B.md` provide the frontend handoff and phased migration plan. This is an application/documentation-only change: Prisma schema and migrations are unchanged, and rollback is code-only.
 
+### Fix 000095-C — Align Quota OpenAPI Contract With Runtime Response
+
+- Root cause and correction: `GET /api/quota/current` has always returned `organizationId`, `generatedAt` and `metrics`, but the handwritten canonical `QuotaSummary` schema incorrectly required `quotas`. The OpenAPI contract now follows the authoritative runtime response and defines concrete `QuotaSummary` and `QuotaSummaryMetric` models with the domain quota state values and Prisma `QuotaMetric`/`QuotaResetPeriod` enums.
+- Compatibility and validation: quota calculation, serialization, Tenant isolation, routes, status codes and runtime field names are unchanged. Focused runtime and OpenAPI regressions protect `metrics`, `generatedAt`, nullable limits/reset/threshold fields and reject the obsolete `quotas` property. This fix changes no Prisma schema, migration or database data.
+
 ---
 
 **Built with ❤️ for the sales team**
