@@ -24,6 +24,7 @@ import { ReportExportsService } from "./report-exports.service";
     CommercialReportsService,
     DataQualityService,
     PeriodComparisonService,
+    ReportingScopeService,
   ],
 })
 export class ReportsModule {}
