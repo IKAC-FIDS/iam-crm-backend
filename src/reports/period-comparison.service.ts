@@ -500,7 +500,8 @@ export class PeriodComparisonService {
     );
   }
   private defaultRange(tz: string) {
-    const today = organizationDayBounds(new Date(), tz).start,
+    const now = new Date(),
+      today = organizationDayBounds(now, tz).start,
       parts = new Intl.DateTimeFormat("en-CA", {
         timeZone: tz,
         year: "numeric",
@@ -516,7 +517,7 @@ export class PeriodComparisonService {
         d.getUTCDate(),
         tz,
       ),
-      end: today,
+      end: now,
     };
   }
   private shiftYear(date: Date, tz: string) {

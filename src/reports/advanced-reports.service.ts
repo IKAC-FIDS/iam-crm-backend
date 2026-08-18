@@ -575,7 +575,7 @@ export class AdvancedReportsService {
     const clock = await this.clock(user);
     const defaultPeriod = {
       start: new Date(clock.start.getTime() - 30 * 86400000),
-      end: clock.start,
+      end: clock.now,
     };
     const range = this.period(f, defaultPeriod)!;
     const historicalScope = this.scopes.opportunity(f, user);
