@@ -6,11 +6,21 @@ import { AttachmentsModule } from '../attachments/attachments.module';
 import { CompanyLegalDocumentsController } from './company-legal-documents.controller';
 import { CompanyLegalDocumentsService } from './company-legal-documents.service';
 import { QuotaModule } from '../quota/quota.module';
+import { CompanyOverviewController } from './company-overview.controller';
+import { CompanyOverviewService } from './company-overview.service';
 
 @Module({
   imports: [PipelineConfigModule, AttachmentsModule, QuotaModule],
-  providers: [CompaniesService, CompanyLegalDocumentsService],
-  controllers: [CompaniesController, CompanyLegalDocumentsController],
-  exports: [CompaniesService],
+  providers: [
+    CompaniesService,
+    CompanyLegalDocumentsService,
+    CompanyOverviewService,
+  ],
+  controllers: [
+    CompaniesController,
+    CompanyLegalDocumentsController,
+    CompanyOverviewController,
+  ],
+  exports: [CompaniesService, CompanyOverviewService],
 })
 export class CompaniesModule {}
