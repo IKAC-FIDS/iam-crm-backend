@@ -1,5 +1,6 @@
-import { Module } from "@nestjs/common";
+﻿import { Module } from "@nestjs/common";
 import { ReportsService } from "./reports.service";
+import { ConversionHealthService } from "./conversion-health.service";
 import { ReportsController } from "./reports.controller";
 import { AdvancedReportsService } from "./advanced-reports.service";
 import { CommercialReportsService } from "./commercial-reports.service";
@@ -11,6 +12,7 @@ import { ReportExportsService } from "./report-exports.service";
 @Module({
   providers: [
     ReportsService,
+    ConversionHealthService,
     AdvancedReportsService,
     CommercialReportsService,
     ReportingScopeService,

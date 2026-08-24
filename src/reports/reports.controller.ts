@@ -1,4 +1,4 @@
-import {
+﻿import {
   Controller,
   Get,
   Param,
@@ -19,6 +19,7 @@ import { ReportFiltersDto } from "./dto/report-filters.dto";
 import { AdvancedReportFiltersDto } from "./dto/advanced-report-filters.dto";
 import { AdvancedReportsService } from "./advanced-reports.service";
 import { ReportsService } from "./reports.service";
+import { ConversionHealthService } from "./conversion-health.service";
 import { CommercialReportsService } from "./commercial-reports.service";
 import { DataQualityService } from "./data-quality.service";
 import {
@@ -35,6 +36,7 @@ import { ReportExportsService } from "./report-exports.service";
 export class ReportsController {
   constructor(
     private reportsService: ReportsService,
+    private conversionHealthService: ConversionHealthService,
     private advancedReportsService: AdvancedReportsService,
     private commercialReportsService: CommercialReportsService,
     private dataQualityService: DataQualityService,
@@ -132,6 +134,13 @@ export class ReportsController {
     return this.advancedReportsService.taskPerformance(filters, user);
   }
 
+  @Get("conversion-health")
+  getConversionHealth(
+    @Query() filters: ReportFiltersDto,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.conversionHealthService.report(filters, user);
+  }
   @Get("conversion-rates")
   getConversionRates(
     @Query() filters: ReportFiltersDto,
@@ -185,3 +194,4 @@ export class ReportsController {
     return this.reportsService.getFilterOptions(user);
   }
 }
+
