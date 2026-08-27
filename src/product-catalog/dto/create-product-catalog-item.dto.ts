@@ -9,12 +9,17 @@ import {
   MaxLength,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
-import { PricingCurrency } from '@prisma/client';
+import { PricingCurrency, ProductType } from '@prisma/client';
 
 const decimalString = ({ value }: { value: unknown }) =>
   value === undefined || value === null ? value : String(value);
 
 export class CreateProductCatalogItemDto {
+  // Optional for legacy API clients; the new UI requires an explicit selection.
+  @IsOptional()
+  @IsEnum(ProductType)
+  type?: ProductType;
+
   @IsString()
   @MaxLength(80)
   code!: string;

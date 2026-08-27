@@ -1275,9 +1275,15 @@ model OpportunityPayment {
   @@map("opportunity_payments")
 }
 
+enum ProductType {
+  HARDWARE
+  SOFTWARE
+}
+
 model ProductCatalogItem {
   id                       String                @id @default(uuid())
   code                     String                @unique
+  type                     ProductType           @default(HARDWARE)
   digikalaCode             String?               @unique
   digikalaUrl              String?
   name                     String
@@ -1305,6 +1311,7 @@ model ProductCatalogItem {
   priceHistory ProductPriceHistory[]
 
   @@index([isActive, sortOrder])
+  @@index([type, isActive, sortOrder])
   @@index([category])
   @@index([pricingCurrency])
   @@index([calculatedExchangeRateId])

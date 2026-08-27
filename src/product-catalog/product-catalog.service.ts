@@ -8,6 +8,7 @@ import {
   PricingCurrency,
   Prisma,
   ProductPriceHistoryReason,
+  ProductType,
 } from "@prisma/client";
 import { AuditLogService } from "../audit-log/audit-log.service";
 import { CurrentUserPayload } from "../common/decorators/current-user.decorator";
@@ -38,6 +39,7 @@ export class ProductCatalogService {
     const limit = query.limit ?? 20;
 
     const where: Prisma.ProductCatalogItemWhereInput = {};
+    if (query.type) where.type = query.type;
 
     if (query.active !== undefined) {
       where.isActive = query.active === "true";
@@ -132,6 +134,7 @@ export class ProductCatalogService {
       const created = await tx.productCatalogItem.create({
         data: {
           code,
+          type: dto.type ?? ProductType.HARDWARE,
           digikalaCode,
           digikalaUrl: dto.digikalaUrl?.trim() || null,
           name: dto.name.trim(),
@@ -176,6 +179,7 @@ export class ProductCatalogService {
     const current = await this.findOne(id);
 
     const data: Prisma.ProductCatalogItemUpdateInput = {};
+    if (dto.type != null) data.type = dto.type;
 
     if (dto.code !== undefined) {
       const code = this.normalizeCode(dto.code);
