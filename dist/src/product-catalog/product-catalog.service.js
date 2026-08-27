@@ -45,6 +45,7 @@ let ProductCatalogService = class ProductCatalogService {
             const search = query.search.trim();
             where.OR = [
                 { code: { contains: search, mode: "insensitive" } },
+                { digikalaCode: { contains: search, mode: "insensitive" } },
                 { name: { contains: search, mode: "insensitive" } },
                 { description: { contains: search, mode: "insensitive" } },
                 { category: { contains: search, mode: "insensitive" } },
@@ -91,6 +92,12 @@ let ProductCatalogService = class ProductCatalogService {
         if (existing) {
             throw new common_1.ConflictException("کد محصول یا سرویس قبلاً ثبت شده است");
         }
+        const digikalaCode = dto.digikalaCode?.trim() || null;
+        if (digikalaCode) {
+            const duplicate = await this.prisma.productCatalogItem.findUnique({ where: { digikalaCode } });
+            if (duplicate)
+                throw new common_1.ConflictException("کد دیجی‌کالا قبلاً ثبت شده است");
+        }
         const compatibilityPrice = dto.inPersonInputPrice ?? dto.defaultUnitPrice ?? "0";
         const prices = await this.pricing.calculate({
             pricingCurrency: dto.pricingCurrency ?? client_1.PricingCurrency.IRR,
@@ -104,6 +111,8 @@ let ProductCatalogService = class ProductCatalogService {
             const created = await tx.productCatalogItem.create({
                 data: {
                     code,
+                    digikalaCode,
+                    digikalaUrl: dto.digikalaUrl?.trim() || null,
                     name: dto.name.trim(),
                     description: dto.description?.trim() || undefined,
                     category: dto.category?.trim() || undefined,
@@ -143,6 +152,18 @@ let ProductCatalogService = class ProductCatalogService {
                 throw new common_1.ConflictException("کد محصول یا سرویس قبلاً ثبت شده است");
             }
             data.code = code;
+        }
+        if (dto.digikalaCode !== undefined) {
+            const digikalaCode = dto.digikalaCode?.trim() || null;
+            if (digikalaCode) {
+                const duplicate = await this.prisma.productCatalogItem.findFirst({ where: { digikalaCode, NOT: { id } } });
+                if (duplicate)
+                    throw new common_1.ConflictException("کد دیجی‌کالا قبلاً ثبت شده است");
+            }
+            data.digikalaCode = digikalaCode;
+        }
+        if (dto.digikalaUrl !== undefined) {
+            data.digikalaUrl = dto.digikalaUrl?.trim() || null;
         }
         if (dto.name !== undefined) {
             const name = dto.name.trim();

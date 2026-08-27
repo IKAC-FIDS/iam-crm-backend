@@ -17,7 +17,7 @@ const client_1 = require("@prisma/client");
 const decimalString = ({ value }) => value === undefined || value === null ? value : String(value);
 class CreateProductCatalogItemDto {
     static _OPENAPI_METADATA_FACTORY() {
-        return { code: { required: true, type: () => String, maxLength: 80 }, name: { required: true, type: () => String, maxLength: 200 }, description: { required: false, type: () => String }, category: { required: false, type: () => String, maxLength: 120 }, unit: { required: false, type: () => String, maxLength: 40 }, defaultUnitPrice: { required: false, type: () => String }, currency: { required: false, type: () => String, maxLength: 10 }, pricingCurrency: { required: false, type: () => Object }, inPersonInputPrice: { required: false, type: () => String }, digikalaInputPrice: { required: false, type: () => String }, inPersonProfitPercent: { required: false, type: () => String }, digikalaProfitPercent: { required: false, type: () => String }, isActive: { required: false, type: () => Boolean }, sortOrder: { required: false, type: () => Number } };
+        return { code: { required: true, type: () => String, maxLength: 80 }, digikalaCode: { required: false, type: () => String, nullable: true, maxLength: 80 }, digikalaUrl: { required: false, type: () => String, nullable: true, maxLength: 2000 }, name: { required: true, type: () => String, maxLength: 200 }, description: { required: false, type: () => String }, category: { required: false, type: () => String, maxLength: 120 }, unit: { required: false, type: () => String, maxLength: 40 }, defaultUnitPrice: { required: false, type: () => String }, currency: { required: false, type: () => String, maxLength: 10 }, pricingCurrency: { required: false, type: () => Object }, inPersonInputPrice: { required: false, type: () => String }, digikalaInputPrice: { required: false, type: () => String }, inPersonProfitPercent: { required: false, type: () => String }, digikalaProfitPercent: { required: false, type: () => String }, isActive: { required: false, type: () => Boolean }, sortOrder: { required: false, type: () => Number } };
     }
 }
 exports.CreateProductCatalogItemDto = CreateProductCatalogItemDto;
@@ -26,6 +26,18 @@ __decorate([
     (0, class_validator_1.MaxLength)(80),
     __metadata("design:type", String)
 ], CreateProductCatalogItemDto.prototype, "code", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.MaxLength)(80),
+    __metadata("design:type", Object)
+], CreateProductCatalogItemDto.prototype, "digikalaCode", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsUrl)({ protocols: ['http', 'https'], require_protocol: true }),
+    (0, class_validator_1.MaxLength)(2000),
+    __metadata("design:type", Object)
+], CreateProductCatalogItemDto.prototype, "digikalaUrl", void 0);
 __decorate([
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.MaxLength)(200),

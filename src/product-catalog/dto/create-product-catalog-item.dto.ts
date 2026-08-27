@@ -5,6 +5,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  IsUrl,
   MaxLength,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
@@ -17,6 +18,16 @@ export class CreateProductCatalogItemDto {
   @IsString()
   @MaxLength(80)
   code!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  digikalaCode?: string | null;
+
+  @IsOptional()
+  @IsUrl({ protocols: ['http', 'https'], require_protocol: true })
+  @MaxLength(2000)
+  digikalaUrl?: string | null;
 
   @IsString()
   @MaxLength(200)

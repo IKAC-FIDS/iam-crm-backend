@@ -1278,6 +1278,8 @@ model OpportunityPayment {
 model ProductCatalogItem {
   id                       String                @id @default(uuid())
   code                     String                @unique
+  digikalaCode             String?               @unique
+  digikalaUrl              String?
   name                     String
   description              String?
   category                 String?
