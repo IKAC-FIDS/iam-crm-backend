@@ -9,6 +9,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ReportsModule = void 0;
 const common_1 = require("@nestjs/common");
 const reports_service_1 = require("./reports.service");
+const conversion_health_service_1 = require("./conversion-health.service");
 const reports_controller_1 = require("./reports.controller");
 const advanced_reports_service_1 = require("./advanced-reports.service");
 const commercial_reports_service_1 = require("./commercial-reports.service");
@@ -23,6 +24,7 @@ exports.ReportsModule = ReportsModule = __decorate([
     (0, common_1.Module)({
         providers: [
             reports_service_1.ReportsService,
+            conversion_health_service_1.ConversionHealthService,
             advanced_reports_service_1.AdvancedReportsService,
             commercial_reports_service_1.CommercialReportsService,
             reporting_scope_service_1.ReportingScopeService,
@@ -36,6 +38,7 @@ exports.ReportsModule = ReportsModule = __decorate([
             commercial_reports_service_1.CommercialReportsService,
             data_quality_service_1.DataQualityService,
             period_comparison_service_1.PeriodComparisonService,
+            reporting_scope_service_1.ReportingScopeService,
         ],
     })
 ], ReportsModule);

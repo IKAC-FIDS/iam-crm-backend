@@ -35,9 +35,8 @@ let AuditRequestContextMiddleware = class AuditRequestContextMiddleware {
         }, () => next());
     }
     resolveHeaderValue(value) {
-        if (Array.isArray(value)) {
+        if (Array.isArray(value))
             return value[0]?.trim() || null;
-        }
         return value?.trim() || null;
     }
     resolveClientIp(req) {

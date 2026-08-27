@@ -37,8 +37,9 @@ let DashboardController = class DashboardController {
         return this.dashboard.latestActivities(user);
     }
     async getSummary(filters, user) {
-        const [summary, finance, products, exchange, quality, comparison] = await Promise.all([
+        const [summary, management, finance, products, exchange, quality, comparison,] = await Promise.all([
             this.reports.dashboard(filters, user),
+            this.dashboard.managementSummary(filters, user),
             this.commercial.financial(filters, user),
             this.commercial.products(filters, user),
             this.commercial.exchangeImpact(filters),
@@ -63,22 +64,22 @@ let DashboardController = class DashboardController {
             "ACTIVITIES_RECORDED",
             "TASKS_COMPLETED",
             "TASK_ON_TIME_COMPLETION_RATE",
-            "PAYMENTS_COLLECTED_IRR",
         ]);
         const comparisonMetrics = comparison.groups
-            .flatMap((g) => g.metrics)
-            .filter((m) => comparisonKeys.has(m.key))
-            .map((m) => ({
-            key: m.key,
-            currentValue: m.currentValue,
-            comparisonValue: m.comparisonValue,
-            percentChange: m.percentChange,
-            direction: m.direction,
-            polarity: m.polarity,
-            isImprovement: m.isImprovement,
+            .flatMap((group) => group.metrics)
+            .filter((metric) => comparisonKeys.has(metric.key))
+            .map((metric) => ({
+            key: metric.key,
+            currentValue: metric.currentValue,
+            comparisonValue: metric.comparisonValue,
+            percentChange: metric.percentChange,
+            direction: metric.direction,
+            polarity: metric.polarity,
+            isImprovement: metric.isImprovement,
         }));
         return {
             ...summary,
+            ...management,
             finance: {
                 outstandingAmountIrr: finance.current.outstandingAmountIrr,
                 overdueAmountIrr: finance.current.overdueAmountIrr,

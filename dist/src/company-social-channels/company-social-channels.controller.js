@@ -22,6 +22,7 @@ const current_user_decorator_1 = require("../common/decorators/current-user.deco
 const company_social_channels_service_1 = require("./company-social-channels.service");
 const create_company_social_channel_dto_1 = require("./dto/create-company-social-channel.dto");
 const update_company_social_channel_dto_1 = require("./dto/update-company-social-channel.dto");
+const find_company_social_channels_dto_1 = require("./dto/find-company-social-channels.dto");
 let CompanySocialChannelsController = class CompanySocialChannelsController {
     constructor(channelsService) {
         this.channelsService = channelsService;
@@ -29,8 +30,8 @@ let CompanySocialChannelsController = class CompanySocialChannelsController {
     create(companyId, dto, user) {
         return this.channelsService.create(companyId, dto, user);
     }
-    findAll(companyId, user) {
-        return this.channelsService.findByCompany(companyId, user);
+    findAll(companyId, query, user) {
+        return this.channelsService.findByCompany(companyId, query, user);
     }
     findOne(id, user) {
         return this.channelsService.findOne(id, user);
@@ -59,9 +60,10 @@ __decorate([
     (0, permissions_decorator_1.Permissions)('company:view'),
     openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Param)('companyId')),
-    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Query)()),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:paramtypes", [String, find_company_social_channels_dto_1.FindCompanySocialChannelsDto, Object]),
     __metadata("design:returntype", void 0)
 ], CompanySocialChannelsController.prototype, "findAll", null);
 __decorate([

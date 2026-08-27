@@ -23,13 +23,14 @@ const jwt_auth_guard_1 = require("../common/guards/jwt-auth.guard");
 const permissions_guard_1 = require("../common/guards/permissions.guard");
 const company_legal_documents_service_1 = require("./company-legal-documents.service");
 const company_legal_document_dto_1 = require("./dto/company-legal-document.dto");
+const find_company_legal_documents_dto_1 = require("./dto/find-company-legal-documents.dto");
 const http_log_context_1 = require("../common/logging/http-log-context");
 let CompanyLegalDocumentsController = class CompanyLegalDocumentsController {
     constructor(service) {
         this.service = service;
     }
-    findAll(companyId, user) {
-        return this.service.findAll(companyId, user);
+    findAll(companyId, query, user) {
+        return this.service.findAll(companyId, query, user);
     }
     upload(companyId, dto, file, user, req) {
         return this.service.upload(companyId, dto, file, user, (0, http_log_context_1.getRequestId)(req));
@@ -47,15 +48,19 @@ __decorate([
     (0, permissions_decorator_1.Permissions)('company:view'),
     openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Param)('companyId')),
-    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Query)()),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:paramtypes", [String, find_company_legal_documents_dto_1.FindCompanyLegalDocumentsDto, Object]),
     __metadata("design:returntype", void 0)
 ], CompanyLegalDocumentsController.prototype, "findAll", null);
 __decorate([
     (0, common_1.Post)('upload'),
     (0, permissions_decorator_1.Permissions)('company:update'),
-    (0, common_1.UseInterceptors)((0, platform_express_1.FileInterceptor)('file', { storage: (0, multer_1.memoryStorage)(), limits: { fileSize: 25 * 1024 * 1024 } })),
+    (0, common_1.UseInterceptors)((0, platform_express_1.FileInterceptor)('file', {
+        storage: (0, multer_1.memoryStorage)(),
+        limits: { fileSize: 25 * 1024 * 1024 },
+    })),
     openapi.ApiResponse({ status: 201 }),
     __param(0, (0, common_1.Param)('companyId')),
     __param(1, (0, common_1.Body)()),

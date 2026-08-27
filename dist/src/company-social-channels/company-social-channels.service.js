@@ -13,6 +13,8 @@ exports.CompanySocialChannelsService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../prisma/prisma.service");
 const company_access_service_1 = require("../companies/company-access.service");
+const pagination_response_1 = require("../common/pagination/pagination.response");
+const pagination_util_1 = require("../common/pagination/pagination.util");
 let CompanySocialChannelsService = class CompanySocialChannelsService {
     constructor(prisma, companyAccess) {
         this.prisma = prisma;
@@ -31,12 +33,34 @@ let CompanySocialChannelsService = class CompanySocialChannelsService {
             },
         });
     }
-    async findByCompany(companyId, user) {
+    async findByCompany(companyId, query, user) {
         await this.validateCompanyAccess(companyId, user);
-        return this.prisma.companySocialChannel.findMany({
-            where: { companyId },
-            orderBy: { platform: 'asc' },
-        });
+        const page = query.page ?? 1;
+        const limit = query.limit ?? 20;
+        const { skip, take } = (0, pagination_util_1.getPaginationOffset)(page, limit);
+        const search = query.search?.trim();
+        const where = {
+            companyId,
+            ...(query.platform ? { platform: query.platform } : {}),
+            ...(search
+                ? {
+                    handle: {
+                        contains: search,
+                        mode: 'insensitive',
+                    },
+                }
+                : {}),
+        };
+        const [data, total] = await Promise.all([
+            this.prisma.companySocialChannel.findMany({
+                where,
+                orderBy: [{ platform: 'asc' }, { id: 'asc' }],
+                skip,
+                take,
+            }),
+            this.prisma.companySocialChannel.count({ where }),
+        ]);
+        return new pagination_response_1.PaginationResponseDto(data, (0, pagination_util_1.createPaginationMeta)(page, limit, total));
     }
     async findOne(id, user) {
         const channel = await this.prisma.companySocialChannel.findUnique({
@@ -83,6 +107,7 @@ let CompanySocialChannelsService = class CompanySocialChannelsService {
 exports.CompanySocialChannelsService = CompanySocialChannelsService;
 exports.CompanySocialChannelsService = CompanySocialChannelsService = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [prisma_service_1.PrismaService, company_access_service_1.CompanyAccessService])
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService,
+        company_access_service_1.CompanyAccessService])
 ], CompanySocialChannelsService);
 //# sourceMappingURL=company-social-channels.service.js.map

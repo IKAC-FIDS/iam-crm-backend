@@ -3,7 +3,9 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.createOpenApiDocument = createOpenApiDocument;
 const swagger_1 = require("@nestjs/swagger");
 const client_1 = require("@prisma/client");
+const quota_resolver_service_1 = require("../quota/quota-resolver.service");
 const openapi_constants_1 = require("./openapi.constants");
+const response_contract_schemas_1 = require("./response-contract.schemas");
 const HTTP_METHODS = ['get', 'post', 'put', 'patch', 'delete', 'options', 'head'];
 const PUBLIC_OPERATIONS = new Set([
     'GET /api/health',
@@ -111,14 +113,17 @@ function normalizeResponses(operation, path, method) {
         return;
     }
     const successCode = operation.responses?.['201'] ? '201' : method === 'post' ? '201' : '200';
+    const typed = response_contract_schemas_1.TYPED_SUCCESS_PAYLOADS[`${method.toUpperCase()} ${path}`];
     const dataSchema = path === '/api/quota/current'
         ? { $ref: '#/components/schemas/QuotaSummary' }
-        : { type: 'object', additionalProperties: true, description: 'Explicit public response payload; never a published Prisma model.' };
+        : typed
+            ? typed.schema
+            : { type: 'object', additionalProperties: true, description: 'Explicit public response payload; never a published Prisma model.' };
     operation.responses = {
         [successCode]: {
             description: 'Successful response',
             headers: { 'x-request-id': { $ref: '#/components/headers/RequestId' } },
-            content: { 'application/json': { schema: successEnvelope(dataSchema) } },
+            content: { 'application/json': { schema: typed?.paginated ? paginatedSuccessEnvelope(dataSchema) : successEnvelope(dataSchema) } },
         },
         '400': errorResponse('Bad request or validation failure'),
         '401': errorResponse('Authentication required or invalid'),
@@ -127,6 +132,14 @@ function normalizeResponses(operation, path, method) {
         '409': errorResponse('Conflict'),
         '429': errorResponse('Rate or quota limit exceeded; quota failures use code QUOTA_EXCEEDED'),
         '500': errorResponse('Internal server error'),
+    };
+}
+function paginatedSuccessEnvelope(itemSchema) {
+    return {
+        allOf: [
+            { $ref: '#/components/schemas/SuccessEnvelope' },
+            { type: 'object', required: ['data', 'meta'], properties: { data: { type: 'array', items: itemSchema }, meta: { $ref: '#/components/schemas/PaginationMeta' } } },
+        ],
     };
 }
 function successEnvelope(dataSchema) {
@@ -147,6 +160,7 @@ function errorResponse(description) {
 function addCanonicalComponents(document) {
     const schemas = (document.components ??= {}).schemas ??= {};
     Object.assign(schemas, {
+        ...response_contract_schemas_1.RESPONSE_CONTRACT_SCHEMAS,
         SuccessEnvelope: {
             type: 'object', required: ['success', 'data', 'requestId', 'timestamp'],
             properties: {
@@ -173,13 +187,22 @@ function addCanonicalComponents(document) {
         SearchFilter: { type: 'object', properties: { search: { type: 'string', description: 'Domain-specific textual search when supported.' } } },
         UserRole: enumSchema(client_1.UserRole), OrganizationStatus: enumSchema(client_1.OrganizationStatus),
         FeatureKey: enumSchema(client_1.FeatureKey), SubscriptionStatus: enumSchema(client_1.SubscriptionStatus), QuotaMetric: enumSchema(client_1.QuotaMetric),
+        QuotaResetPeriod: enumSchema(client_1.QuotaResetPeriod),
+        QuotaConfigurationState: { type: 'string', enum: [...quota_resolver_service_1.QUOTA_CONFIGURATION_STATES] },
         DecimalIntegerString: { type: 'string', pattern: '^-?[0-9]+$', example: '1000', description: 'Integer value serialized as a decimal string to preserve BigInt precision.' },
-        QuotaSummary: {
-            type: 'object', required: ['organizationId', 'quotas'],
+        QuotaSummaryMetric: {
+            type: 'object', required: ['metric', 'state', 'current', 'softLimit', 'hardLimit', 'resetPeriod', 'resetAt', 'threshold'],
             properties: {
-                organizationId: { type: 'string', format: 'uuid' },
-                quotas: { type: 'array', items: { type: 'object', properties: { metric: { $ref: '#/components/schemas/QuotaMetric' }, state: { type: 'string', enum: ['ACTIVE', 'UNLIMITED', 'DISABLED', 'UNCONFIGURED', 'LEGACY_COMPATIBILITY', 'ORGANIZATION_INACTIVE'] }, current: { $ref: '#/components/schemas/DecimalIntegerString' }, softLimit: { type: 'string', pattern: '^-?[0-9]+$', nullable: true, description: 'Nullable decimal BigInt string.' }, hardLimit: { type: 'string', pattern: '^-?[0-9]+$', nullable: true, description: 'Nullable decimal BigInt string.' } } } },
+                metric: { $ref: '#/components/schemas/QuotaMetric' }, state: { $ref: '#/components/schemas/QuotaConfigurationState' },
+                current: { $ref: '#/components/schemas/DecimalIntegerString' },
+                softLimit: { type: 'string', pattern: '^[0-9]+$', nullable: true }, hardLimit: { type: 'string', pattern: '^[0-9]+$', nullable: true },
+                resetPeriod: { $ref: '#/components/schemas/QuotaResetPeriod' }, resetAt: { type: 'string', format: 'date-time', nullable: true },
+                threshold: { type: 'number', nullable: true, enum: [80, 90] },
             },
+        },
+        QuotaSummary: {
+            type: 'object', required: ['organizationId', 'generatedAt', 'metrics'],
+            properties: { organizationId: { type: 'string', format: 'uuid' }, generatedAt: { type: 'string', format: 'date-time' }, metrics: { type: 'array', items: { $ref: '#/components/schemas/QuotaSummaryMetric' } } },
         },
     });
     (document.components ??= {}).headers = {

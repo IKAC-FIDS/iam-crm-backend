@@ -12,13 +12,15 @@ const admin_permissions_service_1 = require("./admin-permissions.service");
 const admin_permissions_controller_1 = require("./admin-permissions.controller");
 const rbac_management_controller_1 = require("./rbac-management.controller");
 const rbac_management_service_1 = require("./rbac-management.service");
+const tenant_roles_service_1 = require("./tenant-roles.service");
+const tenant_roles_controller_1 = require("./tenant-roles.controller");
 let AdminPermissionsModule = class AdminPermissionsModule {
 };
 exports.AdminPermissionsModule = AdminPermissionsModule;
 exports.AdminPermissionsModule = AdminPermissionsModule = __decorate([
     (0, common_1.Module)({
-        providers: [admin_permissions_service_1.AdminPermissionsService, rbac_management_service_1.RbacManagementService],
-        controllers: [admin_permissions_controller_1.AdminPermissionsController, rbac_management_controller_1.PermissionsManagementController, rbac_management_controller_1.RolesManagementController],
+        providers: [admin_permissions_service_1.AdminPermissionsService, rbac_management_service_1.RbacManagementService, tenant_roles_service_1.TenantRolesService],
+        controllers: [admin_permissions_controller_1.AdminPermissionsController, rbac_management_controller_1.PermissionsManagementController, rbac_management_controller_1.RolesManagementController, tenant_roles_controller_1.TenantRolesController],
         exports: [admin_permissions_service_1.AdminPermissionsService],
     })
 ], AdminPermissionsModule);

@@ -282,7 +282,7 @@ let PeriodComparisonService = class PeriodComparisonService {
         return (0, timezone_boundary_util_1.zonedMidnightUtc)(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate(), tz);
     }
     defaultRange(tz) {
-        const today = (0, timezone_boundary_util_1.organizationDayBounds)(new Date(), tz).start, parts = new Intl.DateTimeFormat("en-CA", {
+        const now = new Date(), today = (0, timezone_boundary_util_1.organizationDayBounds)(now, tz).start, parts = new Intl.DateTimeFormat("en-CA", {
             timeZone: tz,
             year: "numeric",
             month: "2-digit",
@@ -290,7 +290,7 @@ let PeriodComparisonService = class PeriodComparisonService {
         }).formatToParts(today), get = (x) => Number(parts.find((p) => p.type === x)?.value), d = new Date(Date.UTC(get("year"), get("month") - 1, get("day") - 30));
         return {
             start: (0, timezone_boundary_util_1.zonedMidnightUtc)(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate(), tz),
-            end: today,
+            end: now,
         };
     }
     shiftYear(date, tz) {

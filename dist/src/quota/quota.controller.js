@@ -119,7 +119,7 @@ let TenantQuotaController = class TenantQuotaController {
 exports.TenantQuotaController = TenantQuotaController;
 __decorate([
     (0, common_1.Get)('current'),
-    openapi.ApiResponse({ status: 200 }),
+    openapi.ApiResponse({ status: 200, type: require("./dto/quota-summary-response.dto").QuotaSummaryDto }),
     __param(0, (0, current_tenant_decorator_1.CurrentTenant)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),

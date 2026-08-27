@@ -23,6 +23,7 @@ const report_filters_dto_1 = require("./dto/report-filters.dto");
 const advanced_report_filters_dto_1 = require("./dto/advanced-report-filters.dto");
 const advanced_reports_service_1 = require("./advanced-reports.service");
 const reports_service_1 = require("./reports.service");
+const conversion_health_service_1 = require("./conversion-health.service");
 const commercial_reports_service_1 = require("./commercial-reports.service");
 const data_quality_service_1 = require("./data-quality.service");
 const data_quality_dto_1 = require("./dto/data-quality.dto");
@@ -30,8 +31,9 @@ const period_comparison_dto_1 = require("./dto/period-comparison.dto");
 const period_comparison_service_1 = require("./period-comparison.service");
 const report_exports_service_1 = require("./report-exports.service");
 let ReportsController = class ReportsController {
-    constructor(reportsService, advancedReportsService, commercialReportsService, dataQualityService, periodComparisonService, reportExports) {
+    constructor(reportsService, conversionHealthService, advancedReportsService, commercialReportsService, dataQualityService, periodComparisonService, reportExports) {
         this.reportsService = reportsService;
+        this.conversionHealthService = conversionHealthService;
         this.advancedReportsService = advancedReportsService;
         this.commercialReportsService = commercialReportsService;
         this.dataQualityService = dataQualityService;
@@ -73,6 +75,9 @@ let ReportsController = class ReportsController {
     }
     getTaskPerformance(filters, user) {
         return this.advancedReportsService.taskPerformance(filters, user);
+    }
+    getConversionHealth(filters, user) {
+        return this.conversionHealthService.report(filters, user);
     }
     getConversionRates(filters, user) {
         return this.reportsService.getConversionRates(filters, user);
@@ -198,6 +203,15 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], ReportsController.prototype, "getTaskPerformance", null);
 __decorate([
+    (0, common_1.Get)("conversion-health"),
+    openapi.ApiResponse({ status: 200 }),
+    __param(0, (0, common_1.Query)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [report_filters_dto_1.ReportFiltersDto, Object]),
+    __metadata("design:returntype", void 0)
+], ReportsController.prototype, "getConversionHealth", null);
+__decorate([
     (0, common_1.Get)("conversion-rates"),
     openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Query)()),
@@ -264,6 +278,7 @@ exports.ReportsController = ReportsController = __decorate([
     (0, permissions_decorator_1.Permissions)("report:view"),
     (0, common_1.Controller)("reports"),
     __metadata("design:paramtypes", [reports_service_1.ReportsService,
+        conversion_health_service_1.ConversionHealthService,
         advanced_reports_service_1.AdvancedReportsService,
         commercial_reports_service_1.CommercialReportsService,
         data_quality_service_1.DataQualityService,

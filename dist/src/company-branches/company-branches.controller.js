@@ -22,6 +22,7 @@ const current_user_decorator_1 = require("../common/decorators/current-user.deco
 const company_branches_service_1 = require("./company-branches.service");
 const create_company_branch_dto_1 = require("./dto/create-company-branch.dto");
 const update_company_branch_dto_1 = require("./dto/update-company-branch.dto");
+const find_company_branches_dto_1 = require("./dto/find-company-branches.dto");
 let CompanyBranchesController = class CompanyBranchesController {
     constructor(branchesService) {
         this.branchesService = branchesService;
@@ -29,8 +30,8 @@ let CompanyBranchesController = class CompanyBranchesController {
     create(companyId, dto, user) {
         return this.branchesService.create(companyId, dto, user);
     }
-    findAll(companyId, user) {
-        return this.branchesService.findByCompany(companyId, user);
+    findAll(companyId, query, user) {
+        return this.branchesService.findByCompany(companyId, query, user);
     }
     findOne(id, user) {
         return this.branchesService.findOne(id, user);
@@ -59,9 +60,10 @@ __decorate([
     (0, permissions_decorator_1.Permissions)('company:view'),
     openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Param)('companyId')),
-    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Query)()),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:paramtypes", [String, find_company_branches_dto_1.FindCompanyBranchesDto, Object]),
     __metadata("design:returntype", void 0)
 ], CompanyBranchesController.prototype, "findAll", null);
 __decorate([

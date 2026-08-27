@@ -13,6 +13,8 @@ exports.CompanyBranchesService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../prisma/prisma.service");
 const company_access_service_1 = require("../companies/company-access.service");
+const pagination_response_1 = require("../common/pagination/pagination.response");
+const pagination_util_1 = require("../common/pagination/pagination.util");
 let CompanyBranchesService = class CompanyBranchesService {
     constructor(prisma, companyAccess) {
         this.prisma = prisma;
@@ -33,12 +35,35 @@ let CompanyBranchesService = class CompanyBranchesService {
             },
         });
     }
-    async findByCompany(companyId, user) {
+    async findByCompany(companyId, query, user) {
         await this.validateCompanyAccess(companyId, user);
-        return this.prisma.companyBranch.findMany({
-            where: { companyId },
-            orderBy: { name: 'asc' },
-        });
+        const page = query.page ?? 1;
+        const limit = query.limit ?? 20;
+        const { skip, take } = (0, pagination_util_1.getPaginationOffset)(page, limit);
+        const search = query.search?.trim();
+        const where = {
+            companyId,
+            ...(search
+                ? {
+                    OR: [
+                        { name: { contains: search, mode: 'insensitive' } },
+                        { city: { contains: search, mode: 'insensitive' } },
+                        { address: { contains: search, mode: 'insensitive' } },
+                        { phone: { contains: search, mode: 'insensitive' } },
+                    ],
+                }
+                : {}),
+        };
+        const [data, total] = await Promise.all([
+            this.prisma.companyBranch.findMany({
+                where,
+                orderBy: [{ name: 'asc' }, { id: 'asc' }],
+                skip,
+                take,
+            }),
+            this.prisma.companyBranch.count({ where }),
+        ]);
+        return new pagination_response_1.PaginationResponseDto(data, (0, pagination_util_1.createPaginationMeta)(page, limit, total));
     }
     async findOne(id, user) {
         const branch = await this.prisma.companyBranch.findUnique({
@@ -87,6 +112,7 @@ let CompanyBranchesService = class CompanyBranchesService {
 exports.CompanyBranchesService = CompanyBranchesService;
 exports.CompanyBranchesService = CompanyBranchesService = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [prisma_service_1.PrismaService, company_access_service_1.CompanyAccessService])
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService,
+        company_access_service_1.CompanyAccessService])
 ], CompanyBranchesService);
 //# sourceMappingURL=company-branches.service.js.map

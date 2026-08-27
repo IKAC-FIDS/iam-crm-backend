@@ -9,10 +9,19 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.QuotaResolverService = void 0;
+exports.QuotaResolverService = exports.QUOTA_CONFIGURATION_STATES = void 0;
 const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
 const prisma_service_1 = require("../prisma/prisma.service");
+exports.QUOTA_CONFIGURATION_STATES = [
+    'ENFORCED',
+    'UNLIMITED',
+    'DISABLED',
+    'UNCONFIGURED',
+    'LEGACY_COMPATIBILITY',
+    'INACTIVE_ORGANIZATION',
+    'INACTIVE_SUBSCRIPTION',
+];
 let QuotaResolverService = class QuotaResolverService {
     constructor(prisma) {
         this.prisma = prisma;

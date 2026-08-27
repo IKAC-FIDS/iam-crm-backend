@@ -15,6 +15,8 @@ const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
 const attachments_service_1 = require("../attachments/attachments.service");
 const api_date_util_1 = require("../common/dates/api-date.util");
+const pagination_response_1 = require("../common/pagination/pagination.response");
+const pagination_util_1 = require("../common/pagination/pagination.util");
 const prisma_service_1 = require("../prisma/prisma.service");
 const company_access_service_1 = require("./company-access.service");
 let CompanyLegalDocumentsService = CompanyLegalDocumentsService_1 = class CompanyLegalDocumentsService {
@@ -24,26 +26,77 @@ let CompanyLegalDocumentsService = CompanyLegalDocumentsService_1 = class Compan
         this.companyAccess = companyAccess;
         this.logger = new common_1.Logger(CompanyLegalDocumentsService_1.name);
     }
-    async findAll(companyId, user) {
+    async findAll(companyId, query, user) {
         await this.assertCompany(companyId, user);
-        return this.prisma.companyLegalDocument.findMany({ where: { companyId }, orderBy: { createdAt: 'desc' } });
+        const page = query.page ?? 1;
+        const limit = query.limit ?? 20;
+        const { skip, take } = (0, pagination_util_1.getPaginationOffset)(page, limit);
+        const search = query.search?.trim();
+        const documentDate = (0, api_date_util_1.parseApiDateRange)(query.dateFrom, query.dateTo, 'dateFrom', 'dateTo');
+        const where = {
+            companyId,
+            ...(query.type ? { type: query.type } : {}),
+            ...(documentDate ? { documentDate } : {}),
+            ...(search
+                ? {
+                    OR: [
+                        { title: { contains: search, mode: 'insensitive' } },
+                        { description: { contains: search, mode: 'insensitive' } },
+                    ],
+                }
+                : {}),
+        };
+        const direction = query.sortOrder ?? 'desc';
+        const orderBy = query.sortBy === 'documentDate'
+            ? [
+                { documentDate: direction },
+                { createdAt: direction },
+                { id: direction },
+            ]
+            : [{ createdAt: direction }, { id: direction }];
+        const [data, total] = await Promise.all([
+            this.prisma.companyLegalDocument.findMany({
+                where,
+                orderBy,
+                skip,
+                take,
+            }),
+            this.prisma.companyLegalDocument.count({ where }),
+        ]);
+        return new pagination_response_1.PaginationResponseDto(data, (0, pagination_util_1.createPaginationMeta)(page, limit, total));
     }
     async upload(companyId, dto, file, user, requestId = null) {
         await this.assertCompany(companyId, user);
-        if (!file)
+        if (!file) {
             throw new common_1.BadRequestException('Legal document file is required');
+        }
         const title = dto.title?.trim();
-        if (!title)
+        if (!title) {
             throw new common_1.BadRequestException('Document title is required');
-        const document = await this.prisma.companyLegalDocument.create({ data: {
-                companyId, type: dto.type, title, description: dto.description?.trim() || undefined,
-                documentDate: dto.documentDate ? (0, api_date_util_1.parseApiDate)(dto.documentDate, 'documentDate') : undefined,
+        }
+        const document = await this.prisma.companyLegalDocument.create({
+            data: {
+                companyId,
+                type: dto.type,
+                title,
+                description: dto.description?.trim() || undefined,
+                documentDate: dto.documentDate
+                    ? (0, api_date_util_1.parseApiDate)(dto.documentDate, 'documentDate')
+                    : undefined,
                 createdById: user.userId,
-            } });
+            },
+        });
         let attachment;
         try {
-            attachment = await this.attachments.upload({ entityType: client_1.FileAttachmentEntityType.COMPANY_LEGAL_DOCUMENT, entityId: document.id, description: dto.description }, file, user);
-            const updated = await this.prisma.companyLegalDocument.update({ where: { id: document.id }, data: { attachmentId: attachment.id } });
+            attachment = await this.attachments.upload({
+                entityType: client_1.FileAttachmentEntityType.COMPANY_LEGAL_DOCUMENT,
+                entityId: document.id,
+                description: dto.description,
+            }, file, user);
+            const updated = await this.prisma.companyLegalDocument.update({
+                where: { id: document.id },
+                data: { attachmentId: attachment.id },
+            });
             return {
                 ...updated,
                 attachment: {
@@ -62,10 +115,14 @@ let CompanyLegalDocumentsService = CompanyLegalDocumentsService_1 = class Compan
                     await this.attachments.remove(attachment.id, user);
                 }
                 catch (cleanupError) {
-                    this.logger.error(`Legal document attachment cleanup failed attachmentId=${attachment.id} requestId=${requestId ?? 'none'}`, cleanupError instanceof Error ? cleanupError.stack : String(cleanupError));
+                    this.logger.error(`Legal document attachment cleanup failed attachmentId=${attachment.id} requestId=${requestId ?? 'none'}`, cleanupError instanceof Error
+                        ? cleanupError.stack
+                        : String(cleanupError));
                 }
             }
-            await this.prisma.companyLegalDocument.deleteMany({ where: { id: document.id } });
+            await this.prisma.companyLegalDocument.deleteMany({
+                where: { id: document.id },
+            });
             throw error;
         }
     }
@@ -77,25 +134,39 @@ let CompanyLegalDocumentsService = CompanyLegalDocumentsService_1 = class Compan
             data.type = dto.type;
         if (dto.title !== undefined)
             data.title = dto.title.trim();
-        if (dto.description !== undefined)
+        if (dto.description !== undefined) {
             data.description = dto.description.trim() || null;
-        if (dto.documentDate !== undefined)
-            data.documentDate = dto.documentDate ? (0, api_date_util_1.parseApiDate)(dto.documentDate, 'documentDate') : null;
-        if (dto.title !== undefined && !data.title)
+        }
+        if (dto.documentDate !== undefined) {
+            data.documentDate = dto.documentDate
+                ? (0, api_date_util_1.parseApiDate)(dto.documentDate, 'documentDate')
+                : null;
+        }
+        if (dto.title !== undefined && !data.title) {
             throw new common_1.BadRequestException('Document title is required');
-        return this.prisma.companyLegalDocument.update({ where: { id: current.id }, data });
+        }
+        return this.prisma.companyLegalDocument.update({
+            where: { id: current.id },
+            data,
+        });
     }
     async remove(companyId, documentId, user) {
         await this.assertCompany(companyId, user);
         const current = await this.getDocument(companyId, documentId);
-        if (current.attachmentId)
+        if (current.attachmentId) {
             await this.attachments.remove(current.attachmentId, user);
-        return this.prisma.companyLegalDocument.delete({ where: { id: current.id } });
+        }
+        return this.prisma.companyLegalDocument.delete({
+            where: { id: current.id },
+        });
     }
     async getDocument(companyId, id) {
-        const document = await this.prisma.companyLegalDocument.findFirst({ where: { id, companyId } });
-        if (!document)
+        const document = await this.prisma.companyLegalDocument.findFirst({
+            where: { id, companyId },
+        });
+        if (!document) {
             throw new common_1.NotFoundException('Company legal document not found');
+        }
         return document;
     }
     async assertCompany(companyId, user) {
@@ -105,6 +176,8 @@ let CompanyLegalDocumentsService = CompanyLegalDocumentsService_1 = class Compan
 exports.CompanyLegalDocumentsService = CompanyLegalDocumentsService;
 exports.CompanyLegalDocumentsService = CompanyLegalDocumentsService = CompanyLegalDocumentsService_1 = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [prisma_service_1.PrismaService, attachments_service_1.AttachmentsService, company_access_service_1.CompanyAccessService])
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService,
+        attachments_service_1.AttachmentsService,
+        company_access_service_1.CompanyAccessService])
 ], CompanyLegalDocumentsService);
 //# sourceMappingURL=company-legal-documents.service.js.map
