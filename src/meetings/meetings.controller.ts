@@ -15,6 +15,7 @@ export class MeetingsController {
   constructor(private readonly service: MeetingsService) {}
   @Post() @Permissions('meeting:create') create(@Body() dto: CreateMeetingDto, @CurrentUser() user: CurrentUserPayload) { return this.service.create(dto, user); }
   @Get() @Permissions('meeting:view') findAll(@Query() query: FindMeetingsDto, @CurrentUser() user: CurrentUserPayload) { return this.service.findAll(query, user); }
+  @Get('types/options') @Permissions('meeting:view') findTypes() { return this.service.findTypes(); }
   @Get(':id') @Permissions('meeting:view') findOne(@Param('id') id: string, @CurrentUser() user: CurrentUserPayload) { return this.service.findOne(id, user); }
   @Patch(':id') @Permissions('meeting:update') update(@Param('id') id: string, @Body() dto: UpdateMeetingDto, @CurrentUser() user: CurrentUserPayload) { return this.service.update(id, dto, user); }
   @Patch(':id/complete') @Permissions('meeting:complete') complete(@Param('id') id: string, @Body() dto: CompleteMeetingDto, @CurrentUser() user: CurrentUserPayload) { return this.service.complete(id, dto, user); }

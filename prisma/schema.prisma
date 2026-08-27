@@ -1495,6 +1495,8 @@ model Meeting {
   opportunityId      String?
   opportunity        Opportunity?      @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
   title              String
+  meetingTypeId      String
+  type               LookupOption      @relation("MeetingTypeOption", fields: [meetingTypeId], references: [id], onDelete: Restrict)
   agenda             String?
   description        String?
   mode               MeetingMode
@@ -1527,6 +1529,7 @@ model Meeting {
   @@index([opportunityId, startAt])
   @@index([organizerId, startAt])
   @@index([status, startAt])
+  @@index([meetingTypeId, startAt])
   @@index([reminderAt, reminderSentAt, status])
   @@map("meetings")
 }
@@ -1750,6 +1753,7 @@ model LookupOption {
   personContactTypes    PersonContact[] @relation("PersonContactTypeOption")
   personSocialPlatforms PersonSocial[]  @relation("PersonSocialPlatformOption")
   opportunitySources    Opportunity[]   @relation("OpportunitySourceOption")
+  meetings              Meeting[]       @relation("MeetingTypeOption")
 
   @@unique([group, code])
   @@index([group])

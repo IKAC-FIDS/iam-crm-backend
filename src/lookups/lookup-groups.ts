@@ -9,6 +9,7 @@ export const LOOKUP_GROUPS = [
   'contact-types',
   'person-social-platforms',
   'company-sources',
+  'meeting-types',
 ] as const;
 
 export type LookupGroup = (typeof LOOKUP_GROUPS)[number];

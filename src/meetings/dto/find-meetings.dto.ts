@@ -15,6 +15,7 @@ export class FindMeetingsDto {
   @IsOptional() @IsUUID() attendeePersonId?: string;
   @IsOptional() @IsEnum(MeetingStatus) status?: MeetingStatus;
   @IsOptional() @IsEnum(MeetingMode) mode?: MeetingMode;
+  @IsOptional() @IsUUID() meetingTypeId?: string;
   @IsOptional() @IsApiDateString() dateFrom?: string;
   @IsOptional() @IsApiDateString() dateTo?: string;
   @IsOptional() @Transform(bool) @IsBoolean() upcoming?: boolean;

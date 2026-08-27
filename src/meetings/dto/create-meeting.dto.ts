@@ -9,6 +9,7 @@ export class CreateMeetingDto {
   @Transform(trim) @IsUUID() companyId!: string;
   @IsOptional() @Transform(trim) @IsUUID() opportunityId?: string;
   @Transform(trim) @IsString() @MaxLength(200) title!: string;
+  @IsOptional() @Transform(trim) @IsUUID() meetingTypeId?: string;
   @IsOptional() @IsString() agenda?: string;
   @IsOptional() @IsString() description?: string;
   @IsEnum(MeetingMode) mode!: MeetingMode;
