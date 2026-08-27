@@ -15,7 +15,7 @@ INSERT INTO "lookup_options" ("id", "group", "code", "label", "description", "is
   (gen_random_uuid(), 'meeting-types', 'OTHER', 'سایر', NULL, true, 140, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 ON CONFLICT ("group", "code") DO NOTHING;
 
-ALTER TABLE "meetings" ADD COLUMN "meetingTypeId" UUID;
+ALTER TABLE "meetings" ADD COLUMN "meetingTypeId" TEXT;
 UPDATE "meetings" SET "meetingTypeId" = (SELECT "id" FROM "lookup_options" WHERE "group" = 'meeting-types' AND "code" = 'OTHER' LIMIT 1);
 ALTER TABLE "meetings" ALTER COLUMN "meetingTypeId" SET NOT NULL;
 ALTER TABLE "meetings" ADD CONSTRAINT "meetings_meetingTypeId_fkey" FOREIGN KEY ("meetingTypeId") REFERENCES "lookup_options"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
