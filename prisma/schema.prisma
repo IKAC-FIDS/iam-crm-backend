@@ -1100,7 +1100,7 @@ model Activity {
   userId    String
   user      User    @relation(fields: [userId], references: [id])
 
-  type           ActivityType
+  type           String
   notes          String?
   outcome        String?
   occurredAt     DateTime     @default(now())

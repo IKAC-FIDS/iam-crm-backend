@@ -1,4 +1,5 @@
-import { ActivityType, UserRole } from '@prisma/client';
+import { UserRole } from '@prisma/client';
+import { ActivityType } from '../src/activities/activity-type';
 import { ActivitiesController } from '../src/activities/activities.controller';
 import { ActivitiesService } from '../src/activities/activities.service';
 import {

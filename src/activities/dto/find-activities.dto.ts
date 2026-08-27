@@ -7,7 +7,6 @@ import {
   IsString,
   IsUUID,
 } from 'class-validator';
-import { ActivityType } from '@prisma/client';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 import { OwnershipScope } from '../../common/dto/ownership-scope.dto';
 import { IsApiDateString } from '../../common/validators/api-date-string.validator';
@@ -33,8 +32,8 @@ export class FindActivitiesDto extends PaginationDto {
   search?: string;
 
   @IsOptional()
-  @IsEnum(ActivityType)
-  activityType?: ActivityType;
+  @IsString()
+  activityType?: string;
 
   @IsOptional()
   @IsEnum(ActivityListStatus)

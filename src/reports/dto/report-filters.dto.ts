@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { ActivityType, Priority } from '@prisma/client';
+import { Priority } from '@prisma/client';
 import { IsArray, IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
 import { IsApiDateString } from '../../common/validators/api-date-string.validator';
 import { OwnershipScope } from '../../common/dto/ownership-scope.dto';
@@ -76,6 +76,6 @@ export class ReportFiltersDto {
   @Transform(csv)
   @IsOptional()
   @IsArray()
-  @IsEnum(ActivityType, { each: true })
-  activityTypes?: ActivityType[];
+  @IsString({ each: true })
+  activityTypes?: string[];
 }

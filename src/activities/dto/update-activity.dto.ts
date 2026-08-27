@@ -1,6 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
-import { ActivityType } from '@prisma/client';
+import { IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 import { IsApiDateString } from '../../common/validators/api-date-string.validator';
 
 const emptyStringToNull = ({ value }: { value: unknown }) =>
@@ -8,8 +7,10 @@ const emptyStringToNull = ({ value }: { value: unknown }) =>
 
 export class UpdateActivityDto {
   @IsOptional()
-  @IsEnum(ActivityType)
-  type?: ActivityType;
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(100)
+  type?: string;
 
   @Transform(emptyStringToNull)
   @IsOptional()

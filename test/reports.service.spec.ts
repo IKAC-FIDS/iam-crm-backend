@@ -1,4 +1,5 @@
-import { ActivityType, UserRole } from '@prisma/client';
+import { UserRole } from '@prisma/client';
+import { ActivityType } from '../src/activities/activity-type';
 import { ReportsService } from '../src/reports/reports.service';
 import { tenantUser } from './helpers/tenant-user';
 

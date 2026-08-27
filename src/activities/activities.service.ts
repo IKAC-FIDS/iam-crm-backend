@@ -56,6 +56,16 @@ const activityCenterSelect = {
 export class ActivitiesService {
   constructor(private prisma: PrismaService, private audit: AuditLogService, private companyAccess: CompanyAccessService) {}
 
+  findTypes() {
+    return this.prisma.lookupOption.findMany({ where: { group: 'activity-types' }, orderBy: [{ sortOrder: 'asc' }, { label: 'asc' }] });
+  }
+
+  private async validateManualType(type: string) {
+    if (type === 'STAGE_CHANGE') throw new BadRequestException('STAGE_CHANGE is a system activity');
+    const option = await this.prisma.lookupOption.findFirst({ where: { group: 'activity-types', code: type, isActive: true } });
+    if (!option) throw new BadRequestException('نوع فعالیت انتخاب‌شده نامعتبر یا غیرفعال است.');
+  }
+
   async findAll(
     query: FindActivitiesDto,
     user: CurrentUserPayload,
@@ -285,6 +295,7 @@ export class ActivitiesService {
   async create(dto: CreateActivityDto, user: CurrentUserPayload) {
     // بررسی دسترسی به شرکت
     await this.validateCompanyAccess(dto.companyId, user);
+    await this.validateManualType(dto.type);
 
     // اگر personId ارسال شده، بررسی دسترسی به مخاطب
     if (dto.personId) {
@@ -321,6 +332,7 @@ export class ActivitiesService {
 
   async updateActivity(activityId: string, dto: UpdateActivityDto, user: CurrentUserPayload) {
     const activity = await this.findActivityForMutation(activityId, user);
+    if (dto.type !== undefined && dto.type !== activity.type) await this.validateManualType(dto.type);
 
     if (activity.type === 'STAGE_CHANGE') {
       throw new BadRequestException('STAGE_CHANGE activities cannot be edited manually');

@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { ActivityType, Prisma, Priority, UserRole } from '@prisma/client';
+import { Prisma, Priority, UserRole } from '@prisma/client';
+import { ActivityType } from '../activities/activity-type';
 import { CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReportFiltersDto } from './dto/report-filters.dto';

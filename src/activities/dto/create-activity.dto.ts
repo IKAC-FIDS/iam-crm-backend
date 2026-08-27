@@ -1,5 +1,4 @@
-import { IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
-import { ActivityType } from '@prisma/client';
+import { IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 import { IsApiDateString } from '../../common/validators/api-date-string.validator';
 
 export class CreateActivityDto {
@@ -10,8 +9,10 @@ export class CreateActivityDto {
   @IsString()
   personId?: string;
 
-  @IsEnum(ActivityType)
-  type: ActivityType;
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(100)
+  type: string;
 
   @IsOptional()
   @IsString()

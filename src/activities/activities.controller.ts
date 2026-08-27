@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
-import { Permissions } from '../common/decorators/permissions.decorator';
+import { AnyPermission, Permissions } from '../common/decorators/permissions.decorator';
 import { CurrentUser, CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { ActivitiesService } from './activities.service';
 import { CreateActivityDto } from './dto/create-activity.dto';
@@ -15,6 +15,10 @@ import { PaginationDto } from '../common/dto/pagination.dto'; // ← اضافه 
 @Controller('activities')
 export class ActivitiesController {
   constructor(private activitiesService: ActivitiesService) {}
+
+  @Get('types/options')
+  @AnyPermission('activity:view', 'activity:create', 'activity:update')
+  findTypes() { return this.activitiesService.findTypes(); }
 
   @Get()
   @Permissions('activity:view')

@@ -4,7 +4,8 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { ActivityType, Prisma, QuotaMetric, UserRole } from '@prisma/client';
+import { Prisma, QuotaMetric, UserRole } from '@prisma/client';
+import { ActivityType } from '../activities/activity-type';
 import { randomUUID } from 'node:crypto';
 import { PipelineConfigService } from '../admin/pipeline/pipeline-config.service';
 import { AuditLogService } from '../audit-log/audit-log.service';
