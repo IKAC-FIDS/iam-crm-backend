@@ -17,9 +17,10 @@ import {
   getRefreshTokenFromRequest,
 } from '../common/cookies/refresh-token-cookie';
 import { SessionsService } from './sessions.service';
+import { CookieOriginGuard } from '../common/guards/cookie-origin.guard';
 
 @Controller('auth/sessions')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, CookieOriginGuard)
 export class SessionsController {
   constructor(private readonly sessionsService: SessionsService) {}
 

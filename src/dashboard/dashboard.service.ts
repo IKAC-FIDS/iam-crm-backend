@@ -298,7 +298,7 @@ export class DashboardService {
     jalaliMonth: number,
     jalaliDay: number,
   ): GregorianDate {
-    let jy = jalaliYear + 1595;
+    const jy = jalaliYear + 1595;
 
     let days =
       -355668 +

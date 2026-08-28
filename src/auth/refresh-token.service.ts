@@ -64,6 +64,10 @@ export class RefreshTokenService {
       where: { refreshTokenHash: this.hashRefreshToken(refreshToken) },
       include: { user: true },
     });
+    // The precheck must not bypass replay detection used by rotation.
+    if (session?.revokedAt && session.revokedReason === 'ROTATED') {
+      await this.revokeActiveSessionsForUser(session.userId, 'REUSE_DETECTED');
+    }
     if (
       !session ||
       session.revokedAt ||

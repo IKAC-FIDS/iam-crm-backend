@@ -178,6 +178,7 @@ describe("AdvancedReportsService", () => {
     );
     const controller = new ReportsController(
       {} as any,
+      {} as any,
       advanced,
       {} as any,
       {} as any,

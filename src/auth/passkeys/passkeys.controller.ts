@@ -21,6 +21,7 @@ import { StartPasskeyRegistrationDto } from './dto/start-passkey-registration.dt
 import { VerifyPasskeyAuthenticationDto } from './dto/verify-passkey-authentication.dto';
 import { VerifyPasskeyRegistrationDto } from './dto/verify-passkey-registration.dto';
 import { PasskeysService } from './passkeys.service';
+import { CookieOriginGuard } from '../../common/guards/cookie-origin.guard';
 
 @UseGuards(JwtAuthGuard)
 @Controller('me/passkeys')
@@ -57,6 +58,7 @@ export class MyPasskeysController {
 }
 
 @Controller('auth/passkeys')
+@UseGuards(CookieOriginGuard)
 export class AuthPasskeysController {
   constructor(private passkeysService: PasskeysService) {}
 

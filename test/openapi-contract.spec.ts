@@ -12,7 +12,7 @@ describe('fix 000094 canonical OpenAPI contract', () => {
   const ops = operations(doc);
 
   it('documents every current HTTP operation with stable unique IDs', () => {
-    expect(ops).toHaveLength(323);
+    expect(ops).toHaveLength(334);
     const ids = ops.map(({ operation }) => operation.operationId);
     expect(ids.every(Boolean)).toBe(true);
     expect(new Set(ids).size).toBe(ids.length);
@@ -48,6 +48,7 @@ describe('fix 000094 canonical OpenAPI contract', () => {
   });
 
   it('documents public and protected security accurately', () => {
+    expect(doc.components.securitySchemes.refreshCookie.name).toBe('refreshToken');
     expect(doc.paths['/api/health'].get.security).toEqual([]);
     expect(doc.paths['/api/auth/login'].post.security).toEqual([]);
     expect(doc.paths['/api/auth/sso/providers'].get.security).toEqual([]);

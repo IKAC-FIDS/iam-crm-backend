@@ -5,9 +5,11 @@ import {
   Req,
   Res,
   UnauthorizedException,
+  UseGuards,
 } from "@nestjs/common";
 import type { Request, Response } from "express";
 import { AuthService } from "../auth.service";
+import { CookieOriginGuard } from '../../common/guards/cookie-origin.guard';
 import { setRefreshTokenCookie } from "../../common/cookies/refresh-token-cookie";
 import { ExchangeSsoTicketDto } from "./dto/exchange-sso-ticket.dto";
 import { PrismaService } from "../../prisma/prisma.service";
@@ -15,6 +17,7 @@ import { SsoTicketService } from "./sso-ticket.service";
 import { TenantResolverService } from "../../organization-memberships/tenant-resolver.service";
 
 @Controller("auth/sso")
+@UseGuards(CookieOriginGuard)
 export class SsoExchangeController {
   constructor(
     private readonly ticketService: SsoTicketService,

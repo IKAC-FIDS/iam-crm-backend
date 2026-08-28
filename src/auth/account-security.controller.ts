@@ -20,10 +20,11 @@ import {
   getRefreshTokenFromRequest,
 } from '../common/cookies/refresh-token-cookie';
 import { AccountSecurityService } from './account-security.service';
+import { CookieOriginGuard } from '../common/guards/cookie-origin.guard';
 import { ChangePasswordDto } from './dto/change-password.dto';
 
 @Controller('auth/account')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, CookieOriginGuard)
 export class AccountSecurityController {
   constructor(
     private readonly accountSecurityService: AccountSecurityService,

@@ -59,7 +59,7 @@ export function createOpenApiDocument(app: INestApplication): OpenAPIObject {
       { type: 'http', scheme: 'bearer', bearerFormat: 'JWT', description: 'Tenant or Platform JWT, interpreted by the route guards.' },
       'bearerAuth',
     )
-    .addCookieAuth('refresh_token', { type: 'apiKey', in: 'cookie', description: 'HttpOnly refresh cookie used only by the refresh flow.' }, 'refreshCookie')
+    .addCookieAuth('refreshToken', { type: 'apiKey', in: 'cookie', description: 'HttpOnly refresh cookie used by auth/session flows.' }, 'refreshCookie')
     .build();
 
   const document = SwaggerModule.createDocument(app, config, {
@@ -102,6 +102,12 @@ function normalizeOperations(document: OpenAPIObject) {
       const key = `${method.toUpperCase()} ${path.replace(/\{([^}]+)\}/g, ':$1')}`;
       operation.security = securityFor(key);
       operation.description = contractDescription(path, operation.description);
+      if (!['get', 'head', 'options'].includes(method) && (
+        /^\/api\/auth\/(login|refresh|logout|logout-all|switch-tenant)$/.test(path) ||
+        /^\/api\/auth\/(sessions|account|passkeys)(\/|$)/.test(path) || path === '/api/auth/sso/exchange'
+      )) {
+        operation.parameters.push({ name: 'Origin', in: 'header', required: true, schema: { type: 'string', format: 'uri' }, description: 'Must exactly match CORS_ORIGINS. Missing, null or untrusted origins return 403 AUTH_ORIGIN_REJECTED. Missing Origin is allowed only by explicit non-production AUTH_ALLOW_MISSING_ORIGIN=true.' });
+      }
       normalizeResponses(operation, path, method);
       if (path === '/api/attachments' && method === 'post') addUploadBody(operation);
       if (PLATFORM_PATHS.some((pattern) => pattern.test(path))) {

@@ -8,7 +8,7 @@ const user = tenantUser({ userId: 'user-1', email: 'a@example.com', role: UserRo
 const base = { companyId: '00000000-0000-4000-8000-000000000010', title: 'Review', mode: MeetingMode.ONLINE, startAt: '2099-01-01T10:00:00.000Z', endAt: '2099-01-01T11:00:00.000Z' };
 
 function setup() {
-  const prisma = { company: { findFirst: jest.fn().mockResolvedValue({ id: base.companyId }) }, opportunity: { findFirst: jest.fn() }, user: { count: jest.fn() }, person: { count: jest.fn() }, meeting: { create: jest.fn().mockResolvedValue({ id: 'meeting-1' }) }, $transaction: jest.fn(async (fn: (tx: unknown) => unknown) => fn(prisma)) };
+  const prisma = { lookupOption: { findFirst: jest.fn().mockResolvedValue({ id: 'meeting-type-other' }) }, company: { findFirst: jest.fn().mockResolvedValue({ id: base.companyId }) }, opportunity: { findFirst: jest.fn() }, user: { count: jest.fn() }, person: { count: jest.fn() }, meeting: { create: jest.fn().mockResolvedValue({ id: 'meeting-1' }) }, $transaction: jest.fn(async (fn: (tx: unknown) => unknown) => fn(prisma)) };
   return { prisma, service: new MeetingsService(prisma as any, { record: jest.fn() } as any) };
 }
 

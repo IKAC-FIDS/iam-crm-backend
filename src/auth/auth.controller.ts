@@ -21,10 +21,12 @@ import {
   setRefreshTokenCookie,
 } from '../common/cookies/refresh-token-cookie';
 import { AuthService } from './auth.service';
+import { CookieOriginGuard } from '../common/guards/cookie-origin.guard';
 import { LoginDto } from './dto/login.dto';
 import { SwitchTenantDto } from './dto/switch-tenant.dto';
 
 @Controller('auth')
+@UseGuards(CookieOriginGuard)
 export class AuthController {
   private readonly logger = new Logger(AuthController.name);
 

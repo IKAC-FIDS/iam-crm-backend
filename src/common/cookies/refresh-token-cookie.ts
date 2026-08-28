@@ -34,7 +34,7 @@ export function clearRefreshTokenCookie(res: Response): void {
   );
 }
 
-function buildRefreshTokenCookieOptions(): CookieOptions {
+export function buildRefreshTokenCookieOptions(): CookieOptions {
   const isProduction = process.env.NODE_ENV === 'production';
   const secure = parseSecureCookieSetting(
     process.env.REFRESH_TOKEN_COOKIE_SECURE,
@@ -44,6 +44,17 @@ function buildRefreshTokenCookieOptions(): CookieOptions {
     process.env.REFRESH_TOKEN_COOKIE_SAME_SITE,
     isProduction ? 'none' : 'lax',
   );
+
+  if (isProduction && !secure) throw new Error('Production refresh cookies require Secure=true');
+  if (process.env.REFRESH_TOKEN_COOKIE_SECURE !== undefined && !['true', 'false'].includes(process.env.REFRESH_TOKEN_COOKIE_SECURE)) {
+    throw new Error('Invalid REFRESH_TOKEN_COOKIE_SECURE');
+  }
+  if (process.env.REFRESH_TOKEN_COOKIE_SAME_SITE !== undefined && !['none', 'lax', 'strict'].includes(process.env.REFRESH_TOKEN_COOKIE_SAME_SITE)) {
+    throw new Error('Invalid REFRESH_TOKEN_COOKIE_SAME_SITE');
+  }
+  const path = process.env.REFRESH_TOKEN_COOKIE_PATH ?? '/api/auth';
+  if (!['/api/auth', '/api', '/'].includes(path)) throw new Error('Refresh cookie path must cover /api/auth endpoints');
+  if (isProduction && path !== '/api/auth') throw new Error('Production refresh cookie path must be /api/auth');
 
   if (sameSite === 'none' && !secure && !unsafeSameSiteWarningLogged) {
     logger.warn(
@@ -56,7 +67,7 @@ function buildRefreshTokenCookieOptions(): CookieOptions {
     httpOnly: true,
     secure,
     sameSite,
-    path: process.env.REFRESH_TOKEN_COOKIE_PATH ?? '/api/auth',
+    path,
   };
 }
 

@@ -6,6 +6,7 @@ import type { NextFunction, Request, Response } from 'express';
 import helmet from 'helmet';
 import { randomUUID } from 'node:crypto';
 import { AppModule } from './app.module';
+import { buildRefreshTokenCookieOptions } from './common/cookies/refresh-token-cookie';
 import { ApiExceptionFilter } from './common/filters/api-exception.filter';
 import { ApiResponseInterceptor } from './common/interceptors/api-response.interceptor';
 import { configureRuntimeOpenApi } from './openapi/openapi.runtime';
@@ -20,6 +21,7 @@ function parseCorsOrigins(value?: string): string[] {
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const config = app.get(ConfigService);
+  buildRefreshTokenCookieOptions(); // Fail before listening when cookie configuration is unsafe.
   const httpAdapter = app.getHttpAdapter().getInstance();
   const corsLogger = new Logger('Cors');
 
