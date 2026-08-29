@@ -541,6 +541,30 @@ export class AttachmentsService {
       return;
     }
 
+    if (entityType === FileAttachmentEntityType.TECHNICAL_DOCUMENT) {
+      const document = await this.prisma.technicalDocument.findFirst({
+        where: {
+          id: entityId,
+          organizationId: getCurrentOrganizationId(user),
+          archivedAt: null,
+        },
+      });
+      if (!document) throw new NotFoundException('Technical document not found');
+      return;
+    }
+
+    if (entityType === FileAttachmentEntityType.TECHNICAL_RESOURCE) {
+      const resource = await this.prisma.technicalResource.findFirst({
+        where: {
+          id: entityId,
+          organizationId: getCurrentOrganizationId(user),
+          archivedAt: null,
+        },
+      });
+      if (!resource) throw new NotFoundException('Technical resource not found');
+      return;
+    }
+
     throw new BadRequestException('Unsupported attachment entity type');
   }
 

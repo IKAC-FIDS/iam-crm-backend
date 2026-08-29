@@ -44,6 +44,7 @@ import { ExchangeRatesModule } from './admin/exchange-rates/exchange-rates.modul
 import { DashboardModule } from './dashboard/dashboard.module';
 import { EntitlementsModule } from './entitlements/entitlements.module';
 import { QuotaModule } from './quota/quota.module';
+import { TechnicalCenterModule } from './technical-center/technical-center.module';
 
 @Module({
   imports: [
@@ -104,6 +105,7 @@ import { QuotaModule } from './quota/quota.module';
     DashboardModule,
     EntitlementsModule,
     QuotaModule,
+    TechnicalCenterModule,
   ],
   providers: [
     {

@@ -218,6 +218,8 @@ enum FileAttachmentEntityType {
   PAYMENT
   COMPANY_LEGAL_DOCUMENT
   MEETING
+  TECHNICAL_DOCUMENT
+  TECHNICAL_RESOURCE
 }
 
 enum AttachmentStorageProvider {
@@ -398,11 +400,30 @@ model User {
   exchangeRatesCreated   CurrencyExchangeRate[] @relation("ExchangeRateCreatedBy")
   productPriceChanges    ProductPriceHistory[]  @relation("ProductPriceHistoryChangedBy")
 
-  notifications           Notification[]           @relation("NotificationRecipient")
-  notificationActions     Notification[]           @relation("NotificationActor")
-  managedTeams            Team[]                   @relation("TeamManager")
-  organizationMemberships OrganizationMembership[]
-  platformAuthority       PlatformAuthority?
+  notifications                     Notification[]             @relation("NotificationRecipient")
+  notificationActions               Notification[]             @relation("NotificationActor")
+  managedTeams                      Team[]                     @relation("TeamManager")
+  organizationMemberships           OrganizationMembership[]
+  technicalReleasesCreated          TechnicalRelease[]         @relation("TechnicalReleaseCreatedBy")
+  technicalReleasesUpdated          TechnicalRelease[]         @relation("TechnicalReleaseUpdatedBy")
+  knowledgeArticlesOwned            KnowledgeBaseArticle[]     @relation("KnowledgeArticleOwner")
+  knowledgeArticlesAuthored         KnowledgeBaseArticle[]     @relation("KnowledgeArticleAuthor")
+  knowledgeArticlesReviewed         KnowledgeBaseArticle[]     @relation("KnowledgeArticleReviewer")
+  technicalDocumentsOwned           TechnicalDocument[]        @relation("TechnicalDocumentOwner")
+  technicalDocumentsCreated         TechnicalDocument[]        @relation("TechnicalDocumentCreatedBy")
+  technicalDocumentsUpdated         TechnicalDocument[]        @relation("TechnicalDocumentUpdatedBy")
+  technicalDocumentVersionsCreated  TechnicalDocumentVersion[] @relation("TechnicalDocumentVersionCreatedBy")
+  technicalDocumentVersionsApproved TechnicalDocumentVersion[] @relation("TechnicalDocumentVersionApprovedBy")
+  technicalResourcesOwned           TechnicalResource[]        @relation("TechnicalResourceOwner")
+  technicalResourcesCreated         TechnicalResource[]        @relation("TechnicalResourceCreatedBy")
+  technicalResourcesUpdated         TechnicalResource[]        @relation("TechnicalResourceUpdatedBy")
+  technicalTendersOwned             Tender[]                   @relation("TechnicalTenderOwner")
+  technicalTendersLed               Tender[]                   @relation("TechnicalTenderTechnicalLead")
+  commercialTendersLed              Tender[]                   @relation("TechnicalTenderCommercialLead")
+  technicalTendersCreated           Tender[]                   @relation("TechnicalTenderCreatedBy")
+  technicalTendersUpdated           Tender[]                   @relation("TechnicalTenderUpdatedBy")
+  tenderRequirementsOwned           TenderRequirement[]        @relation("TenderRequirementOwner")
+  platformAuthority                 PlatformAuthority?
 
   @@index([organizationId])
   @@index([teamId])
@@ -429,6 +450,7 @@ model Team {
 
   members                 User[]                   @relation("UserPrimaryTeam")
   organizationMemberships OrganizationMembership[]
+  technicalTenders        Tender[]
 
   @@unique([organizationId, code])
   @@index([managerId])
@@ -487,6 +509,11 @@ model Organization {
   quotaThresholds     QuotaThresholdEvent[]
   usageReservations   UsageReservation[]
   usageEvents         UsageEvent[]
+  technicalReleases   TechnicalRelease[]
+  knowledgeArticles   KnowledgeBaseArticle[]
+  technicalDocuments  TechnicalDocument[]
+  technicalResources  TechnicalResource[]
+  tenders             Tender[]
 
   @@index([status])
   @@index([createdAt])
@@ -832,6 +859,8 @@ model Company {
   legalDocuments          CompanyLegalDocument[]
   personEmploymentHistory PersonEmploymentHistory[]
   meetings                Meeting[]
+  technicalDocuments      TechnicalDocument[]
+  tenders                 Tender[]
 
   organizationId String       @default("00000000-0000-4000-8000-000000000001")
   organization   Organization @relation(fields: [organizationId], references: [id])
@@ -1174,6 +1203,8 @@ model Opportunity {
   payments            OpportunityPayment[]
   tasks               Task[]
   meetings            Meeting[]
+  technicalDocuments  TechnicalDocument[]
+  tenders             Tender[]
   organizationId      String                          @default("00000000-0000-4000-8000-000000000001")
   organization        Organization                    @relation(fields: [organizationId], references: [id])
 
@@ -1307,8 +1338,12 @@ model ProductCatalogItem {
   createdAt                DateTime              @default(now())
   updatedAt                DateTime              @updatedAt
 
-  lineItems    OpportunityLineItem[]
-  priceHistory ProductPriceHistory[]
+  lineItems          OpportunityLineItem[]
+  priceHistory       ProductPriceHistory[]
+  technicalReleases  TechnicalRelease[]
+  knowledgeArticles  KnowledgeBaseArticle[]
+  technicalDocuments TechnicalDocument[]
+  technicalResources TechnicalResource[]
 
   @@index([isActive, sortOrder])
   @@index([type, isActive, sortOrder])
@@ -2306,10 +2341,12 @@ model FileAttachment {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  organizationId      String                 @default("00000000-0000-4000-8000-000000000001")
-  organization        Organization           @relation(fields: [organizationId], references: [id])
-  brandingLogoUses    OrganizationBranding[] @relation("OrganizationBrandingLogo")
-  brandingFaviconUses OrganizationBranding[] @relation("OrganizationBrandingFavicon")
+  organizationId            String                     @default("00000000-0000-4000-8000-000000000001")
+  organization              Organization               @relation(fields: [organizationId], references: [id])
+  brandingLogoUses          OrganizationBranding[]     @relation("OrganizationBrandingLogo")
+  brandingFaviconUses       OrganizationBranding[]     @relation("OrganizationBrandingFavicon")
+  technicalDocumentVersions TechnicalDocumentVersion[] @relation("TechnicalDocumentVersionAttachment")
+  technicalResources        TechnicalResource[]        @relation("TechnicalResourceAttachment")
 
   @@index([entityType, entityId])
   @@index([storageProvider])
@@ -2321,4 +2358,360 @@ model FileAttachment {
   @@index([organizationId])
   @@index([organizationId, entityType, entityId])
   @@map("file_attachments")
+}
+
+enum TechnicalReleaseStatus {
+  DRAFT
+  PLANNED
+  RELEASED
+  DEPRECATED
+  END_OF_LIFE
+  ARCHIVED
+}
+
+enum KnowledgeBaseStatus {
+  DRAFT
+  IN_REVIEW
+  PUBLISHED
+  ARCHIVED
+}
+
+enum TechnicalVisibility {
+  INTERNAL
+  RESTRICTED
+}
+
+enum TechnicalDocumentStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  ACTIVE
+  SUPERSEDED
+  EXPIRED
+  ARCHIVED
+}
+
+enum TechnicalConfidentiality {
+  INTERNAL
+  CONFIDENTIAL
+  RESTRICTED
+}
+
+enum TechnicalResourceType {
+  SDK
+  SAMPLE_CODE
+  API_COLLECTION
+  CONFIGURATION
+  DRIVER
+  FIRMWARE
+  SCRIPT
+  TEMPLATE
+  EXTERNAL_LINK
+  OTHER
+}
+
+enum TechnicalResourceStatus {
+  DRAFT
+  ACTIVE
+  DEPRECATED
+  ARCHIVED
+}
+
+enum TenderType {
+  RFP
+  RFQ
+  RFI
+  PUBLIC_TENDER
+  PRIVATE_TENDER
+  TECHNICAL_EVALUATION
+  OTHER
+}
+
+enum TenderStatus {
+  DRAFT
+  IDENTIFIED
+  QUALIFICATION
+  PREPARING
+  TECHNICAL_REVIEW
+  COMMERCIAL_REVIEW
+  READY_FOR_SUBMISSION
+  SUBMITTED
+  UNDER_EVALUATION
+  CLARIFICATION
+  WON
+  LOST
+  CANCELLED
+  ARCHIVED
+}
+
+enum TenderResult {
+  WON
+  LOST
+  CANCELLED
+}
+
+enum TenderRequirementStatus {
+  OPEN
+  IN_PROGRESS
+  READY
+  VERIFIED
+  NOT_APPLICABLE
+  BLOCKED
+}
+
+model TechnicalRelease {
+  id                 String                 @id @default(uuid())
+  organizationId     String
+  organization       Organization           @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  productId          String
+  product            ProductCatalogItem     @relation(fields: [productId], references: [id], onDelete: Restrict)
+  version            String
+  title              String
+  summary            String?
+  releaseNotes       String?
+  status             TechnicalReleaseStatus @default(DRAFT)
+  releaseDate        DateTime?
+  supportStartDate   DateTime?
+  supportEndDate     DateTime?
+  endOfLifeDate      DateTime?
+  createdById        String
+  createdBy          User                   @relation("TechnicalReleaseCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedById        String
+  updatedBy          User                   @relation("TechnicalReleaseUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+  revision           Int                    @default(1)
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  archivedAt         DateTime?
+  knowledgeArticles  KnowledgeBaseArticle[]
+  technicalDocuments TechnicalDocument[]
+  technicalResources TechnicalResource[]
+
+  @@unique([organizationId, productId, version])
+  @@index([organizationId, productId])
+  @@index([organizationId, status])
+  @@map("technical_releases")
+}
+
+model KnowledgeBaseArticle {
+  id             String              @id @default(uuid())
+  organizationId String
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  title          String
+  slug           String
+  summary        String?
+  content        String
+  status         KnowledgeBaseStatus @default(DRAFT)
+  category       String?
+  visibility     TechnicalVisibility @default(INTERNAL)
+  productId      String?
+  product        ProductCatalogItem? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  releaseId      String?
+  release        TechnicalRelease?   @relation(fields: [releaseId], references: [id], onDelete: SetNull)
+  ownerId        String?
+  owner          User?               @relation("KnowledgeArticleOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  authorId       String
+  author         User                @relation("KnowledgeArticleAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+  reviewerId     String?
+  reviewer       User?               @relation("KnowledgeArticleReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+  publishedAt    DateTime?
+  lastReviewedAt DateTime?
+  nextReviewAt   DateTime?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  archivedAt     DateTime?
+
+  @@unique([organizationId, slug])
+  @@index([organizationId, status])
+  @@index([organizationId, productId])
+  @@index([organizationId, releaseId])
+  @@index([organizationId, nextReviewAt])
+  @@map("knowledge_base_articles")
+}
+
+model TechnicalDocument {
+  id              String                     @id @default(uuid())
+  organizationId  String
+  organization    Organization               @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  title           String
+  description     String?
+  documentType    String
+  status          TechnicalDocumentStatus    @default(DRAFT)
+  confidentiality TechnicalConfidentiality   @default(INTERNAL)
+  ownerId         String
+  owner           User                       @relation("TechnicalDocumentOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  productId       String?
+  product         ProductCatalogItem?        @relation(fields: [productId], references: [id], onDelete: SetNull)
+  releaseId       String?
+  release         TechnicalRelease?          @relation(fields: [releaseId], references: [id], onDelete: SetNull)
+  companyId       String?
+  company         Company?                   @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  opportunityId   String?
+  opportunity     Opportunity?               @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+  tenderId        String?
+  tender          Tender?                    @relation(fields: [tenderId], references: [id], onDelete: SetNull)
+  effectiveFrom   DateTime?
+  expiresAt       DateTime?
+  createdById     String
+  createdBy       User                       @relation("TechnicalDocumentCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedById     String
+  updatedBy       User                       @relation("TechnicalDocumentUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+  revision        Int                        @default(1)
+  createdAt       DateTime                   @default(now())
+  updatedAt       DateTime                   @updatedAt
+  archivedAt      DateTime?
+  versions        TechnicalDocumentVersion[]
+  deliverables    TenderDeliverable[]
+
+  @@index([organizationId, status])
+  @@index([organizationId, productId])
+  @@index([organizationId, releaseId])
+  @@index([organizationId, companyId])
+  @@index([organizationId, opportunityId])
+  @@index([organizationId, tenderId])
+  @@map("technical_documents")
+}
+
+model TechnicalDocumentVersion {
+  id             String            @id @default(uuid())
+  organizationId String
+  documentId     String
+  document       TechnicalDocument @relation(fields: [documentId], references: [id], onDelete: Restrict)
+  version        String
+  attachmentId   String?
+  attachment     FileAttachment?   @relation("TechnicalDocumentVersionAttachment", fields: [attachmentId], references: [id], onDelete: SetNull)
+  contentHash    String?
+  approvalNote   String?
+  approvedById   String?
+  approvedBy     User?             @relation("TechnicalDocumentVersionApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedAt     DateTime?
+  createdById    String
+  createdBy      User              @relation("TechnicalDocumentVersionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt      DateTime          @default(now())
+
+  @@unique([organizationId, documentId, version])
+  @@index([organizationId, documentId])
+  @@map("technical_document_versions")
+}
+
+model TechnicalResource {
+  id             String                  @id @default(uuid())
+  organizationId String
+  organization   Organization            @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  title          String
+  description    String?
+  resourceType   TechnicalResourceType
+  status         TechnicalResourceStatus @default(DRAFT)
+  productId      String?
+  product        ProductCatalogItem?     @relation(fields: [productId], references: [id], onDelete: SetNull)
+  releaseId      String?
+  release        TechnicalRelease?       @relation(fields: [releaseId], references: [id], onDelete: SetNull)
+  url            String?
+  attachmentId   String?
+  attachment     FileAttachment?         @relation("TechnicalResourceAttachment", fields: [attachmentId], references: [id], onDelete: SetNull)
+  version        String?
+  checksum       String?
+  ownerId        String?
+  owner          User?                   @relation("TechnicalResourceOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  createdById    String
+  createdBy      User                    @relation("TechnicalResourceCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedById    String
+  updatedBy      User                    @relation("TechnicalResourceUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+  archivedAt     DateTime?
+
+  @@index([organizationId, status])
+  @@index([organizationId, resourceType])
+  @@index([organizationId, productId])
+  @@index([organizationId, releaseId])
+  @@map("technical_resources")
+}
+
+model Tender {
+  id                   String              @id @default(uuid())
+  organizationId       String
+  organization         Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  title                String
+  referenceNumber      String?
+  companyId            String?
+  company              Company?            @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  opportunityId        String?
+  opportunity          Opportunity?        @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+  ownerId              String
+  owner                User                @relation("TechnicalTenderOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  teamId               String?
+  team                 Team?               @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  status               TenderStatus        @default(DRAFT)
+  tenderType           TenderType
+  source               String?
+  description          String?
+  submissionDeadline   DateTime?
+  technicalDeadline    DateTime?
+  expectedDecisionDate DateTime?
+  estimatedValue       Decimal?            @db.Decimal(18, 2)
+  currency             String?             @default("IRR")
+  probability          Int?
+  technicalLeadId      String?
+  technicalLead        User?               @relation("TechnicalTenderTechnicalLead", fields: [technicalLeadId], references: [id], onDelete: SetNull)
+  commercialLeadId     String?
+  commercialLead       User?               @relation("TechnicalTenderCommercialLead", fields: [commercialLeadId], references: [id], onDelete: SetNull)
+  result               TenderResult?
+  resultReason         String?
+  createdById          String
+  createdBy            User                @relation("TechnicalTenderCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedById          String
+  updatedBy            User                @relation("TechnicalTenderUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+  revision             Int                 @default(1)
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+  archivedAt           DateTime?
+  requirements         TenderRequirement[]
+  documents            TechnicalDocument[]
+  deliverables         TenderDeliverable[]
+
+  @@unique([organizationId, referenceNumber])
+  @@index([organizationId, status])
+  @@index([organizationId, companyId])
+  @@index([organizationId, opportunityId])
+  @@index([organizationId, ownerId])
+  @@index([organizationId, teamId])
+  @@index([organizationId, submissionDeadline])
+  @@map("technical_tenders")
+}
+
+model TenderRequirement {
+  id             String                  @id @default(uuid())
+  organizationId String
+  tenderId       String
+  tender         Tender                  @relation(fields: [tenderId], references: [id], onDelete: Restrict)
+  category       String?
+  title          String
+  description    String?
+  mandatory      Boolean                 @default(false)
+  status         TenderRequirementStatus @default(OPEN)
+  ownerId        String?
+  owner          User?                   @relation("TenderRequirementOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  dueDate        DateTime?
+  response       String?
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+
+  @@index([organizationId, tenderId])
+  @@index([organizationId, status])
+  @@map("tender_requirements")
+}
+
+model TenderDeliverable {
+  id             String            @id @default(uuid())
+  organizationId String
+  tenderId       String
+  tender         Tender            @relation(fields: [tenderId], references: [id], onDelete: Restrict)
+  documentId     String
+  document       TechnicalDocument @relation(fields: [documentId], references: [id], onDelete: Restrict)
+  label          String?
+  createdAt      DateTime          @default(now())
+
+  @@unique([organizationId, tenderId, documentId])
+  @@index([organizationId, tenderId])
+  @@map("tender_deliverables")
 }

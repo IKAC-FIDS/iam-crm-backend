@@ -53,6 +53,7 @@ const exchange_rates_module_1 = require("./admin/exchange-rates/exchange-rates.m
 const dashboard_module_1 = require("./dashboard/dashboard.module");
 const entitlements_module_1 = require("./entitlements/entitlements.module");
 const quota_module_1 = require("./quota/quota.module");
+const technical_center_module_1 = require("./technical-center/technical-center.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -116,6 +117,7 @@ exports.AppModule = AppModule = __decorate([
             dashboard_module_1.DashboardModule,
             entitlements_module_1.EntitlementsModule,
             quota_module_1.QuotaModule,
+            technical_center_module_1.TechnicalCenterModule,
         ],
         providers: [
             {

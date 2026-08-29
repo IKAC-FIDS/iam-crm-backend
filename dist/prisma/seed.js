@@ -813,6 +813,21 @@ async function main() {
         { action: 'notification:view', description: 'مشاهده اعلان‌ها' },
         { action: 'notification:manage', description: 'مدیریت اعلان‌های شخصی' },
         { action: 'notification:send', description: 'ارسال اعلان داخلی' },
+        { action: 'technical-release:view', description: 'مشاهده انتشارهای فنی' },
+        { action: 'technical-release:manage', description: 'مدیریت انتشارهای فنی' },
+        { action: 'technical-release:publish', description: 'انتشار و پایان چرخه انتشار فنی' },
+        { action: 'technical-knowledge:view', description: 'مشاهده پایگاه دانش فنی' },
+        { action: 'technical-knowledge:manage', description: 'مدیریت پایگاه دانش فنی' },
+        { action: 'technical-knowledge:publish', description: 'انتشار محتوای پایگاه دانش فنی' },
+        { action: 'technical-document:view', description: 'مشاهده اسناد فنی' },
+        { action: 'technical-document:manage', description: 'مدیریت اسناد و نسخه‌های فنی' },
+        { action: 'technical-document:approve', description: 'تأیید و فعال‌سازی اسناد فنی' },
+        { action: 'technical-resource:view', description: 'مشاهده منابع فنی' },
+        { action: 'technical-resource:manage', description: 'مدیریت منابع فنی' },
+        { action: 'technical-tender:view', description: 'مشاهده مناقصه‌های فنی' },
+        { action: 'technical-tender:manage', description: 'مدیریت مناقصه‌های فنی' },
+        { action: 'technical-tender:submit', description: 'ارسال مناقصه فنی' },
+        { action: 'technical-tender:close', description: 'ثبت نتیجه و بستن مناقصه فنی' },
     ];
     for (const permission of permissions) {
         await upsertPermission(permission);
@@ -883,6 +898,21 @@ async function main() {
         'notification:send',
         'organization:view',
         'team:view',
+        'technical-release:view',
+        'technical-release:manage',
+        'technical-release:publish',
+        'technical-knowledge:view',
+        'technical-knowledge:manage',
+        'technical-knowledge:publish',
+        'technical-document:view',
+        'technical-document:manage',
+        'technical-document:approve',
+        'technical-resource:view',
+        'technical-resource:manage',
+        'technical-tender:view',
+        'technical-tender:manage',
+        'technical-tender:submit',
+        'technical-tender:close',
     ];
     const repActions = [
         'company:view',
@@ -931,6 +961,11 @@ async function main() {
         'notification:view',
         'notification:manage',
         'organization:view',
+        'technical-release:view',
+        'technical-knowledge:view',
+        'technical-document:view',
+        'technical-resource:view',
+        'technical-tender:view',
     ];
     const boardsActions = [
         'report:view',
@@ -949,6 +984,11 @@ async function main() {
         'meeting:view',
         'notification:view',
         'organization:view',
+        'technical-release:view',
+        'technical-knowledge:view',
+        'technical-document:view',
+        'technical-resource:view',
+        'technical-tender:view',
     ];
     await syncRolePermissions(client_1.UserRole.ADMIN, allActions);
     await syncRolePermissions(client_1.UserRole.MANAGER, managerActions);
