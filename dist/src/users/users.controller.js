@@ -25,6 +25,7 @@ const find_users_dto_1 = require("./dto/find-users.dto");
 const current_user_decorator_1 = require("../common/decorators/current-user.decorator");
 const find_owner_options_dto_1 = require("./dto/find-owner-options.dto");
 const find_assignee_options_dto_1 = require("./dto/find-assignee-options.dto");
+const reset_user_password_dto_1 = require("./dto/reset-user-password.dto");
 let UsersController = class UsersController {
     constructor(usersService) {
         this.usersService = usersService;
@@ -55,6 +56,9 @@ let UsersController = class UsersController {
     }
     updateUserRole(id, dto, actor) {
         return this.usersService.updateUserRole(id, dto, actor);
+    }
+    resetPassword(id, dto, actor) {
+        return this.usersService.resetPassword(id, dto.newPassword, actor);
     }
 };
 exports.UsersController = UsersController;
@@ -148,6 +152,17 @@ __decorate([
     __metadata("design:paramtypes", [String, update_user_role_dto_1.UpdateUserRoleDto, Object]),
     __metadata("design:returntype", void 0)
 ], UsersController.prototype, "updateUserRole", null);
+__decorate([
+    (0, common_1.Patch)(':id/reset-password'),
+    (0, permissions_decorator_1.Permissions)('user:manage'),
+    openapi.ApiResponse({ status: 200 }),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, reset_user_password_dto_1.ResetUserPasswordDto, Object]),
+    __metadata("design:returntype", void 0)
+], UsersController.prototype, "resetPassword", null);
 exports.UsersController = UsersController = __decorate([
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, permissions_guard_1.PermissionsGuard),
     (0, common_1.Controller)('users'),

@@ -509,6 +509,59 @@ export class UsersService {
     return updatedUser;
   }
 
+  async resetPassword(
+    id: string,
+    newPassword: string,
+    actor: CurrentUserPayload,
+  ) {
+    if (id === actor.userId) {
+      throw new BadRequestException(
+        'برای تغییر رمز حساب خود از بخش امنیت حساب استفاده کنید',
+      );
+    }
+
+    const organizationId = getCurrentOrganizationId(actor);
+    const user = await this.prisma.user.findFirst({
+      where: { id, organizationId },
+      select: { id: true, fullName: true, email: true, isActive: true },
+    });
+    if (!user) throw new NotFoundException('User not found');
+
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    const now = new Date();
+    const [, revoked] = await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id },
+        data: {
+          passwordHash,
+          passwordChangedAt: now,
+          failedLoginAttempts: 0,
+          lockedUntil: null,
+        },
+        select: { id: true },
+      }),
+      this.prisma.refreshSession.updateMany({
+        where: { userId: id, revokedAt: null },
+        data: { revokedAt: now, revokedReason: 'PASSWORD_RESET_BY_ADMIN' },
+      }),
+    ]);
+
+    await this.audit.record({
+      actorId: actor.userId,
+      organizationId,
+      entityType: 'user',
+      entityId: id,
+      action: 'user.password_reset',
+      after: { sessionsRevoked: revoked.count },
+    });
+
+    return {
+      success: true,
+      revokedSessions: revoked.count,
+      message: 'رمز عبور کاربر ریست شد و نشست‌های فعال او پایان یافت.',
+    };
+  }
+
   private async resolveTeamAssignment(
     teamId: string | null | undefined,
     legacyTeam: string | undefined,

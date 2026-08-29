@@ -9,6 +9,7 @@ import { FindUsersDto } from './dto/find-users.dto';
 import { CurrentUser, CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { FindOwnerOptionsDto } from './dto/find-owner-options.dto';
 import { FindAssigneeOptionsDto } from './dto/find-assignee-options.dto';
+import { ResetUserPasswordDto } from './dto/reset-user-password.dto';
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('users')
@@ -92,5 +93,15 @@ export class UsersController {
     @CurrentUser() actor: CurrentUserPayload,
   ) {
     return this.usersService.updateUserRole(id, dto, actor);
+  }
+
+  @Patch(':id/reset-password')
+  @Permissions('user:manage')
+  resetPassword(
+    @Param('id') id: string,
+    @Body() dto: ResetUserPasswordDto,
+    @CurrentUser() actor: CurrentUserPayload,
+  ) {
+    return this.usersService.resetPassword(id, dto.newPassword, actor);
   }
 }
