@@ -174,9 +174,6 @@ let TenantRolesService = class TenantRolesService {
     }
     async replacePermissions(id, dto, tenant) {
         const role = await this.get(id, tenant);
-        if (role.scope === client_1.RoleScope.SYSTEM) {
-            throw new common_1.ForbiddenException('System role definitions are operator controlled');
-        }
         const permissions = await this.prisma.permission.findMany({
             where: {
                 id: { in: dto.permissionIds },
@@ -193,13 +190,15 @@ let TenantRolesService = class TenantRolesService {
         }
         await this.prisma.$transaction(async (tx) => {
             await tx.rolePermission.deleteMany({
-                where: { roleId: id },
+                where: role.scope === client_1.RoleScope.SYSTEM
+                    ? { OR: [{ roleId: id }, { role: role.baseRole }] }
+                    : { roleId: id },
             });
             if (permissions.length) {
                 await tx.rolePermission.createMany({
                     data: permissions.map((permission) => ({
                         roleId: id,
-                        role: null,
+                        role: role.scope === client_1.RoleScope.SYSTEM ? role.baseRole : null,
                         permissionId: permission.id,
                     })),
                 });
