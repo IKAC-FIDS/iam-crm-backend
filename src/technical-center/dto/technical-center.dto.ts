@@ -1,4 +1,5 @@
 import { PartialType } from '@nestjs/mapped-types';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
   KnowledgeBaseStatus,
   TechnicalConfidentiality,
@@ -49,6 +50,13 @@ export class TechnicalListDto extends PaginationDto {
   @IsOptional() @IsIn(['asc', 'desc']) sortDirection?: 'asc' | 'desc';
   @IsOptional() @IsApiDateString() from?: string;
   @IsOptional() @IsApiDateString() to?: string;
+}
+
+export class TechnicalDocumentListDto extends TechnicalListDto {
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional() @IsUUID() tenderId?: string;
+  @ApiPropertyOptional({ enum: TechnicalConfidentiality })
+  @IsOptional() @IsEnum(TechnicalConfidentiality) confidentiality?: TechnicalConfidentiality;
 }
 
 export class TransitionDto {

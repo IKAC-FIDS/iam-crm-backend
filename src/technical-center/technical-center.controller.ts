@@ -17,6 +17,7 @@ import {
   KnowledgeTransitionDto,
   ReleaseTransitionDto,
   TechnicalListDto,
+  TechnicalDocumentListDto,
   TenderTransitionDto,
   UpdateDocumentDto,
   UpdateKnowledgeDto,
@@ -59,7 +60,7 @@ export class TechnicalKnowledgeController {
 @Controller('technical/documents')
 export class TechnicalDocumentsController {
   constructor(private readonly service: TechnicalCenterService) {}
-  @Get() @Permissions('technical-document:view') list(@Query() q: TechnicalListDto, @CurrentUser() u: CurrentUserPayload) { return this.service.listDocuments(q, u); }
+  @Get() @Permissions('technical-document:view') list(@Query() q: TechnicalDocumentListDto, @CurrentUser() u: CurrentUserPayload) { return this.service.listDocuments(q, u); }
   @Post() @Permissions('technical-document:manage') create(@Body() d: CreateDocumentDto, @CurrentUser() u: CurrentUserPayload) { return this.service.createDocument(d, u); }
   @Get(':id') @Permissions('technical-document:view') get(@Param('id') id: string, @CurrentUser() u: CurrentUserPayload) { return this.service.getDocument(id, u); }
   @Patch(':id') @Permissions('technical-document:manage') update(@Param('id') id: string, @Body() d: UpdateDocumentDto, @CurrentUser() u: CurrentUserPayload) { return this.service.updateDocument(id, d, u); }

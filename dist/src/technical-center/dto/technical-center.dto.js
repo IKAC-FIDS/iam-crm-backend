@@ -9,9 +9,10 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.lifecycleEnums = exports.CreateDeliverableDto = exports.UpdateRequirementDto = exports.CreateRequirementDto = exports.UpdateTenderDto = exports.CreateTenderDto = exports.UpdateResourceDto = exports.CreateResourceDto = exports.CreateDocumentVersionDto = exports.UpdateDocumentDto = exports.CreateDocumentDto = exports.UpdateKnowledgeDto = exports.CreateKnowledgeDto = exports.UpdateReleaseDto = exports.CreateReleaseDto = exports.TenderTransitionDto = exports.DocumentTransitionDto = exports.KnowledgeTransitionDto = exports.ReleaseTransitionDto = exports.TransitionDto = exports.TechnicalListDto = void 0;
+exports.lifecycleEnums = exports.CreateDeliverableDto = exports.UpdateRequirementDto = exports.CreateRequirementDto = exports.UpdateTenderDto = exports.CreateTenderDto = exports.UpdateResourceDto = exports.CreateResourceDto = exports.CreateDocumentVersionDto = exports.UpdateDocumentDto = exports.CreateDocumentDto = exports.UpdateKnowledgeDto = exports.CreateKnowledgeDto = exports.UpdateReleaseDto = exports.CreateReleaseDto = exports.TenderTransitionDto = exports.DocumentTransitionDto = exports.KnowledgeTransitionDto = exports.ReleaseTransitionDto = exports.TransitionDto = exports.TechnicalDocumentListDto = exports.TechnicalListDto = void 0;
 const openapi = require("@nestjs/swagger");
 const mapped_types_1 = require("@nestjs/mapped-types");
+const swagger_1 = require("@nestjs/swagger");
 const client_1 = require("@prisma/client");
 const class_transformer_1 = require("class-transformer");
 const class_validator_1 = require("class-validator");
@@ -112,6 +113,24 @@ __decorate([
     (0, api_date_string_validator_1.IsApiDateString)(),
     __metadata("design:type", String)
 ], TechnicalListDto.prototype, "to", void 0);
+class TechnicalDocumentListDto extends TechnicalListDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { tenderId: { required: false, type: () => String }, confidentiality: { required: false, type: () => Object } };
+    }
+}
+exports.TechnicalDocumentListDto = TechnicalDocumentListDto;
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ format: 'uuid' }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsUUID)(),
+    __metadata("design:type", String)
+], TechnicalDocumentListDto.prototype, "tenderId", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ enum: client_1.TechnicalConfidentiality }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsEnum)(client_1.TechnicalConfidentiality),
+    __metadata("design:type", String)
+], TechnicalDocumentListDto.prototype, "confidentiality", void 0);
 class TransitionDto {
     static _OPENAPI_METADATA_FACTORY() {
         return { status: { required: true, type: () => String }, reason: { required: false, type: () => String, maxLength: 1000 }, revision: { required: false, type: () => Number, minimum: 1 } };

@@ -183,7 +183,7 @@ __decorate([
     __param(0, (0, common_1.Query)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [technical_center_dto_1.TechnicalListDto, Object]),
+    __metadata("design:paramtypes", [technical_center_dto_1.TechnicalDocumentListDto, Object]),
     __metadata("design:returntype", void 0)
 ], TechnicalDocumentsController.prototype, "list", null);
 __decorate([

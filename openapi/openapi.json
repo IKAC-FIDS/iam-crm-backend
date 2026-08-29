@@ -63052,6 +63052,28 @@
         "parameters": [
           {
             "in": "query",
+            "name": "tenderId",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "confidentiality",
+            "required": false,
+            "schema": {
+              "enum": [
+                "INTERNAL",
+                "CONFIDENTIAL",
+                "RESTRICTED"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
             "name": "search",
             "required": false,
             "schema": {

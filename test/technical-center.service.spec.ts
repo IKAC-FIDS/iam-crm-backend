@@ -2,6 +2,7 @@ import { ForbiddenException } from '@nestjs/common';
 import {
   KnowledgeBaseStatus,
   TechnicalDocumentStatus,
+  TechnicalConfidentiality,
   TechnicalReleaseStatus,
   TechnicalResourceStatus,
   TenderStatus,
@@ -143,6 +144,32 @@ describe('TechnicalCenterService', () => {
     prisma.company.findFirst.mockResolvedValueOnce(null);
     await expect(service.createDocument({ title: 'Doc', documentType: 'SECURITY', ownerId: user().userId, companyId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }, user())).rejects.toThrow('company not found');
     expect(prisma.technicalDocument.create).not.toHaveBeenCalled();
+  });
+
+  it('filters documents by confidentiality and tender inside the tenant', async () => {
+    const tenderId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    await service.listDocuments({
+      page: 1,
+      limit: 20,
+      confidentiality: TechnicalConfidentiality.CONFIDENTIAL,
+      tenderId,
+    }, user());
+    expect(prisma.technicalDocument.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          organizationId,
+          confidentiality: 'CONFIDENTIAL',
+          tenderId,
+        }),
+      }),
+    );
+    expect(prisma.technicalDocument.count).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        organizationId,
+        confidentiality: 'CONFIDENTIAL',
+        tenderId,
+      }),
+    });
   });
 
   it('creates and filters resources inside the tenant and validates release linkage', async () => {

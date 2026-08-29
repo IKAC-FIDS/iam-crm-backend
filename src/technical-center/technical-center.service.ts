@@ -32,6 +32,7 @@ import {
   CreateResourceDto,
   CreateTenderDto,
   TechnicalListDto,
+  TechnicalDocumentListDto,
   TransitionDto,
   UpdateDocumentDto,
   UpdateKnowledgeDto,
@@ -234,13 +235,15 @@ export class TechnicalCenterService {
     return row;
   }
 
-  async listDocuments(query: TechnicalListDto, user: CurrentUserPayload) {
+  async listDocuments(query: TechnicalDocumentListDto, user: CurrentUserPayload) {
     const organizationId = getCurrentOrganizationId(user);
     const where: Prisma.TechnicalDocumentWhereInput = {
       organizationId, archivedAt: null,
       ...(query.productId && { productId: query.productId }), ...(query.releaseId && { releaseId: query.releaseId }),
       ...(query.companyId && { companyId: query.companyId }), ...(query.opportunityId && { opportunityId: query.opportunityId }),
+      ...(query.tenderId && { tenderId: query.tenderId }),
       ...(query.ownerId && { ownerId: query.ownerId }), ...(query.type && { documentType: query.type }),
+      ...(query.confidentiality && { confidentiality: query.confidentiality }),
       ...(query.status && { status: this.enumValue(TechnicalDocumentStatus, query.status, 'status') }),
       ...(query.search && { OR: [{ title: { contains: query.search, mode: 'insensitive' } }, { description: { contains: query.search, mode: 'insensitive' } }] }),
     };

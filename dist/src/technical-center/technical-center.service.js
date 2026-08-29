@@ -195,7 +195,9 @@ let TechnicalCenterService = class TechnicalCenterService {
             organizationId, archivedAt: null,
             ...(query.productId && { productId: query.productId }), ...(query.releaseId && { releaseId: query.releaseId }),
             ...(query.companyId && { companyId: query.companyId }), ...(query.opportunityId && { opportunityId: query.opportunityId }),
+            ...(query.tenderId && { tenderId: query.tenderId }),
             ...(query.ownerId && { ownerId: query.ownerId }), ...(query.type && { documentType: query.type }),
+            ...(query.confidentiality && { confidentiality: query.confidentiality }),
             ...(query.status && { status: this.enumValue(client_1.TechnicalDocumentStatus, query.status, 'status') }),
             ...(query.search && { OR: [{ title: { contains: query.search, mode: 'insensitive' } }, { description: { contains: query.search, mode: 'insensitive' } }] }),
         };
