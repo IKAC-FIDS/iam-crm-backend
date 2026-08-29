@@ -26,6 +26,8 @@ let LookupsService = class LookupsService {
     }
     async create(groupValue, dto) {
         const group = this.parseGroup(groupValue);
+        if (group === 'activity-types' && (!/^[A-Z][A-Z0-9_]{0,99}$/.test(dto.code) || dto.code === 'STAGE_CHANGE'))
+            throw new common_1.BadRequestException('کد نوع فعالیت باید انگلیسی بزرگ باشد؛ STAGE_CHANGE مختص سیستم است.');
         const existing = await this.prisma.lookupOption.findUnique({ where: { group_code: { group, code: dto.code } } });
         if (existing)
             throw new common_1.ConflictException('Lookup code already exists in this group');
@@ -33,7 +35,9 @@ let LookupsService = class LookupsService {
     }
     async update(groupValue, id, dto) {
         const group = this.parseGroup(groupValue);
-        await this.findOne(group, id);
+        const current = await this.findOne(group, id);
+        if (group === 'activity-types' && dto.code !== undefined && dto.code !== current.code)
+            throw new common_1.BadRequestException('کد نوع فعالیت ثابت است؛ عنوان و وضعیت قابل ویرایش هستند.');
         if (dto.code) {
             const existing = await this.prisma.lookupOption.findFirst({ where: { group, code: dto.code, NOT: { id } } });
             if (existing)

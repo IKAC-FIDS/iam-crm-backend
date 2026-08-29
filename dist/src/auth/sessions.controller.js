@@ -19,6 +19,7 @@ const current_user_decorator_1 = require("../common/decorators/current-user.deco
 const jwt_auth_guard_1 = require("../common/guards/jwt-auth.guard");
 const refresh_token_cookie_1 = require("../common/cookies/refresh-token-cookie");
 const sessions_service_1 = require("./sessions.service");
+const cookie_origin_guard_1 = require("../common/guards/cookie-origin.guard");
 let SessionsController = class SessionsController {
     constructor(sessionsService) {
         this.sessionsService = sessionsService;
@@ -63,7 +64,7 @@ __decorate([
 ], SessionsController.prototype, "revokeMySession", null);
 exports.SessionsController = SessionsController = __decorate([
     (0, common_1.Controller)('auth/sessions'),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, cookie_origin_guard_1.CookieOriginGuard),
     __metadata("design:paramtypes", [sessions_service_1.SessionsService])
 ], SessionsController);
 //# sourceMappingURL=sessions.controller.js.map

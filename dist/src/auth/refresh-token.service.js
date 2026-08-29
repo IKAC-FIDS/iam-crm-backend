@@ -27,6 +27,9 @@ let RefreshTokenService = class RefreshTokenService {
             where: { refreshTokenHash: this.hashRefreshToken(refreshToken) },
             include: { user: true },
         });
+        if (session?.revokedAt && session.revokedReason === 'ROTATED') {
+            await this.revokeActiveSessionsForUser(session.userId, 'REUSE_DETECTED');
+        }
         if (!session ||
             session.revokedAt ||
             session.expiresAt <= new Date() ||

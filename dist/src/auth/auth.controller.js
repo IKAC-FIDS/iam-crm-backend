@@ -22,6 +22,7 @@ const current_user_decorator_1 = require("../common/decorators/current-user.deco
 const jwt_auth_guard_1 = require("../common/guards/jwt-auth.guard");
 const refresh_token_cookie_1 = require("../common/cookies/refresh-token-cookie");
 const auth_service_1 = require("./auth.service");
+const cookie_origin_guard_1 = require("../common/guards/cookie-origin.guard");
 const login_dto_1 = require("./dto/login.dto");
 const switch_tenant_dto_1 = require("./dto/switch-tenant.dto");
 let AuthController = AuthController_1 = class AuthController {
@@ -135,6 +136,7 @@ __decorate([
 ], AuthController.prototype, "logoutAll", null);
 exports.AuthController = AuthController = AuthController_1 = __decorate([
     (0, common_1.Controller)('auth'),
+    (0, common_1.UseGuards)(cookie_origin_guard_1.CookieOriginGuard),
     __metadata("design:paramtypes", [auth_service_1.AuthService])
 ], AuthController);
 //# sourceMappingURL=auth.controller.js.map

@@ -10,7 +10,9 @@ exports.LOOKUP_GROUPS = [
     'persona-tags',
     'opportunity-sources',
     'contact-types',
+    'activity-types',
     'person-social-platforms',
     'company-sources',
+    'meeting-types',
 ];
 //# sourceMappingURL=lookup-groups.js.map

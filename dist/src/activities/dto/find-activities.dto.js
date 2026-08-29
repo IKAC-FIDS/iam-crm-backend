@@ -13,7 +13,6 @@ exports.FindActivitiesDto = exports.ActivityListStatus = void 0;
 const openapi = require("@nestjs/swagger");
 const class_transformer_1 = require("class-transformer");
 const class_validator_1 = require("class-validator");
-const client_1 = require("@prisma/client");
 const pagination_dto_1 = require("../../common/dto/pagination.dto");
 const ownership_scope_dto_1 = require("../../common/dto/ownership-scope.dto");
 const api_date_string_validator_1 = require("../../common/validators/api-date-string.validator");
@@ -35,7 +34,7 @@ class FindActivitiesDto extends pagination_dto_1.PaginationDto {
         this.sortOrder = 'desc';
     }
     static _OPENAPI_METADATA_FACTORY() {
-        return { search: { required: false, type: () => String }, activityType: { required: false, type: () => Object }, status: { required: false, enum: require("./find-activities.dto").ActivityListStatus }, ownerId: { required: false, type: () => String }, createdById: { required: false, type: () => String }, personId: { required: false, type: () => String }, companyId: { required: false, type: () => String }, dateFrom: { required: false, type: () => String }, dateTo: { required: false, type: () => String }, ownershipScope: { required: false, enum: require("../../common/dto/ownership-scope.dto").OwnershipScope }, team: { required: false, type: () => String }, mine: { required: false, type: () => Boolean }, unassigned: { required: false, type: () => Boolean }, sortBy: { required: false, type: () => Object, default: "activityDate", enum: ['activityDate', 'createdAt'] }, sortOrder: { required: false, type: () => Object, default: "desc", enum: ['asc', 'desc'] } };
+        return { search: { required: false, type: () => String }, activityType: { required: false, type: () => String }, status: { required: false, enum: require("./find-activities.dto").ActivityListStatus }, ownerId: { required: false, type: () => String }, createdById: { required: false, type: () => String }, personId: { required: false, type: () => String }, companyId: { required: false, type: () => String }, dateFrom: { required: false, type: () => String }, dateTo: { required: false, type: () => String }, ownershipScope: { required: false, enum: require("../../common/dto/ownership-scope.dto").OwnershipScope }, team: { required: false, type: () => String }, mine: { required: false, type: () => Boolean }, unassigned: { required: false, type: () => Boolean }, sortBy: { required: false, type: () => Object, default: "activityDate", enum: ['activityDate', 'createdAt'] }, sortOrder: { required: false, type: () => Object, default: "desc", enum: ['asc', 'desc'] } };
     }
 }
 exports.FindActivitiesDto = FindActivitiesDto;
@@ -46,7 +45,7 @@ __decorate([
 ], FindActivitiesDto.prototype, "search", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsEnum)(client_1.ActivityType),
+    (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], FindActivitiesDto.prototype, "activityType", void 0);
 __decorate([

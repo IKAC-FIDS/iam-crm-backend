@@ -12,6 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ReportsService = void 0;
 const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
+const activity_type_1 = require("../activities/activity-type");
 const prisma_service_1 = require("../prisma/prisma.service");
 const api_date_util_1 = require("../common/dates/api-date.util");
 const team_scope_util_1 = require("../common/tenant/team-scope.util");
@@ -381,12 +382,12 @@ let ReportsService = class ReportsService {
             fullName: item.fullName,
             team: item.team,
             totalActivities: count(item.id),
-            calls: count(item.id, client_1.ActivityType.CALL),
-            emails: count(item.id, client_1.ActivityType.EMAIL),
-            meetings: count(item.id, client_1.ActivityType.MEETING),
-            notes: count(item.id, client_1.ActivityType.NOTE),
-            linkedinMessages: count(item.id, client_1.ActivityType.LINKEDIN_MESSAGE),
-            linkedinEngagements: count(item.id, client_1.ActivityType.LINKEDIN_ENGAGEMENT),
+            calls: count(item.id, activity_type_1.ActivityType.CALL),
+            emails: count(item.id, activity_type_1.ActivityType.EMAIL),
+            meetings: count(item.id, activity_type_1.ActivityType.MEETING),
+            notes: count(item.id, activity_type_1.ActivityType.NOTE),
+            linkedinMessages: count(item.id, activity_type_1.ActivityType.LINKEDIN_MESSAGE),
+            linkedinEngagements: count(item.id, activity_type_1.ActivityType.LINKEDIN_ENGAGEMENT),
         }));
     }
     async getPipelineByOwner(filters, user) {
@@ -531,13 +532,13 @@ let ReportsService = class ReportsService {
             { value: client_1.Priority.STRATEGIC, label: 'استراتژیک' },
         ];
         const activityTypeOptions = [
-            { value: client_1.ActivityType.CALL, label: 'تماس' },
-            { value: client_1.ActivityType.EMAIL, label: 'ایمیل' },
-            { value: client_1.ActivityType.LINKEDIN_MESSAGE, label: 'پیام لینکدین' },
-            { value: client_1.ActivityType.LINKEDIN_ENGAGEMENT, label: 'تعامل لینکدین' },
-            { value: client_1.ActivityType.MEETING, label: 'جلسه' },
-            { value: client_1.ActivityType.NOTE, label: 'یادداشت' },
-            { value: client_1.ActivityType.STAGE_CHANGE, label: 'تغییر مرحله' },
+            { value: activity_type_1.ActivityType.CALL, label: 'تماس' },
+            { value: activity_type_1.ActivityType.EMAIL, label: 'ایمیل' },
+            { value: activity_type_1.ActivityType.LINKEDIN_MESSAGE, label: 'پیام لینکدین' },
+            { value: activity_type_1.ActivityType.LINKEDIN_ENGAGEMENT, label: 'تعامل لینکدین' },
+            { value: activity_type_1.ActivityType.MEETING, label: 'جلسه' },
+            { value: activity_type_1.ActivityType.NOTE, label: 'یادداشت' },
+            { value: activity_type_1.ActivityType.STAGE_CHANGE, label: 'تغییر مرحله' },
         ];
         return {
             users: activeUsers.map((item) => ({

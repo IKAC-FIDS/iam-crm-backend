@@ -16,6 +16,7 @@ exports.SsoExchangeController = void 0;
 const openapi = require("@nestjs/swagger");
 const common_1 = require("@nestjs/common");
 const auth_service_1 = require("../auth.service");
+const cookie_origin_guard_1 = require("../../common/guards/cookie-origin.guard");
 const refresh_token_cookie_1 = require("../../common/cookies/refresh-token-cookie");
 const exchange_sso_ticket_dto_1 = require("./dto/exchange-sso-ticket.dto");
 const prisma_service_1 = require("../../prisma/prisma.service");
@@ -69,6 +70,7 @@ __decorate([
 ], SsoExchangeController.prototype, "exchange", null);
 exports.SsoExchangeController = SsoExchangeController = __decorate([
     (0, common_1.Controller)("auth/sso"),
+    (0, common_1.UseGuards)(cookie_origin_guard_1.CookieOriginGuard),
     __metadata("design:paramtypes", [sso_ticket_service_1.SsoTicketService,
         prisma_service_1.PrismaService,
         auth_service_1.AuthService,

@@ -26,7 +26,7 @@ const csv = ({ value }) => {
 };
 class ReportFiltersDto {
     static _OPENAPI_METADATA_FACTORY() {
-        return { ownershipScope: { required: false, enum: require("../../common/dto/ownership-scope.dto").OwnershipScope }, startDate: { required: false, type: () => String }, endDate: { required: false, type: () => String }, userIds: { required: false, type: () => [String] }, ownerIds: { required: false, type: () => [String] }, companyIds: { required: false, type: () => [String] }, teams: { required: false, type: () => [String] }, stages: { required: false, type: () => [String] }, priorities: { required: false, type: () => [Object] }, industries: { required: false, type: () => [String] }, sources: { required: false, type: () => [String] }, activityTypes: { required: false, type: () => [Object] } };
+        return { ownershipScope: { required: false, enum: require("../../common/dto/ownership-scope.dto").OwnershipScope }, startDate: { required: false, type: () => String }, endDate: { required: false, type: () => String }, userIds: { required: false, type: () => [String] }, ownerIds: { required: false, type: () => [String] }, companyIds: { required: false, type: () => [String] }, teams: { required: false, type: () => [String] }, stages: { required: false, type: () => [String] }, priorities: { required: false, type: () => [Object] }, industries: { required: false, type: () => [String] }, sources: { required: false, type: () => [String] }, activityTypes: { required: false, type: () => [String] } };
     }
 }
 exports.ReportFiltersDto = ReportFiltersDto;
@@ -105,7 +105,7 @@ __decorate([
     (0, class_transformer_1.Transform)(csv),
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsArray)(),
-    (0, class_validator_1.IsEnum)(client_1.ActivityType, { each: true }),
+    (0, class_validator_1.IsString)({ each: true }),
     __metadata("design:type", Array)
 ], ReportFiltersDto.prototype, "activityTypes", void 0);
 //# sourceMappingURL=report-filters.dto.js.map

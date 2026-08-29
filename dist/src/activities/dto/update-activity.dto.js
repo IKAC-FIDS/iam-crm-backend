@@ -13,18 +13,19 @@ exports.UpdateActivityDto = void 0;
 const openapi = require("@nestjs/swagger");
 const class_transformer_1 = require("class-transformer");
 const class_validator_1 = require("class-validator");
-const client_1 = require("@prisma/client");
 const api_date_string_validator_1 = require("../../common/validators/api-date-string.validator");
 const emptyStringToNull = ({ value }) => typeof value === 'string' && value.trim() === '' ? null : value;
 class UpdateActivityDto {
     static _OPENAPI_METADATA_FACTORY() {
-        return { type: { required: false, type: () => Object }, personId: { required: false, type: () => String, nullable: true }, occurredAt: { required: false, type: () => String, nullable: true }, notes: { required: false, type: () => String, nullable: true }, outcome: { required: false, type: () => String, nullable: true }, nextActionDate: { required: false, type: () => String, nullable: true }, opportunityId: { required: false, type: () => String, nullable: true } };
+        return { type: { required: false, type: () => String, maxLength: 100 }, personId: { required: false, type: () => String, nullable: true }, occurredAt: { required: false, type: () => String, nullable: true }, notes: { required: false, type: () => String, nullable: true }, outcome: { required: false, type: () => String, nullable: true }, nextActionDate: { required: false, type: () => String, nullable: true }, opportunityId: { required: false, type: () => String, nullable: true } };
     }
 }
 exports.UpdateActivityDto = UpdateActivityDto;
 __decorate([
     (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsEnum)(client_1.ActivityType),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsNotEmpty)(),
+    (0, class_validator_1.MaxLength)(100),
     __metadata("design:type", String)
 ], UpdateActivityDto.prototype, "type", void 0);
 __decorate([

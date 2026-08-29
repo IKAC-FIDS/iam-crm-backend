@@ -19,6 +19,7 @@ const current_user_decorator_1 = require("../common/decorators/current-user.deco
 const jwt_auth_guard_1 = require("../common/guards/jwt-auth.guard");
 const refresh_token_cookie_1 = require("../common/cookies/refresh-token-cookie");
 const account_security_service_1 = require("./account-security.service");
+const cookie_origin_guard_1 = require("../common/guards/cookie-origin.guard");
 const change_password_dto_1 = require("./dto/change-password.dto");
 let AccountSecurityController = class AccountSecurityController {
     constructor(accountSecurityService) {
@@ -69,7 +70,7 @@ __decorate([
 ], AccountSecurityController.prototype, "logoutOtherSessions", null);
 exports.AccountSecurityController = AccountSecurityController = __decorate([
     (0, common_1.Controller)('auth/account'),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, cookie_origin_guard_1.CookieOriginGuard),
     __metadata("design:paramtypes", [account_security_service_1.AccountSecurityService])
 ], AccountSecurityController);
 //# sourceMappingURL=account-security.controller.js.map

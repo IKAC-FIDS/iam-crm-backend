@@ -31,6 +31,7 @@ let MeetingsController = class MeetingsController {
     }
     create(dto, user) { return this.service.create(dto, user); }
     findAll(query, user) { return this.service.findAll(query, user); }
+    findTypes() { return this.service.findTypes(); }
     findOne(id, user) { return this.service.findOne(id, user); }
     update(id, dto, user) { return this.service.update(id, dto, user); }
     complete(id, dto, user) { return this.service.complete(id, dto, user); }
@@ -57,6 +58,14 @@ __decorate([
     __metadata("design:paramtypes", [find_meetings_dto_1.FindMeetingsDto, Object]),
     __metadata("design:returntype", void 0)
 ], MeetingsController.prototype, "findAll", null);
+__decorate([
+    (0, common_1.Get)('types/options'),
+    (0, permissions_decorator_1.Permissions)('meeting:view'),
+    openapi.ApiResponse({ status: 200 }),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], MeetingsController.prototype, "findTypes", null);
 __decorate([
     (0, common_1.Get)(':id'),
     (0, permissions_decorator_1.Permissions)('meeting:view'),

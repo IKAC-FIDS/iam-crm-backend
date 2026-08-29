@@ -12,13 +12,19 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.FindProductCatalogItemsDto = void 0;
 const openapi = require("@nestjs/swagger");
 const class_validator_1 = require("class-validator");
+const client_1 = require("@prisma/client");
 const pagination_dto_1 = require("../../common/dto/pagination.dto");
 class FindProductCatalogItemsDto extends pagination_dto_1.PaginationDto {
     static _OPENAPI_METADATA_FACTORY() {
-        return { search: { required: false, type: () => String }, category: { required: false, type: () => String }, active: { required: false, type: () => String } };
+        return { type: { required: false, type: () => Object }, search: { required: false, type: () => String }, category: { required: false, type: () => String }, active: { required: false, type: () => String } };
     }
 }
 exports.FindProductCatalogItemsDto = FindProductCatalogItemsDto;
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsEnum)(client_1.ProductType),
+    __metadata("design:type", String)
+], FindProductCatalogItemsDto.prototype, "type", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),

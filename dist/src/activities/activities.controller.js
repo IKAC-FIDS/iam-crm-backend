@@ -30,6 +30,7 @@ let ActivitiesController = class ActivitiesController {
     constructor(activitiesService) {
         this.activitiesService = activitiesService;
     }
+    findTypes() { return this.activitiesService.findTypes(); }
     findAll(query, user) {
         return this.activitiesService.findAll(query, user);
     }
@@ -50,6 +51,14 @@ let ActivitiesController = class ActivitiesController {
     }
 };
 exports.ActivitiesController = ActivitiesController;
+__decorate([
+    (0, common_1.Get)('types/options'),
+    (0, permissions_decorator_1.AnyPermission)('activity:view', 'activity:create', 'activity:update'),
+    openapi.ApiResponse({ status: 200 }),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], ActivitiesController.prototype, "findTypes", null);
 __decorate([
     (0, common_1.Get)(),
     (0, permissions_decorator_1.Permissions)('activity:view'),

@@ -24,6 +24,7 @@ const start_passkey_registration_dto_1 = require("./dto/start-passkey-registrati
 const verify_passkey_authentication_dto_1 = require("./dto/verify-passkey-authentication.dto");
 const verify_passkey_registration_dto_1 = require("./dto/verify-passkey-registration.dto");
 const passkeys_service_1 = require("./passkeys.service");
+const cookie_origin_guard_1 = require("../../common/guards/cookie-origin.guard");
 let MyPasskeysController = class MyPasskeysController {
     constructor(passkeysService) {
         this.passkeysService = passkeysService;
@@ -116,6 +117,7 @@ __decorate([
 ], AuthPasskeysController.prototype, "verifyAuthentication", null);
 exports.AuthPasskeysController = AuthPasskeysController = __decorate([
     (0, common_1.Controller)('auth/passkeys'),
+    (0, common_1.UseGuards)(cookie_origin_guard_1.CookieOriginGuard),
     __metadata("design:paramtypes", [passkeys_service_1.PasskeysService])
 ], AuthPasskeysController);
 let AdminUserPasskeysController = class AdminUserPasskeysController {

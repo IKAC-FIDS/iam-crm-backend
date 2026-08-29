@@ -4,6 +4,7 @@
   "description": "بک‌اند سیستم مدیریت فرآیند فروش IAM - از تحقیق شرکت تا پایپ‌لاین فروش",
   "private": true,
   "scripts": {
+    "prebuild": "prisma generate",
     "build": "nest build",
     "start": "nest start",
     "start:dev": "nest start --watch",

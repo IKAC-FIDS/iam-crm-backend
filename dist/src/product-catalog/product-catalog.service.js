@@ -32,6 +32,8 @@ let ProductCatalogService = class ProductCatalogService {
         const page = query.page ?? 1;
         const limit = query.limit ?? 20;
         const where = {};
+        if (query.type)
+            where.type = query.type;
         if (query.active !== undefined) {
             where.isActive = query.active === "true";
         }
@@ -111,6 +113,7 @@ let ProductCatalogService = class ProductCatalogService {
             const created = await tx.productCatalogItem.create({
                 data: {
                     code,
+                    type: dto.type ?? client_1.ProductType.HARDWARE,
                     digikalaCode,
                     digikalaUrl: dto.digikalaUrl?.trim() || null,
                     name: dto.name.trim(),
@@ -140,6 +143,8 @@ let ProductCatalogService = class ProductCatalogService {
     async update(id, dto, user) {
         const current = await this.findOne(id);
         const data = {};
+        if (dto.type != null)
+            data.type = dto.type;
         if (dto.code !== undefined) {
             const code = this.normalizeCode(dto.code);
             const duplicate = await this.prisma.productCatalogItem.findFirst({

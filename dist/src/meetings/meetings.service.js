@@ -17,6 +17,7 @@ const api_date_util_1 = require("../common/dates/api-date.util");
 const tenant_scope_util_1 = require("../common/tenant/tenant-scope.util");
 const prisma_service_1 = require("../prisma/prisma.service");
 const meetingInclude = {
+    type: { select: { id: true, code: true, label: true, description: true, sortOrder: true, isActive: true } },
     company: { select: { id: true, legalName: true, brandName: true } },
     opportunity: { select: { id: true, title: true, companyId: true } },
     organizer: { select: { id: true, fullName: true, email: true } },
@@ -31,6 +32,7 @@ let MeetingsService = class MeetingsService {
         this.prisma = prisma;
         this.audit = audit;
     }
+    findTypes() { return this.prisma.lookupOption.findMany({ where: { group: 'meeting-types', isActive: true }, orderBy: [{ sortOrder: 'asc' }, { label: 'asc' }] }); }
     async findAll(query, user) {
         const page = query.page ?? 1, limit = query.limit ?? 20;
         const where = this.buildWhere(query, user);
@@ -64,6 +66,7 @@ let MeetingsService = class MeetingsService {
             throw new common_1.BadRequestException('Only scheduled meetings can be updated');
         const merged = {
             companyId: dto.companyId ?? current.companyId, opportunityId: dto.opportunityId === undefined ? current.opportunityId ?? undefined : dto.opportunityId,
+            meetingTypeId: dto.meetingTypeId ?? current.meetingTypeId,
             startAt: dto.startAt ?? current.startAt.toISOString(), endAt: dto.endAt ?? current.endAt.toISOString(),
             reminderAt: dto.reminderAt === undefined ? current.reminderAt?.toISOString() : dto.reminderAt,
             assigneeUserIds: dto.assigneeUserIds, attendeePersonIds: dto.attendeePersonIds,
@@ -80,7 +83,7 @@ let MeetingsService = class MeetingsService {
             }
             return tx.meeting.update({ where: { id }, data: {
                     ...(dto.companyId !== undefined && { companyId: dto.companyId }), ...(dto.opportunityId !== undefined && { opportunityId: dto.opportunityId || null }),
-                    ...(dto.title !== undefined && { title: this.title(dto.title) }), ...(dto.agenda !== undefined && { agenda: dto.agenda?.trim() || null }),
+                    ...(dto.title !== undefined && { title: this.title(dto.title) }), ...(dto.meetingTypeId !== undefined && { meetingTypeId: values.meetingTypeId }), ...(dto.agenda !== undefined && { agenda: dto.agenda?.trim() || null }),
                     ...(dto.description !== undefined && { description: dto.description?.trim() || null }), ...(dto.mode !== undefined && { mode: dto.mode }),
                     ...(dto.location !== undefined && { location: dto.location?.trim() || null }), ...(dto.meetingUrl !== undefined && { meetingUrl: dto.meetingUrl || null }),
                     ...(dto.startAt !== undefined && { startAt: values.startAt }), ...(dto.endAt !== undefined && { endAt: values.endAt }),
@@ -131,6 +134,8 @@ let MeetingsService = class MeetingsService {
             and.push({ status: q.status });
         if (q.mode)
             and.push({ mode: q.mode });
+        if (q.meetingTypeId)
+            and.push({ meetingTypeId: q.meetingTypeId });
         const range = (0, api_date_util_1.parseApiDateRange)(q.dateFrom, q.dateTo, 'dateFrom', 'dateTo');
         if (range)
             and.push({ startAt: range });
@@ -163,6 +168,9 @@ let MeetingsService = class MeetingsService {
         const company = await this.prisma.company.findFirst({ where: { id: dto.companyId, organizationId }, select: { id: true } });
         if (!company)
             throw new common_1.BadRequestException('Invalid company');
+        const meetingType = dto.meetingTypeId ? await this.prisma.lookupOption.findFirst({ where: { id: dto.meetingTypeId, group: 'meeting-types', isActive: true }, select: { id: true } }) : await this.prisma.lookupOption.findFirst({ where: { group: 'meeting-types', code: 'OTHER' }, select: { id: true } });
+        if (!meetingType)
+            throw new common_1.BadRequestException('Invalid meeting type');
         if (dto.opportunityId) {
             const o = await this.prisma.opportunity.findFirst({ where: { id: dto.opportunityId, organizationId }, select: { companyId: true } });
             if (!o || o.companyId !== dto.companyId)
@@ -180,7 +188,7 @@ let MeetingsService = class MeetingsService {
             if (count !== people.length)
                 throw new common_1.BadRequestException('One or more attendees do not belong to the meeting company');
         }
-        return { startAt, endAt, reminderAt };
+        return { startAt, endAt, reminderAt, meetingTypeId: meetingType.id };
     }
 };
 exports.MeetingsService = MeetingsService;

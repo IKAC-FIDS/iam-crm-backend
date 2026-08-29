@@ -12,6 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.OpportunitiesService = void 0;
 const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
+const activity_type_1 = require("../activities/activity-type");
 const node_crypto_1 = require("node:crypto");
 const pipeline_config_service_1 = require("../admin/pipeline/pipeline-config.service");
 const audit_log_service_1 = require("../audit-log/audit-log.service");
@@ -404,7 +405,7 @@ let OpportunitiesService = class OpportunitiesService {
                     companyId: current.companyId,
                     opportunityId: id,
                     userId: user.userId,
-                    type: client_1.ActivityType.STAGE_CHANGE,
+                    type: activity_type_1.ActivityType.STAGE_CHANGE,
                     notes: dto.note,
                     outcome: `${current.stage.code} -> ${target.code}`,
                 },

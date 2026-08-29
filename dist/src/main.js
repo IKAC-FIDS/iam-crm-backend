@@ -10,6 +10,7 @@ const cookie_parser_1 = __importDefault(require("cookie-parser"));
 const helmet_1 = __importDefault(require("helmet"));
 const node_crypto_1 = require("node:crypto");
 const app_module_1 = require("./app.module");
+const refresh_token_cookie_1 = require("./common/cookies/refresh-token-cookie");
 const api_exception_filter_1 = require("./common/filters/api-exception.filter");
 const api_response_interceptor_1 = require("./common/interceptors/api-response.interceptor");
 const openapi_runtime_1 = require("./openapi/openapi.runtime");
@@ -22,6 +23,7 @@ function parseCorsOrigins(value) {
 async function bootstrap() {
     const app = await core_1.NestFactory.create(app_module_1.AppModule);
     const config = app.get(config_1.ConfigService);
+    (0, refresh_token_cookie_1.buildRefreshTokenCookieOptions)();
     const httpAdapter = app.getHttpAdapter().getInstance();
     const corsLogger = new common_1.Logger('Cors');
     httpAdapter.set('trust proxy', 1);

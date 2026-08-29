@@ -22,7 +22,7 @@ class FindMeetingsDto {
         this.limit = 20;
     }
     static _OPENAPI_METADATA_FACTORY() {
-        return { page: { required: true, type: () => Object, default: 1, minimum: 1 }, limit: { required: true, type: () => Object, default: 20, minimum: 1, maximum: 100 }, search: { required: false, type: () => String }, companyId: { required: false, type: () => String }, opportunityId: { required: false, type: () => String }, organizerId: { required: false, type: () => String }, assignedUserId: { required: false, type: () => String }, attendeePersonId: { required: false, type: () => String }, status: { required: false, type: () => Object }, mode: { required: false, type: () => Object }, dateFrom: { required: false, type: () => String }, dateTo: { required: false, type: () => String }, upcoming: { required: false, type: () => Boolean }, past: { required: false, type: () => Boolean }, mine: { required: false, type: () => Boolean }, reminderDue: { required: false, type: () => Boolean } };
+        return { page: { required: true, type: () => Object, default: 1, minimum: 1 }, limit: { required: true, type: () => Object, default: 20, minimum: 1, maximum: 100 }, search: { required: false, type: () => String }, companyId: { required: false, type: () => String }, opportunityId: { required: false, type: () => String }, organizerId: { required: false, type: () => String }, assignedUserId: { required: false, type: () => String }, attendeePersonId: { required: false, type: () => String }, status: { required: false, type: () => Object }, mode: { required: false, type: () => Object }, meetingTypeId: { required: false, type: () => String }, dateFrom: { required: false, type: () => String }, dateTo: { required: false, type: () => String }, upcoming: { required: false, type: () => Boolean }, past: { required: false, type: () => Boolean }, mine: { required: false, type: () => Boolean }, reminderDue: { required: false, type: () => Boolean } };
     }
 }
 exports.FindMeetingsDto = FindMeetingsDto;
@@ -81,6 +81,11 @@ __decorate([
     (0, class_validator_1.IsEnum)(client_1.MeetingMode),
     __metadata("design:type", String)
 ], FindMeetingsDto.prototype, "mode", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsUUID)(),
+    __metadata("design:type", String)
+], FindMeetingsDto.prototype, "meetingTypeId", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, api_date_string_validator_1.IsApiDateString)(),

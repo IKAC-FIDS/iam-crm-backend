@@ -12,11 +12,10 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.CreateActivityDto = void 0;
 const openapi = require("@nestjs/swagger");
 const class_validator_1 = require("class-validator");
-const client_1 = require("@prisma/client");
 const api_date_string_validator_1 = require("../../common/validators/api-date-string.validator");
 class CreateActivityDto {
     static _OPENAPI_METADATA_FACTORY() {
-        return { companyId: { required: true, type: () => String }, personId: { required: false, type: () => String }, type: { required: true, type: () => Object }, notes: { required: false, type: () => String }, outcome: { required: false, type: () => String }, occurredAt: { required: false, type: () => String }, nextActionDate: { required: false, type: () => String }, opportunityId: { required: false, type: () => String } };
+        return { companyId: { required: true, type: () => String }, personId: { required: false, type: () => String }, type: { required: true, type: () => String, maxLength: 100 }, notes: { required: false, type: () => String }, outcome: { required: false, type: () => String }, occurredAt: { required: false, type: () => String }, nextActionDate: { required: false, type: () => String }, opportunityId: { required: false, type: () => String } };
     }
 }
 exports.CreateActivityDto = CreateActivityDto;
@@ -30,7 +29,9 @@ __decorate([
     __metadata("design:type", String)
 ], CreateActivityDto.prototype, "personId", void 0);
 __decorate([
-    (0, class_validator_1.IsEnum)(client_1.ActivityType),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsNotEmpty)(),
+    (0, class_validator_1.MaxLength)(100),
     __metadata("design:type", String)
 ], CreateActivityDto.prototype, "type", void 0);
 __decorate([

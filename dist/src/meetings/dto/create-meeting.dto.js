@@ -18,7 +18,7 @@ const api_date_string_validator_1 = require("../../common/validators/api-date-st
 const trim = ({ value }) => typeof value === 'string' ? value.trim() : value;
 class CreateMeetingDto {
     static _OPENAPI_METADATA_FACTORY() {
-        return { companyId: { required: true, type: () => String }, opportunityId: { required: false, type: () => String }, title: { required: true, type: () => String, maxLength: 200 }, agenda: { required: false, type: () => String }, description: { required: false, type: () => String }, mode: { required: true, type: () => Object }, location: { required: false, type: () => String }, meetingUrl: { required: false, type: () => String }, startAt: { required: true, type: () => String }, endAt: { required: true, type: () => String }, reminderAt: { required: false, type: () => String }, assigneeUserIds: { required: false, type: () => [String] }, attendeePersonIds: { required: false, type: () => [String] } };
+        return { companyId: { required: true, type: () => String }, opportunityId: { required: false, type: () => String }, title: { required: true, type: () => String, maxLength: 200 }, meetingTypeId: { required: false, type: () => String }, agenda: { required: false, type: () => String }, description: { required: false, type: () => String }, mode: { required: true, type: () => Object }, location: { required: false, type: () => String }, meetingUrl: { required: false, type: () => String }, startAt: { required: true, type: () => String }, endAt: { required: true, type: () => String }, reminderAt: { required: false, type: () => String }, assigneeUserIds: { required: false, type: () => [String] }, attendeePersonIds: { required: false, type: () => [String] } };
     }
 }
 exports.CreateMeetingDto = CreateMeetingDto;
@@ -39,6 +39,12 @@ __decorate([
     (0, class_validator_1.MaxLength)(200),
     __metadata("design:type", String)
 ], CreateMeetingDto.prototype, "title", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Transform)(trim),
+    (0, class_validator_1.IsUUID)(),
+    __metadata("design:type", String)
+], CreateMeetingDto.prototype, "meetingTypeId", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),

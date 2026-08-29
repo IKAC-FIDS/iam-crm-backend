@@ -180,7 +180,7 @@ let DashboardService = class DashboardService {
         return new Date(Date.UTC(gregorian.year, gregorian.month - 1, gregorian.day, 0, 0, 0, 0));
     }
     jalaliToGregorian(jalaliYear, jalaliMonth, jalaliDay) {
-        let jy = jalaliYear + 1595;
+        const jy = jalaliYear + 1595;
         let days = -355668 +
             365 * jy +
             Math.floor(jy / 33) * 8 +
