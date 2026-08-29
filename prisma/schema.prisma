@@ -278,6 +278,7 @@ enum NotificationType {
   PAYMENT_UPDATED
   ATTACHMENT_UPLOADED
   MEETING_REMINDER
+  TENDER_WORKFLOW
 }
 
 enum NotificationPriority {
@@ -296,6 +297,7 @@ enum NotificationEntityType {
   PAYMENT
   ATTACHMENT
   MEETING
+  TENDER
 }
 
 enum OrganizationStatus {
@@ -420,9 +422,15 @@ model User {
   technicalTendersOwned             Tender[]                   @relation("TechnicalTenderOwner")
   technicalTendersLed               Tender[]                   @relation("TechnicalTenderTechnicalLead")
   commercialTendersLed              Tender[]                   @relation("TechnicalTenderCommercialLead")
+  technicalTendersSubmitted         Tender[]                   @relation("TechnicalTenderSubmittedBy")
+  technicalTendersClosed            Tender[]                   @relation("TechnicalTenderClosedBy")
   technicalTendersCreated           Tender[]                   @relation("TechnicalTenderCreatedBy")
   technicalTendersUpdated           Tender[]                   @relation("TechnicalTenderUpdatedBy")
   tenderRequirementsOwned           TenderRequirement[]        @relation("TenderRequirementOwner")
+  tenderRequirementsBlocked         TenderRequirement[]        @relation("TenderRequirementBlockedBy")
+  tenderReviewsAssigned             TenderReview[]             @relation("TenderReviewReviewer")
+  tenderReviewsRequested            TenderReview[]             @relation("TenderReviewRequestedBy")
+  tenderReviewsDecided              TenderReview[]             @relation("TenderReviewDecidedBy")
   platformAuthority                 PlatformAuthority?
 
   @@index([organizationId])
@@ -514,6 +522,7 @@ model Organization {
   technicalDocuments  TechnicalDocument[]
   technicalResources  TechnicalResource[]
   tenders             Tender[]
+  tenderReviews       TenderReview[]
 
   @@index([status])
   @@index([createdAt])
@@ -2459,6 +2468,18 @@ enum TenderRequirementStatus {
   BLOCKED
 }
 
+enum TenderReviewType {
+  TECHNICAL
+  COMMERCIAL
+}
+
+enum TenderReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
 model TechnicalRelease {
   id                 String                 @id @default(uuid())
   organizationId     String
@@ -2657,6 +2678,12 @@ model Tender {
   commercialLead       User?               @relation("TechnicalTenderCommercialLead", fields: [commercialLeadId], references: [id], onDelete: SetNull)
   result               TenderResult?
   resultReason         String?
+  submittedAt          DateTime?
+  submittedById        String?
+  submittedBy          User?               @relation("TechnicalTenderSubmittedBy", fields: [submittedById], references: [id], onDelete: SetNull)
+  closedAt             DateTime?
+  closedById           String?
+  closedBy             User?               @relation("TechnicalTenderClosedBy", fields: [closedById], references: [id], onDelete: SetNull)
   createdById          String
   createdBy            User                @relation("TechnicalTenderCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   updatedById          String
@@ -2668,6 +2695,7 @@ model Tender {
   requirements         TenderRequirement[]
   documents            TechnicalDocument[]
   deliverables         TenderDeliverable[]
+  reviews              TenderReview[]
 
   @@unique([organizationId, referenceNumber])
   @@index([organizationId, status])
@@ -2693,6 +2721,10 @@ model TenderRequirement {
   owner          User?                   @relation("TenderRequirementOwner", fields: [ownerId], references: [id], onDelete: SetNull)
   dueDate        DateTime?
   response       String?
+  blockedReason  String?
+  blockedAt      DateTime?
+  blockedById    String?
+  blockedBy      User?                   @relation("TenderRequirementBlockedBy", fields: [blockedById], references: [id], onDelete: SetNull)
   createdAt      DateTime                @default(now())
   updatedAt      DateTime                @updatedAt
 
@@ -2709,9 +2741,35 @@ model TenderDeliverable {
   documentId     String
   document       TechnicalDocument @relation(fields: [documentId], references: [id], onDelete: Restrict)
   label          String?
+  required       Boolean           @default(true)
   createdAt      DateTime          @default(now())
 
   @@unique([organizationId, tenderId, documentId])
   @@index([organizationId, tenderId])
   @@map("tender_deliverables")
+}
+
+model TenderReview {
+  id             String             @id @default(uuid())
+  organizationId String
+  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  tenderId       String
+  tender         Tender             @relation(fields: [tenderId], references: [id], onDelete: Restrict)
+  type           TenderReviewType
+  status         TenderReviewStatus @default(PENDING)
+  reviewerId     String?
+  reviewer       User?              @relation("TenderReviewReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+  requestedById  String
+  requestedBy    User               @relation("TenderReviewRequestedBy", fields: [requestedById], references: [id], onDelete: Restrict)
+  requestedAt    DateTime           @default(now())
+  decidedById    String?
+  decidedBy      User?              @relation("TenderReviewDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
+  reviewedAt     DateTime?
+  comment        String?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  @@index([organizationId, tenderId, type, createdAt])
+  @@index([organizationId, reviewerId, status])
+  @@map("tender_reviews")
 }

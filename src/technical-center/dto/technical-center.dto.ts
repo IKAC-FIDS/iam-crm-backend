@@ -9,6 +9,8 @@ import {
   TechnicalResourceType,
   TechnicalVisibility,
   TenderRequirementStatus,
+  TenderReviewStatus,
+  TenderReviewType,
   TenderStatus,
   TenderType,
 } from '@prisma/client';
@@ -181,11 +183,26 @@ export class CreateRequirementDto {
 }
 export class UpdateRequirementDto extends PartialType(CreateRequirementDto) {
   @IsOptional() @IsEnum(TenderRequirementStatus) status?: TenderRequirementStatus;
+  @IsOptional() @IsString() @MaxLength(2000) blockedReason?: string;
 }
 
 export class CreateDeliverableDto {
   @IsUUID() documentId!: string;
   @IsOptional() @IsString() @MaxLength(200) label?: string;
+  @IsOptional() @IsBoolean() required?: boolean;
+}
+
+export class RequestTenderReviewDto {
+  @IsEnum(TenderReviewType) type!: TenderReviewType;
+  @IsOptional() @IsUUID() reviewerId?: string;
+  @IsOptional() @IsString() @MaxLength(2000) comment?: string;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) revision?: number;
+}
+
+export class DecideTenderReviewDto {
+  @IsEnum(TenderReviewStatus) status!: TenderReviewStatus;
+  @IsOptional() @IsString() @MaxLength(2000) comment?: string;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) revision?: number;
 }
 
 export const lifecycleEnums = {

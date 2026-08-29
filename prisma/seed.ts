@@ -931,6 +931,8 @@ async function main() {
     { action: 'technical-tender:manage', description: 'مدیریت مناقصه‌های فنی' },
     { action: 'technical-tender:submit', description: 'ارسال مناقصه فنی' },
     { action: 'technical-tender:close', description: 'ثبت نتیجه و بستن مناقصه فنی' },
+    { action: 'technical-tender:review-technical', description: 'درخواست و تصمیم‌گیری بازبینی فنی مناقصه' },
+    { action: 'technical-tender:review-commercial', description: 'درخواست و تصمیم‌گیری بازبینی تجاری مناقصه' },
   ];
 
   for (const permission of permissions) {
@@ -1037,6 +1039,8 @@ async function main() {
     'technical-tender:manage',
     'technical-tender:submit',
     'technical-tender:close',
+    'technical-tender:review-technical',
+    'technical-tender:review-commercial',
   ];
 
   const repActions = [

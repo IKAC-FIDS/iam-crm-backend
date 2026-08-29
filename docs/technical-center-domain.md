@@ -116,6 +116,8 @@ The tender lifecycle is distinct from Opportunity stages. Review stages allow on
 | Resources | `technical-resource:view` | `technical-resource:manage` | — |
 | Tenders | `technical-tender:view` | `technical-tender:manage` | `technical-tender:submit`, `technical-tender:close` |
 
+Phase 4.3 readiness, review, submission and close rules are documented in [tender-workflow.md](./tender-workflow.md). Review decisions additionally use `technical-tender:review-technical` and `technical-tender:review-commercial`.
+
 System ADMIN receives all permissions. The default MANAGER role receives the complete technical-center set. REP and BOARDS receive view permissions only. Tenant administrators can continue assigning these system permissions to custom and system roles through the existing RBAC management APIs.
 
 ## HTTP API

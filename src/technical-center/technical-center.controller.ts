@@ -13,9 +13,11 @@ import {
   CreateRequirementDto,
   CreateResourceDto,
   CreateTenderDto,
+  DecideTenderReviewDto,
   DocumentTransitionDto,
   KnowledgeTransitionDto,
   ReleaseTransitionDto,
+  RequestTenderReviewDto,
   TechnicalListDto,
   TechnicalDocumentListDto,
   TenderTransitionDto,
@@ -93,6 +95,11 @@ export class TechnicalTendersController {
   @Get(':id') @Permissions('technical-tender:view') get(@Param('id') id: string, @CurrentUser() u: CurrentUserPayload) { return this.service.getTender(id, u); }
   @Patch(':id') @Permissions('technical-tender:manage') update(@Param('id') id: string, @Body() d: UpdateTenderDto, @CurrentUser() u: CurrentUserPayload) { return this.service.updateTender(id, d, u); }
   @Post(':id/transition') @AnyPermission('technical-tender:manage', 'technical-tender:submit', 'technical-tender:close') transition(@Param('id') id: string, @Body() d: TenderTransitionDto, @CurrentUser() u: CurrentUserPayload) { return this.service.transitionTender(id, d, u); }
+  @Get(':id/readiness') @Permissions('technical-tender:view') readiness(@Param('id') id: string, @CurrentUser() u: CurrentUserPayload) { return this.service.getTenderReadiness(id, u); }
+  @Get(':id/history') @Permissions('technical-tender:view') history(@Param('id') id: string, @CurrentUser() u: CurrentUserPayload) { return this.service.tenderHistory(id, u); }
+  @Get(':id/reviews') @Permissions('technical-tender:view') reviews(@Param('id') id: string, @CurrentUser() u: CurrentUserPayload) { return this.service.listTenderReviews(id, u); }
+  @Post(':id/reviews') @AnyPermission('technical-tender:review-technical', 'technical-tender:review-commercial') requestReview(@Param('id') id: string, @Body() d: RequestTenderReviewDto, @CurrentUser() u: CurrentUserPayload) { return this.service.requestTenderReview(id, d, u); }
+  @Post(':id/reviews/:reviewId/decision') @AnyPermission('technical-tender:review-technical', 'technical-tender:review-commercial') decideReview(@Param('id') id: string, @Param('reviewId') reviewId: string, @Body() d: DecideTenderReviewDto, @CurrentUser() u: CurrentUserPayload) { return this.service.decideTenderReview(id, reviewId, d, u); }
   @Get(':id/requirements') @Permissions('technical-tender:view') requirements(@Param('id') id: string, @CurrentUser() u: CurrentUserPayload) { return this.service.listRequirements(id, u); }
   @Post(':id/requirements') @Permissions('technical-tender:manage') addRequirement(@Param('id') id: string, @Body() d: CreateRequirementDto, @CurrentUser() u: CurrentUserPayload) { return this.service.addRequirement(id, d, u); }
   @Patch(':id/requirements/:requirementId') @Permissions('technical-tender:manage') updateRequirement(@Param('id') id: string, @Param('requirementId') requirementId: string, @Body() d: UpdateRequirementDto, @CurrentUser() u: CurrentUserPayload) { return this.service.updateRequirement(id, requirementId, d, u); }
