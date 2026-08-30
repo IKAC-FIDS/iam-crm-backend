@@ -63,13 +63,14 @@ describe('TechnicalCenterService', () => {
       },
       tenderRequirement: { create: jest.fn(), findFirst: jest.fn(), findMany: jest.fn(), update: jest.fn(), delete: jest.fn() },
       tenderDeliverable: { create: jest.fn(), findFirst: jest.fn(), delete: jest.fn() },
-      tenderReview: { create: jest.fn(), findFirst: jest.fn(), update: jest.fn() },
+      tenderReview: { create: jest.fn(), findFirst: jest.fn(), updateMany: jest.fn().mockResolvedValue({ count: 1 }), findUniqueOrThrow: jest.fn() },
       auditLog: { findMany: jest.fn().mockResolvedValue([]) },
       organizationMembership: { findFirst: jest.fn().mockResolvedValue({ id: 'membership' }) },
       company: { findFirst: jest.fn().mockResolvedValue({ id: 'company' }) },
       opportunity: { findFirst: jest.fn().mockResolvedValue({ id: 'opportunity' }) },
       team: { findFirst: jest.fn().mockResolvedValue({ id: 'team' }) },
     };
+    prisma.$transaction = jest.fn((callback: (tx: any) => unknown) => callback(prisma));
     audit = { recordTenantEvent: jest.fn().mockResolvedValue({ id: 'audit' }) };
     service = new TechnicalCenterService(prisma, audit);
   });
@@ -200,6 +201,27 @@ describe('TechnicalCenterService', () => {
     await expect(service.transitionTender('tender', { status: 'SUBMITTED' }, user(['technical-tender:manage']))).rejects.toBeInstanceOf(ForbiddenException);
   });
 
+  it('submits a ready tender with actor and timestamp through optimistic concurrency', async () => {
+    const ready = {
+      id: 'tender', organizationId, title: 'RFP', tenderType: 'RFP', ownerId: user().userId,
+      companyId: 'company', submissionDeadline: new Date(Date.now() + 86400000), status: TenderStatus.READY_FOR_SUBMISSION,
+      revision: 3, archivedAt: null, requirements: [], deliverables: [], reviews: [
+        { id: 'technical', type: TenderReviewType.TECHNICAL, status: TenderReviewStatus.APPROVED },
+        { id: 'commercial', type: TenderReviewType.COMMERCIAL, status: TenderReviewStatus.APPROVED },
+      ],
+    };
+    prisma.tender.findFirst
+      .mockResolvedValueOnce(ready)
+      .mockResolvedValueOnce({ ...ready, status: TenderStatus.SUBMITTED, revision: 4, submittedById: user().userId, submittedAt: new Date() });
+    await expect(service.transitionTender('tender', { status: TenderStatus.SUBMITTED, revision: 3 }, user(['technical-tender:submit'])))
+      .resolves.toMatchObject({ status: TenderStatus.SUBMITTED, submittedById: user().userId });
+    expect(prisma.tender.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'tender', organizationId, revision: 3 },
+      data: expect.objectContaining({ status: TenderStatus.SUBMITTED, submittedById: user().userId, submittedAt: expect.any(Date) }),
+    }));
+    expect(audit.recordTenantEvent).toHaveBeenCalledWith(expect.objectContaining({ action: 'technical-tender.submitted' }));
+  });
+
   it('applies tender list filters and tenant ownership', async () => {
     await service.listTenders({ page: 1, limit: 20, companyId: 'company', status: 'DRAFT', type: 'RFP' }, user());
     expect(prisma.tender.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ organizationId, companyId: 'company', status: 'DRAFT', tenderType: 'RFP' }) }));
@@ -255,8 +277,37 @@ describe('TechnicalCenterService', () => {
     expect(prisma.tenderReview.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ type: TenderReviewType.TECHNICAL, organizationId }) }));
   });
 
+  it('counts a required deliverable as complete only with an approved document attachment', async () => {
+    const base = {
+      id: 'tender', organizationId, title: 'RFP', tenderType: 'RFP', ownerId: user().userId,
+      companyId: 'company', submissionDeadline: new Date(Date.now() + 86400000), status: TenderStatus.COMMERCIAL_REVIEW,
+      revision: 1, archivedAt: null, requirements: [], reviews: [
+        { id: 'commercial', type: TenderReviewType.COMMERCIAL, status: TenderReviewStatus.APPROVED },
+        { id: 'technical', type: TenderReviewType.TECHNICAL, status: TenderReviewStatus.APPROVED },
+      ],
+    };
+    prisma.tender.findFirst.mockResolvedValue({ ...base, deliverables: [{ required: true, document: { status: 'APPROVED', versions: [] } }] });
+    await expect(service.getTenderReadiness('tender', user())).resolves.toMatchObject({ overallReady: false, checks: { deliverables: { missing: 1 } } });
+    prisma.tender.findFirst.mockResolvedValue({ ...base, deliverables: [{ required: true, document: { status: 'APPROVED', versions: [{ attachmentId: 'file' }] } }] });
+    await expect(service.getTenderReadiness('tender', user())).resolves.toMatchObject({ overallReady: true, checks: { deliverables: { missing: 0 } } });
+  });
+
+  it('decides a review and advances the tender revision atomically', async () => {
+    const tender = { id: 'tender', organizationId, title: 'RFP', ownerId: user().userId, status: TenderStatus.TECHNICAL_REVIEW, revision: 4, archivedAt: null, requirements: [], deliverables: [], reviews: [] };
+    const pending = { id: 'review', tenderId: 'tender', organizationId, type: TenderReviewType.TECHNICAL, status: TenderReviewStatus.PENDING };
+    prisma.tender.findFirst.mockResolvedValue(tender);
+    prisma.tenderReview.findFirst.mockResolvedValue(pending);
+    prisma.tenderReview.findUniqueOrThrow.mockResolvedValue({ ...pending, status: TenderReviewStatus.APPROVED });
+    await service.decideTenderReview('tender', 'review', { status: TenderReviewStatus.APPROVED, revision: 4 }, user(['technical-tender:review-technical']));
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(prisma.tender.updateMany).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'tender', organizationId, revision: 4 } }));
+    expect(prisma.tenderReview.updateMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ organizationId, status: TenderReviewStatus.PENDING }) }));
+  });
+
   it('requires reasons for lost and cancelled close actions', async () => {
     prisma.tender.findFirst.mockResolvedValue({ id: 'tender', organizationId, status: TenderStatus.UNDER_EVALUATION, revision: 1, archivedAt: null, requirements: [], deliverables: [], reviews: [] });
+    await expect(service.transitionTender('tender', { status: TenderStatus.WON, revision: 1 }, user(['technical-tender:manage'])))
+      .rejects.toBeInstanceOf(ForbiddenException);
     await expect(service.transitionTender('tender', { status: TenderStatus.LOST, revision: 1 }, user(['technical-tender:close'])))
       .rejects.toMatchObject({ response: expect.objectContaining({ code: 'TENDER_CLOSE_REASON_REQUIRED' }) });
   });

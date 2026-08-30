@@ -71,7 +71,7 @@ const tenderInclude = {
   company: { select: { id: true, legalName: true, brandName: true } },
   opportunity: { select: { id: true, title: true } },
   team: { select: { id: true, code: true, name: true } },
-  requirements: { orderBy: { createdAt: 'asc' as const } },
+  requirements: { include: { owner: { select: { id: true, fullName: true, email: true } } }, orderBy: { createdAt: 'asc' as const } },
   deliverables: { include: { document: { select: { id: true, title: true, status: true, versions: { select: { id: true, attachmentId: true }, take: 1, orderBy: { createdAt: 'desc' as const } } } } } },
   reviews: {
     include: {
@@ -512,6 +512,7 @@ export class TechnicalCenterService {
     const tender = await this.getTender(tenderId, user);
     return this.prisma.tenderRequirement.findMany({
       where: { organizationId: tender.organizationId, tenderId },
+      include: { owner: { select: { id: true, fullName: true, email: true } } },
       orderBy: { createdAt: 'asc' },
     });
   }
@@ -583,12 +584,23 @@ export class TechnicalCenterService {
     const expectedStatus = dto.type === TenderReviewType.TECHNICAL ? TenderStatus.TECHNICAL_REVIEW : TenderStatus.COMMERCIAL_REVIEW;
     if (tender.status !== expectedStatus) throw new BadRequestException({ code: 'REVIEW_NOT_AVAILABLE_IN_CURRENT_STATUS', message: `This review can only be requested in ${expectedStatus}` });
     if (dto.reviewerId) await this.assertUser(tender.organizationId, dto.reviewerId);
+    if (dto.revision !== undefined && dto.revision !== tender.revision) throw new ConflictException({ code: 'REVISION_CONFLICT', message: 'The tender was changed by another request' });
     const pending = tender.reviews.find((review) => review.type === dto.type && review.status === TenderReviewStatus.PENDING);
     if (pending) throw new ConflictException({ code: 'REVIEW_ALREADY_PENDING', message: 'A pending review already exists for this review type' });
-    const row = await this.prisma.tenderReview.create({
-      data: { organizationId: tender.organizationId, tenderId: id, type: dto.type, reviewerId: dto.reviewerId, requestedById: user.userId, comment: dto.comment?.trim() },
-      include: { reviewer: true, requestedBy: true, decidedBy: true },
-    });
+    let row;
+    try {
+      row = await this.prisma.$transaction(async (tx) => {
+        const revision = await tx.tender.updateMany({ where: { id, organizationId: tender.organizationId, revision: tender.revision }, data: { revision: { increment: 1 }, updatedById: user.userId } });
+        if (revision.count !== 1) throw new ConflictException({ code: 'REVISION_CONFLICT', message: 'The tender was changed by another request' });
+        return tx.tenderReview.create({
+          data: { organizationId: tender.organizationId, tenderId: id, type: dto.type, reviewerId: dto.reviewerId, requestedById: user.userId, comment: dto.comment?.trim() },
+          include: { reviewer: true, requestedBy: true, decidedBy: true },
+        });
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') throw new ConflictException({ code: 'REVIEW_ALREADY_PENDING', message: 'A pending review already exists for this review type' });
+      throw error;
+    }
     await this.log('technical-tender', id, `technical-tender.review-${dto.type.toLowerCase()}-requested`, tender.organizationId, user, undefined, row, dto.comment);
     if (row.reviewerId) await this.notifyTender(row.reviewerId, user, id, dto.type === TenderReviewType.TECHNICAL ? 'بازبینی فنی جدید' : 'بازبینی تجاری جدید', tender.title);
     return row;
@@ -607,8 +619,13 @@ export class TechnicalCenterService {
     }
     if (dto.status === TenderReviewStatus.REJECTED && !dto.comment?.trim()) throw new BadRequestException({ code: 'REVIEW_REJECTION_REASON_REQUIRED', message: 'A rejection comment is required' });
     if (dto.revision !== undefined && dto.revision !== tender.revision) throw new ConflictException({ code: 'REVISION_CONFLICT', message: 'The tender was changed by another request' });
-    await this.optimistic('tender', id, tender.organizationId, tender.revision, { updatedById: user.userId });
-    const row = await this.prisma.tenderReview.update({ where: { id: reviewId }, data: { status: dto.status, decidedById: user.userId, reviewedAt: new Date(), comment: dto.comment?.trim() } });
+    const row = await this.prisma.$transaction(async (tx) => {
+      const revision = await tx.tender.updateMany({ where: { id, organizationId: tender.organizationId, revision: tender.revision }, data: { revision: { increment: 1 }, updatedById: user.userId } });
+      if (revision.count !== 1) throw new ConflictException({ code: 'REVISION_CONFLICT', message: 'The tender was changed by another request' });
+      const decision = await tx.tenderReview.updateMany({ where: { id: reviewId, tenderId: id, organizationId: tender.organizationId, status: TenderReviewStatus.PENDING }, data: { status: dto.status, decidedById: user.userId, reviewedAt: new Date(), comment: dto.comment?.trim() } });
+      if (decision.count !== 1) throw new ConflictException({ code: 'REVIEW_ALREADY_DECIDED', message: 'This review has already been decided' });
+      return tx.tenderReview.findUniqueOrThrow({ where: { id: reviewId } });
+    });
     await this.log('technical-tender', id, `technical-tender.review-${review.type.toLowerCase()}-${dto.status.toLowerCase()}`, tender.organizationId, user, review, row, dto.comment);
     if (dto.status === TenderReviewStatus.REJECTED) await this.notifyTender(tender.ownerId, user, id, 'بازبینی مناقصه رد شد', dto.comment || tender.title, NotificationPriority.HIGH);
     return row;

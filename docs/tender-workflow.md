@@ -23,6 +23,8 @@ The backend enforces readiness on transitions to `READY_FOR_SUBMISSION` and `SUB
 
 Technical and commercial reviews are separate `TenderReview` records. Multiple rounds preserve history; readiness uses the newest review of each type. A pending review cannot be duplicated, a decided review cannot be decided again, and rejection requires a comment.
 
+Review requests and decisions update the Tender revision and Review record in one database transaction. A partial unique index guarantees at most one pending review per tenant/tender/type even under concurrent requests. The hardening migration deterministically cancels only older duplicate pending rounds, if any already exist.
+
 - `technical-tender:review-technical`
 - `technical-tender:review-commercial`
 

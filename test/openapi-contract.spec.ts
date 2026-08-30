@@ -12,7 +12,7 @@ describe('fix 000094 canonical OpenAPI contract', () => {
   const ops = operations(doc);
 
   it('documents every current HTTP operation with stable unique IDs', () => {
-    expect(ops).toHaveLength(368);
+    expect(ops).toHaveLength(373);
     const ids = ops.map(({ operation }) => operation.operationId);
     expect(ids.every(Boolean)).toBe(true);
     expect(new Set(ids).size).toBe(ids.length);
