@@ -1,5 +1,5 @@
-import { Priority, TaskStatus } from '@prisma/client';
-import { IsBooleanString, IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
+import { Priority, TaskAssignmentScope, TaskStatus } from '@prisma/client';
+import { IsBooleanString, IsEnum, IsIn, IsOptional, IsString, IsUUID } from 'class-validator';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 import { IsApiDateString } from '../../common/validators/api-date-string.validator';
 
@@ -55,4 +55,40 @@ export class FindTasksDto extends PaginationDto {
   @IsOptional()
   @IsBooleanString()
   overdueOnly?: string;
+
+  @IsOptional()
+  @IsEnum(TaskAssignmentScope)
+  assignmentScope?: TaskAssignmentScope;
+
+  @IsOptional()
+  @IsUUID()
+  teamId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  parentTaskId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  meetingId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  activityId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  productId?: string;
+
+  @IsOptional()
+  @IsIn(['all', 'mine', 'team', 'organization', 'created'])
+  view?: 'all' | 'mine' | 'team' | 'organization' | 'created';
+
+  @IsOptional()
+  @IsIn(['none', 'upcoming', 'today', 'overdue', 'completed'])
+  dueState?: 'none' | 'upcoming' | 'today' | 'overdue' | 'completed';
+
+  @IsOptional()
+  @IsIn(['COMPANY', 'OPPORTUNITY', 'PERSON', 'MEETING', 'ACTIVITY', 'PRODUCT'])
+  linkedEntityType?: 'COMPANY' | 'OPPORTUNITY' | 'PERSON' | 'MEETING' | 'ACTIVITY' | 'PRODUCT';
 }

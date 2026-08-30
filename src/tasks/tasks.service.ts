@@ -9,6 +9,7 @@ import {
   NotificationPriority,
   NotificationType,
   Prisma,
+  TaskAssignmentScope,
   TaskStatus,
   UserRole,
 } from '@prisma/client';
@@ -23,8 +24,11 @@ import { CreateTaskDto } from './dto/create-task.dto';
 import { FindTasksDto } from './dto/find-tasks.dto';
 import { RescheduleTaskDto } from './dto/reschedule-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
+import { ReassignTaskDto } from './dto/reassign-task.dto';
+import { CreateSubtaskDto } from './dto/create-subtask.dto';
+import { FindTaskEntityOptionsDto, FindTaskOptionsDto } from './dto/find-task-options.dto';
 import { getCurrentOrganizationId, tenantScope } from '../common/tenant/tenant-scope.util';
-import { userMatchesTeam, userTeamScopeWhere } from '../common/tenant/team-scope.util';
+import { userTeamScopeWhere } from '../common/tenant/team-scope.util';
 import { parseApiDate, parseApiDateRange } from '../common/dates/api-date.util';
 
 const taskInclude = {
@@ -97,6 +101,19 @@ const taskInclude = {
       email: true,
     },
   },
+  team: { select: { id: true, code: true, name: true, isActive: true } },
+  meeting: { select: { id: true, title: true, startAt: true, status: true } },
+  activity: { select: { id: true, type: true, occurredAt: true, companyId: true } },
+  product: { select: { id: true, code: true, name: true, isActive: true } },
+  parentTask: { select: { id: true, title: true, status: true } },
+  subtasks: {
+    select: {
+      id: true, title: true, status: true, priority: true, dueAt: true,
+      assignedTo: { select: { id: true, fullName: true, email: true } },
+    },
+    orderBy: [{ status: 'asc' as const }, { dueAt: 'asc' as const }, { createdAt: 'asc' as const }],
+  },
+  _count: { select: { subtasks: true } },
 } satisfies Prisma.TaskInclude;
 
 type TaskRelationDto = {
@@ -105,6 +122,9 @@ type TaskRelationDto = {
   opportunityId?: string | null;
   commercialDocumentId?: string | null;
   paymentId?: string | null;
+  meetingId?: string | null;
+  activityId?: string | null;
+  productId?: string | null;
 };
 
 type ScopedCompany = {
@@ -145,6 +165,15 @@ type TaskRelationResolution = {
   opportunityId: string | null;
   commercialDocumentId: string | null;
   paymentId: string | null;
+  meetingId: string | null;
+  activityId: string | null;
+  productId: string | null;
+};
+
+type AssignmentResolution = {
+  assignmentScope: TaskAssignmentScope;
+  teamId: string | null;
+  assignedToId: string | null;
 };
 
 @Injectable()
@@ -196,6 +225,52 @@ export class TasksService {
     return task;
   }
 
+  async findTeamOptions(query: FindTaskOptionsDto, user: CurrentUserPayload) {
+    const page = query.page ?? 1, limit = query.limit ?? 25, search = query.search?.trim();
+    const where: Prisma.TeamWhereInput = {
+      organizationId: getCurrentOrganizationId(user), isActive: true,
+      ...(search && { OR: [{ name: { contains: search, mode: 'insensitive' } }, { code: { contains: search, mode: 'insensitive' } }] }),
+    };
+    const [rows, total] = await Promise.all([
+      this.prisma.team.findMany({ where, select: { id: true, name: true, code: true, _count: { select: { members: true } } }, orderBy: [{ name: 'asc' }, { id: 'asc' }], skip: (page - 1) * limit, take: limit }),
+      this.prisma.team.count({ where }),
+    ]);
+    return this.optionPage(rows.map((row) => ({ id: row.id, label: row.name, secondary: `${row.code} · ${row._count.members} عضو` })), total, page, limit);
+  }
+
+  async findEntityOptions(query: FindTaskEntityOptionsDto, user: CurrentUserPayload) {
+    const page = query.page ?? 1, limit = query.limit ?? 25, search = query.search?.trim(), organizationId = getCurrentOrganizationId(user);
+    const paging = { skip: (page - 1) * limit, take: limit };
+    let data: Array<{ id: string; label: string; secondary?: string }>;
+    let total: number;
+    if (query.type === 'COMPANY') {
+      const where: Prisma.CompanyWhereInput = { AND: [{ organizationId, archivedAt: null }, this.companyScopeWhere(user), ...(search ? [{ OR: [{ legalName: { contains: search, mode: 'insensitive' as const } }, { brandName: { contains: search, mode: 'insensitive' as const } }] }] : [])] };
+      const [rows, count] = await Promise.all([this.prisma.company.findMany({ where, select: { id: true, legalName: true, brandName: true }, orderBy: { legalName: 'asc' }, ...paging }), this.prisma.company.count({ where })]);
+      data = rows.map((row) => ({ id: row.id, label: row.brandName || row.legalName, secondary: row.brandName ? row.legalName : undefined })); total = count;
+    } else if (query.type === 'OPPORTUNITY') {
+      const where: Prisma.OpportunityWhereInput = { AND: [{ organizationId, archivedAt: null }, this.opportunityScopeWhere(user), ...(search ? [{ title: { contains: search, mode: 'insensitive' as const } }] : [])] };
+      const [rows, count] = await Promise.all([this.prisma.opportunity.findMany({ where, select: { id: true, title: true, company: { select: { legalName: true, brandName: true } } }, orderBy: { title: 'asc' }, ...paging }), this.prisma.opportunity.count({ where })]);
+      data = rows.map((row) => ({ id: row.id, label: row.title, secondary: row.company.brandName || row.company.legalName })); total = count;
+    } else if (query.type === 'PERSON') {
+      const where: Prisma.PersonWhereInput = { company: { AND: [{ organizationId }, this.companyScopeWhere(user)] }, ...(search && { fullName: { contains: search, mode: 'insensitive' } }) };
+      const [rows, count] = await Promise.all([this.prisma.person.findMany({ where, select: { id: true, fullName: true, title: true }, orderBy: { fullName: 'asc' }, ...paging }), this.prisma.person.count({ where })]);
+      data = rows.map((row) => ({ id: row.id, label: row.fullName, secondary: row.title || undefined })); total = count;
+    } else if (query.type === 'MEETING') {
+      const where: Prisma.MeetingWhereInput = { organizationId, ...(search && { title: { contains: search, mode: 'insensitive' } }) };
+      const [rows, count] = await Promise.all([this.prisma.meeting.findMany({ where, select: { id: true, title: true, startAt: true }, orderBy: { startAt: 'desc' }, ...paging }), this.prisma.meeting.count({ where })]);
+      data = rows.map((row) => ({ id: row.id, label: row.title, secondary: row.startAt.toISOString() })); total = count;
+    } else if (query.type === 'ACTIVITY') {
+      const where: Prisma.ActivityWhereInput = { company: { AND: [{ organizationId }, this.companyScopeWhere(user)] }, ...(search && { OR: [{ notes: { contains: search, mode: 'insensitive' } }, { outcome: { contains: search, mode: 'insensitive' } }] }) };
+      const [rows, count] = await Promise.all([this.prisma.activity.findMany({ where, select: { id: true, type: true, notes: true, occurredAt: true }, orderBy: { occurredAt: 'desc' }, ...paging }), this.prisma.activity.count({ where })]);
+      data = rows.map((row) => ({ id: row.id, label: row.notes?.trim() || row.type, secondary: row.occurredAt.toISOString() })); total = count;
+    } else {
+      const where: Prisma.ProductCatalogItemWhereInput = { isActive: true, ...(search && { OR: [{ name: { contains: search, mode: 'insensitive' } }, { code: { contains: search, mode: 'insensitive' } }] }) };
+      const [rows, count] = await Promise.all([this.prisma.productCatalogItem.findMany({ where, select: { id: true, name: true, code: true }, orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }], ...paging }), this.prisma.productCatalogItem.count({ where })]);
+      data = rows.map((row) => ({ id: row.id, label: row.name, secondary: row.code })); total = count;
+    }
+    return this.optionPage(data, total, page, limit);
+  }
+
   async create(dto: CreateTaskDto, user: CurrentUserPayload) {
     if (user.role === UserRole.BOARDS) {
       throw new ForbiddenException('Tasks are read-only for this role');
@@ -203,11 +278,11 @@ export class TasksService {
 
     const relations = await this.resolveCreateRelations(dto, user);
 
-    const assignedToId = dto.assignedToId ?? user.userId;
-
-    if (assignedToId) {
-      await this.validateAssignee(assignedToId, user);
-    }
+    const assignment = await this.resolveAssignment({
+      assignmentScope: dto.assignmentScope,
+      teamId: dto.teamId,
+      assigneeId: dto.assignedToId,
+    }, user);
 
     const status = dto.status ?? TaskStatus.TODO;
     const now = new Date();
@@ -226,7 +301,12 @@ export class TasksService {
         opportunityId: relations.opportunityId ?? undefined,
         commercialDocumentId: relations.commercialDocumentId ?? undefined,
         paymentId: relations.paymentId ?? undefined,
-        assignedToId,
+        meetingId: relations.meetingId ?? undefined,
+        activityId: relations.activityId ?? undefined,
+        productId: relations.productId ?? undefined,
+        assignmentScope: assignment.assignmentScope,
+        teamId: assignment.teamId ?? undefined,
+        assignedToId: assignment.assignedToId ?? undefined,
         createdById: user.userId,
         completedAt: status === TaskStatus.DONE ? now : undefined,
         completedById: status === TaskStatus.DONE ? user.userId : undefined,
@@ -237,6 +317,7 @@ export class TasksService {
 
     await this.audit.record({
       actorId: user.userId,
+      organizationId: task.organizationId,
       entityType: 'task',
       entityId: task.id,
       action: 'task.created',
@@ -264,6 +345,11 @@ export class TasksService {
     }
 
     if (dto.status !== undefined) {
+      this.assertStatusTransition(current.status, dto.status);
+      if (dto.status === TaskStatus.CANCELLED) {
+        throw new BadRequestException({ code: 'TASK_CANCEL_REASON_REQUIRED', message: 'Use the status endpoint and provide a cancellation reason' });
+      }
+      if (dto.status === TaskStatus.DONE) await this.assertSubtasksResolved(id, current.organizationId);
       Object.assign(data, this.buildStatusUpdate(dto.status, user));
     }
 
@@ -309,14 +395,25 @@ export class TasksService {
         : { disconnect: true };
     }
 
-    if (dto.assignedToId !== undefined) {
-      await this.validateAssignee(dto.assignedToId, user);
+    if (dto.assignedToId !== undefined || dto.assignmentScope !== undefined || dto.teamId !== undefined) {
+      const assignment = await this.resolveAssignment({
+        assignmentScope: dto.assignmentScope ?? current.assignmentScope,
+        teamId: dto.teamId ?? current.teamId ?? undefined,
+        assigneeId: dto.assignedToId ?? current.assignedToId ?? undefined,
+      }, user);
+      data.assignmentScope = assignment.assignmentScope;
+      data.team = assignment.teamId ? { connect: { id: assignment.teamId } } : { disconnect: true };
+      data.assignedTo = assignment.assignedToId ? { connect: { id: assignment.assignedToId } } : { disconnect: true };
+    }
 
-      data.assignedTo = {
-        connect: {
-          id: dto.assignedToId,
-        },
-      };
+    if (relations.meetingId !== current.meetingId) {
+      data.meeting = relations.meetingId ? { connect: { id: relations.meetingId } } : { disconnect: true };
+    }
+    if (relations.activityId !== current.activityId) {
+      data.activity = relations.activityId ? { connect: { id: relations.activityId } } : { disconnect: true };
+    }
+    if (relations.productId !== current.productId) {
+      data.product = relations.productId ? { connect: { id: relations.productId } } : { disconnect: true };
     }
 
     const updated = await this.prisma.task.update({
@@ -327,6 +424,7 @@ export class TasksService {
 
     await this.audit.record({
       actorId: user.userId,
+      organizationId: current.organizationId,
       entityType: 'task',
       entityId: id,
       action: 'task.updated',
@@ -334,7 +432,15 @@ export class TasksService {
       after: updated,
     });
 
-    await this.notifyTaskAssigned(updated, user);
+    if (this.hasRelationChanges(dto)) {
+      await this.audit.record({
+        actorId: user.userId, organizationId: current.organizationId,
+        entityType: 'task', entityId: id, action: 'task.linked_entity_changed',
+        before: this.relationSnapshot(current), after: this.relationSnapshot(updated),
+      });
+    }
+
+    if (updated.assignedToId && updated.assignedToId !== current.assignedToId) await this.notifyTaskAssigned(updated, user);
 
     return updated;
   }
@@ -346,6 +452,12 @@ export class TasksService {
   ) {
     const current = await this.getTaskForMutation(id, user);
 
+    this.assertStatusTransition(current.status, dto.status);
+    if (dto.status === TaskStatus.DONE) await this.assertSubtasksResolved(id, current.organizationId);
+    if (dto.status === TaskStatus.CANCELLED && !dto.note?.trim()) {
+      throw new BadRequestException({ code: 'TASK_CANCEL_REASON_REQUIRED', message: 'A cancellation reason is required' });
+    }
+
     const updated = await this.prisma.task.update({
       where: { id },
       data: {
@@ -356,9 +468,14 @@ export class TasksService {
 
     await this.audit.record({
       actorId: user.userId,
+      organizationId: current.organizationId,
       entityType: 'task',
       entityId: id,
-      action: 'task.status_changed',
+      action: dto.status === TaskStatus.CANCELLED
+        ? 'task.cancelled'
+        : dto.status === TaskStatus.DONE
+          ? 'task.completed'
+          : 'task.status_changed',
       before: {
         status: current.status,
       },
@@ -370,40 +487,99 @@ export class TasksService {
       },
     });
 
+    if (updated.status === TaskStatus.DONE) await this.notifyTaskCompleted(updated, user);
+    if (updated.parentTaskId && (updated.status === TaskStatus.DONE || updated.status === TaskStatus.CANCELLED)) {
+      await this.notifyParentReady(updated.parentTaskId, updated.organizationId, user);
+    }
+
     return updated;
   }
 
   async assign(id: string, dto: AssignTaskDto, user: CurrentUserPayload) {
+    return this.reassign(id, {
+      assignmentScope: dto.assignedToId === user.userId ? TaskAssignmentScope.SELF : TaskAssignmentScope.ORGANIZATION,
+      assigneeId: dto.assignedToId,
+    }, user);
+  }
+
+  async reassign(id: string, dto: ReassignTaskDto, user: CurrentUserPayload) {
     const current = await this.getTaskForMutation(id, user);
-
-    await this.validateAssignee(dto.assignedToId, user);
-
+    this.assertTaskOpen(current.status, 'Completed or cancelled tasks cannot be reassigned');
+    const assignment = await this.resolveAssignment(dto, user);
     const updated = await this.prisma.task.update({
       where: { id },
       data: {
-        assignedToId: dto.assignedToId,
+        assignmentScope: assignment.assignmentScope,
+        teamId: assignment.teamId,
+        assignedToId: assignment.assignedToId,
       },
       include: taskInclude,
     });
-
     await this.audit.record({
       actorId: user.userId,
-      entityType: 'task',
-      entityId: id,
-      action: 'task.assigned',
-      before: {
-        assignedToId: current.assignedToId,
-      },
-      after: {
-        assignedToId: updated.assignedToId,
-      },
+      organizationId: current.organizationId,
+      entityType: 'task', entityId: id, action: 'task.reassigned',
+      before: { assignedToId: current.assignedToId, teamId: current.teamId, assignmentScope: current.assignmentScope },
+      after: { assignedToId: updated.assignedToId, teamId: updated.teamId, assignmentScope: updated.assignmentScope },
+      metadata: { reason: dto.reason?.trim() || undefined },
     });
-
+    if (updated.assignedToId && updated.assignedToId !== current.assignedToId) await this.notifyTaskAssigned(updated, user);
     return updated;
+  }
+
+  async findSubtasks(id: string, user: CurrentUserPayload) {
+    const parent = await this.getTaskInScope(id, user);
+    return this.prisma.task.findMany({
+      where: { organizationId: parent.organizationId, parentTaskId: id, ...this.taskScopeWhere(user) },
+      include: taskInclude,
+      orderBy: [{ status: 'asc' }, { dueAt: 'asc' }, { createdAt: 'asc' }],
+    });
+  }
+
+  async createSubtask(id: string, dto: CreateSubtaskDto, user: CurrentUserPayload) {
+    const parent = await this.getTaskForMutation(id, user);
+    this.assertTaskOpen(parent.status, 'Closed tasks cannot receive subtasks');
+    const depth = await this.taskDepth(parent);
+    if (depth >= 3) throw new BadRequestException({ code: 'TASK_MAX_DEPTH_EXCEEDED', message: 'Task hierarchy is limited to 3 levels' });
+    const assignment = await this.resolveAssignment({
+      assignmentScope: dto.assignmentScope,
+      teamId: dto.teamId,
+      assigneeId: dto.assigneeId,
+    }, user);
+    const inherited = dto.inheritLinkedEntity !== false;
+    const child = await this.prisma.task.create({
+      data: {
+        organizationId: parent.organizationId,
+        parentTaskId: parent.id,
+        title: this.requiredText(dto.title, 'عنوان کار الزامی است'),
+        description: dto.description?.trim() || undefined,
+        priority: dto.priority ?? parent.priority,
+        dueAt: dto.dueAt ? parseApiDate(dto.dueAt, 'dueAt') : undefined,
+        assignmentScope: assignment.assignmentScope,
+        teamId: assignment.teamId,
+        assignedToId: assignment.assignedToId,
+        createdById: user.userId,
+        ...(inherited && {
+          companyId: parent.companyId, personId: parent.personId, opportunityId: parent.opportunityId,
+          commercialDocumentId: parent.commercialDocumentId, paymentId: parent.paymentId,
+          meetingId: parent.meetingId, activityId: parent.activityId, productId: parent.productId,
+        }),
+      },
+      include: taskInclude,
+    });
+    await this.audit.record({
+      actorId: user.userId, organizationId: parent.organizationId,
+      entityType: 'task', entityId: parent.id, action: 'task.subtask_created',
+      after: { subtaskId: child.id, assigneeId: child.assignedToId, assignmentScope: child.assignmentScope },
+    });
+    await this.notifyTaskAssigned(child, user, 'زیرکار جدید به شما ارجاع شد');
+    return child;
   }
 
   async complete(id: string, dto: CompleteTaskDto, user: CurrentUserPayload) {
     const current = await this.getTaskForMutation(id, user);
+    this.assertStatusTransition(current.status, TaskStatus.DONE);
+    await this.assertSubtasksResolved(id, current.organizationId);
 
     const updated = await this.prisma.task.update({
       where: { id },
@@ -424,12 +600,16 @@ export class TasksService {
 
     await this.audit.record({
       actorId: user.userId,
+      organizationId: current.organizationId,
       entityType: 'task',
       entityId: id,
       action: 'task.completed',
       before: current,
       after: updated,
     });
+
+    await this.notifyTaskCompleted(updated, user);
+    if (updated.parentTaskId) await this.notifyParentReady(updated.parentTaskId, updated.organizationId, user);
 
     return updated;
   }
@@ -449,6 +629,7 @@ export class TasksService {
 
     await this.audit.record({
       actorId: user.userId,
+      organizationId: current.organizationId,
       entityType: 'task',
       entityId: id,
       action: 'task.rescheduled',
@@ -476,6 +657,7 @@ export class TasksService {
 
     await this.audit.record({
       actorId: user.userId,
+      organizationId: current.organizationId,
       entityType: 'task',
       entityId: id,
       action: 'task.deleted',
@@ -514,6 +696,9 @@ export class TasksService {
     if (query.priority) and.push({ priority: query.priority });
     if (query.assignedToId) and.push({ assignedToId: query.assignedToId });
     if (query.createdById) and.push({ createdById: query.createdById });
+    if (query.assignmentScope) and.push({ assignmentScope: query.assignmentScope });
+    if (query.teamId) and.push({ teamId: query.teamId });
+    if (query.parentTaskId) and.push({ parentTaskId: query.parentTaskId });
     if (query.companyId) and.push({ companyId: query.companyId });
     if (query.personId) and.push({ personId: query.personId });
     if (query.opportunityId) and.push({ opportunityId: query.opportunityId });
@@ -521,10 +706,43 @@ export class TasksService {
       and.push({ commercialDocumentId: query.commercialDocumentId });
     }
     if (query.paymentId) and.push({ paymentId: query.paymentId });
+    if (query.meetingId) and.push({ meetingId: query.meetingId });
+    if (query.activityId) and.push({ activityId: query.activityId });
+    if (query.productId) and.push({ productId: query.productId });
+
+    if (query.view === 'mine') and.push({ assignedToId: user.userId });
+    if (query.view === 'created') and.push({ createdById: user.userId });
+    if (query.view === 'team') {
+      if (!this.hasPermission(user, 'task:view-team') || !user.teamId) throw new ForbiddenException('Team task visibility is not permitted');
+      and.push({ assignmentScope: TaskAssignmentScope.TEAM, teamId: user.teamId });
+    }
+    if (query.view === 'organization') {
+      if (!this.hasPermission(user, 'task:view-organization')) throw new ForbiddenException('Organization task visibility is not permitted');
+      and.push({ assignmentScope: TaskAssignmentScope.ORGANIZATION });
+    }
+
+    if (query.linkedEntityType) {
+      const field = {
+        COMPANY: 'companyId', OPPORTUNITY: 'opportunityId', PERSON: 'personId',
+        MEETING: 'meetingId', ACTIVITY: 'activityId', PRODUCT: 'productId',
+      }[query.linkedEntityType] as 'companyId';
+      and.push({ [field]: { not: null } });
+    }
 
     const dueRange = parseApiDateRange(query.dueFrom, query.dueTo, 'dueFrom', 'dueTo');
     if (dueRange) {
       and.push({ dueAt: dueRange });
+    }
+
+    if (query.dueState) {
+      const now = new Date();
+      const start = new Date(now); start.setHours(0, 0, 0, 0);
+      const end = new Date(start); end.setDate(end.getDate() + 1);
+      if (query.dueState === 'none') and.push({ dueAt: null });
+      if (query.dueState === 'overdue') and.push({ dueAt: { lt: now }, status: { in: [TaskStatus.TODO, TaskStatus.IN_PROGRESS] } });
+      if (query.dueState === 'today') and.push({ dueAt: { gte: start, lt: end } });
+      if (query.dueState === 'upcoming') and.push({ dueAt: { gte: end }, status: { in: [TaskStatus.TODO, TaskStatus.IN_PROGRESS] } });
+      if (query.dueState === 'completed') and.push({ status: { in: [TaskStatus.DONE, TaskStatus.CANCELLED] } });
     }
 
     const search = query.search?.trim();
@@ -579,6 +797,8 @@ export class TasksService {
       return {};
     }
 
+    if (this.hasPermission(user, 'task:view-organization')) return {};
+
     if (user.role === UserRole.MANAGER) {
       if (!user.teamId && !user.team) {
         return { id: { in: [] } };
@@ -586,6 +806,9 @@ export class TasksService {
 
       return {
         OR: [
+          ...(user.teamId && this.hasPermission(user, 'task:view-team')
+            ? [{ assignmentScope: TaskAssignmentScope.TEAM, teamId: user.teamId } as Prisma.TaskWhereInput]
+            : []),
           { assignedTo: userTeamScopeWhere(user) },
           { createdBy: userTeamScopeWhere(user) },
           { company: { owner: userTeamScopeWhere(user) } },
@@ -615,6 +838,9 @@ export class TasksService {
 
     return {
       OR: [
+        ...(user.teamId && this.hasPermission(user, 'task:view-team')
+          ? [{ assignmentScope: TaskAssignmentScope.TEAM, teamId: user.teamId } as Prisma.TaskWhereInput]
+          : []),
         { assignedToId: user.userId },
         { createdById: user.userId },
         { company: { ownerId: user.userId } },
@@ -662,6 +888,9 @@ export class TasksService {
         opportunityId: null,
         commercialDocumentId: null,
         paymentId: null,
+        meetingId: null,
+        activityId: null,
+        productId: null,
       },
       dto,
       user,
@@ -679,6 +908,9 @@ export class TasksService {
       opportunityId: current.opportunityId,
       commercialDocumentId: current.commercialDocumentId,
       paymentId: current.paymentId,
+      meetingId: current.meetingId,
+      activityId: current.activityId,
+      productId: current.productId,
     };
 
     if (!this.hasRelationChanges(dto)) {
@@ -704,6 +936,9 @@ export class TasksService {
     const explicitOpportunityId = this.normalizeOptionalRelationId(dto.opportunityId);
     const explicitDocumentId = this.normalizeOptionalRelationId(dto.commercialDocumentId);
     const explicitPaymentId = this.normalizeOptionalRelationId(dto.paymentId);
+    const explicitMeetingId = this.normalizeOptionalRelationId(dto.meetingId);
+    const explicitActivityId = this.normalizeOptionalRelationId(dto.activityId);
+    const explicitProductId = this.normalizeOptionalRelationId(dto.productId);
 
     const nextOpportunityId =
       dto.opportunityId !== undefined ? explicitOpportunityId : current.opportunityId;
@@ -713,12 +948,18 @@ export class TasksService {
         ? explicitDocumentId
         : current.commercialDocumentId;
     const nextPaymentId = dto.paymentId !== undefined ? explicitPaymentId : current.paymentId;
+    const nextMeetingId = dto.meetingId !== undefined ? explicitMeetingId : current.meetingId;
+    const nextActivityId = dto.activityId !== undefined ? explicitActivityId : current.activityId;
+    const nextProductId = dto.productId !== undefined ? explicitProductId : current.productId;
 
     let nextCompanyId = dto.companyId !== undefined ? explicitCompanyId : current.companyId;
     const opportunity = await this.resolveOpportunityContext(nextOpportunityId, user, currentTask);
     const person = await this.resolvePersonContext(nextPersonId, user, currentTask);
     const document = await this.resolveCommercialDocumentContext(nextDocumentId, user);
     const payment = await this.resolvePaymentContext(nextPaymentId, user);
+    if (nextMeetingId) await this.assertMeetingAccess(nextMeetingId, user);
+    if (nextActivityId) await this.assertActivityAccess(nextActivityId, user);
+    if (nextProductId) await this.assertProductAccess(nextProductId);
 
     if (opportunity) {
       if (explicitCompanyId && explicitCompanyId !== opportunity.companyId) {
@@ -745,6 +986,9 @@ export class TasksService {
       opportunityId: nextOpportunityId,
       commercialDocumentId: nextDocumentId,
       paymentId: nextPaymentId,
+      meetingId: nextMeetingId,
+      activityId: nextActivityId,
+      productId: nextProductId,
     };
   }
 
@@ -761,6 +1005,9 @@ export class TasksService {
       dto.opportunityId !== undefined ||
       dto.commercialDocumentId !== undefined ||
       dto.paymentId !== undefined
+      || dto.meetingId !== undefined
+      || dto.activityId !== undefined
+      || dto.productId !== undefined
     );
   }
 
@@ -993,6 +1240,121 @@ export class TasksService {
     return payment;
   }
 
+  private async assertMeetingAccess(meetingId: string, user: CurrentUserPayload) {
+    const meeting = await this.prisma.meeting.findFirst({
+      where: { id: meetingId, organizationId: getCurrentOrganizationId(user) },
+      select: { id: true },
+    });
+    if (!meeting) throw new NotFoundException('Meeting not found');
+  }
+
+  private async assertActivityAccess(activityId: string, user: CurrentUserPayload) {
+    const activity = await this.prisma.activity.findFirst({
+      where: { id: activityId, company: { organizationId: getCurrentOrganizationId(user) } },
+      select: { id: true },
+    });
+    if (!activity) throw new NotFoundException('Activity not found');
+  }
+
+  private async assertProductAccess(productId: string) {
+    const product = await this.prisma.productCatalogItem.findFirst({
+      where: { id: productId, isActive: true }, select: { id: true },
+    });
+    if (!product) throw new NotFoundException('Product not found');
+  }
+
+  private async resolveAssignment(
+    input: { assignmentScope?: TaskAssignmentScope; teamId?: string; assigneeId?: string },
+    user: CurrentUserPayload,
+  ): Promise<AssignmentResolution> {
+    const scope = input.assignmentScope
+      ?? (input.assigneeId && input.assigneeId !== user.userId ? TaskAssignmentScope.ORGANIZATION : TaskAssignmentScope.SELF);
+    if (scope === TaskAssignmentScope.SELF) {
+      if (input.teamId) throw new BadRequestException({ code: 'TASK_SELF_TEAM_NOT_ALLOWED', message: 'SELF tasks cannot have a team target' });
+      if (input.assigneeId && input.assigneeId !== user.userId) throw new BadRequestException({ code: 'TASK_SELF_ASSIGNEE_INVALID', message: 'SELF tasks must be assigned to the acting user' });
+      return { assignmentScope: scope, teamId: null, assignedToId: user.userId };
+    }
+
+    let team: { id: string } | null = null;
+    if (scope === TaskAssignmentScope.TEAM) {
+      if (!input.teamId) throw new BadRequestException({ code: 'TASK_TEAM_REQUIRED', message: 'TEAM assignment requires an active team' });
+      team = await this.prisma.team.findFirst({
+        where: { id: input.teamId, organizationId: getCurrentOrganizationId(user), isActive: true }, select: { id: true },
+      });
+      if (!team) throw new BadRequestException({ code: 'TASK_TEAM_INVALID', message: 'Task team must be active and belong to the organization' });
+    } else if (input.teamId) {
+      throw new BadRequestException({ code: 'TASK_ORGANIZATION_TEAM_NOT_ALLOWED', message: 'ORGANIZATION assignment does not use a team target' });
+    }
+
+    const assigneeId = input.assigneeId || null;
+    if (assigneeId) {
+      const assignee = await this.validateAssignee(assigneeId, user, scope === TaskAssignmentScope.TEAM ? team!.id : undefined);
+      if (scope === TaskAssignmentScope.TEAM && assignee.teamId !== team!.id) {
+        throw new BadRequestException({ code: 'TASK_ASSIGNEE_TEAM_MISMATCH', message: 'Assignee must belong to the selected team' });
+      }
+    }
+    return { assignmentScope: scope, teamId: team?.id ?? null, assignedToId: assigneeId };
+  }
+
+  private assertStatusTransition(from: TaskStatus, to: TaskStatus) {
+    if (from === to) return;
+    const allowed: Record<TaskStatus, TaskStatus[]> = {
+      [TaskStatus.TODO]: [TaskStatus.IN_PROGRESS, TaskStatus.DONE, TaskStatus.CANCELLED],
+      [TaskStatus.IN_PROGRESS]: [TaskStatus.DONE, TaskStatus.CANCELLED],
+      [TaskStatus.DONE]: [],
+      [TaskStatus.CANCELLED]: [],
+    };
+    if (!allowed[from].includes(to)) throw new BadRequestException({ code: 'INVALID_TASK_TRANSITION', message: `Task cannot transition from ${from} to ${to}` });
+  }
+
+  private assertTaskOpen(status: TaskStatus, message: string) {
+    if (status === TaskStatus.DONE || status === TaskStatus.CANCELLED) throw new BadRequestException({ code: 'TASK_CLOSED', message });
+  }
+
+  private async assertSubtasksResolved(taskId: string, organizationId: string) {
+    const count = await this.prisma.task.count({
+      where: { organizationId, parentTaskId: taskId, status: { notIn: [TaskStatus.DONE, TaskStatus.CANCELLED] } },
+    });
+    if (count) throw new BadRequestException({
+      code: 'TASK_INCOMPLETE_SUBTASKS',
+      message: `Task cannot be completed while ${count} subtasks are incomplete.`,
+      details: { incompleteSubtaskCount: count },
+    });
+  }
+
+  private async taskDepth(task: { id: string; parentTaskId: string | null; organizationId: string }) {
+    let depth = 1;
+    let parentId = task.parentTaskId;
+    const seen = new Set([task.id]);
+    while (parentId) {
+      if (seen.has(parentId)) throw new BadRequestException({ code: 'TASK_HIERARCHY_CYCLE', message: 'Circular task hierarchy detected' });
+      seen.add(parentId);
+      const parent = await this.prisma.task.findFirst({ where: { id: parentId, organizationId: task.organizationId }, select: { parentTaskId: true } });
+      if (!parent) throw new BadRequestException({ code: 'TASK_PARENT_INVALID', message: 'Parent task does not belong to the organization' });
+      depth += 1;
+      parentId = parent.parentTaskId;
+      if (depth > 3) break;
+    }
+    return depth;
+  }
+
+  private relationSnapshot(task: TaskRelationResolution) {
+    return {
+      companyId: task.companyId, personId: task.personId, opportunityId: task.opportunityId,
+      commercialDocumentId: task.commercialDocumentId, paymentId: task.paymentId,
+      meetingId: task.meetingId, activityId: task.activityId, productId: task.productId,
+    };
+  }
+
+  private hasPermission(user: CurrentUserPayload, permission: string) {
+    return Boolean(user.tenantContext?.permissions?.includes(permission));
+  }
+
+  private optionPage<T>(data: T[], total: number, page: number, limit: number) {
+    const totalPages = Math.ceil(total / limit);
+    return { data, meta: { total, page, limit, totalPages, hasNext: page < totalPages, hasPrevious: page > 1 } };
+  }
+
   private companyScopeWhere(user: CurrentUserPayload): Prisma.CompanyWhereInput {
     if (user.role === UserRole.ADMIN || user.role === UserRole.BOARDS) {
       return {};
@@ -1047,6 +1409,7 @@ export class TasksService {
   private async validateAssignee(
     assignedToId: string,
     user: CurrentUserPayload,
+    requiredTeamId?: string,
   ) {
     const assignee = await this.prisma.user.findFirst({
       where: {
@@ -1065,12 +1428,11 @@ export class TasksService {
       throw new ForbiddenException('REP can only assign tasks to self');
     }
 
-    if (
-      user.role === UserRole.MANAGER &&
-      !userMatchesTeam(assignee, user)
-    ) {
-      throw new ForbiddenException('Assignee must belong to the manager team');
+    if (requiredTeamId && assignee.teamId !== requiredTeamId) {
+      throw new BadRequestException({ code: 'TASK_ASSIGNEE_TEAM_MISMATCH', message: 'Assignee must belong to the selected team' });
     }
+
+    return assignee;
   }
 
   private buildStatusUpdate(
@@ -1135,6 +1497,7 @@ private async notifyTaskAssigned(
     assignedToId: string | null;
   },
   user: CurrentUserPayload,
+  title = 'کار جدید به شما ارجاع شد',
 ) {
   if (!task.assignedToId) {
     return;
@@ -1146,12 +1509,27 @@ private async notifyTaskAssigned(
     actorId: user.userId,
     type: NotificationType.TASK_ASSIGNED,
     priority: NotificationPriority.NORMAL,
-    title: 'کار جدید به شما ارجاع شد',
+    title,
     body: task.title,
     entityType: NotificationEntityType.TASK,
     entityId: task.id,
     actionUrl: `/tasks/${task.id}`,
     skipSelf: true,
+  });
+}
+
+private async notifyParentReady(parentTaskId: string, organizationId: string, user: CurrentUserPayload) {
+  const [parent, unresolved] = await Promise.all([
+    this.prisma.task.findFirst({ where: { id: parentTaskId, organizationId }, select: { id: true, title: true, assignedToId: true } }),
+    this.prisma.task.count({ where: { parentTaskId, organizationId, status: { notIn: [TaskStatus.DONE, TaskStatus.CANCELLED] } } }),
+  ]);
+  if (!parent?.assignedToId || unresolved > 0) return;
+  await this.notifications.notifyUser({
+    organizationId, recipientId: parent.assignedToId, actorId: user.userId,
+    type: NotificationType.TASK_STATUS_CHANGED, priority: NotificationPriority.NORMAL,
+    title: 'همه زیرکارها تعیین تکلیف شدند', body: parent.title,
+    entityType: NotificationEntityType.TASK, entityId: parent.id,
+    actionUrl: `/tasks/${parent.id}`, skipSelf: true,
   });
 }
 

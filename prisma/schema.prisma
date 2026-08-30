@@ -234,6 +234,12 @@ enum TaskStatus {
   CANCELLED
 }
 
+enum TaskAssignmentScope {
+  SELF
+  TEAM
+  ORGANIZATION
+}
+
 enum MeetingStatus {
   SCHEDULED
   COMPLETED
@@ -459,6 +465,7 @@ model Team {
   members                 User[]                   @relation("UserPrimaryTeam")
   organizationMemberships OrganizationMembership[]
   technicalTenders        Tender[]
+  tasks                   Task[]
 
   @@unique([organizationId, code])
   @@index([managerId])
@@ -1149,6 +1156,7 @@ model Activity {
   completionNote String?
   opportunityId  String?
   opportunity    Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+  tasks          Task[]
 
   createdAt DateTime @default(now())
 
@@ -1353,6 +1361,7 @@ model ProductCatalogItem {
   knowledgeArticles  KnowledgeBaseArticle[]
   technicalDocuments TechnicalDocument[]
   technicalResources TechnicalResource[]
+  tasks              Task[]
 
   @@index([isActive, sortOrder])
   @@index([type, isActive, sortOrder])
@@ -1485,6 +1494,15 @@ model Task {
   dueAt      DateTime?
   reminderAt DateTime?
 
+  assignmentScope TaskAssignmentScope @default(SELF)
+
+  teamId String?
+  team   Team?   @relation(fields: [teamId], references: [id], onDelete: SetNull)
+
+  parentTaskId String?
+  parentTask   Task?   @relation("TaskHierarchy", fields: [parentTaskId], references: [id], onDelete: Restrict)
+  subtasks     Task[]  @relation("TaskHierarchy")
+
   companyId String?
   company   Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
 
@@ -1499,6 +1517,15 @@ model Task {
 
   paymentId String?
   payment   OpportunityPayment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+
+  meetingId String?
+  meeting   Meeting? @relation(fields: [meetingId], references: [id], onDelete: SetNull)
+
+  activityId String?
+  activity   Activity? @relation(fields: [activityId], references: [id], onDelete: SetNull)
+
+  productId String?
+  product   ProductCatalogItem? @relation(fields: [productId], references: [id], onDelete: SetNull)
 
   assignedToId String?
   assignedTo   User?   @relation("TaskAssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
@@ -1528,6 +1555,13 @@ model Task {
   @@index([opportunityId])
   @@index([commercialDocumentId])
   @@index([paymentId])
+  @@index([meetingId])
+  @@index([activityId])
+  @@index([productId])
+  @@index([teamId])
+  @@index([parentTaskId])
+  @@index([organizationId, assignmentScope, status, dueAt])
+  @@index([organizationId, teamId, status, dueAt])
   @@index([assignedToId])
   @@index([createdById])
   @@index([completedAt])
@@ -1572,6 +1606,7 @@ model Meeting {
   cancellationReason String?
   assignees          MeetingAssignee[]
   attendees          MeetingAttendee[]
+  tasks              Task[]
   createdAt          DateTime          @default(now())
   updatedAt          DateTime          @updatedAt
 

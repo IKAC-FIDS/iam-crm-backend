@@ -262,6 +262,7 @@ export class UsersService {
     const where: Prisma.UserWhereInput = {
       organizationId: getCurrentOrganizationId(user),
       isActive: true,
+      ...(query.teamId && { teamId: query.teamId }),
       ...(query.selectedId
         ? { id: query.selectedId }
         : search

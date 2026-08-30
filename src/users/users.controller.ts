@@ -50,7 +50,7 @@ export class UsersController {
   }
 
   @Get('assignee-options')
-  @AnyPermission('meeting:create', 'meeting:update')
+  @AnyPermission('meeting:create', 'meeting:update', 'task:create', 'task:update', 'task:assign', 'task:reassign', 'task:create-subtask')
   findAssigneeOptions(@Query() query: FindAssigneeOptionsDto, @CurrentUser() user: CurrentUserPayload) {
     return this.usersService.findAssigneeOptions(user, query);
   }

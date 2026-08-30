@@ -13,7 +13,7 @@ import {
   CurrentUser,
   CurrentUserPayload,
 } from '../common/decorators/current-user.decorator';
-import { Permissions } from '../common/decorators/permissions.decorator';
+import { AnyPermission, Permissions } from '../common/decorators/permissions.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { AssignTaskDto } from './dto/assign-task.dto';
@@ -23,6 +23,9 @@ import { CreateTaskDto } from './dto/create-task.dto';
 import { FindTasksDto } from './dto/find-tasks.dto';
 import { RescheduleTaskDto } from './dto/reschedule-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
+import { ReassignTaskDto } from './dto/reassign-task.dto';
+import { CreateSubtaskDto } from './dto/create-subtask.dto';
+import { FindTaskEntityOptionsDto, FindTaskOptionsDto } from './dto/find-task-options.dto';
 import { TasksService } from './tasks.service';
 
 @Controller('tasks')
@@ -43,6 +46,18 @@ export class TasksController {
   @Permissions('task:create')
   create(@Body() dto: CreateTaskDto, @CurrentUser() user: CurrentUserPayload) {
     return this.service.create(dto, user);
+  }
+
+  @Get('options/teams')
+  @AnyPermission('task:create', 'task:update', 'task:assign', 'task:reassign', 'task:create-subtask')
+  teamOptions(@Query() query: FindTaskOptionsDto, @CurrentUser() user: CurrentUserPayload) {
+    return this.service.findTeamOptions(query, user);
+  }
+
+  @Get('options/entities')
+  @AnyPermission('task:create', 'task:update', 'task:create-subtask')
+  entityOptions(@Query() query: FindTaskEntityOptionsDto, @CurrentUser() user: CurrentUserPayload) {
+    return this.service.findEntityOptions(query, user);
   }
 
   @Get(':id')
@@ -79,6 +94,32 @@ export class TasksController {
     @CurrentUser() user: CurrentUserPayload,
   ) {
     return this.service.assign(id, dto, user);
+  }
+
+  @Post(':id/reassign')
+  @AnyPermission('task:reassign', 'task:assign')
+  reassign(
+    @Param('id') id: string,
+    @Body() dto: ReassignTaskDto,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.service.reassign(id, dto, user);
+  }
+
+  @Get(':id/subtasks')
+  @Permissions('task:view')
+  subtasks(@Param('id') id: string, @CurrentUser() user: CurrentUserPayload) {
+    return this.service.findSubtasks(id, user);
+  }
+
+  @Post(':id/subtasks')
+  @AnyPermission('task:create-subtask', 'task:create')
+  createSubtask(
+    @Param('id') id: string,
+    @Body() dto: CreateSubtaskDto,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.service.createSubtask(id, dto, user);
   }
 
   @Patch(':id/complete')

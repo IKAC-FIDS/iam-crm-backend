@@ -1,4 +1,4 @@
-import { Priority, TaskStatus } from '@prisma/client';
+import { Priority, TaskAssignmentScope, TaskStatus } from '@prisma/client';
 import {
   IsEnum,
   IsOptional,
@@ -56,4 +56,24 @@ export class CreateTaskDto {
   @IsOptional()
   @IsUUID()
   assignedToId?: string;
+
+  @IsOptional()
+  @IsEnum(TaskAssignmentScope)
+  assignmentScope?: TaskAssignmentScope;
+
+  @IsOptional()
+  @IsUUID()
+  teamId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  meetingId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  activityId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  productId?: string;
 }
