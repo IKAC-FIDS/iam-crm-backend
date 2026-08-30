@@ -2,3 +2,7 @@
 /uploads/
 /.migration-safety-artifacts/
 /migration-safety-review.local.json
+
+/node_modules/
+/backups/
+*.dump
