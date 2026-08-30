@@ -1,5 +1,5 @@
-import { FileAttachmentEntityType } from '@prisma/client';
-import { IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
+import { ArtifactRelationType, FileAttachmentEntityType } from '@prisma/client';
+import { IsEnum, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 
 export class UploadAttachmentDto {
   @IsEnum(FileAttachmentEntityType)
@@ -10,5 +10,15 @@ export class UploadAttachmentDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(200)
   description?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(240)
+  name?: string;
+
+  @IsOptional()
+  @IsEnum(ArtifactRelationType)
+  relationType?: ArtifactRelationType;
 }

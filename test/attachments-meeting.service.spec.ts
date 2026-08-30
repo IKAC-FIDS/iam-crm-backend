@@ -85,7 +85,9 @@ function setup(meetingStatus: MeetingStatus | null = MeetingStatus.COMPLETED) {
     companyLegalDocument: {
       findFirst: jest.fn().mockResolvedValue({ id: 'legal-1' }),
     },
+    artifactLink: { create: jest.fn().mockResolvedValue({ id: 'link-1' }) },
   };
+  Object.assign(prisma, { $transaction: jest.fn(async (callback: (tx: typeof prisma) => unknown) => callback(prisma)) });
   const audit = { record: jest.fn().mockResolvedValue(undefined) };
   const storage = {
     save: jest.fn().mockResolvedValue({
@@ -95,6 +97,7 @@ function setup(meetingStatus: MeetingStatus | null = MeetingStatus.COMPLETED) {
       storagePath: attachment.storagePath,
     }),
     getStream: jest.fn().mockResolvedValue(Readable.from('minutes')),
+    delete: jest.fn().mockResolvedValue(undefined),
   };
   const config = {
     get: jest.fn((_key: string, fallback: unknown) => fallback),
@@ -132,6 +135,7 @@ describe('AttachmentsService meeting attachments', () => {
         organizationId,
         entityType: FileAttachmentEntityType.MEETING,
         entityId: meetingId,
+        sha256: '90e63d85fa1ab2c8ed65222f3ebd794b1e524b4b7cf84bec451542d0451b2985',
       }),
     });
     expect(audit.record).toHaveBeenCalledWith(

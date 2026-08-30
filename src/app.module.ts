@@ -45,6 +45,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { EntitlementsModule } from './entitlements/entitlements.module';
 import { QuotaModule } from './quota/quota.module';
 import { TechnicalCenterModule } from './technical-center/technical-center.module';
+import { ArtifactsModule } from './artifacts/artifacts.module';
 
 @Module({
   imports: [
@@ -106,6 +107,7 @@ import { TechnicalCenterModule } from './technical-center/technical-center.modul
     EntitlementsModule,
     QuotaModule,
     TechnicalCenterModule,
+    ArtifactsModule,
   ],
   providers: [
     {

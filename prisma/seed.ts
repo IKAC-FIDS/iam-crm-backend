@@ -899,6 +899,11 @@ async function main() {
 
     { action: 'attachment:view', description: 'مشاهده فایل‌های پیوست' },
     { action: 'attachment:manage', description: 'مدیریت فایل‌های پیوست' },
+    { action: 'artifact:view', description: 'مشاهده آرتیفکت‌ها' },
+    { action: 'artifact:create', description: 'ایجاد و بارگذاری آرتیفکت' },
+    { action: 'artifact:update', description: 'ویرایش متادیتای آرتیفکت' },
+    { action: 'artifact:delete', description: 'حذف آرتیفکت' },
+    { action: 'artifact:link', description: 'مدیریت ارتباط آرتیفکت‌ها' },
 
     { action: 'task:view', description: 'مشاهده کارها' },
     { action: 'task:view-team', description: 'مشاهده کارهای تیم' },
@@ -1012,6 +1017,7 @@ async function main() {
 
     'attachment:view',
     'attachment:manage',
+    'artifact:view', 'artifact:create', 'artifact:update', 'artifact:delete', 'artifact:link',
 
     'task:view',
     'task:view-team',
@@ -1098,6 +1104,7 @@ async function main() {
 
     'attachment:view',
     'attachment:manage',
+    'artifact:view', 'artifact:create', 'artifact:update', 'artifact:delete', 'artifact:link',
 
     'task:view',
     'task:create',
@@ -1134,6 +1141,7 @@ async function main() {
     'payment:view',
 
     'attachment:view',
+    'artifact:view',
 
     'task:view',
     'meeting:view',

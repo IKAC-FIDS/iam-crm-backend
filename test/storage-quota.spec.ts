@@ -50,7 +50,9 @@ function setup(
         .fn()
         .mockResolvedValue({ ...attachment, deletedAt: new Date() }),
     },
+    artifactLink: { create: jest.fn().mockResolvedValue({ id: 'link-a' }) },
   };
+  prisma.$transaction = jest.fn((callback) => callback(prisma));
   const storage: any = {
     save: options.storageFailure
       ? jest.fn().mockRejectedValue(new Error('storage failed'))

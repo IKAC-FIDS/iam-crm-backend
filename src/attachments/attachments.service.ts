@@ -10,6 +10,9 @@ import { ConfigService } from '@nestjs/config';
 import {
   FileAttachment,
   FileAttachmentEntityType,
+  ArtifactProvider,
+  ArtifactRelationType,
+  ArtifactType,
   MeetingStatus,
   Prisma,
   QuotaMetric,
@@ -153,16 +156,20 @@ export class AttachmentsService {
         relativeDirectory,
         mimeType: file.mimetype,
       });
+      const saved = stored;
 
-      attachment = await this.prisma.fileAttachment.create({
-        data: {
+      attachment = await this.prisma.$transaction(async (tx) => {
+        const created = await tx.fileAttachment.create({ data: {
           organizationId,
           entityType: dto.entityType,
           entityId: dto.entityId,
-          storageProvider: stored.storageProvider,
-          bucket: stored.bucket,
-          objectKey: stored.objectKey,
-          storagePath: stored.storagePath,
+          storageProvider: saved.storageProvider,
+          bucket: saved.bucket,
+          objectKey: saved.objectKey,
+          storagePath: saved.storagePath,
+          type: ArtifactType.FILE,
+          provider: saved.storageProvider === 'MINIO' ? ArtifactProvider.OBJECT_STORAGE : ArtifactProvider.LOCAL,
+          name: dto.name?.trim() || originalFileName,
           originalFileName,
           storedFileName,
           mimeType: file.mimetype,
@@ -170,7 +177,13 @@ export class AttachmentsService {
           sha256,
           description: dto.description?.trim() || undefined,
           uploadedById: user.userId,
-        },
+        } });
+        await tx.artifactLink.create({ data: {
+          organizationId, artifactId: created.id, entityType: dto.entityType,
+          entityId: dto.entityId, relationType: dto.relationType ?? ArtifactRelationType.ATTACHMENT,
+          createdById: user.userId,
+        } });
+        return created;
       });
     } catch (error) {
       if (stored && !attachment)
@@ -192,6 +205,7 @@ export class AttachmentsService {
 
     await this.audit.record({
       actorId: user.userId,
+      organizationId,
       entityType: 'file-attachment',
       entityId: attachment.id,
       action: 'attachment.uploaded',
@@ -270,6 +284,7 @@ export class AttachmentsService {
 
     await this.audit.record({
       actorId: user.userId,
+      organizationId: getCurrentOrganizationId(user),
       entityType: 'file-attachment',
       entityId: attachment.id,
       action: 'attachment.deleted',
@@ -290,7 +305,7 @@ export class AttachmentsService {
     return deleted;
   }
 
-  private async getActiveAttachment(
+  async getActiveAttachment(
     id: string,
     user: CurrentUserPayload,
   ): Promise<FileAttachment> {
@@ -408,7 +423,7 @@ export class AttachmentsService {
     return extension.replace(/[^a-z0-9.]/g, '') || '.bin';
   }
 
-  private async assertEntityAccess(
+  async assertEntityAccess(
     entityType: FileAttachmentEntityType,
     entityId: string,
     user: CurrentUserPayload,
@@ -416,6 +431,59 @@ export class AttachmentsService {
   ) {
     if (mutation && user.role === UserRole.BOARDS) {
       throw new ForbiddenException('Attachments are read-only for this role');
+    }
+
+    if (entityType === FileAttachmentEntityType.ORGANIZATION) {
+      if (entityId !== getCurrentOrganizationId(user)) throw new NotFoundException('Organization not found');
+      if (mutation && user.role !== UserRole.ADMIN && user.role !== UserRole.MANAGER)
+        throw new ForbiddenException('Organization artifacts require manager access');
+      return;
+    }
+
+    if (entityType === FileAttachmentEntityType.COMPANY) {
+      const company = await this.prisma.company.findFirst({ where: {
+        id: entityId, organizationId: getCurrentOrganizationId(user), archivedAt: null,
+        ...(user.role === UserRole.ADMIN || user.role === UserRole.BOARDS ? {} : user.role === UserRole.MANAGER ? { owner: userTeamScopeWhere(user) } : { ownerId: user.userId }),
+      }, select: { id: true } });
+      if (!company) throw new NotFoundException('Company not found');
+      return;
+    }
+
+    if (entityType === FileAttachmentEntityType.PERSON) {
+      const person = await this.prisma.person.findFirst({ where: {
+        id: entityId, company: {
+          organizationId: getCurrentOrganizationId(user), archivedAt: null,
+          ...(user.role === UserRole.ADMIN || user.role === UserRole.BOARDS ? {} : user.role === UserRole.MANAGER ? { owner: userTeamScopeWhere(user) } : { ownerId: user.userId }),
+        },
+      }, select: { id: true } });
+      if (!person) throw new NotFoundException('Person not found');
+      return;
+    }
+
+    if (entityType === FileAttachmentEntityType.TASK) {
+      const task = await this.prisma.task.findFirst({ where: {
+        id: entityId, organizationId: getCurrentOrganizationId(user),
+        ...(user.role === UserRole.ADMIN || user.role === UserRole.BOARDS ? {} : {
+          OR: [{ createdById: user.userId }, { assignedToId: user.userId }, ...(user.role === UserRole.MANAGER && user.teamId ? [{ teamId: user.teamId }] : [])],
+        }),
+      }, select: { id: true } });
+      if (!task) throw new NotFoundException('Task not found');
+      return;
+    }
+
+    if (entityType === FileAttachmentEntityType.ACTIVITY) {
+      const activity = await this.prisma.activity.findFirst({ where: {
+        id: entityId, company: { organizationId: getCurrentOrganizationId(user) },
+        ...(user.role === UserRole.ADMIN || user.role === UserRole.BOARDS ? {} : { OR: [{ userId: user.userId }, { company: user.role === UserRole.MANAGER ? { owner: userTeamScopeWhere(user) } : { ownerId: user.userId } }] }),
+      }, select: { id: true } });
+      if (!activity) throw new NotFoundException('Activity not found');
+      return;
+    }
+
+    if (entityType === FileAttachmentEntityType.PRODUCT) {
+      const product = await this.prisma.productCatalogItem.findFirst({ where: { id: entityId, isActive: true }, select: { id: true } });
+      if (!product) throw new NotFoundException('Product not found');
+      return;
     }
 
     if (entityType === FileAttachmentEntityType.OPPORTUNITY) {

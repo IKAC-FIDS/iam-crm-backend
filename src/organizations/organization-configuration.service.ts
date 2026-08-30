@@ -342,7 +342,9 @@ export class OrganizationConfigurationService {
     });
     if (!attachment) throw new NotFoundException("Branding asset not found");
     if (
+      !attachment.mimeType ||
       !IMAGE_TYPES.has(attachment.mimeType) ||
+      attachment.sizeBytes === null ||
       attachment.sizeBytes > maxBytes
     )
       throw new BadRequestException("Unsupported branding asset");
