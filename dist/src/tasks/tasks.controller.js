@@ -26,7 +26,11 @@ const create_task_dto_1 = require("./dto/create-task.dto");
 const find_tasks_dto_1 = require("./dto/find-tasks.dto");
 const reschedule_task_dto_1 = require("./dto/reschedule-task.dto");
 const update_task_dto_1 = require("./dto/update-task.dto");
+const reassign_task_dto_1 = require("./dto/reassign-task.dto");
+const create_subtask_dto_1 = require("./dto/create-subtask.dto");
+const find_task_options_dto_1 = require("./dto/find-task-options.dto");
 const tasks_service_1 = require("./tasks.service");
+const task_review_dto_1 = require("./dto/task-review.dto");
 let TasksController = class TasksController {
     constructor(service) {
         this.service = service;
@@ -36,6 +40,12 @@ let TasksController = class TasksController {
     }
     create(dto, user) {
         return this.service.create(dto, user);
+    }
+    teamOptions(query, user) {
+        return this.service.findTeamOptions(query, user);
+    }
+    entityOptions(query, user) {
+        return this.service.findEntityOptions(query, user);
     }
     findOne(id, user) {
         return this.service.findOne(id, user);
@@ -48,6 +58,27 @@ let TasksController = class TasksController {
     }
     assign(id, dto, user) {
         return this.service.assign(id, dto, user);
+    }
+    reassign(id, dto, user) {
+        return this.service.reassign(id, dto, user);
+    }
+    subtasks(id, user) {
+        return this.service.findSubtasks(id, user);
+    }
+    reviews(id, user) {
+        return this.service.findReviews(id, user);
+    }
+    submitReview(id, dto, user) {
+        return this.service.submitReview(id, dto, user);
+    }
+    approveReview(id, dto, user) {
+        return this.service.decideReview(id, 'APPROVED', dto, user);
+    }
+    requestReviewChanges(id, dto, user) {
+        return this.service.decideReview(id, 'CHANGES_REQUESTED', dto, user);
+    }
+    createSubtask(id, dto, user) {
+        return this.service.createSubtask(id, dto, user);
     }
     complete(id, dto, user) {
         return this.service.complete(id, dto, user);
@@ -80,6 +111,26 @@ __decorate([
     __metadata("design:paramtypes", [create_task_dto_1.CreateTaskDto, Object]),
     __metadata("design:returntype", void 0)
 ], TasksController.prototype, "create", null);
+__decorate([
+    (0, common_1.Get)('options/teams'),
+    (0, permissions_decorator_1.AnyPermission)('task:create', 'task:update', 'task:assign', 'task:reassign', 'task:create-subtask'),
+    openapi.ApiResponse({ status: 200 }),
+    __param(0, (0, common_1.Query)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [find_task_options_dto_1.FindTaskOptionsDto, Object]),
+    __metadata("design:returntype", void 0)
+], TasksController.prototype, "teamOptions", null);
+__decorate([
+    (0, common_1.Get)('options/entities'),
+    (0, permissions_decorator_1.AnyPermission)('task:create', 'task:update', 'task:create-subtask'),
+    openapi.ApiResponse({ status: 200 }),
+    __param(0, (0, common_1.Query)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [find_task_options_dto_1.FindTaskEntityOptionsDto, Object]),
+    __metadata("design:returntype", void 0)
+], TasksController.prototype, "entityOptions", null);
 __decorate([
     (0, common_1.Get)(':id'),
     (0, permissions_decorator_1.Permissions)('task:view'),
@@ -123,6 +174,81 @@ __decorate([
     __metadata("design:paramtypes", [String, assign_task_dto_1.AssignTaskDto, Object]),
     __metadata("design:returntype", void 0)
 ], TasksController.prototype, "assign", null);
+__decorate([
+    (0, common_1.Post)(':id/reassign'),
+    (0, permissions_decorator_1.AnyPermission)('task:reassign', 'task:assign'),
+    openapi.ApiResponse({ status: 201, type: Object }),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, reassign_task_dto_1.ReassignTaskDto, Object]),
+    __metadata("design:returntype", void 0)
+], TasksController.prototype, "reassign", null);
+__decorate([
+    (0, common_1.Get)(':id/subtasks'),
+    (0, permissions_decorator_1.Permissions)('task:view'),
+    openapi.ApiResponse({ status: 200, type: [Object] }),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", void 0)
+], TasksController.prototype, "subtasks", null);
+__decorate([
+    (0, common_1.Get)(':id/reviews'),
+    (0, permissions_decorator_1.AnyPermission)('task:view', 'task:review'),
+    openapi.ApiResponse({ status: 200, type: [Object] }),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", void 0)
+], TasksController.prototype, "reviews", null);
+__decorate([
+    (0, common_1.Post)(':id/submit-review'),
+    (0, permissions_decorator_1.Permissions)('task:submit-review'),
+    openapi.ApiResponse({ status: 201, type: Object }),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, task_review_dto_1.SubmitTaskReviewDto, Object]),
+    __metadata("design:returntype", void 0)
+], TasksController.prototype, "submitReview", null);
+__decorate([
+    (0, common_1.Post)(':id/review/approve'),
+    (0, permissions_decorator_1.Permissions)('task:review'),
+    openapi.ApiResponse({ status: 201, type: Object }),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, task_review_dto_1.TaskReviewDecisionDto, Object]),
+    __metadata("design:returntype", void 0)
+], TasksController.prototype, "approveReview", null);
+__decorate([
+    (0, common_1.Post)(':id/review/request-changes'),
+    (0, permissions_decorator_1.Permissions)('task:review'),
+    openapi.ApiResponse({ status: 201, type: Object }),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, task_review_dto_1.TaskReviewDecisionDto, Object]),
+    __metadata("design:returntype", void 0)
+], TasksController.prototype, "requestReviewChanges", null);
+__decorate([
+    (0, common_1.Post)(':id/subtasks'),
+    (0, permissions_decorator_1.AnyPermission)('task:create-subtask', 'task:create'),
+    openapi.ApiResponse({ status: 201, type: Object }),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, create_subtask_dto_1.CreateSubtaskDto, Object]),
+    __metadata("design:returntype", void 0)
+], TasksController.prototype, "createSubtask", null);
 __decorate([
     (0, common_1.Patch)(':id/complete'),
     (0, permissions_decorator_1.Permissions)('task:complete'),

@@ -266,6 +266,7 @@ let UsersService = class UsersService {
         const where = {
             organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
             isActive: true,
+            ...(query.teamId && { teamId: query.teamId }),
             ...(query.selectedId
                 ? { id: query.selectedId }
                 : search

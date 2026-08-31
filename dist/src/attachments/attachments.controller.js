@@ -39,12 +39,14 @@ let AttachmentsController = class AttachmentsController {
     }
     async download(id, user, response) {
         const { attachment, stream } = await this.service.getDownloadStream(id, user);
-        const safeFileName = this.safeContentDispositionFileName(attachment.originalFileName);
-        const encodedFileName = encodeURIComponent(attachment.originalFileName)
+        const downloadName = attachment.originalFileName || attachment.name || 'artifact';
+        const safeFileName = this.safeContentDispositionFileName(downloadName);
+        const encodedFileName = encodeURIComponent(downloadName)
             .replace(/['()]/g, (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`)
             .replace(/\*/g, '%2A');
         response.setHeader('Content-Type', attachment.mimeType || 'application/octet-stream');
-        response.setHeader('Content-Length', String(attachment.sizeBytes));
+        if (attachment.sizeBytes !== null)
+            response.setHeader('Content-Length', String(attachment.sizeBytes));
         response.setHeader('Content-Disposition', `attachment; filename="${safeFileName}"; filename*=UTF-8''${encodedFileName}`);
         return new common_1.StreamableFile(stream);
     }

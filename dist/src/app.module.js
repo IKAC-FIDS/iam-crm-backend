@@ -54,6 +54,7 @@ const dashboard_module_1 = require("./dashboard/dashboard.module");
 const entitlements_module_1 = require("./entitlements/entitlements.module");
 const quota_module_1 = require("./quota/quota.module");
 const technical_center_module_1 = require("./technical-center/technical-center.module");
+const artifacts_module_1 = require("./artifacts/artifacts.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -118,6 +119,7 @@ exports.AppModule = AppModule = __decorate([
             entitlements_module_1.EntitlementsModule,
             quota_module_1.QuotaModule,
             technical_center_module_1.TechnicalCenterModule,
+            artifacts_module_1.ArtifactsModule,
         ],
         providers: [
             {

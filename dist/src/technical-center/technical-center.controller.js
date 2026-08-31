@@ -334,6 +334,11 @@ let TechnicalTendersController = class TechnicalTendersController {
     get(id, u) { return this.service.getTender(id, u); }
     update(id, d, u) { return this.service.updateTender(id, d, u); }
     transition(id, d, u) { return this.service.transitionTender(id, d, u); }
+    readiness(id, u) { return this.service.getTenderReadiness(id, u); }
+    history(id, u) { return this.service.tenderHistory(id, u); }
+    reviews(id, u) { return this.service.listTenderReviews(id, u); }
+    requestReview(id, d, u) { return this.service.requestTenderReview(id, d, u); }
+    decideReview(id, reviewId, d, u) { return this.service.decideTenderReview(id, reviewId, d, u); }
     requirements(id, u) { return this.service.listRequirements(id, u); }
     addRequirement(id, d, u) { return this.service.addRequirement(id, d, u); }
     updateRequirement(id, requirementId, d, u) { return this.service.updateRequirement(id, requirementId, d, u); }
@@ -365,7 +370,7 @@ __decorate([
 __decorate([
     (0, common_1.Get)(':id'),
     (0, permissions_decorator_1.Permissions)('technical-tender:view'),
-    openapi.ApiResponse({ status: 200, type: Object }),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
@@ -375,7 +380,7 @@ __decorate([
 __decorate([
     (0, common_1.Patch)(':id'),
     (0, permissions_decorator_1.Permissions)('technical-tender:manage'),
-    openapi.ApiResponse({ status: 200, type: Object }),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
     __param(2, (0, current_user_decorator_1.CurrentUser)()),
@@ -386,7 +391,7 @@ __decorate([
 __decorate([
     (0, common_1.Post)(':id/transition'),
     (0, permissions_decorator_1.AnyPermission)('technical-tender:manage', 'technical-tender:submit', 'technical-tender:close'),
-    openapi.ApiResponse({ status: 201, type: Object }),
+    openapi.ApiResponse({ status: 201 }),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
     __param(2, (0, current_user_decorator_1.CurrentUser)()),
@@ -395,9 +400,62 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], TechnicalTendersController.prototype, "transition", null);
 __decorate([
-    (0, common_1.Get)(':id/requirements'),
+    (0, common_1.Get)(':id/readiness'),
     (0, permissions_decorator_1.Permissions)('technical-tender:view'),
     openapi.ApiResponse({ status: 200 }),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", void 0)
+], TechnicalTendersController.prototype, "readiness", null);
+__decorate([
+    (0, common_1.Get)(':id/history'),
+    (0, permissions_decorator_1.Permissions)('technical-tender:view'),
+    openapi.ApiResponse({ status: 200 }),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", void 0)
+], TechnicalTendersController.prototype, "history", null);
+__decorate([
+    (0, common_1.Get)(':id/reviews'),
+    (0, permissions_decorator_1.Permissions)('technical-tender:view'),
+    openapi.ApiResponse({ status: 200, type: [Object] }),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", void 0)
+], TechnicalTendersController.prototype, "reviews", null);
+__decorate([
+    (0, common_1.Post)(':id/reviews'),
+    (0, permissions_decorator_1.AnyPermission)('technical-tender:review-technical', 'technical-tender:review-commercial'),
+    openapi.ApiResponse({ status: 201, type: Object }),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, technical_center_dto_1.RequestTenderReviewDto, Object]),
+    __metadata("design:returntype", void 0)
+], TechnicalTendersController.prototype, "requestReview", null);
+__decorate([
+    (0, common_1.Post)(':id/reviews/:reviewId/decision'),
+    (0, permissions_decorator_1.AnyPermission)('technical-tender:review-technical', 'technical-tender:review-commercial'),
+    openapi.ApiResponse({ status: 201 }),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Param)('reviewId')),
+    __param(2, (0, common_1.Body)()),
+    __param(3, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, technical_center_dto_1.DecideTenderReviewDto, Object]),
+    __metadata("design:returntype", void 0)
+], TechnicalTendersController.prototype, "decideReview", null);
+__decorate([
+    (0, common_1.Get)(':id/requirements'),
+    (0, permissions_decorator_1.Permissions)('technical-tender:view'),
+    openapi.ApiResponse({ status: 200, type: [Object] }),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),

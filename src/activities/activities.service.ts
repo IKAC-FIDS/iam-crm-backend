@@ -1,5 +1,5 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { ActivityTargetType, Prisma, TaskStatus, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateActivityDto } from './dto/create-activity.dto';
 import { UpdateActivityDto } from './dto/update-activity.dto';
@@ -11,23 +11,23 @@ import { AuditLogService } from '../audit-log/audit-log.service';
 import { parseApiDate, parseNullableApiDate } from '../common/dates/api-date.util';
 import { CompanyAccessService } from '../companies/company-access.service';
 import { getCurrentOrganizationId } from '../common/tenant/tenant-scope.util';
-import {
-  userTeamFilterWhere,
-  userTeamScopeWhere,
-} from '../common/tenant/team-scope.util';
+import { userTeamFilterWhere, userTeamScopeWhere } from '../common/tenant/team-scope.util';
 import { OwnershipScope } from '../common/dto/ownership-scope.dto';
 import { parseApiDateRange } from '../common/dates/api-date.util';
-import {
-  ActivityListStatus,
-  FindActivitiesDto,
-} from './dto/find-activities.dto';
+import { ActivityListStatus, FindActivitiesDto } from './dto/find-activities.dto';
 
 const activityCenterSelect = {
   id: true,
+  targetType: true,
+  taskId: true,
+  companyId: true,
+  personId: true,
+  opportunityId: true,
   type: true,
   notes: true,
   outcome: true,
   occurredAt: true,
+  nextActionDate: true,
   completedAt: true,
   createdAt: true,
   person: { select: { id: true, fullName: true } },
@@ -36,40 +36,45 @@ const activityCenterSelect = {
       id: true,
       legalName: true,
       brandName: true,
-      owner: {
-        select: {
-          id: true,
-          fullName: true,
-          email: true,
-          team: true,
-          teamId: true,
-        },
-      },
+      owner: { select: { id: true, fullName: true, email: true, team: true, teamId: true } },
     },
   },
-  user: {
-    select: { id: true, fullName: true, email: true },
+  task: {
+    select: {
+      id: true,
+      title: true,
+      status: true,
+      parentTaskId: true,
+      parentTask: { select: { id: true, title: true } },
+    },
   },
+  user: { select: { id: true, fullName: true, email: true } },
 } satisfies Prisma.ActivitySelect;
 
 @Injectable()
 export class ActivitiesService {
-  constructor(private prisma: PrismaService, private audit: AuditLogService, private companyAccess: CompanyAccessService) {}
+  constructor(
+    private prisma: PrismaService,
+    private audit: AuditLogService,
+    private companyAccess: CompanyAccessService,
+  ) {}
 
   findTypes() {
-    return this.prisma.lookupOption.findMany({ where: { group: 'activity-types' }, orderBy: [{ sortOrder: 'asc' }, { label: 'asc' }] });
+    return this.prisma.lookupOption.findMany({
+      where: { group: 'activity-types' },
+      orderBy: [{ sortOrder: 'asc' }, { label: 'asc' }],
+    });
   }
 
   private async validateManualType(type: string) {
     if (type === 'STAGE_CHANGE') throw new BadRequestException('STAGE_CHANGE is a system activity');
-    const option = await this.prisma.lookupOption.findFirst({ where: { group: 'activity-types', code: type, isActive: true } });
+    const option = await this.prisma.lookupOption.findFirst({
+      where: { group: 'activity-types', code: type, isActive: true },
+    });
     if (!option) throw new BadRequestException('نوع فعالیت انتخاب‌شده نامعتبر یا غیرفعال است.');
   }
 
-  async findAll(
-    query: FindActivitiesDto,
-    user: CurrentUserPayload,
-  ): Promise<PaginatedResponse<any>> {
+  async findAll(query: FindActivitiesDto, user: CurrentUserPayload): Promise<PaginatedResponse<any>> {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const where = this.activityCenterWhere(query, user);
@@ -81,11 +86,7 @@ export class ActivitiesService {
     const orderBy: Prisma.ActivityOrderByWithRelationInput[] =
       query.sortBy === 'createdAt'
         ? [primaryOrder, { id: orderDirection }]
-        : [
-            primaryOrder,
-            { createdAt: orderDirection },
-            { id: orderDirection },
-          ];
+        : [primaryOrder, { createdAt: orderDirection }, { id: orderDirection }];
     const [rows, total] = await Promise.all([
       this.prisma.activity.findMany({
         where,
@@ -99,14 +100,7 @@ export class ActivitiesService {
     const totalPages = Math.ceil(total / limit);
     return {
       data: rows.map((row) => this.activityCenterRow(row)),
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages,
-        hasNext: page < totalPages,
-        hasPrevious: page > 1,
-      },
+      meta: { total, page, limit, totalPages, hasNext: page < totalPages, hasPrevious: page > 1 },
     };
   }
 
@@ -126,50 +120,36 @@ export class ActivitiesService {
         activityDate: mapped.activityDate,
         person: mapped.person,
         company: mapped.company,
+        task: mapped.task,
+        targetType: mapped.targetType,
         createdBy: mapped.createdBy,
       };
     });
   }
 
-  private activityCenterWhere(
-    query: FindActivitiesDto,
-    user: CurrentUserPayload,
-  ): Prisma.ActivityWhereInput {
+  private activityCenterWhere(query: FindActivitiesDto, user: CurrentUserPayload): Prisma.ActivityWhereInput {
+    const organizationId = getCurrentOrganizationId(user);
     const and: Prisma.ActivityWhereInput[] = [
       {
-        company: {
-          organizationId: getCurrentOrganizationId(user),
-          archivedAt: null,
-        },
+        OR: [
+          { company: { organizationId, archivedAt: null } },
+          { task: { organizationId } },
+        ],
       },
     ];
     if (query.activityType) and.push({ type: query.activityType });
-    if (query.status === ActivityListStatus.COMPLETED) {
-      and.push({ completedAt: { not: null } });
-    } else if (query.status === ActivityListStatus.RECORDED) {
-      and.push({ completedAt: null });
-    }
+    if (query.status === ActivityListStatus.COMPLETED) and.push({ completedAt: { not: null } });
+    else if (query.status === ActivityListStatus.RECORDED) and.push({ completedAt: null });
     if (query.ownerId) and.push({ company: { ownerId: query.ownerId } });
     if (query.createdById) and.push({ userId: query.createdById });
     if (query.personId) and.push({ personId: query.personId });
     if (query.companyId) and.push({ companyId: query.companyId });
-    const activityDate = parseApiDateRange(
-      query.dateFrom,
-      query.dateTo,
-      'dateFrom',
-      'dateTo',
-    );
+    const activityDate = parseApiDateRange(query.dateFrom, query.dateTo, 'dateFrom', 'dateTo');
     if (activityDate) and.push({ occurredAt: activityDate });
-    if (query.team?.trim()) {
-      and.push({ company: { owner: userTeamFilterWhere([query.team]) } });
-    }
-    if (query.ownershipScope === OwnershipScope.MINE) {
-      and.push({ company: { ownerId: user.userId } });
-    } else if (query.ownershipScope === OwnershipScope.TEAM) {
-      and.push({ company: { owner: userTeamScopeWhere(user) } });
-    } else if (query.ownershipScope === OwnershipScope.UNASSIGNED) {
-      and.push({ company: { ownerId: null } });
-    }
+    if (query.team?.trim()) and.push({ company: { owner: userTeamFilterWhere([query.team]) } });
+    if (query.ownershipScope === OwnershipScope.MINE) and.push({ company: { ownerId: user.userId } });
+    else if (query.ownershipScope === OwnershipScope.TEAM) and.push({ company: { owner: userTeamScopeWhere(user) } });
+    else if (query.ownershipScope === OwnershipScope.UNASSIGNED) and.push({ company: { ownerId: null } });
     if (query.mine) and.push({ userId: user.userId });
     if (query.unassigned) and.push({ company: { ownerId: null } });
     const search = query.search?.trim();
@@ -181,158 +161,325 @@ export class ActivitiesService {
           { person: { fullName: { contains: search, mode: 'insensitive' } } },
           { company: { legalName: { contains: search, mode: 'insensitive' } } },
           { company: { brandName: { contains: search, mode: 'insensitive' } } },
+          { task: { title: { contains: search, mode: 'insensitive' } } },
         ],
       });
     }
     return { AND: and };
   }
 
-  private activityCenterRow(
-    row: Prisma.ActivityGetPayload<{ select: typeof activityCenterSelect }>,
-  ) {
-    const { owner, ...company } = row.company;
+  private activityCenterRow(row: Prisma.ActivityGetPayload<{ select: typeof activityCenterSelect }>) {
+    const company = row.company
+      ? (() => {
+          const { owner: _owner, ...value } = row.company;
+          return value;
+        })()
+      : null;
     return {
       ...row,
       title: row.outcome ?? row.type,
       description: row.notes,
-      status: row.completedAt
-        ? ActivityListStatus.COMPLETED
-        : ActivityListStatus.RECORDED,
+      status: row.completedAt ? ActivityListStatus.COMPLETED : ActivityListStatus.RECORDED,
       activityDate: row.occurredAt,
       updatedAt: row.createdAt,
       company,
-      owner,
+      owner: row.company?.owner ?? null,
       createdBy: row.user,
     };
   }
 
-  // ============================================================
-  // متد کمکی: بررسی دسترسی به شرکت
-  // ============================================================
   private async validateCompanyAccess(companyId: string, user: CurrentUserPayload) {
     await this.companyAccess.assertCompanyMutable(companyId, user);
   }
 
-  // ============================================================
-  // متد کمکی: بررسی دسترسی به مخاطب
-  // ============================================================
   private async validatePersonAccess(personId: string, user: CurrentUserPayload) {
     const person = await this.prisma.person.findFirst({
       where: { id: personId, company: { organizationId: getCurrentOrganizationId(user) } },
       include: { company: { select: { ownerId: true, owner: { select: { team: true, teamId: true } } } } },
     });
-
-    if (!person) {
-      throw new NotFoundException('مخاطب پیدا نشد');
-    }
-
-    // بررسی دسترسی به شرکت مربوطه
+    if (!person) throw new NotFoundException('مخاطب پیدا نشد');
     await this.validateCompanyAccess(person.companyId, user);
     return person;
   }
 
+  private taskScopeWhere(user: CurrentUserPayload): Prisma.TaskWhereInput {
+    if (user.role === UserRole.ADMIN || user.role === UserRole.BOARDS) return {};
+    if (user.role === UserRole.MANAGER) {
+      if (!user.teamId && !user.team) return { id: { in: [] } };
+      return {
+        OR: [
+          { assignedTo: userTeamScopeWhere(user) },
+          { createdBy: userTeamScopeWhere(user) },
+          { company: { owner: userTeamScopeWhere(user) } },
+          { opportunity: { company: { owner: userTeamScopeWhere(user) } } },
+          { person: { company: { owner: userTeamScopeWhere(user) } } },
+        ],
+      };
+    }
+    return {
+      OR: [
+        { assignedToId: user.userId },
+        { createdById: user.userId },
+        { company: { ownerId: user.userId } },
+        {
+          opportunity: {
+            OR: [{ ownerId: user.userId }, { company: { ownerId: user.userId } }],
+          },
+        },
+        { person: { company: { ownerId: user.userId } } },
+      ],
+    };
+  }
+
+  private async validateTaskAccess(taskId: string, user: CurrentUserPayload, forCreate = false) {
+    const task = await this.prisma.task.findFirst({
+      where: {
+        AND: [
+          { id: taskId, organizationId: getCurrentOrganizationId(user) },
+          this.taskScopeWhere(user),
+        ],
+      },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        companyId: true,
+        personId: true,
+        opportunityId: true,
+        parentTaskId: true,
+        company: { select: { id: true, legalName: true, brandName: true } },
+        parentTask: { select: { id: true, title: true } },
+      },
+    });
+    if (!task) throw new NotFoundException('Task not found');
+    if (forCreate && (task.status === TaskStatus.DONE || task.status === TaskStatus.CANCELLED)) {
+      throw new BadRequestException({
+        code: 'ACTIVITY_TASK_CLOSED',
+        message: 'برای کار تکمیل‌شده یا لغوشده نمی‌توان فعالیت جدید ثبت کرد.',
+      });
+    }
+    return task;
+  }
+
   private async findActivityForMutation(activityId: string, user: CurrentUserPayload) {
+    const organizationId = getCurrentOrganizationId(user);
     const activity = await this.prisma.activity.findFirst({
-      where: { id: activityId, company: { organizationId: getCurrentOrganizationId(user) } },
+      where: {
+        id: activityId,
+        OR: [{ company: { organizationId } }, { task: { organizationId } }],
+      },
       include: {
         company: true,
+        task: true,
         person: true,
         user: { select: { id: true, fullName: true } },
         completedBy: { select: { id: true, fullName: true } },
       },
     });
-
     if (!activity) throw new NotFoundException('Activity not found');
-    await this.validateCompanyAccess(activity.companyId, user);
+    if (activity.targetType === ActivityTargetType.TASK && activity.taskId) {
+      await this.validateTaskAccess(activity.taskId, user);
+    } else if (activity.companyId) {
+      await this.validateCompanyAccess(activity.companyId, user);
+    } else {
+      throw new ForbiddenException('Activity target is not accessible');
+    }
     return activity;
   }
 
-  // ============================================================
-  // ۱. دریافت فعالیت‌های یک شرکت (با صفحه‌بندی + محدودیت دسترسی)
-  // ============================================================
-  async findByCompany(
-    companyId: string,
-    pagination: PaginationDto,
-    user: CurrentUserPayload,
-  ): Promise<PaginatedResponse<any>> {
-    if (!companyId) {
-      throw new BadRequestException('شناسه شرکت الزامی است');
-    }
-
+  async findByCompany(companyId: string, pagination: PaginationDto, user: CurrentUserPayload): Promise<PaginatedResponse<any>> {
+    if (!companyId) throw new BadRequestException('شناسه شرکت الزامی است');
     await this.assertCompanyReadable(companyId, user);
-
     const page = pagination.page ?? 1;
     const limit = pagination.limit ?? 20;
     const skip = (page - 1) * limit;
-
     const [data, total] = await Promise.all([
       this.prisma.activity.findMany({
         where: { companyId },
-        include: { person: true, user: { select: { id: true, fullName: true } } },
+        include: {
+          person: true,
+          task: {
+            select: {
+              id: true,
+              title: true,
+              parentTaskId: true,
+              parentTask: { select: { id: true, title: true } },
+            },
+          },
+          user: { select: { id: true, fullName: true } },
+        },
         orderBy: { occurredAt: 'desc' },
         skip,
         take: limit,
       }),
       this.prisma.activity.count({ where: { companyId } }),
     ]);
-
     const totalPages = Math.ceil(total / limit);
     return {
       data,
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages,
-        hasNext: page < totalPages,
-        hasPrevious: page > 1,
-      },
+      meta: { total, page, limit, totalPages, hasNext: page < totalPages, hasPrevious: page > 1 },
     };
   }
-  // ============================================================
-  // ۲. ایجاد فعالیت جدید (با بررسی دسترسی)
-  // ============================================================
-  async create(dto: CreateActivityDto, user: CurrentUserPayload) {
-    // بررسی دسترسی به شرکت
-    await this.validateCompanyAccess(dto.companyId, user);
-    await this.validateManualType(dto.type);
 
-    // اگر personId ارسال شده، بررسی دسترسی به مخاطب
-    if (dto.personId) {
-      const person = await this.validatePersonAccess(dto.personId, user);
-      if (person.companyId !== dto.companyId) {
-        throw new BadRequestException('Person must belong to the activity company');
+  async findByTask(
+    taskId: string,
+    pagination: PaginationDto,
+    includeSubtasks: boolean,
+    user: CurrentUserPayload,
+  ): Promise<PaginatedResponse<any>> {
+    await this.validateTaskAccess(taskId, user);
+    const taskIds = [taskId];
+    if (includeSubtasks) {
+      let frontier = [taskId];
+      for (let depth = 0; depth < 3 && frontier.length; depth += 1) {
+        const children = await this.prisma.task.findMany({
+          where: { organizationId: getCurrentOrganizationId(user), parentTaskId: { in: frontier } },
+          select: { id: true },
+        });
+        const next = children.map((row) => row.id).filter((id) => !taskIds.includes(id));
+        taskIds.push(...next);
+        frontier = next;
       }
     }
-    if (dto.opportunityId) await this.validateOpportunityCompany(dto.opportunityId, dto.companyId);
+    const page = pagination.page ?? 1;
+    const limit = pagination.limit ?? 20;
+    const where: Prisma.ActivityWhereInput = {
+      targetType: ActivityTargetType.TASK,
+      taskId: { in: taskIds },
+    };
+    const [data, total] = await Promise.all([
+      this.prisma.activity.findMany({
+        where,
+        select: activityCenterSelect,
+        orderBy: [{ occurredAt: 'desc' }, { createdAt: 'desc' }],
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.activity.count({ where }),
+    ]);
+    const totalPages = Math.ceil(total / limit);
+    return {
+      data: data.map((row) => this.activityCenterRow(row)),
+      meta: { total, page, limit, totalPages, hasNext: page < totalPages, hasPrevious: page > 1 },
+    };
+  }
+
+  async create(dto: CreateActivityDto, user: CurrentUserPayload) {
+    await this.validateManualType(dto.type);
+    const targetType = dto.targetType ?? ActivityTargetType.COMPANY;
+
+    let companyId: string | null = null;
+    let taskId: string | null = null;
+    let personId = dto.personId;
+    let opportunityId = dto.opportunityId;
+
+    if (targetType === ActivityTargetType.COMPANY) {
+      if (!dto.companyId) {
+        throw new BadRequestException({
+          code: 'ACTIVITY_COMPANY_REQUIRED',
+          message: 'برای فعالیت شرکتی، انتخاب شرکت الزامی است.',
+        });
+      }
+      if (dto.taskId) {
+        throw new BadRequestException({
+          code: 'ACTIVITY_TARGET_INVALID',
+          message: 'فعالیت شرکتی نمی‌تواند هم‌زمان به کار متصل باشد.',
+        });
+      }
+
+      companyId = dto.companyId;
+      await this.validateCompanyAccess(companyId, user);
+
+      if (personId) {
+        const person = await this.validatePersonAccess(personId, user);
+        if (person.companyId !== companyId) {
+          throw new BadRequestException('Person must belong to the activity company');
+        }
+      }
+      if (opportunityId) {
+        await this.validateOpportunityCompany(opportunityId, companyId);
+      }
+    } else {
+      if (!dto.taskId) {
+        throw new BadRequestException({
+          code: 'ACTIVITY_TASK_REQUIRED',
+          message: 'برای فعالیت مرتبط با کار، انتخاب کار الزامی است.',
+        });
+      }
+      if (dto.companyId) {
+        throw new BadRequestException({
+          code: 'ACTIVITY_TARGET_INVALID',
+          message: 'companyId برای فعالیت مبتنی بر کار از سمت سرور تعیین می‌شود.',
+        });
+      }
+
+      const task = await this.validateTaskAccess(dto.taskId, user, true);
+      taskId = task.id;
+      companyId = task.companyId ?? null;
+      personId = personId ?? task.personId ?? undefined;
+      opportunityId = opportunityId ?? task.opportunityId ?? undefined;
+
+      if (personId && companyId) {
+        const person = await this.validatePersonAccess(personId, user);
+        if (person.companyId !== companyId) {
+          throw new BadRequestException('Person must belong to the task company');
+        }
+      }
+      if (opportunityId && companyId) {
+        await this.validateOpportunityCompany(opportunityId, companyId);
+      }
+    }
 
     const activity = await this.prisma.activity.create({
       data: {
-        companyId: dto.companyId,
-        personId: dto.personId,
+        targetType,
+        companyId,
+        taskId,
+        personId,
         userId: user.userId,
         type: dto.type,
         notes: dto.notes,
         outcome: dto.outcome,
         occurredAt: dto.occurredAt ? parseApiDate(dto.occurredAt, 'occurredAt') : undefined,
         nextActionDate: dto.nextActionDate ? parseApiDate(dto.nextActionDate, 'nextActionDate') : undefined,
-        opportunityId: dto.opportunityId,
+        opportunityId,
+      },
+      include: {
+        company: true,
+        task: {
+          select: {
+            id: true,
+            title: true,
+            parentTaskId: true,
+            parentTask: { select: { id: true, title: true } },
+          },
+        },
+        person: true,
+        user: { select: { id: true, fullName: true } },
       },
     });
-    await this.audit.record({ actorId: user.userId, entityType: 'activity', entityId: activity.id, action: 'activity.created', after: activity });
+
+    await this.audit.record({
+      actorId: user.userId,
+      organizationId: getCurrentOrganizationId(user),
+      entityType: 'activity',
+      entityId: activity.id,
+      action: 'activity.created',
+      after: activity,
+      metadata: { targetType, companyId, taskId },
+    });
     return activity;
   }
 
-  private async assertCompanyReadable(
-    companyId: string,
-    user: CurrentUserPayload,
-  ): Promise<void> {
+  private async assertCompanyReadable(companyId: string, user: CurrentUserPayload): Promise<void> {
     await this.companyAccess.assertCompanyReadable(companyId, user);
   }
 
   async updateActivity(activityId: string, dto: UpdateActivityDto, user: CurrentUserPayload) {
     const activity = await this.findActivityForMutation(activityId, user);
-    if (dto.type !== undefined && dto.type !== activity.type) await this.validateManualType(dto.type);
+    if (dto.type !== undefined && dto.type !== activity.type) {
+      await this.validateManualType(dto.type);
+    }
 
     if (activity.type === 'STAGE_CHANGE') {
       throw new BadRequestException('STAGE_CHANGE activities cannot be edited manually');
@@ -340,13 +487,16 @@ export class ActivitiesService {
     if (dto.type === 'STAGE_CHANGE') {
       throw new BadRequestException('Activity type cannot be changed to STAGE_CHANGE manually');
     }
+
     if (dto.personId) {
       const person = await this.validatePersonAccess(dto.personId, user);
-      if (person.companyId !== activity.companyId) {
+      if (activity.companyId && person.companyId !== activity.companyId) {
         throw new BadRequestException('Person must belong to the activity company');
       }
     }
-    if (dto.opportunityId) await this.validateOpportunityCompany(dto.opportunityId, activity.companyId);
+    if (dto.opportunityId && activity.companyId) {
+      await this.validateOpportunityCompany(dto.opportunityId, activity.companyId);
+    }
 
     const updated = await this.prisma.activity.update({
       where: { id: activityId },
@@ -361,9 +511,24 @@ export class ActivitiesService {
         }),
         ...(dto.opportunityId !== undefined && { opportunityId: dto.opportunityId }),
       },
-      include: { company: true, person: true, user: { select: { id: true, fullName: true } }, completedBy: { select: { id: true, fullName: true } } },
+      include: {
+        company: true,
+        task: true,
+        person: true,
+        user: { select: { id: true, fullName: true } },
+        completedBy: { select: { id: true, fullName: true } },
+      },
     });
-    await this.audit.record({ actorId: user.userId, entityType: 'activity', entityId: activityId, action: 'activity.updated', before: activity, after: updated });
+
+    await this.audit.record({
+      actorId: user.userId,
+      organizationId: getCurrentOrganizationId(user),
+      entityType: 'activity',
+      entityId: activityId,
+      action: 'activity.updated',
+      before: activity,
+      after: updated,
+    });
     return updated;
   }
 
@@ -382,9 +547,24 @@ export class ActivitiesService {
         completionNote: dto.completionNote,
         ...(dto.outcome !== undefined && { outcome: dto.outcome }),
       },
-      include: { company: true, person: true, user: { select: { id: true, fullName: true } }, completedBy: { select: { id: true, fullName: true } } },
+      include: {
+        company: true,
+        task: true,
+        person: true,
+        user: { select: { id: true, fullName: true } },
+        completedBy: { select: { id: true, fullName: true } },
+      },
     });
-    await this.audit.record({ actorId: user.userId, entityType: 'activity', entityId: activityId, action: 'follow-up.completed', before: activity, after: completed });
+
+    await this.audit.record({
+      actorId: user.userId,
+      organizationId: getCurrentOrganizationId(user),
+      entityType: 'activity',
+      entityId: activityId,
+      action: 'follow-up.completed',
+      before: activity,
+      after: completed,
+    });
     return completed;
   }
 
@@ -399,31 +579,43 @@ export class ActivitiesService {
       throw new BadRequestException('nextActionDate must be in the future');
     }
     const note = dto.note?.trim();
-    const notes = note ? [activity.notes, `[Rescheduled] ${note}`].filter(Boolean).join('\n') : activity.notes;
+    const notes = note
+      ? [activity.notes, `[Rescheduled] ${note}`].filter(Boolean).join('\n')
+      : activity.notes;
 
     const rescheduled = await this.prisma.activity.update({
       where: { id: activityId },
       data: { nextActionDate, notes },
-      include: { company: true, person: true, user: { select: { id: true, fullName: true } }, completedBy: { select: { id: true, fullName: true } } },
+      include: {
+        company: true,
+        task: true,
+        person: true,
+        user: { select: { id: true, fullName: true } },
+        completedBy: { select: { id: true, fullName: true } },
+      },
     });
-    await this.audit.record({ actorId: user.userId, entityType: 'activity', entityId: activityId, action: 'follow-up.rescheduled', before: activity, after: rescheduled });
+
+    await this.audit.record({
+      actorId: user.userId,
+      organizationId: getCurrentOrganizationId(user),
+      entityType: 'activity',
+      entityId: activityId,
+      action: 'follow-up.rescheduled',
+      before: activity,
+      after: rescheduled,
+    });
     return rescheduled;
   }
 
-  // ============================================================
-  // ۳. دریافت فعالیت‌های سررسید شده (فقط برای کاربر جاری)
-  // ============================================================
-  async findDueFollowUps(
-    user: CurrentUserPayload,
-    pagination: PaginationDto,
-  ): Promise<PaginatedResponse<any>> {
+  async findDueFollowUps(user: CurrentUserPayload, pagination: PaginationDto): Promise<PaginatedResponse<any>> {
     const page = pagination.page ?? 1;
     const limit = pagination.limit ?? 20;
     const skip = (page - 1) * limit;
+    const organizationId = getCurrentOrganizationId(user);
 
-    const where = {
+    const where: Prisma.ActivityWhereInput = {
       userId: user.userId,
-      company: { organizationId: getCurrentOrganizationId(user) },
+      OR: [{ company: { organizationId } }, { task: { organizationId } }],
       nextActionDate: { lte: new Date() },
       completedAt: null,
     };
@@ -431,7 +623,11 @@ export class ActivitiesService {
     const [data, total] = await Promise.all([
       this.prisma.activity.findMany({
         where,
-        include: { company: { select: { id: true, legalName: true } }, person: true },
+        include: {
+          company: { select: { id: true, legalName: true } },
+          task: { select: { id: true, title: true } },
+          person: true,
+        },
         orderBy: { nextActionDate: 'asc' },
         skip,
         take: limit,
@@ -442,19 +638,15 @@ export class ActivitiesService {
     const totalPages = Math.ceil(total / limit);
     return {
       data,
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages,
-        hasNext: page < totalPages,
-        hasPrevious: page > 1,
-      },
+      meta: { total, page, limit, totalPages, hasNext: page < totalPages, hasPrevious: page > 1 },
     };
   }
 
   private async validateOpportunityCompany(opportunityId: string, companyId: string) {
-    const opportunity = await this.prisma.opportunity.findFirst({ where: { id: opportunityId, companyId }, select: { companyId: true } });
+    const opportunity = await this.prisma.opportunity.findFirst({
+      where: { id: opportunityId, companyId },
+      select: { companyId: true },
+    });
     if (!opportunity) throw new NotFoundException('Opportunity not found');
   }
 }

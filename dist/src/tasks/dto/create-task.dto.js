@@ -16,7 +16,7 @@ const class_validator_1 = require("class-validator");
 const api_date_string_validator_1 = require("../../common/validators/api-date-string.validator");
 class CreateTaskDto {
     static _OPENAPI_METADATA_FACTORY() {
-        return { title: { required: true, type: () => String, maxLength: 200 }, description: { required: false, type: () => String }, status: { required: false, type: () => Object }, priority: { required: false, type: () => Object }, dueAt: { required: false, type: () => String }, reminderAt: { required: false, type: () => String }, companyId: { required: false, type: () => String }, personId: { required: false, type: () => String }, opportunityId: { required: false, type: () => String }, commercialDocumentId: { required: false, type: () => String }, paymentId: { required: false, type: () => String }, assignedToId: { required: false, type: () => String } };
+        return { title: { required: true, type: () => String, maxLength: 200 }, description: { required: false, type: () => String }, status: { required: false, type: () => Object }, priority: { required: false, type: () => Object }, dueAt: { required: false, type: () => String }, reminderAt: { required: false, type: () => String }, companyId: { required: false, type: () => String }, personId: { required: false, type: () => String }, opportunityId: { required: false, type: () => String }, commercialDocumentId: { required: false, type: () => String }, paymentId: { required: false, type: () => String }, assignedToId: { required: false, type: () => String }, assignmentScope: { required: false, type: () => Object }, teamId: { required: false, type: () => String }, meetingId: { required: false, type: () => String }, activityId: { required: false, type: () => String }, productId: { required: false, type: () => String }, requiresReview: { required: false, type: () => Boolean }, reviewerId: { required: false, type: () => String } };
     }
 }
 exports.CreateTaskDto = CreateTaskDto;
@@ -80,4 +80,39 @@ __decorate([
     (0, class_validator_1.IsUUID)(),
     __metadata("design:type", String)
 ], CreateTaskDto.prototype, "assignedToId", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsEnum)(client_1.TaskAssignmentScope),
+    __metadata("design:type", String)
+], CreateTaskDto.prototype, "assignmentScope", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsUUID)(),
+    __metadata("design:type", String)
+], CreateTaskDto.prototype, "teamId", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsUUID)(),
+    __metadata("design:type", String)
+], CreateTaskDto.prototype, "meetingId", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsUUID)(),
+    __metadata("design:type", String)
+], CreateTaskDto.prototype, "activityId", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsUUID)(),
+    __metadata("design:type", String)
+], CreateTaskDto.prototype, "productId", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsBoolean)(),
+    __metadata("design:type", Boolean)
+], CreateTaskDto.prototype, "requiresReview", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsUUID)(),
+    __metadata("design:type", String)
+], CreateTaskDto.prototype, "reviewerId", void 0);
 //# sourceMappingURL=create-task.dto.js.map

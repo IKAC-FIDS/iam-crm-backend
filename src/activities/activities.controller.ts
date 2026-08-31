@@ -9,7 +9,7 @@ import { FindActivitiesDto } from './dto/find-activities.dto';
 import { UpdateActivityDto } from './dto/update-activity.dto';
 import { CompleteActivityDto } from './dto/complete-activity.dto';
 import { RescheduleActivityDto } from './dto/reschedule-activity.dto';
-import { PaginationDto } from '../common/dto/pagination.dto'; // ← اضافه شد
+import { PaginationDto } from '../common/dto/pagination.dto';
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('activities')
@@ -22,28 +22,30 @@ export class ActivitiesController {
 
   @Get()
   @Permissions('activity:view')
-  findAll(
-    @Query() query: FindActivitiesDto,
+  findAll(@Query() query: FindActivitiesDto, @CurrentUser() user: CurrentUserPayload) {
+    return this.activitiesService.findAll(query, user);
+  }
+
+  @Get('task/:taskId')
+  @Permissions('activity:view')
+  findByTask(
+    @Param('taskId') taskId: string,
+    @Query() pagination: PaginationDto,
+    @Query('includeSubtasks') includeSubtasks: string | undefined,
     @CurrentUser() user: CurrentUserPayload,
   ) {
-    return this.activitiesService.findAll(query, user);
+    return this.activitiesService.findByTask(taskId, pagination, includeSubtasks === 'true', user);
   }
 
   @Get('follow-ups/due')
   @Permissions('activity:view')
-  findDueFollowUps(
-    @CurrentUser() user: CurrentUserPayload,
-    @Query() pagination: PaginationDto, // ← دیگر خطا ندارد
-  ) {
+  findDueFollowUps(@CurrentUser() user: CurrentUserPayload, @Query() pagination: PaginationDto) {
     return this.activitiesService.findDueFollowUps(user, pagination);
   }
 
   @Post()
   @Permissions('activity:create')
-  create(
-    @Body() dto: CreateActivityDto,
-    @CurrentUser() user: CurrentUserPayload,
-  ) {
+  create(@Body() dto: CreateActivityDto, @CurrentUser() user: CurrentUserPayload) {
     return this.activitiesService.create(dto, user);
   }
 

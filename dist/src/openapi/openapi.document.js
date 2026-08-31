@@ -99,7 +99,7 @@ function normalizeOperations(document) {
                 operation.parameters.push({ name: 'Origin', in: 'header', required: true, schema: { type: 'string', format: 'uri' }, description: 'Must exactly match CORS_ORIGINS. Missing, null or untrusted origins return 403 AUTH_ORIGIN_REJECTED. Missing Origin is allowed only by explicit non-production AUTH_ALLOW_MISSING_ORIGIN=true.' });
             }
             normalizeResponses(operation, path, method);
-            if (path === '/api/attachments' && method === 'post')
+            if ((path === '/api/attachments' || path === '/api/artifacts/upload') && method === 'post')
                 addUploadBody(operation);
             if (PLATFORM_PATHS.some((pattern) => pattern.test(path))) {
                 operation.description = `PlatformAdmin-only. Platform authority does not imply Tenant membership. ${operation.description ?? ''}`.trim();

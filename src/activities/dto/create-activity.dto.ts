@@ -1,12 +1,22 @@
-import { IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import { ActivityTargetType } from '@prisma/client';
+import { IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 import { IsApiDateString } from '../../common/validators/api-date-string.validator';
 
 export class CreateActivityDto {
-  @IsString()
-  companyId: string;
+  @IsOptional()
+  @IsEnum(ActivityTargetType)
+  targetType?: ActivityTargetType;
 
   @IsOptional()
-  @IsString()
+  @IsUUID()
+  companyId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  taskId?: string;
+
+  @IsOptional()
+  @IsUUID()
   personId?: string;
 
   @IsString()

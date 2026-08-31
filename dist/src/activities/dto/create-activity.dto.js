@@ -11,21 +11,33 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CreateActivityDto = void 0;
 const openapi = require("@nestjs/swagger");
+const client_1 = require("@prisma/client");
 const class_validator_1 = require("class-validator");
 const api_date_string_validator_1 = require("../../common/validators/api-date-string.validator");
 class CreateActivityDto {
     static _OPENAPI_METADATA_FACTORY() {
-        return { companyId: { required: true, type: () => String }, personId: { required: false, type: () => String }, type: { required: true, type: () => String, maxLength: 100 }, notes: { required: false, type: () => String }, outcome: { required: false, type: () => String }, occurredAt: { required: false, type: () => String }, nextActionDate: { required: false, type: () => String }, opportunityId: { required: false, type: () => String } };
+        return { targetType: { required: false, type: () => Object }, companyId: { required: false, type: () => String }, taskId: { required: false, type: () => String }, personId: { required: false, type: () => String }, type: { required: true, type: () => String, maxLength: 100 }, notes: { required: false, type: () => String }, outcome: { required: false, type: () => String }, occurredAt: { required: false, type: () => String }, nextActionDate: { required: false, type: () => String }, opportunityId: { required: false, type: () => String } };
     }
 }
 exports.CreateActivityDto = CreateActivityDto;
 __decorate([
-    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsEnum)(client_1.ActivityTargetType),
+    __metadata("design:type", String)
+], CreateActivityDto.prototype, "targetType", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsUUID)(),
     __metadata("design:type", String)
 ], CreateActivityDto.prototype, "companyId", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsUUID)(),
+    __metadata("design:type", String)
+], CreateActivityDto.prototype, "taskId", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsUUID)(),
     __metadata("design:type", String)
 ], CreateActivityDto.prototype, "personId", void 0);
 __decorate([

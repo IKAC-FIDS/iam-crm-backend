@@ -34,6 +34,9 @@ let ActivitiesController = class ActivitiesController {
     findAll(query, user) {
         return this.activitiesService.findAll(query, user);
     }
+    findByTask(taskId, pagination, includeSubtasks, user) {
+        return this.activitiesService.findByTask(taskId, pagination, includeSubtasks === 'true', user);
+    }
     findDueFollowUps(user, pagination) {
         return this.activitiesService.findDueFollowUps(user, pagination);
     }
@@ -70,6 +73,18 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], ActivitiesController.prototype, "findAll", null);
 __decorate([
+    (0, common_1.Get)('task/:taskId'),
+    (0, permissions_decorator_1.Permissions)('activity:view'),
+    openapi.ApiResponse({ status: 200 }),
+    __param(0, (0, common_1.Param)('taskId')),
+    __param(1, (0, common_1.Query)()),
+    __param(2, (0, common_1.Query)('includeSubtasks')),
+    __param(3, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, pagination_dto_1.PaginationDto, Object, Object]),
+    __metadata("design:returntype", void 0)
+], ActivitiesController.prototype, "findByTask", null);
+__decorate([
     (0, common_1.Get)('follow-ups/due'),
     (0, permissions_decorator_1.Permissions)('activity:view'),
     openapi.ApiResponse({ status: 200 }),
@@ -82,7 +97,7 @@ __decorate([
 __decorate([
     (0, common_1.Post)(),
     (0, permissions_decorator_1.Permissions)('activity:create'),
-    openapi.ApiResponse({ status: 201 }),
+    openapi.ApiResponse({ status: 201, type: Object }),
     __param(0, (0, common_1.Body)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),

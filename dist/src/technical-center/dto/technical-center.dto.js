@@ -9,7 +9,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.lifecycleEnums = exports.CreateDeliverableDto = exports.UpdateRequirementDto = exports.CreateRequirementDto = exports.UpdateTenderDto = exports.CreateTenderDto = exports.UpdateResourceDto = exports.CreateResourceDto = exports.CreateDocumentVersionDto = exports.UpdateDocumentDto = exports.CreateDocumentDto = exports.UpdateKnowledgeDto = exports.CreateKnowledgeDto = exports.UpdateReleaseDto = exports.CreateReleaseDto = exports.TenderTransitionDto = exports.DocumentTransitionDto = exports.KnowledgeTransitionDto = exports.ReleaseTransitionDto = exports.TransitionDto = exports.TechnicalDocumentListDto = exports.TechnicalListDto = void 0;
+exports.lifecycleEnums = exports.DecideTenderReviewDto = exports.RequestTenderReviewDto = exports.CreateDeliverableDto = exports.UpdateRequirementDto = exports.CreateRequirementDto = exports.UpdateTenderDto = exports.CreateTenderDto = exports.UpdateResourceDto = exports.CreateResourceDto = exports.CreateDocumentVersionDto = exports.UpdateDocumentDto = exports.CreateDocumentDto = exports.UpdateKnowledgeDto = exports.CreateKnowledgeDto = exports.UpdateReleaseDto = exports.CreateReleaseDto = exports.TenderTransitionDto = exports.DocumentTransitionDto = exports.KnowledgeTransitionDto = exports.ReleaseTransitionDto = exports.TransitionDto = exports.TechnicalDocumentListDto = exports.TechnicalListDto = void 0;
 const openapi = require("@nestjs/swagger");
 const mapped_types_1 = require("@nestjs/mapped-types");
 const swagger_1 = require("@nestjs/swagger");
@@ -652,7 +652,7 @@ __decorate([
 ], CreateRequirementDto.prototype, "response", void 0);
 class UpdateRequirementDto extends (0, mapped_types_1.PartialType)(CreateRequirementDto) {
     static _OPENAPI_METADATA_FACTORY() {
-        return { status: { required: false, type: () => Object } };
+        return { status: { required: false, type: () => Object }, blockedReason: { required: false, type: () => String, maxLength: 2000 } };
     }
 }
 exports.UpdateRequirementDto = UpdateRequirementDto;
@@ -661,9 +661,15 @@ __decorate([
     (0, class_validator_1.IsEnum)(client_1.TenderRequirementStatus),
     __metadata("design:type", String)
 ], UpdateRequirementDto.prototype, "status", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.MaxLength)(2000),
+    __metadata("design:type", String)
+], UpdateRequirementDto.prototype, "blockedReason", void 0);
 class CreateDeliverableDto {
     static _OPENAPI_METADATA_FACTORY() {
-        return { documentId: { required: true, type: () => String }, label: { required: false, type: () => String, maxLength: 200 } };
+        return { documentId: { required: true, type: () => String }, label: { required: false, type: () => String, maxLength: 200 }, required: { required: false, type: () => Boolean } };
     }
 }
 exports.CreateDeliverableDto = CreateDeliverableDto;
@@ -677,6 +683,62 @@ __decorate([
     (0, class_validator_1.MaxLength)(200),
     __metadata("design:type", String)
 ], CreateDeliverableDto.prototype, "label", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsBoolean)(),
+    __metadata("design:type", Boolean)
+], CreateDeliverableDto.prototype, "required", void 0);
+class RequestTenderReviewDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { type: { required: true, type: () => Object }, reviewerId: { required: false, type: () => String }, comment: { required: false, type: () => String, maxLength: 2000 }, revision: { required: false, type: () => Number, minimum: 1 } };
+    }
+}
+exports.RequestTenderReviewDto = RequestTenderReviewDto;
+__decorate([
+    (0, class_validator_1.IsEnum)(client_1.TenderReviewType),
+    __metadata("design:type", String)
+], RequestTenderReviewDto.prototype, "type", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsUUID)(),
+    __metadata("design:type", String)
+], RequestTenderReviewDto.prototype, "reviewerId", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.MaxLength)(2000),
+    __metadata("design:type", String)
+], RequestTenderReviewDto.prototype, "comment", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Type)(() => Number),
+    (0, class_validator_1.IsInt)(),
+    (0, class_validator_1.Min)(1),
+    __metadata("design:type", Number)
+], RequestTenderReviewDto.prototype, "revision", void 0);
+class DecideTenderReviewDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { status: { required: true, type: () => Object }, comment: { required: false, type: () => String, maxLength: 2000 }, revision: { required: false, type: () => Number, minimum: 1 } };
+    }
+}
+exports.DecideTenderReviewDto = DecideTenderReviewDto;
+__decorate([
+    (0, class_validator_1.IsEnum)(client_1.TenderReviewStatus),
+    __metadata("design:type", String)
+], DecideTenderReviewDto.prototype, "status", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.MaxLength)(2000),
+    __metadata("design:type", String)
+], DecideTenderReviewDto.prototype, "comment", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Type)(() => Number),
+    (0, class_validator_1.IsInt)(),
+    (0, class_validator_1.Min)(1),
+    __metadata("design:type", Number)
+], DecideTenderReviewDto.prototype, "revision", void 0);
 exports.lifecycleEnums = {
     release: client_1.TechnicalReleaseStatus,
     knowledge: client_1.KnowledgeBaseStatus,

@@ -9,56 +9,48 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.FindAssigneeOptionsDto = void 0;
+exports.FindTaskEntityOptionsDto = exports.FindTaskOptionsDto = void 0;
 const openapi = require("@nestjs/swagger");
 const class_transformer_1 = require("class-transformer");
 const class_validator_1 = require("class-validator");
-const bool = ({ value }) => value === true || value === 'true';
-class FindAssigneeOptionsDto {
+class FindTaskOptionsDto {
     constructor() {
         this.page = 1;
         this.limit = 25;
-        this.activeOnly = true;
     }
     static _OPENAPI_METADATA_FACTORY() {
-        return { search: { required: false, type: () => String }, page: { required: true, type: () => Object, default: 1, minimum: 1 }, limit: { required: true, type: () => Object, default: 25, minimum: 1, maximum: 100 }, selectedId: { required: false, type: () => String }, teamId: { required: false, type: () => String }, activeOnly: { required: true, type: () => Object, default: true } };
+        return { search: { required: false, type: () => String }, page: { required: true, type: () => Object, default: 1, minimum: 1 }, limit: { required: true, type: () => Object, default: 25, minimum: 1, maximum: 50 } };
     }
 }
-exports.FindAssigneeOptionsDto = FindAssigneeOptionsDto;
+exports.FindTaskOptionsDto = FindTaskOptionsDto;
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
-], FindAssigneeOptionsDto.prototype, "search", void 0);
+], FindTaskOptionsDto.prototype, "search", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_transformer_1.Type)(() => Number),
     (0, class_validator_1.IsInt)(),
     (0, class_validator_1.Min)(1),
     __metadata("design:type", Object)
-], FindAssigneeOptionsDto.prototype, "page", void 0);
+], FindTaskOptionsDto.prototype, "page", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_transformer_1.Type)(() => Number),
     (0, class_validator_1.IsInt)(),
     (0, class_validator_1.Min)(1),
-    (0, class_validator_1.Max)(100),
+    (0, class_validator_1.Max)(50),
     __metadata("design:type", Object)
-], FindAssigneeOptionsDto.prototype, "limit", void 0);
+], FindTaskOptionsDto.prototype, "limit", void 0);
+class FindTaskEntityOptionsDto extends FindTaskOptionsDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { type: { required: true, type: () => Object, enum: ['COMPANY', 'OPPORTUNITY', 'PERSON', 'MEETING', 'ACTIVITY', 'PRODUCT'] } };
+    }
+}
+exports.FindTaskEntityOptionsDto = FindTaskEntityOptionsDto;
 __decorate([
-    (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsUUID)(),
+    (0, class_validator_1.IsIn)(['COMPANY', 'OPPORTUNITY', 'PERSON', 'MEETING', 'ACTIVITY', 'PRODUCT']),
     __metadata("design:type", String)
-], FindAssigneeOptionsDto.prototype, "selectedId", void 0);
-__decorate([
-    (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsUUID)(),
-    __metadata("design:type", String)
-], FindAssigneeOptionsDto.prototype, "teamId", void 0);
-__decorate([
-    (0, class_validator_1.IsOptional)(),
-    (0, class_transformer_1.Transform)(bool),
-    (0, class_validator_1.IsBoolean)(),
-    __metadata("design:type", Object)
-], FindAssigneeOptionsDto.prototype, "activeOnly", void 0);
-//# sourceMappingURL=find-assignee-options.dto.js.map
+], FindTaskEntityOptionsDto.prototype, "type", void 0);
+//# sourceMappingURL=find-task-options.dto.js.map

@@ -9,39 +9,34 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.UploadAttachmentDto = void 0;
+exports.ReassignTaskDto = void 0;
 const openapi = require("@nestjs/swagger");
 const client_1 = require("@prisma/client");
 const class_validator_1 = require("class-validator");
-class UploadAttachmentDto {
+class ReassignTaskDto {
     static _OPENAPI_METADATA_FACTORY() {
-        return { entityType: { required: true, type: () => Object }, entityId: { required: true, type: () => String }, description: { required: false, type: () => String, maxLength: 200 }, name: { required: false, type: () => String, maxLength: 240 }, relationType: { required: false, type: () => Object } };
+        return { assignmentScope: { required: true, type: () => Object }, teamId: { required: false, type: () => String }, assigneeId: { required: false, type: () => String }, reason: { required: false, type: () => String, maxLength: 1000 } };
     }
 }
-exports.UploadAttachmentDto = UploadAttachmentDto;
+exports.ReassignTaskDto = ReassignTaskDto;
 __decorate([
-    (0, class_validator_1.IsEnum)(client_1.FileAttachmentEntityType),
+    (0, class_validator_1.IsEnum)(client_1.TaskAssignmentScope),
     __metadata("design:type", String)
-], UploadAttachmentDto.prototype, "entityType", void 0);
+], ReassignTaskDto.prototype, "assignmentScope", void 0);
 __decorate([
+    (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsUUID)(),
     __metadata("design:type", String)
-], UploadAttachmentDto.prototype, "entityId", void 0);
+], ReassignTaskDto.prototype, "teamId", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsUUID)(),
+    __metadata("design:type", String)
+], ReassignTaskDto.prototype, "assigneeId", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
-    (0, class_validator_1.MaxLength)(200),
+    (0, class_validator_1.MaxLength)(1000),
     __metadata("design:type", String)
-], UploadAttachmentDto.prototype, "description", void 0);
-__decorate([
-    (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsString)(),
-    (0, class_validator_1.MaxLength)(240),
-    __metadata("design:type", String)
-], UploadAttachmentDto.prototype, "name", void 0);
-__decorate([
-    (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsEnum)(client_1.ArtifactRelationType),
-    __metadata("design:type", String)
-], UploadAttachmentDto.prototype, "relationType", void 0);
-//# sourceMappingURL=upload-attachment.dto.js.map
+], ReassignTaskDto.prototype, "reason", void 0);
+//# sourceMappingURL=reassign-task.dto.js.map

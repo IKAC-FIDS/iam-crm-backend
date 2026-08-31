@@ -106,23 +106,33 @@ let AttachmentsService = AttachmentsService_1 = class AttachmentsService {
                 relativeDirectory,
                 mimeType: file.mimetype,
             });
-            attachment = await this.prisma.fileAttachment.create({
-                data: {
-                    organizationId,
-                    entityType: dto.entityType,
-                    entityId: dto.entityId,
-                    storageProvider: stored.storageProvider,
-                    bucket: stored.bucket,
-                    objectKey: stored.objectKey,
-                    storagePath: stored.storagePath,
-                    originalFileName,
-                    storedFileName,
-                    mimeType: file.mimetype,
-                    sizeBytes: file.size,
-                    sha256,
-                    description: dto.description?.trim() || undefined,
-                    uploadedById: user.userId,
-                },
+            const saved = stored;
+            attachment = await this.prisma.$transaction(async (tx) => {
+                const created = await tx.fileAttachment.create({ data: {
+                        organizationId,
+                        entityType: dto.entityType,
+                        entityId: dto.entityId,
+                        storageProvider: saved.storageProvider,
+                        bucket: saved.bucket,
+                        objectKey: saved.objectKey,
+                        storagePath: saved.storagePath,
+                        type: client_1.ArtifactType.FILE,
+                        provider: saved.storageProvider === 'MINIO' ? client_1.ArtifactProvider.OBJECT_STORAGE : client_1.ArtifactProvider.LOCAL,
+                        name: dto.name?.trim() || originalFileName,
+                        originalFileName,
+                        storedFileName,
+                        mimeType: file.mimetype,
+                        sizeBytes: file.size,
+                        sha256,
+                        description: dto.description?.trim() || undefined,
+                        uploadedById: user.userId,
+                    } });
+                await tx.artifactLink.create({ data: {
+                        organizationId, artifactId: created.id, entityType: dto.entityType,
+                        entityId: dto.entityId, relationType: dto.relationType ?? client_1.ArtifactRelationType.ATTACHMENT,
+                        createdById: user.userId,
+                    } });
+                return created;
             });
         }
         catch (error) {
@@ -140,6 +150,7 @@ let AttachmentsService = AttachmentsService_1 = class AttachmentsService {
         ]);
         await this.audit.record({
             actorId: user.userId,
+            organizationId,
             entityType: 'file-attachment',
             entityId: attachment.id,
             action: 'attachment.uploaded',
@@ -186,6 +197,7 @@ let AttachmentsService = AttachmentsService_1 = class AttachmentsService {
         ]);
         await this.audit.record({
             actorId: user.userId,
+            organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
             entityType: 'file-attachment',
             entityId: attachment.id,
             action: 'attachment.deleted',
@@ -294,6 +306,59 @@ let AttachmentsService = AttachmentsService_1 = class AttachmentsService {
     async assertEntityAccess(entityType, entityId, user, mutation = false) {
         if (mutation && user.role === client_1.UserRole.BOARDS) {
             throw new common_1.ForbiddenException('Attachments are read-only for this role');
+        }
+        if (entityType === client_1.FileAttachmentEntityType.ORGANIZATION) {
+            if (entityId !== (0, tenant_scope_util_1.getCurrentOrganizationId)(user))
+                throw new common_1.NotFoundException('Organization not found');
+            if (mutation && user.role !== client_1.UserRole.ADMIN && user.role !== client_1.UserRole.MANAGER)
+                throw new common_1.ForbiddenException('Organization artifacts require manager access');
+            return;
+        }
+        if (entityType === client_1.FileAttachmentEntityType.COMPANY) {
+            const company = await this.prisma.company.findFirst({ where: {
+                    id: entityId, organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user), archivedAt: null,
+                    ...(user.role === client_1.UserRole.ADMIN || user.role === client_1.UserRole.BOARDS ? {} : user.role === client_1.UserRole.MANAGER ? { owner: (0, team_scope_util_1.userTeamScopeWhere)(user) } : { ownerId: user.userId }),
+                }, select: { id: true } });
+            if (!company)
+                throw new common_1.NotFoundException('Company not found');
+            return;
+        }
+        if (entityType === client_1.FileAttachmentEntityType.PERSON) {
+            const person = await this.prisma.person.findFirst({ where: {
+                    id: entityId, company: {
+                        organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user), archivedAt: null,
+                        ...(user.role === client_1.UserRole.ADMIN || user.role === client_1.UserRole.BOARDS ? {} : user.role === client_1.UserRole.MANAGER ? { owner: (0, team_scope_util_1.userTeamScopeWhere)(user) } : { ownerId: user.userId }),
+                    },
+                }, select: { id: true } });
+            if (!person)
+                throw new common_1.NotFoundException('Person not found');
+            return;
+        }
+        if (entityType === client_1.FileAttachmentEntityType.TASK) {
+            const task = await this.prisma.task.findFirst({ where: {
+                    id: entityId, organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
+                    ...(user.role === client_1.UserRole.ADMIN || user.role === client_1.UserRole.BOARDS ? {} : {
+                        OR: [{ createdById: user.userId }, { assignedToId: user.userId }, ...(user.role === client_1.UserRole.MANAGER && user.teamId ? [{ teamId: user.teamId }] : [])],
+                    }),
+                }, select: { id: true } });
+            if (!task)
+                throw new common_1.NotFoundException('Task not found');
+            return;
+        }
+        if (entityType === client_1.FileAttachmentEntityType.ACTIVITY) {
+            const activity = await this.prisma.activity.findFirst({ where: {
+                    id: entityId, company: { organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user) },
+                    ...(user.role === client_1.UserRole.ADMIN || user.role === client_1.UserRole.BOARDS ? {} : { OR: [{ userId: user.userId }, { company: user.role === client_1.UserRole.MANAGER ? { owner: (0, team_scope_util_1.userTeamScopeWhere)(user) } : { ownerId: user.userId } }] }),
+                }, select: { id: true } });
+            if (!activity)
+                throw new common_1.NotFoundException('Activity not found');
+            return;
+        }
+        if (entityType === client_1.FileAttachmentEntityType.PRODUCT) {
+            const product = await this.prisma.productCatalogItem.findFirst({ where: { id: entityId, isActive: true }, select: { id: true } });
+            if (!product)
+                throw new common_1.NotFoundException('Product not found');
+            return;
         }
         if (entityType === client_1.FileAttachmentEntityType.OPPORTUNITY) {
             const opportunity = await this.prisma.opportunity.findFirst({

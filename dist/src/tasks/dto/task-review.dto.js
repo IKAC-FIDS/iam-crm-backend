@@ -9,39 +9,42 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.UploadAttachmentDto = void 0;
+exports.TaskReviewDecisionDto = exports.SubmitTaskReviewDto = void 0;
 const openapi = require("@nestjs/swagger");
-const client_1 = require("@prisma/client");
 const class_validator_1 = require("class-validator");
-class UploadAttachmentDto {
+class SubmitTaskReviewDto {
     static _OPENAPI_METADATA_FACTORY() {
-        return { entityType: { required: true, type: () => Object }, entityId: { required: true, type: () => String }, description: { required: false, type: () => String, maxLength: 200 }, name: { required: false, type: () => String, maxLength: 240 }, relationType: { required: false, type: () => Object } };
+        return { reviewerId: { required: false, type: () => String }, note: { required: false, type: () => String, maxLength: 4000 }, artifactIds: { required: false, type: () => [String] } };
     }
 }
-exports.UploadAttachmentDto = UploadAttachmentDto;
+exports.SubmitTaskReviewDto = SubmitTaskReviewDto;
 __decorate([
-    (0, class_validator_1.IsEnum)(client_1.FileAttachmentEntityType),
-    __metadata("design:type", String)
-], UploadAttachmentDto.prototype, "entityType", void 0);
-__decorate([
+    (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsUUID)(),
     __metadata("design:type", String)
-], UploadAttachmentDto.prototype, "entityId", void 0);
+], SubmitTaskReviewDto.prototype, "reviewerId", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
-    (0, class_validator_1.MaxLength)(200),
+    (0, class_validator_1.MaxLength)(4000),
     __metadata("design:type", String)
-], UploadAttachmentDto.prototype, "description", void 0);
+], SubmitTaskReviewDto.prototype, "note", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.IsUUID)('4', { each: true }),
+    __metadata("design:type", Array)
+], SubmitTaskReviewDto.prototype, "artifactIds", void 0);
+class TaskReviewDecisionDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { comment: { required: false, type: () => String, maxLength: 4000 } };
+    }
+}
+exports.TaskReviewDecisionDto = TaskReviewDecisionDto;
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
-    (0, class_validator_1.MaxLength)(240),
+    (0, class_validator_1.MaxLength)(4000),
     __metadata("design:type", String)
-], UploadAttachmentDto.prototype, "name", void 0);
-__decorate([
-    (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsEnum)(client_1.ArtifactRelationType),
-    __metadata("design:type", String)
-], UploadAttachmentDto.prototype, "relationType", void 0);
-//# sourceMappingURL=upload-attachment.dto.js.map
+], TaskReviewDecisionDto.prototype, "comment", void 0);
+//# sourceMappingURL=task-review.dto.js.map

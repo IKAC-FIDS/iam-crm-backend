@@ -260,6 +260,11 @@ enum ArtifactRelationType {
   OTHER
 }
 
+enum ActivityTargetType {
+  COMPANY
+  TASK
+}
+
 enum TaskStatus {
   TODO
   IN_PROGRESS
@@ -1194,13 +1199,18 @@ model PersonSocial {
 // ============================================================
 
 model Activity {
-  id        String  @id @default(uuid())
-  companyId String
-  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  personId  String?
-  person    Person? @relation(fields: [personId], references: [id])
-  userId    String
-  user      User    @relation(fields: [userId], references: [id])
+  id         String             @id @default(uuid())
+  targetType ActivityTargetType @default(COMPANY)
+
+  companyId String?
+  company   Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  taskId   String?
+  task     Task?   @relation("TaskActivities", fields: [taskId], references: [id], onDelete: SetNull)
+  personId String?
+  person   Person? @relation(fields: [personId], references: [id])
+  userId   String
+  user     User    @relation(fields: [userId], references: [id])
 
   type           String
   notes          String?
@@ -1213,7 +1223,7 @@ model Activity {
   completionNote String?
   opportunityId  String?
   opportunity    Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
-  tasks          Task[]
+  tasks          Task[]       @relation("LegacyTaskActivity")
 
   createdAt DateTime @default(now())
 
@@ -1226,6 +1236,9 @@ model Activity {
   @@index([userId, nextActionDate])
   @@index([companyId, occurredAt])
   @@index([opportunityId])
+  @@index([targetType])
+  @@index([taskId])
+  @@index([taskId, occurredAt])
   @@map("activities")
 }
 
@@ -1579,7 +1592,8 @@ model Task {
   meeting   Meeting? @relation(fields: [meetingId], references: [id], onDelete: SetNull)
 
   activityId String?
-  activity   Activity? @relation(fields: [activityId], references: [id], onDelete: SetNull)
+  activity   Activity?  @relation("LegacyTaskActivity", fields: [activityId], references: [id], onDelete: SetNull)
+  activities Activity[] @relation("TaskActivities")
 
   productId String?
   product   ProductCatalogItem? @relation(fields: [productId], references: [id], onDelete: SetNull)

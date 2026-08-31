@@ -294,7 +294,9 @@ let OrganizationConfigurationService = class OrganizationConfigurationService {
         });
         if (!attachment)
             throw new common_1.NotFoundException("Branding asset not found");
-        if (!IMAGE_TYPES.has(attachment.mimeType) ||
+        if (!attachment.mimeType ||
+            !IMAGE_TYPES.has(attachment.mimeType) ||
+            attachment.sizeBytes === null ||
             attachment.sizeBytes > maxBytes)
             throw new common_1.BadRequestException("Unsupported branding asset");
     }
