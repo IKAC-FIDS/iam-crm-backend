@@ -5,6 +5,7 @@ import { TenantRolesService } from '../src/admin/tenant-roles.service';
 const tenant = {
   organizationId: 'org-a',
   tenantId: 'org-a',
+  userId: 'actor-a',
 } as any;
 
 describe('TenantRolesService system role permissions', () => {
@@ -29,6 +30,8 @@ describe('TenantRolesService system role permissions', () => {
         deleteMany: jest.fn(),
         createMany: jest.fn(),
       },
+      organization: { updateMany: jest.fn() },
+      auditLog: { create: jest.fn() },
     };
     const prisma: any = {
       role: { findFirst: jest.fn().mockResolvedValue(systemRole) },
@@ -51,6 +54,16 @@ describe('TenantRolesService system role permissions', () => {
         permissionId: permission.id,
       })),
     });
+    expect(tx.organization.updateMany).toHaveBeenCalledWith({
+      where: {},
+      data: { authorizationVersion: { increment: 1 } },
+    });
+    expect(tx.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        actorId: 'actor-a',
+        action: 'tenant-role.permissions-replaced',
+      }),
+    }));
   });
 
   it('keeps critical ADMIN permissions protected', async () => {

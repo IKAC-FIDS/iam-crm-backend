@@ -176,6 +176,8 @@ type AssignmentResolution = {
   assignedToId: string | null;
 };
 
+type AssignmentOperation = 'create' | 'update' | 'assign' | 'reassign' | 'subtask';
+
 @Injectable()
 export class TasksService {
   constructor(
@@ -278,11 +280,13 @@ export class TasksService {
 
     const relations = await this.resolveCreateRelations(dto, user);
 
-    const assignment = await this.resolveAssignment({
+    const assignmentInput = {
       assignmentScope: dto.assignmentScope,
       teamId: dto.teamId,
       assigneeId: dto.assignedToId,
-    }, user);
+    };
+    this.assertAssignmentPermission(assignmentInput, user, 'create');
+    const assignment = await this.resolveAssignment(assignmentInput, user);
 
     const status = dto.status ?? TaskStatus.TODO;
     const now = new Date();
@@ -396,11 +400,13 @@ export class TasksService {
     }
 
     if (dto.assignedToId !== undefined || dto.assignmentScope !== undefined || dto.teamId !== undefined) {
-      const assignment = await this.resolveAssignment({
+      const assignmentInput = {
         assignmentScope: dto.assignmentScope ?? current.assignmentScope,
         teamId: dto.teamId ?? current.teamId ?? undefined,
         assigneeId: dto.assignedToId ?? current.assignedToId ?? undefined,
-      }, user);
+      };
+      this.assertAssignmentPermission(assignmentInput, user, 'update');
+      const assignment = await this.resolveAssignment(assignmentInput, user);
       data.assignmentScope = assignment.assignmentScope;
       data.team = assignment.teamId ? { connect: { id: assignment.teamId } } : { disconnect: true };
       data.assignedTo = assignment.assignedToId ? { connect: { id: assignment.assignedToId } } : { disconnect: true };
@@ -496,15 +502,25 @@ export class TasksService {
   }
 
   async assign(id: string, dto: AssignTaskDto, user: CurrentUserPayload) {
-    return this.reassign(id, {
+    return this.reassignWithOperation(id, {
       assignmentScope: dto.assignedToId === user.userId ? TaskAssignmentScope.SELF : TaskAssignmentScope.ORGANIZATION,
       assigneeId: dto.assignedToId,
-    }, user);
+    }, user, 'assign');
   }
 
   async reassign(id: string, dto: ReassignTaskDto, user: CurrentUserPayload) {
+    return this.reassignWithOperation(id, dto, user, 'reassign');
+  }
+
+  private async reassignWithOperation(
+    id: string,
+    dto: ReassignTaskDto,
+    user: CurrentUserPayload,
+    operation: 'assign' | 'reassign',
+  ) {
     const current = await this.getTaskForMutation(id, user);
     this.assertTaskOpen(current.status, 'Completed or cancelled tasks cannot be reassigned');
+    this.assertAssignmentPermission(dto, user, operation);
     const assignment = await this.resolveAssignment(dto, user);
     const updated = await this.prisma.task.update({
       where: { id },
@@ -541,11 +557,13 @@ export class TasksService {
     this.assertTaskOpen(parent.status, 'Closed tasks cannot receive subtasks');
     const depth = await this.taskDepth(parent);
     if (depth >= 3) throw new BadRequestException({ code: 'TASK_MAX_DEPTH_EXCEEDED', message: 'Task hierarchy is limited to 3 levels' });
-    const assignment = await this.resolveAssignment({
+    const assignmentInput = {
       assignmentScope: dto.assignmentScope,
       teamId: dto.teamId,
       assigneeId: dto.assigneeId,
-    }, user);
+    };
+    this.assertAssignmentPermission(assignmentInput, user, 'subtask');
+    const assignment = await this.resolveAssignment(assignmentInput, user);
     const inherited = dto.inheritLinkedEntity !== false;
     const child = await this.prisma.task.create({
       data: {
@@ -1296,6 +1314,42 @@ export class TasksService {
     return { assignmentScope: scope, teamId: team?.id ?? null, assignedToId: assigneeId };
   }
 
+  private assertAssignmentPermission(
+    input: { assignmentScope?: TaskAssignmentScope; teamId?: string; assigneeId?: string },
+    user: CurrentUserPayload,
+    operation: AssignmentOperation,
+  ) {
+    const scope = input.assignmentScope
+      ?? (input.assigneeId && input.assigneeId !== user.userId
+        ? TaskAssignmentScope.ORGANIZATION
+        : TaskAssignmentScope.SELF);
+    const targetsBeyondSelf = scope !== TaskAssignmentScope.SELF
+      || Boolean(input.teamId)
+      || Boolean(input.assigneeId && input.assigneeId !== user.userId);
+
+    if (operation === 'assign') {
+      if (this.hasPermission(user, 'task:assign')) return;
+      throw new ForbiddenException({
+        code: 'TASK_ASSIGN_PERMISSION_REQUIRED',
+        message: 'برای ارجاع کار به کاربر دیگری، دسترسی task:assign لازم است.',
+      });
+    }
+
+    if (operation === 'reassign' || operation === 'update') {
+      if (this.hasPermission(user, 'task:reassign') || this.hasPermission(user, 'task:assign')) return;
+      throw new ForbiddenException({
+        code: 'TASK_REASSIGN_PERMISSION_REQUIRED',
+        message: 'برای تغییر مسئول کار موجود، دسترسی task:reassign لازم است.',
+      });
+    }
+
+    if (!targetsBeyondSelf || this.hasPermission(user, 'task:assign')) return;
+    throw new ForbiddenException({
+      code: 'TASK_ASSIGN_PERMISSION_REQUIRED',
+      message: 'برای ارجاع کار به کاربران یا دامنه‌های دیگر، دسترسی task:assign لازم است.',
+    });
+  }
+
   private assertStatusTransition(from: TaskStatus, to: TaskStatus) {
     if (from === to) return;
     const allowed: Record<TaskStatus, TaskStatus[]> = {
@@ -1422,10 +1476,6 @@ export class TasksService {
       throw new BadRequestException(
         'Task assignee must be an active internal user',
       );
-    }
-
-    if (user.role === UserRole.REP && assignee.id !== user.userId) {
-      throw new ForbiddenException('REP can only assign tasks to self');
     }
 
     if (requiredTeamId && assignee.teamId !== requiredTeamId) {

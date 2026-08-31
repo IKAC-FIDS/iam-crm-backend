@@ -253,6 +253,28 @@ export class TenantRolesService {
           })),
         });
       }
+
+      await tx.organization.updateMany({
+        where:
+          role.scope === RoleScope.SYSTEM
+            ? {}
+            : { id: tenant.organizationId },
+        data: { authorizationVersion: { increment: 1 } },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          actorId: tenant.userId,
+          organizationId: tenant.organizationId,
+          entityType: 'tenant-rbac',
+          entityId: id,
+          action: 'tenant-role.permissions-replaced',
+          before: {
+            permissionIds: role.permissions.map((item) => item.permissionId),
+          },
+          after: { permissionIds: permissions.map((item) => item.id) },
+        },
+      });
     });
 
     PermissionsGuard.clearCache(role.baseRole);
