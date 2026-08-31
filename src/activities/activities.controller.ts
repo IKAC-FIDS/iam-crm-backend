@@ -10,6 +10,7 @@ import { UpdateActivityDto } from './dto/update-activity.dto';
 import { CompleteActivityDto } from './dto/complete-activity.dto';
 import { RescheduleActivityDto } from './dto/reschedule-activity.dto';
 import { PaginationDto } from '../common/dto/pagination.dto';
+import { FindTaskActivitiesDto } from './dto/find-task-activities.dto';
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('activities')
@@ -30,11 +31,15 @@ export class ActivitiesController {
   @Permissions('activity:view')
   findByTask(
     @Param('taskId') taskId: string,
-    @Query() pagination: PaginationDto,
-    @Query('includeSubtasks') includeSubtasks: string | undefined,
+    @Query() query: FindTaskActivitiesDto,
     @CurrentUser() user: CurrentUserPayload,
   ) {
-    return this.activitiesService.findByTask(taskId, pagination, includeSubtasks === 'true', user);
+    return this.activitiesService.findByTask(
+      taskId,
+      query,
+      query.includeSubtasks ?? false,
+      user,
+    );
   }
 
   @Get('follow-ups/due')

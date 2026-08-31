@@ -26,6 +26,7 @@ const update_activity_dto_1 = require("./dto/update-activity.dto");
 const complete_activity_dto_1 = require("./dto/complete-activity.dto");
 const reschedule_activity_dto_1 = require("./dto/reschedule-activity.dto");
 const pagination_dto_1 = require("../common/dto/pagination.dto");
+const find_task_activities_dto_1 = require("./dto/find-task-activities.dto");
 let ActivitiesController = class ActivitiesController {
     constructor(activitiesService) {
         this.activitiesService = activitiesService;
@@ -34,8 +35,8 @@ let ActivitiesController = class ActivitiesController {
     findAll(query, user) {
         return this.activitiesService.findAll(query, user);
     }
-    findByTask(taskId, pagination, includeSubtasks, user) {
-        return this.activitiesService.findByTask(taskId, pagination, includeSubtasks === 'true', user);
+    findByTask(taskId, query, user) {
+        return this.activitiesService.findByTask(taskId, query, query.includeSubtasks ?? false, user);
     }
     findDueFollowUps(user, pagination) {
         return this.activitiesService.findDueFollowUps(user, pagination);
@@ -78,10 +79,9 @@ __decorate([
     openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Param)('taskId')),
     __param(1, (0, common_1.Query)()),
-    __param(2, (0, common_1.Query)('includeSubtasks')),
-    __param(3, (0, current_user_decorator_1.CurrentUser)()),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, pagination_dto_1.PaginationDto, Object, Object]),
+    __metadata("design:paramtypes", [String, find_task_activities_dto_1.FindTaskActivitiesDto, Object]),
     __metadata("design:returntype", void 0)
 ], ActivitiesController.prototype, "findByTask", null);
 __decorate([
