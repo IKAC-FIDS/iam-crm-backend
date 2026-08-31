@@ -27,6 +27,7 @@ import { ReassignTaskDto } from './dto/reassign-task.dto';
 import { CreateSubtaskDto } from './dto/create-subtask.dto';
 import { FindTaskEntityOptionsDto, FindTaskOptionsDto } from './dto/find-task-options.dto';
 import { TasksService } from './tasks.service';
+import { SubmitTaskReviewDto, TaskReviewDecisionDto } from './dto/task-review.dto';
 
 @Controller('tasks')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
@@ -110,6 +111,30 @@ export class TasksController {
   @Permissions('task:view')
   subtasks(@Param('id') id: string, @CurrentUser() user: CurrentUserPayload) {
     return this.service.findSubtasks(id, user);
+  }
+
+  @Get(':id/reviews')
+  @AnyPermission('task:view', 'task:review')
+  reviews(@Param('id') id: string, @CurrentUser() user: CurrentUserPayload) {
+    return this.service.findReviews(id, user);
+  }
+
+  @Post(':id/submit-review')
+  @Permissions('task:submit-review')
+  submitReview(@Param('id') id: string, @Body() dto: SubmitTaskReviewDto, @CurrentUser() user: CurrentUserPayload) {
+    return this.service.submitReview(id, dto, user);
+  }
+
+  @Post(':id/review/approve')
+  @Permissions('task:review')
+  approveReview(@Param('id') id: string, @Body() dto: TaskReviewDecisionDto, @CurrentUser() user: CurrentUserPayload) {
+    return this.service.decideReview(id, 'APPROVED', dto, user);
+  }
+
+  @Post(':id/review/request-changes')
+  @Permissions('task:review')
+  requestReviewChanges(@Param('id') id: string, @Body() dto: TaskReviewDecisionDto, @CurrentUser() user: CurrentUserPayload) {
+    return this.service.decideReview(id, 'CHANGES_REQUESTED', dto, user);
   }
 
   @Post(':id/subtasks')

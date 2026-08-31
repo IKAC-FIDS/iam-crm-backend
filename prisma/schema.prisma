@@ -267,6 +267,21 @@ enum TaskStatus {
   CANCELLED
 }
 
+enum TaskReviewStatus {
+  NOT_REQUIRED
+  DRAFT
+  PENDING_REVIEW
+  CHANGES_REQUESTED
+  APPROVED
+}
+
+enum TaskReviewDecision {
+  PENDING
+  APPROVED
+  CHANGES_REQUESTED
+  CANCELLED
+}
+
 enum TaskAssignmentScope {
   SELF
   TEAM
@@ -428,9 +443,12 @@ model User {
   ssoLoginTickets         SsoLoginTicket[]
   refreshSessions         RefreshSession[]
 
-  assignedTasks  Task[] @relation("TaskAssignedTo")
-  createdTasks   Task[] @relation("TaskCreatedBy")
-  completedTasks Task[] @relation("TaskCompletedBy")
+  assignedTasks        Task[]            @relation("TaskAssignedTo")
+  createdTasks         Task[]            @relation("TaskCreatedBy")
+  completedTasks       Task[]            @relation("TaskCompletedBy")
+  tasksToReview        Task[]            @relation("TaskReviewer")
+  taskReviewsAssigned  TaskReviewRound[] @relation("TaskReviewReviewer")
+  taskReviewsSubmitted TaskReviewRound[] @relation("TaskReviewSubmittedBy")
 
   organizedMeetings      Meeting[]              @relation("MeetingOrganizer")
   createdMeetings        Meeting[]              @relation("MeetingCreatedBy")
@@ -473,6 +491,7 @@ model User {
   artifactsUploaded                 FileAttachment[]           @relation("ArtifactUploadedBy")
   artifactsDeleted                  FileAttachment[]           @relation("ArtifactDeletedBy")
   artifactLinksCreated              ArtifactLink[]             @relation("ArtifactLinkCreatedBy")
+  taskReviewArtifactsAdded          TaskReviewArtifact[]       @relation("TaskReviewArtifactAddedBy")
   platformAuthority                 PlatformAuthority?
 
   @@index([organizationId])
@@ -543,6 +562,7 @@ model Organization {
   notifications       Notification[]
   fileAttachments     FileAttachment[]
   artifactLinks       ArtifactLink[]
+  taskReviewRounds    TaskReviewRound[]
   auditLogs           AuditLog[]
   meetings            Meeting[]
   memberships         OrganizationMembership[]
@@ -1567,6 +1587,12 @@ model Task {
   assignedToId String?
   assignedTo   User?   @relation("TaskAssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
 
+  requiresReview Boolean           @default(false)
+  reviewStatus   TaskReviewStatus  @default(NOT_REQUIRED)
+  reviewerId     String?
+  reviewer       User?             @relation("TaskReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+  reviewRounds   TaskReviewRound[]
+
   createdById String?
   createdBy   User?   @relation("TaskCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
 
@@ -1600,12 +1626,55 @@ model Task {
   @@index([organizationId, assignmentScope, status, dueAt])
   @@index([organizationId, teamId, status, dueAt])
   @@index([assignedToId])
+  @@index([organizationId, reviewStatus, reviewerId])
+  @@index([reviewerId])
   @@index([createdById])
   @@index([completedAt])
   @@index([assignedToId, status, dueAt])
   @@index([organizationId])
   @@index([organizationId, assignedToId, status, dueAt])
   @@map("tasks")
+}
+
+model TaskReviewRound {
+  id             String               @id @default(uuid())
+  organizationId String
+  organization   Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  taskId         String
+  task           Task                 @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  roundNumber    Int
+  reviewerId     String
+  reviewer       User                 @relation("TaskReviewReviewer", fields: [reviewerId], references: [id], onDelete: Restrict)
+  submittedById  String
+  submittedBy    User                 @relation("TaskReviewSubmittedBy", fields: [submittedById], references: [id], onDelete: Restrict)
+  submittedAt    DateTime             @default(now())
+  submissionNote String?
+  decision       TaskReviewDecision   @default(PENDING)
+  reviewedAt     DateTime?
+  reviewComment  String?
+  artifacts      TaskReviewArtifact[]
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  @@unique([taskId, roundNumber])
+  @@index([organizationId, reviewerId, decision, submittedAt])
+  @@index([taskId, submittedAt])
+  @@map("task_review_rounds")
+}
+
+model TaskReviewArtifact {
+  id            String          @id @default(uuid())
+  reviewRoundId String
+  reviewRound   TaskReviewRound @relation(fields: [reviewRoundId], references: [id], onDelete: Cascade)
+  artifactId    String
+  artifact      FileAttachment  @relation(fields: [artifactId], references: [id], onDelete: Restrict)
+  addedById     String?
+  addedBy       User?           @relation("TaskReviewArtifactAddedBy", fields: [addedById], references: [id], onDelete: SetNull)
+  createdAt     DateTime        @default(now())
+
+  @@unique([reviewRoundId, artifactId])
+  @@index([artifactId])
+  @@map("task_review_artifacts")
 }
 
 model Meeting {
@@ -2441,6 +2510,7 @@ model FileAttachment {
   technicalDocumentVersions TechnicalDocumentVersion[] @relation("TechnicalDocumentVersionAttachment")
   technicalResources        TechnicalResource[]        @relation("TechnicalResourceAttachment")
   links                     ArtifactLink[]
+  taskReviewArtifacts       TaskReviewArtifact[]
 
   @@index([entityType, entityId])
   @@index([storageProvider])

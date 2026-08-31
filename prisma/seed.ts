@@ -915,6 +915,9 @@ async function main() {
     { action: 'task:reassign', description: 'تغییر مسئول، تیم یا دامنه کار' },
     { action: 'task:complete', description: 'تکمیل کار' },
     { action: 'task:delete', description: 'حذف کار' },
+    { action: 'task:submit-review', description: 'ارسال کار برای بازبینی' },
+    { action: 'task:review', description: 'تأیید یا درخواست اصلاح کار' },
+    { action: 'task:assign-reviewer', description: 'تعیین بازبین کار' },
     { action: 'meeting:view', description: 'View meetings' },
     { action: 'meeting:create', description: 'Create meetings' },
     { action: 'meeting:update', description: 'Update meetings' },
@@ -1028,6 +1031,9 @@ async function main() {
     'task:reassign',
     'task:complete',
     'task:delete',
+    'task:submit-review',
+    'task:review',
+    'task:assign-reviewer',
     'meeting:view', 'meeting:create', 'meeting:update', 'meeting:complete', 'meeting:cancel',
 
     'notification:view',
@@ -1111,6 +1117,8 @@ async function main() {
     'task:create-subtask',
     'task:update',
     'task:complete',
+    'task:submit-review',
+    'task:review',
     'meeting:view', 'meeting:create', 'meeting:update', 'meeting:complete', 'meeting:cancel',
 
     'notification:view',

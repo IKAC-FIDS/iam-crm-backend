@@ -1,5 +1,6 @@
 import { Priority, TaskAssignmentScope, TaskStatus } from '@prisma/client';
 import {
+  IsBoolean,
   IsEnum,
   IsOptional,
   IsString,
@@ -76,4 +77,12 @@ export class CreateTaskDto {
   @IsOptional()
   @IsUUID()
   productId?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  requiresReview?: boolean;
+
+  @IsOptional()
+  @IsUUID()
+  reviewerId?: string;
 }

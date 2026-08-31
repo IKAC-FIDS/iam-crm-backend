@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -8,8 +9,11 @@ import {
   NotificationEntityType,
   NotificationPriority,
   NotificationType,
+  FileAttachmentEntityType,
   Prisma,
   TaskAssignmentScope,
+  TaskReviewDecision,
+  TaskReviewStatus,
   TaskStatus,
   UserRole,
 } from '@prisma/client';
@@ -30,6 +34,7 @@ import { FindTaskEntityOptionsDto, FindTaskOptionsDto } from './dto/find-task-op
 import { getCurrentOrganizationId, tenantScope } from '../common/tenant/tenant-scope.util';
 import { userTeamScopeWhere } from '../common/tenant/team-scope.util';
 import { parseApiDate, parseApiDateRange } from '../common/dates/api-date.util';
+import { SubmitTaskReviewDto, TaskReviewDecisionDto } from './dto/task-review.dto';
 
 const taskInclude = {
   company: {
@@ -101,6 +106,17 @@ const taskInclude = {
       email: true,
     },
   },
+  reviewer: { select: { id: true, fullName: true, email: true } },
+  reviewRounds: {
+    take: 1,
+    orderBy: { roundNumber: 'desc' as const },
+    select: {
+      id: true, roundNumber: true, decision: true, submittedAt: true,
+      reviewedAt: true, reviewComment: true, submissionNote: true,
+      reviewer: { select: { id: true, fullName: true, email: true } },
+      submittedBy: { select: { id: true, fullName: true, email: true } },
+    },
+  },
   team: { select: { id: true, code: true, name: true, isActive: true } },
   meeting: { select: { id: true, title: true, startAt: true, status: true } },
   activity: { select: { id: true, type: true, occurredAt: true, companyId: true } },
@@ -113,7 +129,7 @@ const taskInclude = {
     },
     orderBy: [{ status: 'asc' as const }, { dueAt: 'asc' as const }, { createdAt: 'asc' as const }],
   },
-  _count: { select: { subtasks: true } },
+  _count: { select: { subtasks: true, reviewRounds: true } },
 } satisfies Prisma.TaskInclude;
 
 type TaskRelationDto = {
@@ -288,7 +304,17 @@ export class TasksService {
     this.assertAssignmentPermission(assignmentInput, user, 'create');
     const assignment = await this.resolveAssignment(assignmentInput, user);
 
+    if (dto.reviewerId && !this.hasPermission(user, 'task:assign-reviewer')) {
+      throw new ForbiddenException({ code: 'TASK_REVIEWER_ASSIGN_PERMISSION_REQUIRED', message: 'Assigning a reviewer requires task:assign-reviewer' });
+    }
+    const requiresReview = dto.requiresReview ?? Boolean(dto.reviewerId);
+    if (requiresReview && !dto.reviewerId) {
+      throw new BadRequestException({ code: 'TASK_REVIEWER_REQUIRED', message: 'A review-required task must have a reviewer' });
+    }
+    if (dto.reviewerId) await this.validateReviewer(dto.reviewerId, assignment.assignedToId, user);
+
     const status = dto.status ?? TaskStatus.TODO;
+    if (status === TaskStatus.DONE && requiresReview) this.assertReviewApproved(TaskReviewStatus.DRAFT, true);
     const now = new Date();
 
     const task = await this.prisma.task.create({
@@ -311,6 +337,9 @@ export class TasksService {
         assignmentScope: assignment.assignmentScope,
         teamId: assignment.teamId ?? undefined,
         assignedToId: assignment.assignedToId ?? undefined,
+        requiresReview,
+        reviewStatus: requiresReview ? TaskReviewStatus.DRAFT : TaskReviewStatus.NOT_REQUIRED,
+        reviewerId: dto.reviewerId ?? undefined,
         createdById: user.userId,
         completedAt: status === TaskStatus.DONE ? now : undefined,
         completedById: status === TaskStatus.DONE ? user.userId : undefined,
@@ -327,8 +356,12 @@ export class TasksService {
       action: 'task.created',
       after: task,
     });
+    if (task.requiresReview) {
+      await this.audit.record({ actorId: user.userId, organizationId: task.organizationId, entityType: 'task', entityId: task.id, action: 'task.review_required', after: { requiresReview: true, reviewerId: task.reviewerId } });
+    }
 
     await this.notifyTaskAssigned(task, user);
+    if (task.reviewerId) await this.notifyReviewUser(task.reviewerId, user, task, 'شما به‌عنوان بازبین کار تعیین شدید', 'REVIEWER_ASSIGNED');
 
     return task;
   }
@@ -336,9 +369,35 @@ export class TasksService {
   async update(id: string, dto: UpdateTaskDto, user: CurrentUserPayload) {
     const current = await this.getTaskForMutation(id, user);
 
+    const reviewConfigurationChanged = dto.requiresReview !== undefined || dto.reviewerId !== undefined;
+    if (reviewConfigurationChanged && !this.hasPermission(user, 'task:assign-reviewer')) {
+      throw new ForbiddenException({ code: 'TASK_REVIEWER_ASSIGN_PERMISSION_REQUIRED', message: 'Changing review configuration requires task:assign-reviewer' });
+    }
+    if (reviewConfigurationChanged && current.reviewStatus === TaskReviewStatus.PENDING_REVIEW) {
+      throw new BadRequestException({ code: 'TASK_REVIEW_PENDING', message: 'Reviewer configuration cannot change while a review is pending' });
+    }
+
+    const nextRequiresReview = dto.requiresReview ?? current.requiresReview;
+    const nextReviewerId = dto.requiresReview === false ? null : (dto.reviewerId ?? current.reviewerId);
+    if (nextRequiresReview && !nextReviewerId) {
+      throw new BadRequestException({ code: 'TASK_REVIEWER_REQUIRED', message: 'A review-required task must have a reviewer' });
+    }
+    if (nextReviewerId && (dto.assignedToId ?? current.assignedToId) === nextReviewerId) {
+      throw new BadRequestException({ code: 'TASK_SELF_REVIEW_NOT_ALLOWED', message: 'Task assignee cannot review their own work' });
+    }
+    if (nextReviewerId && nextReviewerId !== current.reviewerId) {
+      await this.validateReviewer(nextReviewerId, dto.assignedToId ?? current.assignedToId, user);
+    }
+
     const relations = await this.resolveUpdateRelations(current, dto, user);
 
     const data: Prisma.TaskUpdateInput = {};
+
+    if (reviewConfigurationChanged) {
+      data.requiresReview = nextRequiresReview;
+      data.reviewStatus = nextRequiresReview ? TaskReviewStatus.DRAFT : TaskReviewStatus.NOT_REQUIRED;
+      data.reviewer = nextReviewerId ? { connect: { id: nextReviewerId } } : { disconnect: true };
+    }
 
     if (dto.title !== undefined) {
       data.title = this.requiredText(dto.title, 'عنوان کار الزامی است');
@@ -353,7 +412,10 @@ export class TasksService {
       if (dto.status === TaskStatus.CANCELLED) {
         throw new BadRequestException({ code: 'TASK_CANCEL_REASON_REQUIRED', message: 'Use the status endpoint and provide a cancellation reason' });
       }
-      if (dto.status === TaskStatus.DONE) await this.assertSubtasksResolved(id, current.organizationId);
+      if (dto.status === TaskStatus.DONE) {
+        await this.assertSubtasksResolved(id, current.organizationId);
+        this.assertReviewApproved(current.reviewStatus, current.requiresReview);
+      }
       Object.assign(data, this.buildStatusUpdate(dto.status, user));
     }
 
@@ -367,6 +429,11 @@ export class TasksService {
 
     if (dto.reminderAt !== undefined) {
       data.reminderAt = dto.reminderAt ? parseApiDate(dto.reminderAt, 'reminderAt') : null;
+    }
+
+    const reviewSensitiveChange = dto.title !== undefined || dto.description !== undefined || this.hasRelationChanges(dto) || dto.assignedToId !== undefined;
+    if (!reviewConfigurationChanged && current.requiresReview && current.reviewStatus === TaskReviewStatus.APPROVED && reviewSensitiveChange) {
+      data.reviewStatus = TaskReviewStatus.DRAFT;
     }
 
     if (relations.companyId !== current.companyId) {
@@ -437,6 +504,9 @@ export class TasksService {
       before: current,
       after: updated,
     });
+    if (reviewConfigurationChanged) {
+      await this.audit.record({ actorId: user.userId, organizationId: current.organizationId, entityType: 'task', entityId: id, action: current.reviewerId && current.reviewerId !== updated.reviewerId ? 'task.reviewer_changed' : 'task.reviewer_assigned', before: { requiresReview: current.requiresReview, reviewerId: current.reviewerId }, after: { requiresReview: updated.requiresReview, reviewerId: updated.reviewerId } });
+    }
 
     if (this.hasRelationChanges(dto)) {
       await this.audit.record({
@@ -447,6 +517,7 @@ export class TasksService {
     }
 
     if (updated.assignedToId && updated.assignedToId !== current.assignedToId) await this.notifyTaskAssigned(updated, user);
+    if (updated.reviewerId && updated.reviewerId !== current.reviewerId) await this.notifyReviewUser(updated.reviewerId, user, updated, 'شما به‌عنوان بازبین کار تعیین شدید', 'REVIEWER_ASSIGNED');
 
     return updated;
   }
@@ -459,17 +530,29 @@ export class TasksService {
     const current = await this.getTaskForMutation(id, user);
 
     this.assertStatusTransition(current.status, dto.status);
-    if (dto.status === TaskStatus.DONE) await this.assertSubtasksResolved(id, current.organizationId);
+    if (dto.status === TaskStatus.DONE) {
+      await this.assertSubtasksResolved(id, current.organizationId);
+      this.assertReviewApproved(current.reviewStatus, current.requiresReview);
+    }
     if (dto.status === TaskStatus.CANCELLED && !dto.note?.trim()) {
       throw new BadRequestException({ code: 'TASK_CANCEL_REASON_REQUIRED', message: 'A cancellation reason is required' });
     }
 
-    const updated = await this.prisma.task.update({
-      where: { id },
-      data: {
-        ...this.buildStatusUpdate(dto.status, user, dto.note),
-      },
-      include: taskInclude,
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const changedTask = await tx.task.update({
+        where: { id },
+        data: {
+          ...this.buildStatusUpdate(dto.status, user, dto.note),
+          ...(dto.status === TaskStatus.CANCELLED && current.reviewStatus === TaskReviewStatus.PENDING_REVIEW
+            ? { reviewStatus: current.requiresReview ? TaskReviewStatus.DRAFT : TaskReviewStatus.NOT_REQUIRED }
+            : {}),
+        },
+        include: taskInclude,
+      });
+      if (dto.status === TaskStatus.CANCELLED && current.reviewStatus === TaskReviewStatus.PENDING_REVIEW) {
+        await tx.taskReviewRound.updateMany({ where: { taskId: id, decision: TaskReviewDecision.PENDING }, data: { decision: TaskReviewDecision.CANCELLED, reviewedAt: new Date(), reviewComment: dto.note?.trim() } });
+      }
+      return changedTask;
     });
 
     await this.audit.record({
@@ -522,12 +605,16 @@ export class TasksService {
     this.assertTaskOpen(current.status, 'Completed or cancelled tasks cannot be reassigned');
     this.assertAssignmentPermission(dto, user, operation);
     const assignment = await this.resolveAssignment(dto, user);
+    if (current.reviewerId && assignment.assignedToId === current.reviewerId) {
+      throw new BadRequestException({ code: 'TASK_SELF_REVIEW_NOT_ALLOWED', message: 'Task assignee cannot review their own work' });
+    }
     const updated = await this.prisma.task.update({
       where: { id },
       data: {
         assignmentScope: assignment.assignmentScope,
         teamId: assignment.teamId,
         assignedToId: assignment.assignedToId,
+        ...(current.requiresReview && current.reviewStatus === TaskReviewStatus.APPROVED ? { reviewStatus: TaskReviewStatus.DRAFT } : {}),
       },
       include: taskInclude,
     });
@@ -598,6 +685,7 @@ export class TasksService {
     const current = await this.getTaskForMutation(id, user);
     this.assertStatusTransition(current.status, TaskStatus.DONE);
     await this.assertSubtasksResolved(id, current.organizationId);
+    this.assertReviewApproved(current.reviewStatus, current.requiresReview);
 
     const updated = await this.prisma.task.update({
       where: { id },
@@ -630,6 +718,93 @@ export class TasksService {
     if (updated.parentTaskId) await this.notifyParentReady(updated.parentTaskId, updated.organizationId, user);
 
     return updated;
+  }
+
+  async findReviews(id: string, user: CurrentUserPayload) {
+    const task = await this.getTaskInScope(id, user);
+    return this.prisma.taskReviewRound.findMany({
+      where: { taskId: task.id, organizationId: task.organizationId },
+      include: {
+        reviewer: { select: { id: true, fullName: true, email: true } },
+        submittedBy: { select: { id: true, fullName: true, email: true } },
+        artifacts: { include: { artifact: { select: { id: true, name: true, type: true, provider: true, mimeType: true, sizeBytes: true, externalUrl: true } } } },
+      },
+      orderBy: { roundNumber: 'desc' },
+    });
+  }
+
+  async submitReview(id: string, dto: SubmitTaskReviewDto, user: CurrentUserPayload) {
+    if (!this.hasPermission(user, 'task:submit-review')) throw new ForbiddenException('task:submit-review permission is required');
+    const task = await this.getTaskForMutation(id, user);
+    this.assertTaskOpen(task.status, 'Closed tasks cannot be submitted for review');
+    if (!task.requiresReview) throw new BadRequestException({ code: 'TASK_REVIEW_NOT_REQUIRED', message: 'This task does not require review' });
+    if (task.reviewStatus === TaskReviewStatus.PENDING_REVIEW) throw new ConflictException({ code: 'TASK_REVIEW_ALREADY_PENDING', message: 'A review is already pending' });
+    if (task.reviewStatus === TaskReviewStatus.APPROVED) throw new BadRequestException({ code: 'TASK_REVIEW_ALREADY_APPROVED', message: 'Approved work must be materially updated before resubmission' });
+    const reviewerId = dto.reviewerId ?? task.reviewerId;
+    if (!reviewerId) throw new BadRequestException({ code: 'TASK_REVIEWER_REQUIRED', message: 'A reviewer is required' });
+    if (dto.reviewerId && dto.reviewerId !== task.reviewerId && !this.hasPermission(user, 'task:assign-reviewer')) {
+      throw new ForbiddenException({ code: 'TASK_REVIEWER_ASSIGN_PERMISSION_REQUIRED', message: 'Changing reviewer requires task:assign-reviewer' });
+    }
+    await this.validateReviewer(reviewerId, task.assignedToId, user, user.userId);
+    const artifactIds = [...new Set(dto.artifactIds ?? [])];
+    await this.validateSubmissionArtifacts(task.id, artifactIds, task.organizationId);
+
+    try {
+      const result = await this.prisma.$transaction(async (tx) => {
+        const latest = await tx.taskReviewRound.aggregate({ where: { taskId: id }, _max: { roundNumber: true } });
+        const roundNumber = (latest._max.roundNumber ?? 0) + 1;
+        const changed = await tx.task.updateMany({
+          where: { id, organizationId: task.organizationId, reviewStatus: { in: [TaskReviewStatus.DRAFT, TaskReviewStatus.CHANGES_REQUESTED] }, status: { notIn: [TaskStatus.DONE, TaskStatus.CANCELLED] } },
+          data: { reviewStatus: TaskReviewStatus.PENDING_REVIEW, reviewerId },
+        });
+        if (changed.count !== 1) throw new ConflictException({ code: 'TASK_REVIEW_STATE_CHANGED', message: 'Task review state changed; refresh and retry' });
+        const round = await tx.taskReviewRound.create({ data: {
+          organizationId: task.organizationId, taskId: id, roundNumber, reviewerId,
+          submittedById: user.userId, submissionNote: dto.note?.trim() || undefined,
+          artifacts: artifactIds.length ? { create: artifactIds.map((artifactId) => ({ artifactId, addedById: user.userId })) } : undefined,
+        } });
+        return round;
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+      const action = result.roundNumber > 1 ? 'task.review_resubmitted' : 'task.review_submitted';
+      await this.audit.record({ actorId: user.userId, organizationId: task.organizationId, entityType: 'task', entityId: id, action, metadata: { taskId: id, reviewRoundId: result.id, roundNumber: result.roundNumber, reviewerId, submitterId: user.userId, artifactIds } });
+      await this.notifyReviewUser(reviewerId, user, task, result.roundNumber > 1 ? 'کار برای بازبینی مجدد ارسال شد' : 'کار جدیدی منتظر بازبینی شماست', result.roundNumber > 1 ? 'RESUBMITTED' : 'REQUESTED');
+      return this.findOne(id, user);
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && ['P2002', 'P2034'].includes(error.code)) throw new ConflictException({ code: 'TASK_REVIEW_CONFLICT', message: 'Concurrent review submission detected; refresh and retry' });
+      throw error;
+    }
+  }
+
+  async decideReview(id: string, decision: 'APPROVED' | 'CHANGES_REQUESTED', dto: TaskReviewDecisionDto, user: CurrentUserPayload) {
+    if (!this.hasPermission(user, 'task:review')) throw new ForbiddenException('task:review permission is required');
+    const task = await this.getTaskForMutation(id, user);
+    this.assertTaskOpen(task.status, 'Closed tasks cannot be reviewed');
+    if (task.reviewStatus !== TaskReviewStatus.PENDING_REVIEW) throw new ConflictException({ code: 'TASK_REVIEW_NOT_PENDING', message: 'Task is not pending review' });
+    if (task.reviewerId !== user.userId) throw new ForbiddenException({ code: 'TASK_REVIEWER_MISMATCH', message: 'Only the assigned reviewer can decide this review' });
+    const comment = dto.comment?.trim();
+    if (decision === 'CHANGES_REQUESTED' && !comment) throw new BadRequestException({ code: 'TASK_REVIEW_COMMENT_REQUIRED', message: 'A review comment is required when requesting changes' });
+
+    const pending = await this.prisma.taskReviewRound.findFirst({ where: { taskId: id, organizationId: task.organizationId, decision: TaskReviewDecision.PENDING }, orderBy: { roundNumber: 'desc' } });
+    if (!pending) throw new ConflictException({ code: 'TASK_REVIEW_ROUND_NOT_PENDING', message: 'No pending review round was found' });
+    const reviewDecision = decision === 'APPROVED' ? TaskReviewDecision.APPROVED : TaskReviewDecision.CHANGES_REQUESTED;
+    const reviewStatus = decision === 'APPROVED' ? TaskReviewStatus.APPROVED : TaskReviewStatus.CHANGES_REQUESTED;
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        const changed = await tx.taskReviewRound.updateMany({ where: { id: pending.id, decision: TaskReviewDecision.PENDING }, data: { decision: reviewDecision, reviewedAt: new Date(), reviewComment: comment || undefined } });
+        if (changed.count !== 1) throw new ConflictException({ code: 'TASK_REVIEW_ALREADY_DECIDED', message: 'This review round was already decided' });
+        const taskChanged = await tx.task.updateMany({ where: { id, organizationId: task.organizationId, reviewStatus: TaskReviewStatus.PENDING_REVIEW, reviewerId: user.userId }, data: { reviewStatus } });
+        if (taskChanged.count !== 1) throw new ConflictException({ code: 'TASK_REVIEW_STATE_CHANGED', message: 'Task review state changed; refresh and retry' });
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034') {
+        throw new ConflictException({ code: 'TASK_REVIEW_CONFLICT', message: 'Concurrent review decision detected; refresh and retry' });
+      }
+      throw error;
+    }
+    await this.audit.record({ actorId: user.userId, organizationId: task.organizationId, entityType: 'task', entityId: id, action: decision === 'APPROVED' ? 'task.review_approved' : 'task.review_changes_requested', metadata: { taskId: id, reviewRoundId: pending.id, roundNumber: pending.roundNumber, reviewerId: user.userId, decision, comment } });
+    const recipients = [...new Set([task.assignedToId, pending.submittedById].filter((value): value is string => Boolean(value && value !== user.userId)))];
+    await Promise.all(recipients.map((recipientId) => this.notifyReviewUser(recipientId, user, task, decision === 'APPROVED' ? 'بازبینی کار تأیید شد' : 'اصلاحات برای کار درخواست شد', decision)));
+    return this.findOne(id, user);
   }
 
   async reschedule(id: string, dto: RescheduleTaskDto, user: CurrentUserPayload) {
@@ -727,6 +902,12 @@ export class TasksService {
     if (query.meetingId) and.push({ meetingId: query.meetingId });
     if (query.activityId) and.push({ activityId: query.activityId });
     if (query.productId) and.push({ productId: query.productId });
+    if (query.reviewStatus) and.push({ reviewStatus: query.reviewStatus });
+    if (query.reviewerId) and.push({ reviewerId: query.reviewerId });
+    if (query.awaitingMyReview === 'true') {
+      if (!this.hasPermission(user, 'task:review')) throw new ForbiddenException('task:review permission is required');
+      and.push({ reviewStatus: TaskReviewStatus.PENDING_REVIEW, reviewerId: user.userId });
+    }
 
     if (query.view === 'mine') and.push({ assignedToId: user.userId });
     if (query.view === 'created') and.push({ createdById: user.userId });
@@ -829,6 +1010,7 @@ export class TasksService {
             : []),
           { assignedTo: userTeamScopeWhere(user) },
           { createdBy: userTeamScopeWhere(user) },
+          ...(this.hasPermission(user, 'task:review') ? [{ reviewerId: user.userId } as Prisma.TaskWhereInput] : []),
           { company: { owner: userTeamScopeWhere(user) } },
           { opportunity: { company: { owner: userTeamScopeWhere(user) } } },
           { person: { company: { owner: userTeamScopeWhere(user) } } },
@@ -861,6 +1043,7 @@ export class TasksService {
           : []),
         { assignedToId: user.userId },
         { createdById: user.userId },
+        ...(this.hasPermission(user, 'task:review') ? [{ reviewerId: user.userId } as Prisma.TaskWhereInput] : []),
         { company: { ownerId: user.userId } },
         {
           opportunity: {
@@ -1483,6 +1666,62 @@ export class TasksService {
     }
 
     return assignee;
+  }
+
+  private async validateReviewer(
+    reviewerId: string,
+    assigneeId: string | null,
+    user: CurrentUserPayload,
+    submitterId?: string,
+  ) {
+    if (reviewerId === assigneeId || reviewerId === submitterId) {
+      throw new BadRequestException({ code: 'TASK_SELF_REVIEW_NOT_ALLOWED', message: 'Assignee or submitter cannot review their own work' });
+    }
+    const organizationId = getCurrentOrganizationId(user);
+    const reviewer = await this.prisma.user.findFirst({
+      where: { id: reviewerId, organizationId, isActive: true, role: { not: UserRole.BOARDS } },
+      include: {
+        organizationMemberships: {
+          where: { organizationId, status: 'ACTIVE' },
+          include: { role: { include: { permissions: { include: { permission: true } } } } },
+        },
+      },
+    });
+    if (!reviewer) throw new BadRequestException({ code: 'TASK_REVIEWER_INVALID', message: 'Reviewer must be an active internal user in the same organization' });
+    const membershipAllows = reviewer.organizationMemberships.some((membership) => membership.isTenantOwner || membership.role?.permissions.some((item) => item.permission.isActive && item.permission.action === 'task:review'));
+    const legacyAllows = await this.prisma.rolePermission.count({ where: { role: reviewer.role, permission: { action: 'task:review', isActive: true } } });
+    if (!membershipAllows && !legacyAllows) throw new BadRequestException({ code: 'TASK_REVIEWER_PERMISSION_REQUIRED', message: 'Reviewer does not have task:review permission' });
+    return reviewer;
+  }
+
+  private async validateSubmissionArtifacts(taskId: string, artifactIds: string[], organizationId: string) {
+    if (!artifactIds.length) return;
+    const count = await this.prisma.fileAttachment.count({ where: {
+      id: { in: artifactIds }, organizationId, deletedAt: null,
+      links: { some: { organizationId, entityType: FileAttachmentEntityType.TASK, entityId: taskId } },
+    } });
+    if (count !== artifactIds.length) throw new BadRequestException({ code: 'TASK_REVIEW_ARTIFACT_INVALID', message: 'Every submission artifact must be active, tenant-owned and linked to this task' });
+  }
+
+  private assertReviewApproved(reviewStatus: TaskReviewStatus, requiresReview: boolean) {
+    if (requiresReview && reviewStatus !== TaskReviewStatus.APPROVED) {
+      throw new BadRequestException({ code: 'TASK_REVIEW_NOT_APPROVED', message: 'Task cannot be completed until the current review is approved' });
+    }
+  }
+
+  private async notifyReviewUser(
+    recipientId: string,
+    user: CurrentUserPayload,
+    task: { id: string; title: string; organizationId: string },
+    title: string,
+    event: string,
+  ) {
+    await this.notifications.notifyUser({
+      organizationId: task.organizationId, recipientId, actorId: user.userId,
+      type: NotificationType.TASK_STATUS_CHANGED, priority: NotificationPriority.NORMAL,
+      title, body: task.title, entityType: NotificationEntityType.TASK, entityId: task.id,
+      actionUrl: `/tasks/${task.id}#review`, metadata: { event }, skipSelf: true,
+    });
   }
 
   private buildStatusUpdate(
