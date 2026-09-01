@@ -2955,7 +2955,7 @@ model TenderRequirement {
   blockedBy             User?                         @relation("TenderRequirementBlockedBy", fields: [blockedById], references: [id], onDelete: SetNull)
   createdAt             DateTime                      @default(now())
   updatedAt             DateTime                      @updatedAt
-  OpportunityLineItem   OpportunityLineItem?          @relation(fields: [opportunityLineItemId], references: [id])
+  opportunityLineItem   OpportunityLineItem?          @relation(fields: [opportunityLineItemId], references: [id], onDelete: SetNull)
   opportunityLineItemId String?
 
   @@unique([organizationId, tenderId, referenceId])
@@ -2964,6 +2964,7 @@ model TenderRequirement {
   @@index([organizationId, parentRequirementId])
   @@index([organizationId, ownerId])
   @@index([organizationId, taskId])
+  @@index([opportunityLineItemId])
   @@map("tender_requirements")
 }
 
