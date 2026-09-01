@@ -537,11 +537,15 @@ export class TechnicalCenterService {
     if (dto.ownerId) await this.assertUser(tender.organizationId, dto.ownerId);
     if (dto.parentRequirementId) await this.assertRequirementParent(tenderId, undefined, dto.parentRequirementId, tender.organizationId);
     if (dto.dependencyIds?.length) await this.assertRequirementIds(tenderId, dto.dependencyIds, tender.organizationId);
+    if (dto.status === TenderRequirementStatus.BLOCKED && !dto.blockedReason?.trim()) {
+      throw new BadRequestException({ code: 'REQUIREMENT_BLOCK_REASON_REQUIRED', message: 'A reason is required when blocking a requirement' });
+    }
     const { dependencyIds, ...input } = dto;
     const row = await this.prisma.tenderRequirement.create({ data: {
       ...input, title: dto.title.trim(), category: dto.category?.trim(), description: dto.description?.trim(), response: dto.response?.trim(),
-      section: dto.section?.trim(), page: dto.page?.trim(), referenceId: dto.referenceId?.trim(), notes: dto.notes?.trim(),
+      section: dto.section?.trim(), page: dto.page?.trim(), referenceId: dto.referenceId?.trim(), notes: dto.notes?.trim(), blockedReason: dto.blockedReason?.trim(),
       dueDate: this.date(dto.dueDate, 'dueDate'), organizationId: tender.organizationId, tenderId,
+      ...(dto.status === TenderRequirementStatus.BLOCKED && { blockedAt: new Date(), blockedById: user.userId }),
       ...(dependencyIds?.length && { dependencies: { create: [...new Set(dependencyIds)].map((dependsOnRequirementId) => ({ dependsOnRequirementId })) } }),
     }});
     await this.log('tender-requirement', row.id, 'technical-tender.requirement-created', tender.organizationId, user, undefined, row);
@@ -639,6 +643,18 @@ export class TechnicalCenterService {
     const row = await this.prisma.tenderRequirement.update({ where: { id: requirementId }, data: { taskId: task.id } });
     await this.log('tender-requirement', requirementId, 'technical-tender.requirement-task-linked', tender.organizationId, user, requirement, row);
     return row;
+  }
+
+  async listTenderCurrencyOptions() {
+    const rates = await this.prisma.currencyExchangeRate.findMany({
+      select: { baseCurrency: true, quoteCurrency: true },
+    });
+    const codes = new Set<string>(['IRR']);
+    for (const rate of rates) {
+      if (rate.baseCurrency?.trim()) codes.add(rate.baseCurrency.trim().toUpperCase());
+      if (rate.quoteCurrency?.trim()) codes.add(rate.quoteCurrency.trim().toUpperCase());
+    }
+    return [...codes].sort((left, right) => left === 'IRR' ? -1 : right === 'IRR' ? 1 : left.localeCompare(right)).map((code) => ({ id: code, label: code }));
   }
 
   async createRequirementTask(tenderId: string, requirementId: string, dto: CreateRequirementTaskDto, user: CurrentUserPayload) {

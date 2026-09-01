@@ -206,11 +206,10 @@ export class CreateRequirementDto {
   @IsOptional() @IsUUID() ownerId?: string | null;
   @IsOptional() @IsApiDateString() dueDate?: string;
   @IsOptional() @IsString() @MaxLength(20000) response?: string;
-}
-export class UpdateRequirementDto extends PartialType(CreateRequirementDto) {
   @IsOptional() @IsEnum(TenderRequirementStatus) status?: TenderRequirementStatus;
   @IsOptional() @IsString() @MaxLength(2000) blockedReason?: string;
 }
+export class UpdateRequirementDto extends PartialType(CreateRequirementDto) {}
 
 export class RequirementDependencyDto {
   @IsUUID() dependsOnRequirementId!: string;

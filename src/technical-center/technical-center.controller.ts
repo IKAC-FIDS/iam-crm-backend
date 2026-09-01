@@ -95,6 +95,7 @@ export class TechnicalResourcesController {
 export class TechnicalTendersController {
   constructor(private readonly service: TechnicalCenterService) {}
   @Get() @Permissions('technical-tender:view') list(@Query() q: TechnicalListDto, @CurrentUser() u: CurrentUserPayload) { return this.service.listTenders(q, u); }
+  @Get('currency-options') @AnyPermission('technical-tender:view', 'technical-tender:manage') currencyOptions() { return this.service.listTenderCurrencyOptions(); }
   @Post() @Permissions('technical-tender:manage') create(@Body() d: CreateTenderDto, @CurrentUser() u: CurrentUserPayload) { return this.service.createTender(d, u); }
   @Get(':id') @Permissions('technical-tender:view') get(@Param('id') id: string, @CurrentUser() u: CurrentUserPayload) { return this.service.getTender(id, u); }
   @Patch(':id') @Permissions('technical-tender:manage') update(@Param('id') id: string, @Body() d: UpdateTenderDto, @CurrentUser() u: CurrentUserPayload) { return this.service.updateTender(id, d, u); }
