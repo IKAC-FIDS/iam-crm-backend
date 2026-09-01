@@ -66,6 +66,12 @@ export class ActivitiesService {
     });
   }
 
+  private canViewOrganizationActivities(user: CurrentUserPayload) {
+    return Boolean(
+      user.tenantContext?.permissions.includes('activity:view-organization'),
+    );
+  }
+
   private async validateManualType(type: string) {
     if (type === 'STAGE_CHANGE') throw new BadRequestException('STAGE_CHANGE is a system activity');
     const option = await this.prisma.lookupOption.findFirst({
@@ -137,6 +143,9 @@ export class ActivitiesService {
         ],
       },
     ];
+    if (!this.canViewOrganizationActivities(user)) {
+      and.push({ userId: user.userId });
+    }
     if (query.activityType) and.push({ type: query.activityType });
     if (query.status === ActivityListStatus.COMPLETED) and.push({ completedAt: { not: null } });
     else if (query.status === ActivityListStatus.RECORDED) and.push({ completedAt: null });
@@ -293,9 +302,12 @@ export class ActivitiesService {
     const page = pagination.page ?? 1;
     const limit = pagination.limit ?? 20;
     const skip = (page - 1) * limit;
+    const activityScope = this.canViewOrganizationActivities(user)
+      ? {}
+      : { userId: user.userId };
     const [data, total] = await Promise.all([
       this.prisma.activity.findMany({
-        where: { companyId },
+        where: { companyId, ...activityScope },
         include: {
           person: true,
           task: {
@@ -312,7 +324,7 @@ export class ActivitiesService {
         skip,
         take: limit,
       }),
-      this.prisma.activity.count({ where: { companyId } }),
+      this.prisma.activity.count({ where: { companyId, ...activityScope } }),
     ]);
     const totalPages = Math.ceil(total / limit);
     return {
@@ -346,6 +358,9 @@ export class ActivitiesService {
     const where: Prisma.ActivityWhereInput = {
       targetType: ActivityTargetType.TASK,
       taskId: { in: taskIds },
+      ...(!this.canViewOrganizationActivities(user) && {
+        userId: user.userId,
+      }),
     };
     const [data, total] = await Promise.all([
       this.prisma.activity.findMany({

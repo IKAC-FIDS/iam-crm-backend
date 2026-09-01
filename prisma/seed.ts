@@ -854,6 +854,12 @@ async function main() {
     { action: 'social-channel:manage', description: 'مدیریت کانال‌های اجتماعی شرکت' },
 
     { action: 'activity:view', description: 'مشاهده فعالیت‌ها' },
+    {
+      action: 'activity:view-organization',
+      description: 'مشاهده فعالیت‌های همه کاربران سازمان',
+      name: 'مشاهده فعالیت‌های سازمان',
+      group: 'فعالیت‌ها',
+    },
     { action: 'activity:create', description: 'ثبت فعالیت' },
     { action: 'activity:update', description: 'ویرایش فعالیت' },
     { action: 'follow-up:complete', description: 'تکمیل پیگیری' },

@@ -22,6 +22,13 @@ const user = tenantUser({
   organizationId,
   teamId: 'team-1',
 });
+const organizationViewer = {
+  ...user,
+  tenantContext: {
+    ...user.tenantContext!,
+    permissions: ['activity:view', 'activity:view-organization'],
+  },
+};
 const occurredAt = new Date('2026-07-29T08:00:00.000Z');
 const createdAt = new Date('2026-07-29T09:00:00.000Z');
 const row = {
@@ -119,7 +126,9 @@ describe('Activity Center listing', () => {
   it('searches title, description, person, and company names', async () => {
     const { service, prisma } = setup();
     await service.findAll({ search: ' نمونه ' }, user);
-    const search = prisma.activity.findMany.mock.calls[0][0].where.AND[1];
+    const search = prisma.activity.findMany.mock.calls[0][0].where.AND.find(
+      (item: any) => Array.isArray(item.OR) && item.OR.some((part: any) => part.outcome),
+    );
     expect(search.OR).toEqual([
       { outcome: { contains: 'نمونه', mode: 'insensitive' } },
       { notes: { contains: 'نمونه', mode: 'insensitive' } },
@@ -176,7 +185,10 @@ describe('Activity Center listing', () => {
     );
     const and = prisma.activity.findMany.mock.calls[0][0].where.AND;
     expect(and[0]).toEqual({
-      company: { organizationId, archivedAt: null },
+      OR: [
+        { company: { organizationId, archivedAt: null } },
+        { task: { organizationId } },
+      ],
     });
     expect(and).toEqual(
       expect.arrayContaining([
@@ -195,6 +207,24 @@ describe('Activity Center listing', () => {
       companyId: 'company-1',
     });
     expect(new FindActivitiesDto().companyId).toBeUndefined();
+  });
+
+  it('limits activity:view to the current user', async () => {
+    const { service, prisma } = setup();
+    await service.findAll({}, user);
+
+    expect(prisma.activity.findMany.mock.calls[0][0].where.AND).toContainEqual({
+      userId: user.userId,
+    });
+  });
+
+  it('allows organization-wide listing only with activity:view-organization', async () => {
+    const { service, prisma } = setup();
+    await service.findAll({}, organizationViewer);
+
+    expect(prisma.activity.findMany.mock.calls[0][0].where.AND).not.toContainEqual({
+      userId: user.userId,
+    });
   });
 });
 
