@@ -6,6 +6,7 @@
   Res,
   StreamableFile,
   UseGuards,
+  ForbiddenException,
 } from "@nestjs/common";
 import type { Response } from "express";
 import {
@@ -29,6 +30,17 @@ import {
 import { PeriodComparisonDto } from "./dto/period-comparison.dto";
 import { PeriodComparisonService } from "./period-comparison.service";
 import { ReportExportsService } from "./report-exports.service";
+import { canViewFinancials } from "../common/financial/financial-visibility";
+
+const FINANCIAL_EXPORTS = new Set([
+  "period-comparison",
+  "opportunity-forecast",
+  "financial-collections",
+  "product-performance",
+  "exchange-rate-impact",
+  "pipeline-summary",
+  "pipeline-by-owner",
+]);
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @Permissions("report:view")
@@ -75,6 +87,9 @@ export class ReportsController {
     @CurrentUser() user: CurrentUserPayload,
     @Res({ passthrough: true }) response: Response,
   ) {
+    if (FINANCIAL_EXPORTS.has(reportKey) && !canViewFinancials(user)) {
+      throw new ForbiddenException("Missing permission: financial:view");
+    }
     const file = await this.reportExports.export(reportKey, query, user);
     response.setHeader("Content-Type", file.contentType);
     response.setHeader("Content-Disposition", file.contentDisposition);
@@ -82,6 +97,7 @@ export class ReportsController {
   }
 
   @Get("financial/collections")
+  @Permissions("report:view", "financial:view")
   getFinancialCollections(
     @Query() filters: AdvancedReportFiltersDto,
     @CurrentUser() user: CurrentUserPayload,
@@ -98,6 +114,7 @@ export class ReportsController {
   }
 
   @Get("exchange-rates/impact")
+  @Permissions("report:view", "financial:view")
   getExchangeRateImpact(@Query() filters: AdvancedReportFiltersDto) {
     return this.commercialReportsService.exchangeImpact(filters);
   }

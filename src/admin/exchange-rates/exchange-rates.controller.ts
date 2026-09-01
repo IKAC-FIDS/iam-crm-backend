@@ -9,7 +9,7 @@ import { ExchangeRatesService } from './exchange-rates.service';
 @Controller('admin/exchange-rates') @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class ExchangeRatesController {
   constructor(private readonly service: ExchangeRatesService) {}
-  @Get('current') @Permissions('exchange-rate:view') current() { return this.service.current(); }
-  @Get() @Permissions('exchange-rate:view') findAll(@Query() query: FindExchangeRatesDto) { return this.service.findAll(query); }
-  @Post() @Permissions('exchange-rate:manage') create(@Body() dto: CreateExchangeRateDto, @CurrentUser() user: CurrentUserPayload) { return this.service.create(dto, user); }
+  @Get('current') @Permissions('exchange-rate:view', 'financial:view') current() { return this.service.current(); }
+  @Get() @Permissions('exchange-rate:view', 'financial:view') findAll(@Query() query: FindExchangeRatesDto) { return this.service.findAll(query); }
+  @Post() @Permissions('exchange-rate:manage', 'financial:view') create(@Body() dto: CreateExchangeRateDto, @CurrentUser() user: CurrentUserPayload) { return this.service.create(dto, user); }
 }

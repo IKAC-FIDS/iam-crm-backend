@@ -11,6 +11,8 @@ const prisma = new PrismaClient();
 type PermissionSeed = {
   action: string;
   description: string;
+  name?: string;
+  group?: string;
 };
 
 type StageSeed = readonly [
@@ -24,7 +26,13 @@ type StageSeed = readonly [
 async function upsertPermission(permission: PermissionSeed) {
   return prisma.permission.upsert({
     where: { action: permission.action },
-    update: { description: permission.description, isSystem: true, isActive: true },
+    update: {
+      description: permission.description,
+      name: permission.name,
+      group: permission.group,
+      isSystem: true,
+      isActive: true,
+    },
     create: { ...permission, isSystem: true, isActive: true },
   });
 }
@@ -853,6 +861,12 @@ async function main() {
 
     { action: 'report:view', description: 'مشاهده گزارش‌ها' },
     { action: 'report:advanced-filter', description: 'استفاده از فیلترهای پیشرفته گزارش' },
+    {
+      action: 'financial:view',
+      description: 'مشاهده اطلاعات مالی',
+      name: 'مشاهده اطلاعات مالی',
+      group: 'اطلاعات مالی',
+    },
 
     { action: 'call-card:view', description: 'مشاهده Call Card' },
     { action: 'call-card:manage', description: 'مدیریت Call Card' },
@@ -995,6 +1009,7 @@ async function main() {
 
     'report:view',
     'report:advanced-filter',
+    'financial:view',
 
     'call-card:view',
     'call-card:manage',
@@ -1136,6 +1151,7 @@ async function main() {
   const boardsActions = [
     'report:view',
     'report:advanced-filter',
+    'financial:view',
 
     'library:persona:view',
     'library:industry:view',
