@@ -33,7 +33,7 @@ let ExchangeRatesController = class ExchangeRatesController {
 exports.ExchangeRatesController = ExchangeRatesController;
 __decorate([
     (0, common_1.Get)('current'),
-    (0, permissions_decorator_1.Permissions)('exchange-rate:view'),
+    (0, permissions_decorator_1.Permissions)('exchange-rate:view', 'financial:view'),
     openapi.ApiResponse({ status: 200, type: Object }),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
@@ -41,7 +41,7 @@ __decorate([
 ], ExchangeRatesController.prototype, "current", null);
 __decorate([
     (0, common_1.Get)(),
-    (0, permissions_decorator_1.Permissions)('exchange-rate:view'),
+    (0, permissions_decorator_1.Permissions)('exchange-rate:view', 'financial:view'),
     openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Query)()),
     __metadata("design:type", Function),
@@ -50,7 +50,7 @@ __decorate([
 ], ExchangeRatesController.prototype, "findAll", null);
 __decorate([
     (0, common_1.Post)(),
-    (0, permissions_decorator_1.Permissions)('exchange-rate:manage'),
+    (0, permissions_decorator_1.Permissions)('exchange-rate:manage', 'financial:view'),
     openapi.ApiResponse({ status: 201 }),
     __param(0, (0, common_1.Body)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),

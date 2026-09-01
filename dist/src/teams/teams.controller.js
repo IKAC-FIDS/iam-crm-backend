@@ -59,7 +59,7 @@ let TeamsController = class TeamsController {
 exports.TeamsController = TeamsController;
 __decorate([
     (0, common_1.Get)(),
-    (0, permissions_decorator_1.Permissions)('team:view'),
+    (0, permissions_decorator_1.AnyPermission)('team:view', 'technical-tender:manage', 'technical-tender:review-technical', 'technical-tender:review-commercial'),
     openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Query)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),

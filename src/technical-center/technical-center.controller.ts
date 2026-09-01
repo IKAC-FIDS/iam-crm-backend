@@ -11,6 +11,7 @@ import {
   CreateKnowledgeDto,
   CreateReleaseDto,
   CreateRequirementDto,
+  CreateRequirementTaskDto,
   CreateResourceDto,
   CreateTenderDto,
   DecideTenderReviewDto,
@@ -18,6 +19,8 @@ import {
   KnowledgeTransitionDto,
   ReleaseTransitionDto,
   RequestTenderReviewDto,
+  RequirementDependencyDto,
+  LinkRequirementTaskDto,
   TechnicalListDto,
   TechnicalDocumentListDto,
   TenderTransitionDto,
@@ -27,6 +30,7 @@ import {
   UpdateRequirementDto,
   UpdateResourceDto,
   UpdateTenderDto,
+  UpdateTenderQualificationDto,
 } from './dto/technical-center.dto';
 import { TechnicalCenterService } from './technical-center.service';
 
@@ -94,6 +98,7 @@ export class TechnicalTendersController {
   @Post() @Permissions('technical-tender:manage') create(@Body() d: CreateTenderDto, @CurrentUser() u: CurrentUserPayload) { return this.service.createTender(d, u); }
   @Get(':id') @Permissions('technical-tender:view') get(@Param('id') id: string, @CurrentUser() u: CurrentUserPayload) { return this.service.getTender(id, u); }
   @Patch(':id') @Permissions('technical-tender:manage') update(@Param('id') id: string, @Body() d: UpdateTenderDto, @CurrentUser() u: CurrentUserPayload) { return this.service.updateTender(id, d, u); }
+  @Patch(':id/qualification') @Permissions('technical-tender:manage') qualification(@Param('id') id: string, @Body() d: UpdateTenderQualificationDto, @CurrentUser() u: CurrentUserPayload) { return this.service.updateTenderQualification(id, d, u); }
   @Post(':id/transition') @AnyPermission('technical-tender:manage', 'technical-tender:submit', 'technical-tender:close') transition(@Param('id') id: string, @Body() d: TenderTransitionDto, @CurrentUser() u: CurrentUserPayload) { return this.service.transitionTender(id, d, u); }
   @Get(':id/readiness') @Permissions('technical-tender:view') readiness(@Param('id') id: string, @CurrentUser() u: CurrentUserPayload) { return this.service.getTenderReadiness(id, u); }
   @Get(':id/history') @Permissions('technical-tender:view') history(@Param('id') id: string, @CurrentUser() u: CurrentUserPayload) { return this.service.tenderHistory(id, u); }
@@ -104,6 +109,11 @@ export class TechnicalTendersController {
   @Post(':id/requirements') @Permissions('technical-tender:manage') addRequirement(@Param('id') id: string, @Body() d: CreateRequirementDto, @CurrentUser() u: CurrentUserPayload) { return this.service.addRequirement(id, d, u); }
   @Patch(':id/requirements/:requirementId') @Permissions('technical-tender:manage') updateRequirement(@Param('id') id: string, @Param('requirementId') requirementId: string, @Body() d: UpdateRequirementDto, @CurrentUser() u: CurrentUserPayload) { return this.service.updateRequirement(id, requirementId, d, u); }
   @Delete(':id/requirements/:requirementId') @Permissions('technical-tender:manage') removeRequirement(@Param('id') id: string, @Param('requirementId') requirementId: string, @CurrentUser() u: CurrentUserPayload) { return this.service.removeRequirement(id, requirementId, u); }
+  @Post(':id/requirements/:requirementId/dependencies') @Permissions('technical-tender:manage') addDependency(@Param('id') id: string, @Param('requirementId') requirementId: string, @Body() d: RequirementDependencyDto, @CurrentUser() u: CurrentUserPayload) { return this.service.addRequirementDependency(id, requirementId, d, u); }
+  @Delete(':id/requirements/:requirementId/dependencies/:dependencyId') @Permissions('technical-tender:manage') removeDependency(@Param('id') id: string, @Param('requirementId') requirementId: string, @Param('dependencyId') dependencyId: string, @CurrentUser() u: CurrentUserPayload) { return this.service.removeRequirementDependency(id, requirementId, dependencyId, u); }
+  @Post(':id/requirements/:requirementId/link-task') @Permissions('technical-tender:manage') linkTask(@Param('id') id: string, @Param('requirementId') requirementId: string, @Body() d: LinkRequirementTaskDto, @CurrentUser() u: CurrentUserPayload) { return this.service.linkRequirementTask(id, requirementId, d, u); }
+  @Post(':id/requirements/:requirementId/create-task') @Permissions('technical-tender:manage') createTask(@Param('id') id: string, @Param('requirementId') requirementId: string, @Body() d: CreateRequirementTaskDto, @CurrentUser() u: CurrentUserPayload) { return this.service.createRequirementTask(id, requirementId, d, u); }
+  @Delete(':id/requirements/:requirementId/task') @Permissions('technical-tender:manage') unlinkTask(@Param('id') id: string, @Param('requirementId') requirementId: string, @CurrentUser() u: CurrentUserPayload) { return this.service.unlinkRequirementTask(id, requirementId, u); }
   @Post(':id/deliverables') @Permissions('technical-tender:manage') addDeliverable(@Param('id') id: string, @Body() d: CreateDeliverableDto, @CurrentUser() u: CurrentUserPayload) { return this.service.addDeliverable(id, d, u); }
   @Delete(':id/deliverables/:deliverableId') @Permissions('technical-tender:manage') removeDeliverable(@Param('id') id: string, @Param('deliverableId') deliverableId: string, @CurrentUser() u: CurrentUserPayload) { return this.service.removeDeliverable(id, deliverableId, u); }
 }

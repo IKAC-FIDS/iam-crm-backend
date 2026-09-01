@@ -67,6 +67,9 @@ let ActivitiesService = class ActivitiesService {
             orderBy: [{ sortOrder: 'asc' }, { label: 'asc' }],
         });
     }
+    canViewOrganizationActivities(user) {
+        return Boolean(user.tenantContext?.permissions.includes('activity:view-organization'));
+    }
     async validateManualType(type) {
         if (type === 'STAGE_CHANGE')
             throw new common_1.BadRequestException('STAGE_CHANGE is a system activity');
@@ -135,6 +138,9 @@ let ActivitiesService = class ActivitiesService {
                 ],
             },
         ];
+        if (!this.canViewOrganizationActivities(user)) {
+            and.push({ userId: user.userId });
+        }
         if (query.activityType)
             and.push({ type: query.activityType });
         if (query.status === find_activities_dto_1.ActivityListStatus.COMPLETED)
@@ -306,9 +312,12 @@ let ActivitiesService = class ActivitiesService {
         const page = pagination.page ?? 1;
         const limit = pagination.limit ?? 20;
         const skip = (page - 1) * limit;
+        const activityScope = this.canViewOrganizationActivities(user)
+            ? {}
+            : { userId: user.userId };
         const [data, total] = await Promise.all([
             this.prisma.activity.findMany({
-                where: { companyId },
+                where: { companyId, ...activityScope },
                 include: {
                     person: true,
                     task: {
@@ -325,7 +334,7 @@ let ActivitiesService = class ActivitiesService {
                 skip,
                 take: limit,
             }),
-            this.prisma.activity.count({ where: { companyId } }),
+            this.prisma.activity.count({ where: { companyId, ...activityScope } }),
         ]);
         const totalPages = Math.ceil(total / limit);
         return {
@@ -353,6 +362,9 @@ let ActivitiesService = class ActivitiesService {
         const where = {
             targetType: client_1.ActivityTargetType.TASK,
             taskId: { in: taskIds },
+            ...(!this.canViewOrganizationActivities(user) && {
+                userId: user.userId,
+            }),
         };
         const [data, total] = await Promise.all([
             this.prisma.activity.findMany({

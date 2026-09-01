@@ -11,12 +11,13 @@ const common_1 = require("@nestjs/common");
 const technical_center_controller_1 = require("./technical-center.controller");
 const technical_center_service_1 = require("./technical-center.service");
 const notifications_module_1 = require("../notifications/notifications.module");
+const tasks_module_1 = require("../tasks/tasks.module");
 let TechnicalCenterModule = class TechnicalCenterModule {
 };
 exports.TechnicalCenterModule = TechnicalCenterModule;
 exports.TechnicalCenterModule = TechnicalCenterModule = __decorate([
     (0, common_1.Module)({
-        imports: [notifications_module_1.NotificationsModule],
+        imports: [notifications_module_1.NotificationsModule, tasks_module_1.TasksModule],
         controllers: [
             technical_center_controller_1.TechnicalReleasesController,
             technical_center_controller_1.TechnicalKnowledgeController,

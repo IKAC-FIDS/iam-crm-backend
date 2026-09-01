@@ -8,9 +8,10 @@ import {
 } from './technical-center.controller';
 import { TechnicalCenterService } from './technical-center.service';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { TasksModule } from '../tasks/tasks.module';
 
 @Module({
-  imports: [NotificationsModule],
+  imports: [NotificationsModule, TasksModule],
   controllers: [
     TechnicalReleasesController,
     TechnicalKnowledgeController,

@@ -9,6 +9,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ApiResponseInterceptor = void 0;
 const common_1 = require("@nestjs/common");
 const rxjs_1 = require("rxjs");
+const financial_visibility_1 = require("../financial/financial-visibility");
 function isObject(value) {
     return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -35,29 +36,31 @@ function getResponseRequestId(response) {
 let ApiResponseInterceptor = class ApiResponseInterceptor {
     intercept(context, next) {
         const response = context.switchToHttp().getResponse();
+        const request = context.switchToHttp().getRequest();
         return next.handle().pipe((0, rxjs_1.map)((payload) => {
             if (payload instanceof common_1.StreamableFile) {
                 return payload;
             }
-            if (isAlreadyStandardResponse(payload)) {
-                return payload;
+            const visiblePayload = (0, financial_visibility_1.redactFinancialResponse)(payload, request.user);
+            if (isAlreadyStandardResponse(visiblePayload)) {
+                return visiblePayload;
             }
             const base = {
                 success: true,
                 requestId: getResponseRequestId(response),
                 timestamp: new Date().toISOString(),
             };
-            if (isPaginatedPayload(payload)) {
+            if (isPaginatedPayload(visiblePayload)) {
                 const result = {
                     ...base,
-                    data: payload.data,
-                    meta: payload.meta,
+                    data: visiblePayload.data,
+                    meta: visiblePayload.meta,
                 };
                 return result;
             }
             const result = {
                 ...base,
-                data: payload ?? null,
+                data: visiblePayload ?? null,
             };
             return result;
         }));

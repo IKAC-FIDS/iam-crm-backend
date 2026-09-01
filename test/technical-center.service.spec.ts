@@ -9,6 +9,8 @@ import {
   TenderRequirementStatus,
   TenderReviewStatus,
   TenderReviewType,
+  TenderBidDecision,
+  TenderQualificationDecision,
 } from '@prisma/client';
 import { CurrentUserPayload } from '../src/common/decorators/current-user.decorator';
 import { TechnicalCenterService } from '../src/technical-center/technical-center.service';
@@ -34,6 +36,7 @@ describe('TechnicalCenterService', () => {
   };
   let prisma: any;
   let audit: any;
+  let tasks: any;
   let service: TechnicalCenterService;
 
   beforeEach(() => {
@@ -61,7 +64,8 @@ describe('TechnicalCenterService', () => {
         create: jest.fn(), findFirst: jest.fn(), findMany: jest.fn().mockResolvedValue([]),
         count: jest.fn().mockResolvedValue(0), updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
-      tenderRequirement: { create: jest.fn(), findFirst: jest.fn(), findMany: jest.fn(), update: jest.fn(), delete: jest.fn() },
+      tenderRequirement: { create: jest.fn(), findFirst: jest.fn(), findMany: jest.fn(), count: jest.fn(), update: jest.fn(), delete: jest.fn() },
+      tenderRequirementDependency: { create: jest.fn(), findFirst: jest.fn(), findMany: jest.fn().mockResolvedValue([]), delete: jest.fn() },
       tenderDeliverable: { create: jest.fn(), findFirst: jest.fn(), delete: jest.fn() },
       tenderReview: { create: jest.fn(), findFirst: jest.fn(), updateMany: jest.fn().mockResolvedValue({ count: 1 }), findUniqueOrThrow: jest.fn() },
       auditLog: { findMany: jest.fn().mockResolvedValue([]) },
@@ -72,7 +76,8 @@ describe('TechnicalCenterService', () => {
     };
     prisma.$transaction = jest.fn((callback: (tx: any) => unknown) => callback(prisma));
     audit = { recordTenantEvent: jest.fn().mockResolvedValue({ id: 'audit' }) };
-    service = new TechnicalCenterService(prisma, audit);
+    tasks = { findOne: jest.fn(), create: jest.fn() };
+    service = new TechnicalCenterService(prisma, audit, undefined, tasks);
   });
 
   it('derives tenant ownership from the authenticated context and audits creation', async () => {
@@ -265,6 +270,59 @@ describe('TechnicalCenterService', () => {
     prisma.tenderRequirement.findFirst.mockResolvedValue({ id: 'req', tenderId: 'tender', organizationId, status: TenderRequirementStatus.OPEN });
     await expect(service.updateRequirement('tender', 'req', { status: TenderRequirementStatus.BLOCKED }, user()))
       .rejects.toMatchObject({ response: expect.objectContaining({ code: 'REQUIREMENT_BLOCK_REASON_REQUIRED' }) });
+  });
+
+  it('updates qualification and audits consequential decisions', async () => {
+    const tender = { id: 'tender', organizationId, status: TenderStatus.QUALIFICATION, revision: 1, archivedAt: null, bidDecision: TenderBidDecision.UNDECIDED, qualificationDecision: TenderQualificationDecision.PENDING, qualificationConditions: null, decisionReason: null, requirements: [], deliverables: [], reviews: [] };
+    prisma.tender.findFirst.mockResolvedValueOnce(tender).mockResolvedValueOnce({ ...tender, revision: 2, bidDecision: TenderBidDecision.BID, qualificationDecision: TenderQualificationDecision.GO, fitScore: 85 });
+    await service.updateTenderQualification('tender', { bidDecision: TenderBidDecision.BID, qualificationDecision: TenderQualificationDecision.GO, fitScore: 85, revision: 1 }, user());
+    expect(prisma.tender.updateMany).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'tender', organizationId, revision: 1 }, data: expect.objectContaining({ fitScore: 85 }) }));
+    expect(audit.recordTenantEvent).toHaveBeenCalledWith(expect.objectContaining({ action: 'technical-tender.qualification-updated' }));
+  });
+
+  it('requires conditions for CONDITIONAL_GO and a reason for NO_GO or NO_BID', async () => {
+    const tender = { id: 'tender', organizationId, status: TenderStatus.QUALIFICATION, revision: 1, archivedAt: null, bidDecision: TenderBidDecision.UNDECIDED, qualificationDecision: TenderQualificationDecision.PENDING, qualificationConditions: null, decisionReason: null, requirements: [], deliverables: [], reviews: [] };
+    prisma.tender.findFirst.mockResolvedValue(tender);
+    await expect(service.updateTenderQualification('tender', { qualificationDecision: TenderQualificationDecision.CONDITIONAL_GO }, user())).rejects.toMatchObject({ response: expect.objectContaining({ code: 'QUALIFICATION_CONDITIONS_REQUIRED' }) });
+    await expect(service.updateTenderQualification('tender', { bidDecision: TenderBidDecision.NO_BID }, user())).rejects.toMatchObject({ response: expect.objectContaining({ code: 'QUALIFICATION_DECISION_REASON_REQUIRED' }) });
+  });
+
+  it('rejects cross-tender parents and hierarchy cycles', async () => {
+    const tender = { id: 'tender', organizationId, status: TenderStatus.PREPARING, requirements: [], deliverables: [], reviews: [] };
+    prisma.tender.findFirst.mockResolvedValue(tender);
+    prisma.tenderRequirement.findFirst.mockResolvedValue({ id: 'req', tenderId: 'tender', organizationId, status: TenderRequirementStatus.OPEN });
+    prisma.tenderRequirement.count.mockResolvedValueOnce(0);
+    await expect(service.updateRequirement('tender', 'req', { parentRequirementId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }, user())).rejects.toMatchObject({ response: expect.objectContaining({ code: 'REQUIREMENT_TENDER_MISMATCH' }) });
+    prisma.tenderRequirement.count.mockResolvedValueOnce(1);
+    prisma.tenderRequirement.findMany.mockResolvedValue([{ id: 'req', parentRequirementId: null }, { id: 'child', parentRequirementId: 'req' }]);
+    await expect(service.updateRequirement('tender', 'req', { parentRequirementId: 'child' }, user())).rejects.toMatchObject({ response: expect.objectContaining({ code: 'REQUIREMENT_PARENT_CYCLE' }) });
+  });
+
+  it('rejects self and cyclic dependencies and duplicate dependency rows', async () => {
+    const tender = { id: 'tender', organizationId, status: TenderStatus.PREPARING, requirements: [], deliverables: [], reviews: [] };
+    prisma.tender.findFirst.mockResolvedValue(tender);
+    prisma.tenderRequirement.findFirst.mockResolvedValue({ id: 'req', tenderId: 'tender', organizationId });
+    prisma.tenderRequirement.count.mockResolvedValue(1);
+    await expect(service.addRequirementDependency('tender', 'req', { dependsOnRequirementId: 'req' }, user())).rejects.toMatchObject({ response: expect.objectContaining({ code: 'REQUIREMENT_SELF_DEPENDENCY' }) });
+    prisma.tenderRequirementDependency.findMany.mockResolvedValue([{ requirementId: 'dependency', dependsOnRequirementId: 'req' }]);
+    await expect(service.addRequirementDependency('tender', 'req', { dependsOnRequirementId: 'dependency' }, user())).rejects.toMatchObject({ response: expect.objectContaining({ code: 'REQUIREMENT_DEPENDENCY_CYCLE' }) });
+  });
+
+  it('links, creates and unlinks normal tasks without deleting them', async () => {
+    const tender = { id: 'tender', organizationId, title: 'RFP', companyId: null, opportunityId: null, status: TenderStatus.PREPARING, requirements: [], deliverables: [], reviews: [] };
+    const requirement = { id: 'req', tenderId: 'tender', organizationId, title: 'Security', referenceId: 'SEC-1', description: null, taskId: null };
+    prisma.tender.findFirst.mockResolvedValue(tender);
+    prisma.tenderRequirement.findFirst.mockResolvedValue(requirement);
+    prisma.tenderRequirement.update.mockImplementation(({ data }: any) => Promise.resolve({ ...requirement, ...data }));
+    tasks.findOne.mockResolvedValue({ id: 'task', organizationId });
+    await service.linkRequirementTask('tender', 'req', { taskId: 'task' }, user(['task:view']));
+    tasks.create.mockResolvedValue({ id: 'created-task', organizationId, title: 'پیگیری الزام: Security' });
+    await service.createRequirementTask('tender', 'req', {}, user(['task:create']));
+    prisma.tenderRequirement.findFirst.mockResolvedValue({ ...requirement, taskId: 'created-task' });
+    await service.unlinkRequirementTask('tender', 'req', user());
+    expect(tasks.create).toHaveBeenCalled();
+    expect(prisma.tenderRequirement.update).toHaveBeenCalledWith({ where: { id: 'req' }, data: { taskId: null } });
+    expect(prisma.tenderRequirement.delete).not.toHaveBeenCalled();
   });
 
   it('keeps technical and commercial reviews separate and enforces review permission', async () => {

@@ -9,14 +9,19 @@ import {
   TechnicalResourceType,
   TechnicalVisibility,
   TenderRequirementStatus,
+  TenderBidDecision,
+  TenderQualificationDecision,
   TenderReviewStatus,
   TenderReviewType,
   TenderStatus,
   TenderType,
+  Priority,
+  TaskAssignmentScope,
 } from '@prisma/client';
 import { Type } from 'class-transformer';
 import {
   IsBoolean,
+  IsArray,
   IsBooleanString,
   IsEnum,
   IsIn,
@@ -172,18 +177,57 @@ export class UpdateTenderDto extends PartialType(CreateTenderDto) {
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) revision?: number;
 }
 
+export class UpdateTenderQualificationDto {
+  @IsOptional() @IsEnum(TenderBidDecision) bidDecision?: TenderBidDecision;
+  @IsOptional() @IsEnum(TenderQualificationDecision) qualificationDecision?: TenderQualificationDecision;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(100) fitScore?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(100) riskScore?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(100) feasibilityScore?: number;
+  @IsOptional() @IsString() @MaxLength(10000) fitNotes?: string;
+  @IsOptional() @IsString() @MaxLength(10000) riskNotes?: string;
+  @IsOptional() @IsString() @MaxLength(10000) feasibilityNotes?: string;
+  @IsOptional() @IsString() @MaxLength(20000) qualificationSummary?: string;
+  @IsOptional() @IsString() @MaxLength(20000) qualificationConditions?: string;
+  @IsOptional() @IsString() @MaxLength(10000) decisionReason?: string;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) revision?: number;
+}
+
 export class CreateRequirementDto {
   @IsString() @Length(1, 200) title!: string;
   @IsOptional() @IsString() @MaxLength(120) category?: string;
   @IsOptional() @IsString() @MaxLength(10000) description?: string;
+  @IsOptional() @IsString() @MaxLength(120) section?: string;
+  @IsOptional() @IsString() @MaxLength(40) page?: string;
+  @IsOptional() @IsString() @MaxLength(120) referenceId?: string;
+  @IsOptional() @IsString() @MaxLength(10000) notes?: string;
+  @IsOptional() @IsUUID() parentRequirementId?: string | null;
+  @IsOptional() @IsArray() @IsUUID('4', { each: true }) dependencyIds?: string[];
   @IsOptional() @IsBoolean() mandatory?: boolean;
-  @IsOptional() @IsUUID() ownerId?: string;
+  @IsOptional() @IsUUID() ownerId?: string | null;
   @IsOptional() @IsApiDateString() dueDate?: string;
   @IsOptional() @IsString() @MaxLength(20000) response?: string;
 }
 export class UpdateRequirementDto extends PartialType(CreateRequirementDto) {
   @IsOptional() @IsEnum(TenderRequirementStatus) status?: TenderRequirementStatus;
   @IsOptional() @IsString() @MaxLength(2000) blockedReason?: string;
+}
+
+export class RequirementDependencyDto {
+  @IsUUID() dependsOnRequirementId!: string;
+}
+
+export class LinkRequirementTaskDto {
+  @IsUUID() taskId!: string;
+}
+
+export class CreateRequirementTaskDto {
+  @IsOptional() @IsString() @MaxLength(200) title?: string;
+  @IsOptional() @IsString() @MaxLength(10000) description?: string;
+  @IsOptional() @IsEnum(Priority) priority?: Priority;
+  @IsOptional() @IsApiDateString() dueAt?: string;
+  @IsOptional() @IsUUID() assignedToId?: string;
+  @IsOptional() @IsEnum(TaskAssignmentScope) assignmentScope?: TaskAssignmentScope;
+  @IsOptional() @IsUUID() teamId?: string;
 }
 
 export class CreateDeliverableDto {

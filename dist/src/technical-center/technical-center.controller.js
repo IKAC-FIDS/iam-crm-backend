@@ -333,6 +333,7 @@ let TechnicalTendersController = class TechnicalTendersController {
     create(d, u) { return this.service.createTender(d, u); }
     get(id, u) { return this.service.getTender(id, u); }
     update(id, d, u) { return this.service.updateTender(id, d, u); }
+    qualification(id, d, u) { return this.service.updateTenderQualification(id, d, u); }
     transition(id, d, u) { return this.service.transitionTender(id, d, u); }
     readiness(id, u) { return this.service.getTenderReadiness(id, u); }
     history(id, u) { return this.service.tenderHistory(id, u); }
@@ -343,6 +344,11 @@ let TechnicalTendersController = class TechnicalTendersController {
     addRequirement(id, d, u) { return this.service.addRequirement(id, d, u); }
     updateRequirement(id, requirementId, d, u) { return this.service.updateRequirement(id, requirementId, d, u); }
     removeRequirement(id, requirementId, u) { return this.service.removeRequirement(id, requirementId, u); }
+    addDependency(id, requirementId, d, u) { return this.service.addRequirementDependency(id, requirementId, d, u); }
+    removeDependency(id, requirementId, dependencyId, u) { return this.service.removeRequirementDependency(id, requirementId, dependencyId, u); }
+    linkTask(id, requirementId, d, u) { return this.service.linkRequirementTask(id, requirementId, d, u); }
+    createTask(id, requirementId, d, u) { return this.service.createRequirementTask(id, requirementId, d, u); }
+    unlinkTask(id, requirementId, u) { return this.service.unlinkRequirementTask(id, requirementId, u); }
     addDeliverable(id, d, u) { return this.service.addDeliverable(id, d, u); }
     removeDeliverable(id, deliverableId, u) { return this.service.removeDeliverable(id, deliverableId, u); }
 };
@@ -388,6 +394,17 @@ __decorate([
     __metadata("design:paramtypes", [String, technical_center_dto_1.UpdateTenderDto, Object]),
     __metadata("design:returntype", void 0)
 ], TechnicalTendersController.prototype, "update", null);
+__decorate([
+    (0, common_1.Patch)(':id/qualification'),
+    (0, permissions_decorator_1.Permissions)('technical-tender:manage'),
+    openapi.ApiResponse({ status: 200 }),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, technical_center_dto_1.UpdateTenderQualificationDto, Object]),
+    __metadata("design:returntype", void 0)
+], TechnicalTendersController.prototype, "qualification", null);
 __decorate([
     (0, common_1.Post)(':id/transition'),
     (0, permissions_decorator_1.AnyPermission)('technical-tender:manage', 'technical-tender:submit', 'technical-tender:close'),
@@ -496,6 +513,65 @@ __decorate([
     __metadata("design:paramtypes", [String, String, Object]),
     __metadata("design:returntype", void 0)
 ], TechnicalTendersController.prototype, "removeRequirement", null);
+__decorate([
+    (0, common_1.Post)(':id/requirements/:requirementId/dependencies'),
+    (0, permissions_decorator_1.Permissions)('technical-tender:manage'),
+    openapi.ApiResponse({ status: 201 }),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Param)('requirementId')),
+    __param(2, (0, common_1.Body)()),
+    __param(3, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, technical_center_dto_1.RequirementDependencyDto, Object]),
+    __metadata("design:returntype", void 0)
+], TechnicalTendersController.prototype, "addDependency", null);
+__decorate([
+    (0, common_1.Delete)(':id/requirements/:requirementId/dependencies/:dependencyId'),
+    (0, permissions_decorator_1.Permissions)('technical-tender:manage'),
+    openapi.ApiResponse({ status: 200 }),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Param)('requirementId')),
+    __param(2, (0, common_1.Param)('dependencyId')),
+    __param(3, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, String, Object]),
+    __metadata("design:returntype", void 0)
+], TechnicalTendersController.prototype, "removeDependency", null);
+__decorate([
+    (0, common_1.Post)(':id/requirements/:requirementId/link-task'),
+    (0, permissions_decorator_1.Permissions)('technical-tender:manage'),
+    openapi.ApiResponse({ status: 201 }),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Param)('requirementId')),
+    __param(2, (0, common_1.Body)()),
+    __param(3, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, technical_center_dto_1.LinkRequirementTaskDto, Object]),
+    __metadata("design:returntype", void 0)
+], TechnicalTendersController.prototype, "linkTask", null);
+__decorate([
+    (0, common_1.Post)(':id/requirements/:requirementId/create-task'),
+    (0, permissions_decorator_1.Permissions)('technical-tender:manage'),
+    openapi.ApiResponse({ status: 201 }),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Param)('requirementId')),
+    __param(2, (0, common_1.Body)()),
+    __param(3, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, technical_center_dto_1.CreateRequirementTaskDto, Object]),
+    __metadata("design:returntype", void 0)
+], TechnicalTendersController.prototype, "createTask", null);
+__decorate([
+    (0, common_1.Delete)(':id/requirements/:requirementId/task'),
+    (0, permissions_decorator_1.Permissions)('technical-tender:manage'),
+    openapi.ApiResponse({ status: 200 }),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Param)('requirementId')),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, Object]),
+    __metadata("design:returntype", void 0)
+], TechnicalTendersController.prototype, "unlinkTask", null);
 __decorate([
     (0, common_1.Post)(':id/deliverables'),
     (0, permissions_decorator_1.Permissions)('technical-tender:manage'),

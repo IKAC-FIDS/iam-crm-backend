@@ -18,6 +18,8 @@ import {
   TechnicalResourceStatus,
   TechnicalResourceType,
   TenderResult,
+  TenderBidDecision,
+  TenderQualificationDecision,
   TenderRequirementStatus,
   TenderReviewStatus,
   TenderReviewType,
@@ -30,6 +32,7 @@ import { parseApiDate, parseApiDateRange } from '../common/dates/api-date.util';
 import { getCurrentOrganizationId } from '../common/tenant/tenant-scope.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { TasksService } from '../tasks/tasks.service';
 import {
   CreateDeliverableDto,
   CreateDocumentDto,
@@ -37,10 +40,13 @@ import {
   CreateKnowledgeDto,
   CreateReleaseDto,
   CreateRequirementDto,
+  CreateRequirementTaskDto,
   CreateResourceDto,
   CreateTenderDto,
   DecideTenderReviewDto,
   RequestTenderReviewDto,
+  RequirementDependencyDto,
+  LinkRequirementTaskDto,
   TechnicalListDto,
   TechnicalDocumentListDto,
   TransitionDto,
@@ -50,6 +56,7 @@ import {
   UpdateRequirementDto,
   UpdateResourceDto,
   UpdateTenderDto,
+  UpdateTenderQualificationDto,
 } from './dto/technical-center.dto';
 import {
   assertTransition,
@@ -71,7 +78,11 @@ const tenderInclude = {
   company: { select: { id: true, legalName: true, brandName: true } },
   opportunity: { select: { id: true, title: true } },
   team: { select: { id: true, code: true, name: true } },
-  requirements: { include: { owner: { select: { id: true, fullName: true, email: true } } }, orderBy: { createdAt: 'asc' as const } },
+  requirements: { include: {
+    owner: { select: { id: true, fullName: true, email: true } },
+    task: { select: { id: true, title: true, status: true, assignedToId: true } },
+    dependencies: { include: { dependsOnRequirement: { select: { id: true, title: true, referenceId: true, status: true } } } },
+  }, orderBy: { createdAt: 'asc' as const } },
   deliverables: { include: { document: { select: { id: true, title: true, status: true, versions: { select: { id: true, attachmentId: true }, take: 1, orderBy: { createdAt: 'desc' as const } } } } } },
   reviews: {
     include: {
@@ -89,6 +100,7 @@ export class TechnicalCenterService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditLogService,
     @Optional() private readonly notifications?: NotificationsService,
+    private readonly tasks?: TasksService,
   ) {}
 
   async listReleases(query: TechnicalListDto, user: CurrentUserPayload) {
@@ -462,6 +474,29 @@ export class TechnicalCenterService {
     return row;
   }
 
+  async updateTenderQualification(id: string, dto: UpdateTenderQualificationDto, user: CurrentUserPayload) {
+    const current = await this.getTender(id, user);
+    this.assertTenderOpen(current.status);
+    const nextDecision = dto.qualificationDecision ?? current.qualificationDecision;
+    const nextBidDecision = dto.bidDecision ?? current.bidDecision;
+    const conditions = dto.qualificationConditions ?? current.qualificationConditions;
+    const reason = dto.decisionReason ?? current.decisionReason;
+    if (nextDecision === TenderQualificationDecision.CONDITIONAL_GO && !conditions?.trim()) {
+      throw new BadRequestException({ code: 'QUALIFICATION_CONDITIONS_REQUIRED', message: 'Conditional GO requires explicit conditions' });
+    }
+    if ((nextDecision === TenderQualificationDecision.NO_GO || nextBidDecision === TenderBidDecision.NO_BID) && !reason?.trim()) {
+      throw new BadRequestException({ code: 'QUALIFICATION_DECISION_REASON_REQUIRED', message: 'NO GO and NO BID decisions require a reason' });
+    }
+    const { revision, ...input } = dto;
+    const textFields = ['fitNotes', 'riskNotes', 'feasibilityNotes', 'qualificationSummary', 'qualificationConditions', 'decisionReason'] as const;
+    const data: Record<string, unknown> = { ...input, updatedById: user.userId };
+    for (const field of textFields) if (input[field] !== undefined) data[field] = input[field]?.trim() || null;
+    await this.optimistic('tender', id, current.organizationId, revision ?? current.revision, data);
+    const row = await this.getTender(id, user);
+    await this.log('technical-tender', id, 'technical-tender.qualification-updated', current.organizationId, user, current, row);
+    return row;
+  }
+
   async transitionTender(id: string, dto: TransitionDto, user: CurrentUserPayload) {
     const current = await this.getTender(id, user);
     const target = this.enumValue(TenderStatus, dto.status, 'status');
@@ -500,9 +535,14 @@ export class TechnicalCenterService {
     const tender = await this.getTender(tenderId, user);
     this.assertTenderOpen(tender.status);
     if (dto.ownerId) await this.assertUser(tender.organizationId, dto.ownerId);
+    if (dto.parentRequirementId) await this.assertRequirementParent(tenderId, undefined, dto.parentRequirementId, tender.organizationId);
+    if (dto.dependencyIds?.length) await this.assertRequirementIds(tenderId, dto.dependencyIds, tender.organizationId);
+    const { dependencyIds, ...input } = dto;
     const row = await this.prisma.tenderRequirement.create({ data: {
-      ...dto, title: dto.title.trim(), category: dto.category?.trim(), description: dto.description?.trim(), response: dto.response?.trim(),
+      ...input, title: dto.title.trim(), category: dto.category?.trim(), description: dto.description?.trim(), response: dto.response?.trim(),
+      section: dto.section?.trim(), page: dto.page?.trim(), referenceId: dto.referenceId?.trim(), notes: dto.notes?.trim(),
       dueDate: this.date(dto.dueDate, 'dueDate'), organizationId: tender.organizationId, tenderId,
+      ...(dependencyIds?.length && { dependencies: { create: [...new Set(dependencyIds)].map((dependsOnRequirementId) => ({ dependsOnRequirementId })) } }),
     }});
     await this.log('tender-requirement', row.id, 'technical-tender.requirement-created', tender.organizationId, user, undefined, row);
     return row;
@@ -512,7 +552,11 @@ export class TechnicalCenterService {
     const tender = await this.getTender(tenderId, user);
     return this.prisma.tenderRequirement.findMany({
       where: { organizationId: tender.organizationId, tenderId },
-      include: { owner: { select: { id: true, fullName: true, email: true } } },
+      include: {
+        owner: { select: { id: true, fullName: true, email: true } },
+        task: { select: { id: true, title: true, status: true, assignedToId: true } },
+        dependencies: { include: { dependsOnRequirement: { select: { id: true, title: true, referenceId: true, status: true } } } },
+      },
       orderBy: { createdAt: 'asc' },
     });
   }
@@ -520,18 +564,31 @@ export class TechnicalCenterService {
   async updateRequirement(tenderId: string, requirementId: string, dto: UpdateRequirementDto, user: CurrentUserPayload) {
     const tender = await this.getTender(tenderId, user);
     this.assertTenderOpen(tender.status);
-    const current = await this.prisma.tenderRequirement.findFirst({ where: { id: requirementId, tenderId, organizationId: tender.organizationId } });
+    const current = await this.prisma.tenderRequirement.findFirst({ where: { id: requirementId, tenderId, organizationId: tender.organizationId }, include: { dependencies: { select: { dependsOnRequirementId: true } } } });
     if (!current) throw new NotFoundException('Tender requirement not found');
     if (dto.ownerId) await this.assertUser(tender.organizationId, dto.ownerId);
+    if (dto.parentRequirementId) await this.assertRequirementParent(tenderId, requirementId, dto.parentRequirementId, tender.organizationId);
+    if (dto.dependencyIds) {
+      await this.assertRequirementIds(tenderId, dto.dependencyIds, tender.organizationId);
+      for (const dependencyId of dto.dependencyIds) await this.assertNoDependencyCycle(tenderId, requirementId, dependencyId, tender.organizationId);
+    }
     if (dto.status === TenderRequirementStatus.BLOCKED && !dto.blockedReason?.trim()) {
       throw new BadRequestException({ code: 'REQUIREMENT_BLOCK_REASON_REQUIRED', message: 'A reason is required when blocking a requirement' });
     }
+    const { dependencyIds, ...input } = dto;
     const row = await this.prisma.tenderRequirement.update({ where: { id: requirementId }, data: {
-      ...dto, title: dto.title?.trim(), category: dto.category?.trim(), description: dto.description?.trim(), response: dto.response?.trim(), blockedReason: dto.blockedReason?.trim(), dueDate: this.date(dto.dueDate, 'dueDate'),
+      ...input, title: dto.title?.trim(), category: dto.category?.trim(), description: dto.description?.trim(), response: dto.response?.trim(), blockedReason: dto.blockedReason?.trim(), dueDate: this.date(dto.dueDate, 'dueDate'),
+      section: dto.section?.trim(), page: dto.page?.trim(), referenceId: dto.referenceId?.trim(), notes: dto.notes?.trim(),
+      ...(dependencyIds && { dependencies: { deleteMany: {}, create: [...new Set(dependencyIds)].map((dependsOnRequirementId) => ({ dependsOnRequirementId })) } }),
       ...(dto.status === TenderRequirementStatus.BLOCKED ? { blockedAt: new Date(), blockedById: user.userId } : dto.status ? { blockedAt: null, blockedById: null, blockedReason: null } : {}),
     }});
-    const action = dto.status && dto.status !== current.status ? 'technical-tender.requirement-status-changed' : 'technical-tender.requirement-updated';
+    const action = dto.status && dto.status !== current.status
+      ? 'technical-tender.requirement-status-changed'
+      : dto.ownerId !== undefined && dto.ownerId !== current.ownerId
+        ? 'technical-tender.requirement-owner-changed'
+        : 'technical-tender.requirement-updated';
     await this.log('tender-requirement', row.id, action, tender.organizationId, user, current, row);
+    if (dependencyIds) await this.log('tender-requirement', row.id, 'technical-tender.requirement-dependencies-changed', tender.organizationId, user, { id: row.id, tenderId, dependencyIds: current.dependencies.map((dependency) => dependency.dependsOnRequirementId) }, { id: row.id, tenderId, dependencyIds });
     if (dto.status === TenderRequirementStatus.BLOCKED && row.ownerId) await this.notifyTender(row.ownerId, user, tenderId, 'الزام مناقصه مسدود شد', row.title, NotificationPriority.HIGH);
     return row;
   }
@@ -544,6 +601,77 @@ export class TechnicalCenterService {
     await this.prisma.tenderRequirement.delete({ where: { id: requirementId } });
     await this.log('tender-requirement', requirementId, 'technical-tender.requirement-deleted', tender.organizationId, user, current);
     return { id: requirementId, deleted: true };
+  }
+
+  async addRequirementDependency(tenderId: string, requirementId: string, dto: RequirementDependencyDto, user: CurrentUserPayload) {
+    const tender = await this.getTender(tenderId, user);
+    this.assertTenderOpen(tender.status);
+    await this.getRequirement(tenderId, requirementId, tender.organizationId);
+    await this.assertRequirementIds(tenderId, [dto.dependsOnRequirementId], tender.organizationId);
+    await this.assertNoDependencyCycle(tenderId, requirementId, dto.dependsOnRequirementId, tender.organizationId);
+    try {
+      const row = await this.prisma.tenderRequirementDependency.create({ data: { requirementId, dependsOnRequirementId: dto.dependsOnRequirementId } });
+      await this.log('tender-requirement', requirementId, 'technical-tender.requirement-dependency-added', tender.organizationId, user, undefined, row);
+      return row;
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') throw new ConflictException({ code: 'REQUIREMENT_DEPENDENCY_EXISTS', message: 'Dependency already exists' });
+      throw error;
+    }
+  }
+
+  async removeRequirementDependency(tenderId: string, requirementId: string, dependencyId: string, user: CurrentUserPayload) {
+    const tender = await this.getTender(tenderId, user);
+    this.assertTenderOpen(tender.status);
+    const current = await this.prisma.tenderRequirementDependency.findFirst({ where: { id: dependencyId, requirementId, requirement: { tenderId, organizationId: tender.organizationId } } });
+    if (!current) throw new NotFoundException('Tender requirement dependency not found');
+    await this.prisma.tenderRequirementDependency.delete({ where: { id: dependencyId } });
+    await this.log('tender-requirement', requirementId, 'technical-tender.requirement-dependency-removed', tender.organizationId, user, current);
+    return { id: dependencyId, deleted: true };
+  }
+
+  async linkRequirementTask(tenderId: string, requirementId: string, dto: LinkRequirementTaskDto, user: CurrentUserPayload) {
+    const tender = await this.getTender(tenderId, user);
+    this.assertTenderOpen(tender.status);
+    this.require(user, 'task:view');
+    const requirement = await this.getRequirement(tenderId, requirementId, tender.organizationId);
+    const task = await this.tasks!.findOne(dto.taskId, user);
+    if (task.organizationId !== tender.organizationId) throw new BadRequestException({ code: 'TASK_TENANT_MISMATCH', message: 'Task must belong to the same organization' });
+    const row = await this.prisma.tenderRequirement.update({ where: { id: requirementId }, data: { taskId: task.id } });
+    await this.log('tender-requirement', requirementId, 'technical-tender.requirement-task-linked', tender.organizationId, user, requirement, row);
+    return row;
+  }
+
+  async createRequirementTask(tenderId: string, requirementId: string, dto: CreateRequirementTaskDto, user: CurrentUserPayload) {
+    const tender = await this.getTender(tenderId, user);
+    this.assertTenderOpen(tender.status);
+    this.require(user, 'task:create');
+    const requirement = await this.getRequirement(tenderId, requirementId, tender.organizationId);
+    const reference = requirement.referenceId ? ` [${requirement.referenceId}]` : '';
+    const context = `الزام مناقصه «${tender.title}»${reference}`;
+    const task = await this.tasks!.create({
+      title: dto.title?.trim() || `پیگیری الزام: ${requirement.title}`,
+      description: [dto.description?.trim(), context, requirement.description].filter(Boolean).join('\n\n'),
+      priority: dto.priority,
+      dueAt: dto.dueAt,
+      assignedToId: dto.assignedToId,
+      assignmentScope: dto.assignmentScope,
+      teamId: dto.teamId,
+      companyId: tender.companyId ?? undefined,
+      opportunityId: tender.opportunityId ?? undefined,
+    }, user);
+    const row = await this.prisma.tenderRequirement.update({ where: { id: requirementId }, data: { taskId: task.id } });
+    await this.log('tender-requirement', requirementId, 'technical-tender.requirement-task-created', tender.organizationId, user, requirement, row);
+    return { requirement: row, task };
+  }
+
+  async unlinkRequirementTask(tenderId: string, requirementId: string, user: CurrentUserPayload) {
+    const tender = await this.getTender(tenderId, user);
+    this.assertTenderOpen(tender.status);
+    const requirement = await this.getRequirement(tenderId, requirementId, tender.organizationId);
+    if (!requirement.taskId) return requirement;
+    const row = await this.prisma.tenderRequirement.update({ where: { id: requirementId }, data: { taskId: null } });
+    await this.log('tender-requirement', requirementId, 'technical-tender.requirement-task-unlinked', tender.organizationId, user, requirement, row);
+    return row;
   }
 
   async addDeliverable(tenderId: string, dto: CreateDeliverableDto, user: CurrentUserPayload) {
@@ -649,6 +777,9 @@ export class TechnicalCenterService {
     const blocked = requirements.filter((row: any) => row.status === TenderRequirementStatus.BLOCKED);
     const overdue = requirements.filter((row: any) => row.status !== TenderRequirementStatus.VERIFIED && row.dueDate && new Date(row.dueDate) < now);
     const unassigned = requirements.filter((row: any) => row.status !== TenderRequirementStatus.VERIFIED && !row.ownerId);
+    const withoutTask = requirements.filter((row: any) => !row.taskId);
+    const dependencyBlocked = requirements.filter((row: any) => row.dependencies?.some((dependency: any) => ![TenderRequirementStatus.VERIFIED, TenderRequirementStatus.NOT_APPLICABLE].includes(dependency.dependsOnRequirement?.status)));
+    const criticalUnsatisfied = requirements.filter((row: any) => row.mandatory && ![TenderRequirementStatus.VERIFIED, TenderRequirementStatus.NOT_APPLICABLE].includes(row.status));
     const dueAfterSubmission = tender.submissionDeadline
       ? requirements.filter((row: any) => row.dueDate && new Date(row.dueDate) > new Date(tender.submissionDeadline))
       : [];
@@ -674,10 +805,32 @@ export class TechnicalCenterService {
     if (deadlinePassed) blockers.push({ code: 'TENDER_DEADLINE_PASSED' });
     if (dueAfterSubmission.length) warnings.push({ code: 'REQUIREMENT_DUE_AFTER_SUBMISSION', count: dueAfterSubmission.length });
     if (overdue.length) warnings.push({ code: 'REQUIREMENTS_OVERDUE', count: overdue.length });
+    if (dependencyBlocked.length) warnings.push({ code: 'REQUIREMENT_DEPENDENCIES_UNRESOLVED', count: dependencyBlocked.length });
+    if (tender.qualificationDecision === TenderQualificationDecision.GO && criticalUnsatisfied.length) warnings.push({ code: 'GO_WITH_UNSATISFIED_REQUIREMENTS', count: criticalUnsatisfied.length });
     return {
       overallReady: blockers.length === 0,
       blockers,
       warnings,
+      qualification: {
+        bidDecision: tender.bidDecision,
+        qualificationDecision: tender.qualificationDecision,
+        fitScore: tender.fitScore,
+        riskScore: tender.riskScore,
+        feasibilityScore: tender.feasibilityScore,
+        qualificationConditions: tender.qualificationConditions,
+        decisionReason: tender.decisionReason,
+        qualificationSummary: tender.qualificationSummary,
+      },
+      requirementSummary: {
+        totalRequirements: requirements.length,
+        satisfiedRequirements: requirements.filter((row: any) => row.status === TenderRequirementStatus.VERIFIED).length,
+        openRequirements: requirements.filter((row: any) => [TenderRequirementStatus.OPEN, TenderRequirementStatus.IN_PROGRESS, TenderRequirementStatus.READY].includes(row.status)).length,
+        blockedRequirements: blocked.length,
+        criticalUnsatisfiedRequirements: criticalUnsatisfied.length,
+        requirementsWithoutOwner: requirements.filter((row: any) => !row.ownerId).length,
+        requirementsWithoutTask: withoutTask.length,
+        dependencyBlockedRequirements: dependencyBlocked.length,
+      },
       checks: {
         mandatoryRequirements: { total: mandatory.length, satisfied: mandatoryVerified.length, unresolved: unresolved.length, blocked: mandatory.filter((row: any) => row.status === TenderRequirementStatus.BLOCKED).length },
         requirements: { total: requirements.length, verified: requirements.filter((row: any) => row.status === TenderRequirementStatus.VERIFIED).length, inProgress: requirements.filter((row: any) => row.status === TenderRequirementStatus.IN_PROGRESS).length, open: requirements.filter((row: any) => row.status === TenderRequirementStatus.OPEN).length, blocked: blocked.length, overdue: overdue.length, unassigned: unassigned.length },
@@ -694,6 +847,50 @@ export class TechnicalCenterService {
     return (from === TenderStatus.TECHNICAL_REVIEW && to === TenderStatus.PREPARING)
       || (from === TenderStatus.COMMERCIAL_REVIEW && to === TenderStatus.TECHNICAL_REVIEW)
       || (from === TenderStatus.READY_FOR_SUBMISSION && to === TenderStatus.COMMERCIAL_REVIEW);
+  }
+
+  private async getRequirement(tenderId: string, requirementId: string, organizationId: string) {
+    const row = await this.prisma.tenderRequirement.findFirst({ where: { id: requirementId, tenderId, organizationId } });
+    if (!row) throw new NotFoundException('Tender requirement not found');
+    return row;
+  }
+
+  private async assertRequirementIds(tenderId: string, ids: string[], organizationId: string) {
+    const unique = [...new Set(ids)];
+    const count = await this.prisma.tenderRequirement.count({ where: { id: { in: unique }, tenderId, organizationId } });
+    if (count !== unique.length) throw new BadRequestException({ code: 'REQUIREMENT_TENDER_MISMATCH', message: 'All requirements must belong to the same tender' });
+  }
+
+  private async assertRequirementParent(tenderId: string, requirementId: string | undefined, parentId: string, organizationId: string) {
+    if (requirementId && requirementId === parentId) throw new BadRequestException({ code: 'REQUIREMENT_SELF_PARENT', message: 'A requirement cannot be its own parent' });
+    await this.assertRequirementIds(tenderId, [parentId], organizationId);
+    if (!requirementId) return;
+    const requirements = await this.prisma.tenderRequirement.findMany({ where: { tenderId, organizationId }, select: { id: true, parentRequirementId: true } });
+    const parents = new Map(requirements.map((row) => [row.id, row.parentRequirementId]));
+    let cursor: string | null | undefined = parentId;
+    while (cursor) {
+      if (cursor === requirementId) throw new BadRequestException({ code: 'REQUIREMENT_PARENT_CYCLE', message: 'Requirement hierarchy cannot contain a cycle' });
+      cursor = parents.get(cursor);
+    }
+  }
+
+  private async assertNoDependencyCycle(tenderId: string, requirementId: string, dependencyId: string, organizationId: string) {
+    if (requirementId === dependencyId) throw new BadRequestException({ code: 'REQUIREMENT_SELF_DEPENDENCY', message: 'A requirement cannot depend on itself' });
+    const rows = await this.prisma.tenderRequirementDependency.findMany({
+      where: { requirement: { tenderId, organizationId } },
+      select: { requirementId: true, dependsOnRequirementId: true },
+    });
+    const graph = new Map<string, string[]>();
+    for (const row of rows) graph.set(row.requirementId, [...(graph.get(row.requirementId) ?? []), row.dependsOnRequirementId]);
+    const seen = new Set<string>();
+    const stack = [dependencyId];
+    while (stack.length) {
+      const current = stack.pop()!;
+      if (current === requirementId) throw new BadRequestException({ code: 'REQUIREMENT_DEPENDENCY_CYCLE', message: 'Requirement dependencies cannot contain a cycle' });
+      if (seen.has(current)) continue;
+      seen.add(current);
+      stack.push(...(graph.get(current) ?? []));
+    }
   }
 
   private async notifyTender(recipientId: string, user: CurrentUserPayload, tenderId: string, title: string, body: string, priority: NotificationPriority = NotificationPriority.NORMAL) {
@@ -801,7 +998,7 @@ export class TechnicalCenterService {
   private auditSnapshot(value: unknown) {
     if (!value || typeof value !== 'object') return value;
     const row = value as Record<string, unknown>;
-    const keys = ['id', 'organizationId', 'productId', 'releaseId', 'documentId', 'tenderId', 'companyId', 'opportunityId', 'ownerId', 'title', 'slug', 'version', 'status', 'resourceType', 'tenderType', 'result', 'revision', 'archivedAt', 'updatedAt'];
+    const keys = ['id', 'organizationId', 'productId', 'releaseId', 'documentId', 'tenderId', 'companyId', 'opportunityId', 'ownerId', 'taskId', 'parentRequirementId', 'referenceId', 'dependencyIds', 'title', 'slug', 'version', 'status', 'resourceType', 'tenderType', 'result', 'bidDecision', 'qualificationDecision', 'fitScore', 'riskScore', 'feasibilityScore', 'fitNotes', 'riskNotes', 'feasibilityNotes', 'qualificationSummary', 'qualificationConditions', 'decisionReason', 'revision', 'archivedAt', 'updatedAt'];
     return Object.fromEntries(keys.filter((key) => row[key] !== undefined).map((key) => [key, row[key]]));
   }
 }

@@ -30,6 +30,16 @@ const data_quality_dto_1 = require("./dto/data-quality.dto");
 const period_comparison_dto_1 = require("./dto/period-comparison.dto");
 const period_comparison_service_1 = require("./period-comparison.service");
 const report_exports_service_1 = require("./report-exports.service");
+const financial_visibility_1 = require("../common/financial/financial-visibility");
+const FINANCIAL_EXPORTS = new Set([
+    "period-comparison",
+    "opportunity-forecast",
+    "financial-collections",
+    "product-performance",
+    "exchange-rate-impact",
+    "pipeline-summary",
+    "pipeline-by-owner",
+]);
 let ReportsController = class ReportsController {
     constructor(reportsService, conversionHealthService, advancedReportsService, commercialReportsService, dataQualityService, periodComparisonService, reportExports) {
         this.reportsService = reportsService;
@@ -50,6 +60,9 @@ let ReportsController = class ReportsController {
         return this.periodComparisonService.compare(query, user);
     }
     async exportReport(reportKey, query, user, response) {
+        if (FINANCIAL_EXPORTS.has(reportKey) && !(0, financial_visibility_1.canViewFinancials)(user)) {
+            throw new common_1.ForbiddenException("Missing permission: financial:view");
+        }
         const file = await this.reportExports.export(reportKey, query, user);
         response.setHeader("Content-Type", file.contentType);
         response.setHeader("Content-Disposition", file.contentDisposition);
@@ -142,6 +155,7 @@ __decorate([
 ], ReportsController.prototype, "exportReport", null);
 __decorate([
     (0, common_1.Get)("financial/collections"),
+    (0, permissions_decorator_1.Permissions)("report:view", "financial:view"),
     openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Query)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
@@ -160,6 +174,7 @@ __decorate([
 ], ReportsController.prototype, "getProductPerformance", null);
 __decorate([
     (0, common_1.Get)("exchange-rates/impact"),
+    (0, permissions_decorator_1.Permissions)("report:view", "financial:view"),
     openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Query)()),
     __metadata("design:type", Function),

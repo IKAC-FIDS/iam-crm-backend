@@ -10,7 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { CurrentUser, CurrentUserPayload } from '../common/decorators/current-user.decorator';
-import { Permissions } from '../common/decorators/permissions.decorator';
+import { AnyPermission, Permissions } from '../common/decorators/permissions.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { AddTeamMemberDto } from './dto/add-team-member.dto';
@@ -25,7 +25,7 @@ export class TeamsController {
   constructor(private readonly service: TeamsService) {}
 
   @Get()
-  @Permissions('team:view')
+  @AnyPermission('team:view', 'technical-tender:manage', 'technical-tender:review-technical', 'technical-tender:review-commercial')
   findAll(@Query() query: FindTeamsDto, @CurrentUser() user: CurrentUserPayload) {
     return this.service.findAll(query, user);
   }

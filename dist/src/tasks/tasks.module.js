@@ -19,6 +19,7 @@ exports.TasksModule = TasksModule = __decorate([
         imports: [notifications_module_1.NotificationsModule],
         controllers: [tasks_controller_1.TasksController],
         providers: [tasks_service_1.TasksService],
+        exports: [tasks_service_1.TasksService],
     })
 ], TasksModule);
 //# sourceMappingURL=tasks.module.js.map

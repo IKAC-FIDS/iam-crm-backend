@@ -43,7 +43,13 @@ const prisma = new client_1.PrismaClient();
 async function upsertPermission(permission) {
     return prisma.permission.upsert({
         where: { action: permission.action },
-        update: { description: permission.description, isSystem: true, isActive: true },
+        update: {
+            description: permission.description,
+            name: permission.name,
+            group: permission.group,
+            isSystem: true,
+            isActive: true,
+        },
         create: { ...permission, isSystem: true, isActive: true },
     });
 }
@@ -755,12 +761,24 @@ async function main() {
         { action: 'branch:manage', description: 'مدیریت شعب شرکت' },
         { action: 'social-channel:manage', description: 'مدیریت کانال‌های اجتماعی شرکت' },
         { action: 'activity:view', description: 'مشاهده فعالیت‌ها' },
+        {
+            action: 'activity:view-organization',
+            description: 'مشاهده فعالیت‌های همه کاربران سازمان',
+            name: 'مشاهده فعالیت‌های سازمان',
+            group: 'فعالیت‌ها',
+        },
         { action: 'activity:create', description: 'ثبت فعالیت' },
         { action: 'activity:update', description: 'ویرایش فعالیت' },
         { action: 'follow-up:complete', description: 'تکمیل پیگیری' },
         { action: 'follow-up:reschedule', description: 'زمان‌بندی مجدد پیگیری' },
         { action: 'report:view', description: 'مشاهده گزارش‌ها' },
         { action: 'report:advanced-filter', description: 'استفاده از فیلترهای پیشرفته گزارش' },
+        {
+            action: 'financial:view',
+            description: 'مشاهده اطلاعات مالی',
+            name: 'مشاهده اطلاعات مالی',
+            group: 'اطلاعات مالی',
+        },
         { action: 'call-card:view', description: 'مشاهده Call Card' },
         { action: 'call-card:manage', description: 'مدیریت Call Card' },
         { action: 'import:sam', description: 'آپلود و پردازش لیست SAM' },
@@ -880,6 +898,7 @@ async function main() {
         'follow-up:reschedule',
         'report:view',
         'report:advanced-filter',
+        'financial:view',
         'call-card:view',
         'call-card:manage',
         'library:persona:view',
@@ -997,6 +1016,7 @@ async function main() {
     const boardsActions = [
         'report:view',
         'report:advanced-filter',
+        'financial:view',
         'library:persona:view',
         'library:industry:view',
         'library:pain-point:view',

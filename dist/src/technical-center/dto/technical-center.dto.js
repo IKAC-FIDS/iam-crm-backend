@@ -9,7 +9,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.lifecycleEnums = exports.DecideTenderReviewDto = exports.RequestTenderReviewDto = exports.CreateDeliverableDto = exports.UpdateRequirementDto = exports.CreateRequirementDto = exports.UpdateTenderDto = exports.CreateTenderDto = exports.UpdateResourceDto = exports.CreateResourceDto = exports.CreateDocumentVersionDto = exports.UpdateDocumentDto = exports.CreateDocumentDto = exports.UpdateKnowledgeDto = exports.CreateKnowledgeDto = exports.UpdateReleaseDto = exports.CreateReleaseDto = exports.TenderTransitionDto = exports.DocumentTransitionDto = exports.KnowledgeTransitionDto = exports.ReleaseTransitionDto = exports.TransitionDto = exports.TechnicalDocumentListDto = exports.TechnicalListDto = void 0;
+exports.lifecycleEnums = exports.DecideTenderReviewDto = exports.RequestTenderReviewDto = exports.CreateDeliverableDto = exports.CreateRequirementTaskDto = exports.LinkRequirementTaskDto = exports.RequirementDependencyDto = exports.UpdateRequirementDto = exports.CreateRequirementDto = exports.UpdateTenderQualificationDto = exports.UpdateTenderDto = exports.CreateTenderDto = exports.UpdateResourceDto = exports.CreateResourceDto = exports.CreateDocumentVersionDto = exports.UpdateDocumentDto = exports.CreateDocumentDto = exports.UpdateKnowledgeDto = exports.CreateKnowledgeDto = exports.UpdateReleaseDto = exports.CreateReleaseDto = exports.TenderTransitionDto = exports.DocumentTransitionDto = exports.KnowledgeTransitionDto = exports.ReleaseTransitionDto = exports.TransitionDto = exports.TechnicalDocumentListDto = exports.TechnicalListDto = void 0;
 const openapi = require("@nestjs/swagger");
 const mapped_types_1 = require("@nestjs/mapped-types");
 const swagger_1 = require("@nestjs/swagger");
@@ -606,9 +606,92 @@ __decorate([
     (0, class_validator_1.Min)(1),
     __metadata("design:type", Number)
 ], UpdateTenderDto.prototype, "revision", void 0);
+class UpdateTenderQualificationDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { bidDecision: { required: false, type: () => Object }, qualificationDecision: { required: false, type: () => Object }, fitScore: { required: false, type: () => Number, minimum: 0, maximum: 100 }, riskScore: { required: false, type: () => Number, minimum: 0, maximum: 100 }, feasibilityScore: { required: false, type: () => Number, minimum: 0, maximum: 100 }, fitNotes: { required: false, type: () => String, maxLength: 10000 }, riskNotes: { required: false, type: () => String, maxLength: 10000 }, feasibilityNotes: { required: false, type: () => String, maxLength: 10000 }, qualificationSummary: { required: false, type: () => String, maxLength: 20000 }, qualificationConditions: { required: false, type: () => String, maxLength: 20000 }, decisionReason: { required: false, type: () => String, maxLength: 10000 }, revision: { required: false, type: () => Number, minimum: 1 } };
+    }
+}
+exports.UpdateTenderQualificationDto = UpdateTenderQualificationDto;
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsEnum)(client_1.TenderBidDecision),
+    __metadata("design:type", String)
+], UpdateTenderQualificationDto.prototype, "bidDecision", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsEnum)(client_1.TenderQualificationDecision),
+    __metadata("design:type", String)
+], UpdateTenderQualificationDto.prototype, "qualificationDecision", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Type)(() => Number),
+    (0, class_validator_1.IsInt)(),
+    (0, class_validator_1.Min)(0),
+    (0, class_validator_1.Max)(100),
+    __metadata("design:type", Number)
+], UpdateTenderQualificationDto.prototype, "fitScore", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Type)(() => Number),
+    (0, class_validator_1.IsInt)(),
+    (0, class_validator_1.Min)(0),
+    (0, class_validator_1.Max)(100),
+    __metadata("design:type", Number)
+], UpdateTenderQualificationDto.prototype, "riskScore", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Type)(() => Number),
+    (0, class_validator_1.IsInt)(),
+    (0, class_validator_1.Min)(0),
+    (0, class_validator_1.Max)(100),
+    __metadata("design:type", Number)
+], UpdateTenderQualificationDto.prototype, "feasibilityScore", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.MaxLength)(10000),
+    __metadata("design:type", String)
+], UpdateTenderQualificationDto.prototype, "fitNotes", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.MaxLength)(10000),
+    __metadata("design:type", String)
+], UpdateTenderQualificationDto.prototype, "riskNotes", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.MaxLength)(10000),
+    __metadata("design:type", String)
+], UpdateTenderQualificationDto.prototype, "feasibilityNotes", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.MaxLength)(20000),
+    __metadata("design:type", String)
+], UpdateTenderQualificationDto.prototype, "qualificationSummary", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.MaxLength)(20000),
+    __metadata("design:type", String)
+], UpdateTenderQualificationDto.prototype, "qualificationConditions", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.MaxLength)(10000),
+    __metadata("design:type", String)
+], UpdateTenderQualificationDto.prototype, "decisionReason", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Type)(() => Number),
+    (0, class_validator_1.IsInt)(),
+    (0, class_validator_1.Min)(1),
+    __metadata("design:type", Number)
+], UpdateTenderQualificationDto.prototype, "revision", void 0);
 class CreateRequirementDto {
     static _OPENAPI_METADATA_FACTORY() {
-        return { title: { required: true, type: () => String, minLength: 1, maxLength: 200 }, category: { required: false, type: () => String, maxLength: 120 }, description: { required: false, type: () => String, maxLength: 10000 }, mandatory: { required: false, type: () => Boolean }, ownerId: { required: false, type: () => String }, dueDate: { required: false, type: () => String }, response: { required: false, type: () => String, maxLength: 20000 } };
+        return { title: { required: true, type: () => String, minLength: 1, maxLength: 200 }, category: { required: false, type: () => String, maxLength: 120 }, description: { required: false, type: () => String, maxLength: 10000 }, section: { required: false, type: () => String, maxLength: 120 }, page: { required: false, type: () => String, maxLength: 40 }, referenceId: { required: false, type: () => String, maxLength: 120 }, notes: { required: false, type: () => String, maxLength: 10000 }, parentRequirementId: { required: false, type: () => String, nullable: true }, dependencyIds: { required: false, type: () => [String] }, mandatory: { required: false, type: () => Boolean }, ownerId: { required: false, type: () => String, nullable: true }, dueDate: { required: false, type: () => String }, response: { required: false, type: () => String, maxLength: 20000 } };
     }
 }
 exports.CreateRequirementDto = CreateRequirementDto;
@@ -631,13 +714,48 @@ __decorate([
 ], CreateRequirementDto.prototype, "description", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.MaxLength)(120),
+    __metadata("design:type", String)
+], CreateRequirementDto.prototype, "section", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.MaxLength)(40),
+    __metadata("design:type", String)
+], CreateRequirementDto.prototype, "page", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.MaxLength)(120),
+    __metadata("design:type", String)
+], CreateRequirementDto.prototype, "referenceId", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.MaxLength)(10000),
+    __metadata("design:type", String)
+], CreateRequirementDto.prototype, "notes", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsUUID)(),
+    __metadata("design:type", Object)
+], CreateRequirementDto.prototype, "parentRequirementId", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.IsUUID)('4', { each: true }),
+    __metadata("design:type", Array)
+], CreateRequirementDto.prototype, "dependencyIds", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsBoolean)(),
     __metadata("design:type", Boolean)
 ], CreateRequirementDto.prototype, "mandatory", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsUUID)(),
-    __metadata("design:type", String)
+    __metadata("design:type", Object)
 ], CreateRequirementDto.prototype, "ownerId", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
@@ -667,6 +785,69 @@ __decorate([
     (0, class_validator_1.MaxLength)(2000),
     __metadata("design:type", String)
 ], UpdateRequirementDto.prototype, "blockedReason", void 0);
+class RequirementDependencyDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { dependsOnRequirementId: { required: true, type: () => String } };
+    }
+}
+exports.RequirementDependencyDto = RequirementDependencyDto;
+__decorate([
+    (0, class_validator_1.IsUUID)(),
+    __metadata("design:type", String)
+], RequirementDependencyDto.prototype, "dependsOnRequirementId", void 0);
+class LinkRequirementTaskDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { taskId: { required: true, type: () => String } };
+    }
+}
+exports.LinkRequirementTaskDto = LinkRequirementTaskDto;
+__decorate([
+    (0, class_validator_1.IsUUID)(),
+    __metadata("design:type", String)
+], LinkRequirementTaskDto.prototype, "taskId", void 0);
+class CreateRequirementTaskDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { title: { required: false, type: () => String, maxLength: 200 }, description: { required: false, type: () => String, maxLength: 10000 }, priority: { required: false, type: () => Object }, dueAt: { required: false, type: () => String }, assignedToId: { required: false, type: () => String }, assignmentScope: { required: false, type: () => Object }, teamId: { required: false, type: () => String } };
+    }
+}
+exports.CreateRequirementTaskDto = CreateRequirementTaskDto;
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.MaxLength)(200),
+    __metadata("design:type", String)
+], CreateRequirementTaskDto.prototype, "title", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.MaxLength)(10000),
+    __metadata("design:type", String)
+], CreateRequirementTaskDto.prototype, "description", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsEnum)(client_1.Priority),
+    __metadata("design:type", String)
+], CreateRequirementTaskDto.prototype, "priority", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, api_date_string_validator_1.IsApiDateString)(),
+    __metadata("design:type", String)
+], CreateRequirementTaskDto.prototype, "dueAt", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsUUID)(),
+    __metadata("design:type", String)
+], CreateRequirementTaskDto.prototype, "assignedToId", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsEnum)(client_1.TaskAssignmentScope),
+    __metadata("design:type", String)
+], CreateRequirementTaskDto.prototype, "assignmentScope", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsUUID)(),
+    __metadata("design:type", String)
+], CreateRequirementTaskDto.prototype, "teamId", void 0);
 class CreateDeliverableDto {
     static _OPENAPI_METADATA_FACTORY() {
         return { documentId: { required: true, type: () => String }, label: { required: false, type: () => String, maxLength: 200 }, required: { required: false, type: () => Boolean } };

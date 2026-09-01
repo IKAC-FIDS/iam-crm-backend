@@ -1465,8 +1465,9 @@ model OpportunityLineItem {
   opportunityId String
   opportunity   Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
 
-  productId String?
-  product   ProductCatalogItem? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  productId          String?
+  product            ProductCatalogItem? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  tenderRequirements TenderRequirement[]
 
   productCodeSnapshot String
   productNameSnapshot String
@@ -1618,10 +1619,11 @@ model Task {
   cancelledAt  DateTime?
   cancelReason String?
 
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-  organizationId String       @default("00000000-0000-4000-8000-000000000001")
-  organization   Organization @relation(fields: [organizationId], references: [id])
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  organizationId    String              @default("00000000-0000-4000-8000-000000000001")
+  organization      Organization        @relation(fields: [organizationId], references: [id])
+  TenderRequirement TenderRequirement[]
 
   @@index([status])
   @@index([priority])
@@ -2650,6 +2652,19 @@ enum TenderResult {
   CANCELLED
 }
 
+enum TenderBidDecision {
+  UNDECIDED
+  BID
+  NO_BID
+}
+
+enum TenderQualificationDecision {
+  PENDING
+  GO
+  CONDITIONAL_GO
+  NO_GO
+}
+
 enum TenderRequirementStatus {
   OPEN
   IN_PROGRESS
@@ -2840,53 +2855,64 @@ model TechnicalResource {
 }
 
 model Tender {
-  id                   String              @id @default(uuid())
-  organizationId       String
-  organization         Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  title                String
-  referenceNumber      String?
-  companyId            String?
-  company              Company?            @relation(fields: [companyId], references: [id], onDelete: SetNull)
-  opportunityId        String?
-  opportunity          Opportunity?        @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
-  ownerId              String
-  owner                User                @relation("TechnicalTenderOwner", fields: [ownerId], references: [id], onDelete: Restrict)
-  teamId               String?
-  team                 Team?               @relation(fields: [teamId], references: [id], onDelete: SetNull)
-  status               TenderStatus        @default(DRAFT)
-  tenderType           TenderType
-  source               String?
-  description          String?
-  submissionDeadline   DateTime?
-  technicalDeadline    DateTime?
-  expectedDecisionDate DateTime?
-  estimatedValue       Decimal?            @db.Decimal(18, 2)
-  currency             String?             @default("IRR")
-  probability          Int?
-  technicalLeadId      String?
-  technicalLead        User?               @relation("TechnicalTenderTechnicalLead", fields: [technicalLeadId], references: [id], onDelete: SetNull)
-  commercialLeadId     String?
-  commercialLead       User?               @relation("TechnicalTenderCommercialLead", fields: [commercialLeadId], references: [id], onDelete: SetNull)
-  result               TenderResult?
-  resultReason         String?
-  submittedAt          DateTime?
-  submittedById        String?
-  submittedBy          User?               @relation("TechnicalTenderSubmittedBy", fields: [submittedById], references: [id], onDelete: SetNull)
-  closedAt             DateTime?
-  closedById           String?
-  closedBy             User?               @relation("TechnicalTenderClosedBy", fields: [closedById], references: [id], onDelete: SetNull)
-  createdById          String
-  createdBy            User                @relation("TechnicalTenderCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
-  updatedById          String
-  updatedBy            User                @relation("TechnicalTenderUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
-  revision             Int                 @default(1)
-  createdAt            DateTime            @default(now())
-  updatedAt            DateTime            @updatedAt
-  archivedAt           DateTime?
-  requirements         TenderRequirement[]
-  documents            TechnicalDocument[]
-  deliverables         TenderDeliverable[]
-  reviews              TenderReview[]
+  id                      String                      @id @default(uuid())
+  organizationId          String
+  organization            Organization                @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  title                   String
+  referenceNumber         String?
+  companyId               String?
+  company                 Company?                    @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  opportunityId           String?
+  opportunity             Opportunity?                @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+  ownerId                 String
+  owner                   User                        @relation("TechnicalTenderOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  teamId                  String?
+  team                    Team?                       @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  status                  TenderStatus                @default(DRAFT)
+  tenderType              TenderType
+  source                  String?
+  description             String?
+  submissionDeadline      DateTime?
+  technicalDeadline       DateTime?
+  expectedDecisionDate    DateTime?
+  estimatedValue          Decimal?                    @db.Decimal(18, 2)
+  currency                String?                     @default("IRR")
+  probability             Int?
+  technicalLeadId         String?
+  technicalLead           User?                       @relation("TechnicalTenderTechnicalLead", fields: [technicalLeadId], references: [id], onDelete: SetNull)
+  commercialLeadId        String?
+  commercialLead          User?                       @relation("TechnicalTenderCommercialLead", fields: [commercialLeadId], references: [id], onDelete: SetNull)
+  result                  TenderResult?
+  resultReason            String?
+  bidDecision             TenderBidDecision           @default(UNDECIDED)
+  qualificationDecision   TenderQualificationDecision @default(PENDING)
+  fitScore                Int?
+  riskScore               Int?
+  feasibilityScore        Int?
+  fitNotes                String?
+  riskNotes               String?
+  feasibilityNotes        String?
+  qualificationSummary    String?
+  qualificationConditions String?
+  decisionReason          String?
+  submittedAt             DateTime?
+  submittedById           String?
+  submittedBy             User?                       @relation("TechnicalTenderSubmittedBy", fields: [submittedById], references: [id], onDelete: SetNull)
+  closedAt                DateTime?
+  closedById              String?
+  closedBy                User?                       @relation("TechnicalTenderClosedBy", fields: [closedById], references: [id], onDelete: SetNull)
+  createdById             String
+  createdBy               User                        @relation("TechnicalTenderCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedById             String
+  updatedBy               User                        @relation("TechnicalTenderUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+  revision                Int                         @default(1)
+  createdAt               DateTime                    @default(now())
+  updatedAt               DateTime                    @updatedAt
+  archivedAt              DateTime?
+  requirements            TenderRequirement[]
+  documents               TechnicalDocument[]
+  deliverables            TenderDeliverable[]
+  reviews                 TenderReview[]
 
   @@unique([organizationId, referenceNumber])
   @@index([organizationId, status])
@@ -2899,29 +2925,59 @@ model Tender {
 }
 
 model TenderRequirement {
-  id             String                  @id @default(uuid())
-  organizationId String
-  tenderId       String
-  tender         Tender                  @relation(fields: [tenderId], references: [id], onDelete: Restrict)
-  category       String?
-  title          String
-  description    String?
-  mandatory      Boolean                 @default(false)
-  status         TenderRequirementStatus @default(OPEN)
-  ownerId        String?
-  owner          User?                   @relation("TenderRequirementOwner", fields: [ownerId], references: [id], onDelete: SetNull)
-  dueDate        DateTime?
-  response       String?
-  blockedReason  String?
-  blockedAt      DateTime?
-  blockedById    String?
-  blockedBy      User?                   @relation("TenderRequirementBlockedBy", fields: [blockedById], references: [id], onDelete: SetNull)
-  createdAt      DateTime                @default(now())
-  updatedAt      DateTime                @updatedAt
+  id                    String                        @id @default(uuid())
+  organizationId        String
+  tenderId              String
+  tender                Tender                        @relation(fields: [tenderId], references: [id], onDelete: Restrict)
+  category              String?
+  title                 String
+  description           String?
+  section               String?
+  page                  String?
+  referenceId           String?
+  notes                 String?
+  mandatory             Boolean                       @default(false)
+  status                TenderRequirementStatus       @default(OPEN)
+  ownerId               String?
+  owner                 User?                         @relation("TenderRequirementOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  parentRequirementId   String?
+  parentRequirement     TenderRequirement?            @relation("TenderRequirementHierarchy", fields: [parentRequirementId], references: [id], onDelete: Restrict)
+  childRequirements     TenderRequirement[]           @relation("TenderRequirementHierarchy")
+  taskId                String?
+  task                  Task?                         @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  dependencies          TenderRequirementDependency[] @relation("RequirementDependencies")
+  dependedOnBy          TenderRequirementDependency[] @relation("RequirementDependents")
+  dueDate               DateTime?
+  response              String?
+  blockedReason         String?
+  blockedAt             DateTime?
+  blockedById           String?
+  blockedBy             User?                         @relation("TenderRequirementBlockedBy", fields: [blockedById], references: [id], onDelete: SetNull)
+  createdAt             DateTime                      @default(now())
+  updatedAt             DateTime                      @updatedAt
+  OpportunityLineItem   OpportunityLineItem?          @relation(fields: [opportunityLineItemId], references: [id])
+  opportunityLineItemId String?
 
+  @@unique([organizationId, tenderId, referenceId])
   @@index([organizationId, tenderId])
   @@index([organizationId, status])
+  @@index([organizationId, parentRequirementId])
+  @@index([organizationId, ownerId])
+  @@index([organizationId, taskId])
   @@map("tender_requirements")
+}
+
+model TenderRequirementDependency {
+  id                     String            @id @default(uuid())
+  requirementId          String
+  requirement            TenderRequirement @relation("RequirementDependencies", fields: [requirementId], references: [id], onDelete: Cascade)
+  dependsOnRequirementId String
+  dependsOnRequirement   TenderRequirement @relation("RequirementDependents", fields: [dependsOnRequirementId], references: [id], onDelete: Cascade)
+  createdAt              DateTime          @default(now())
+
+  @@unique([requirementId, dependsOnRequirementId])
+  @@index([dependsOnRequirementId])
+  @@map("tender_requirement_dependencies")
 }
 
 model TenderDeliverable {
