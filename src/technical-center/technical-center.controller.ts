@@ -1,5 +1,8 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { ApiBearerAuth, ApiBody, ApiConsumes, ApiTags } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
+import { FileAttachmentEntityType } from '@prisma/client';
 import { CurrentUser, CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { AnyPermission, Permissions } from '../common/decorators/permissions.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -33,6 +36,7 @@ import {
   UpdateTenderQualificationDto,
 } from './dto/technical-center.dto';
 import { TechnicalCenterService } from './technical-center.service';
+import { AttachmentsService } from '../attachments/attachments.service';
 
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, PermissionsGuard)
@@ -65,7 +69,10 @@ export class TechnicalKnowledgeController {
 @ApiTags('Technical documents')
 @Controller('technical/documents')
 export class TechnicalDocumentsController {
-  constructor(private readonly service: TechnicalCenterService) {}
+  constructor(
+    private readonly service: TechnicalCenterService,
+    private readonly attachments: AttachmentsService,
+  ) {}
   @Get() @Permissions('technical-document:view') list(@Query() q: TechnicalDocumentListDto, @CurrentUser() u: CurrentUserPayload) { return this.service.listDocuments(q, u); }
   @Post() @Permissions('technical-document:manage') create(@Body() d: CreateDocumentDto, @CurrentUser() u: CurrentUserPayload) { return this.service.createDocument(d, u); }
   @Get(':id') @Permissions('technical-document:view') get(@Param('id') id: string, @CurrentUser() u: CurrentUserPayload) { return this.service.getDocument(id, u); }
@@ -73,6 +80,41 @@ export class TechnicalDocumentsController {
   @Post(':id/transition') @AnyPermission('technical-document:manage', 'technical-document:approve') transition(@Param('id') id: string, @Body() d: DocumentTransitionDto, @CurrentUser() u: CurrentUserPayload) { return this.service.transitionDocument(id, d, u); }
   @Get(':id/versions') @Permissions('technical-document:view') versions(@Param('id') id: string, @CurrentUser() u: CurrentUserPayload) { return this.service.listDocumentVersions(id, u); }
   @Post(':id/versions') @Permissions('technical-document:manage') version(@Param('id') id: string, @Body() d: CreateDocumentVersionDto, @CurrentUser() u: CurrentUserPayload) { return this.service.addDocumentVersion(id, d, u); }
+  @Post(':id/versions/upload')
+  @Permissions('technical-document:manage')
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({ schema: { type: 'object', required: ['version', 'file'], properties: {
+    version: { type: 'string', maxLength: 80 },
+    file: { type: 'string', format: 'binary' },
+    contentHash: { type: 'string', maxLength: 128 },
+  } } })
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } }))
+  async uploadVersion(
+    @Param('id') id: string,
+    @Body() d: CreateDocumentVersionDto,
+    @UploadedFile() file: Express.Multer.File,
+    @CurrentUser() u: CurrentUserPayload,
+  ) {
+    const attachment = await this.attachments.upload({
+      entityType: FileAttachmentEntityType.TECHNICAL_DOCUMENT,
+      entityId: id,
+      description: `فایل نسخه ${d.version}`,
+    }, file, u);
+    try {
+      return await this.service.addDocumentVersion(id, {
+        ...d,
+        attachmentId: attachment.id,
+        contentHash: d.contentHash?.trim() || attachment.sha256 || undefined,
+      }, u);
+    } catch (error) {
+      try {
+        await this.attachments.remove(attachment.id, u);
+      } catch {
+        // Keep the original versioning error; orphan cleanup can be reconciled safely later.
+      }
+      throw error;
+    }
+  }
   @Get(':id/versions/:versionId') @Permissions('technical-document:view') getVersion(@Param('id') id: string, @Param('versionId') versionId: string, @CurrentUser() u: CurrentUserPayload) { return this.service.getDocumentVersion(id, versionId, u); }
 }
 

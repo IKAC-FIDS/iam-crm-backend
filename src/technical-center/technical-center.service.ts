@@ -66,12 +66,28 @@ import {
   tenderTransitions,
 } from './technical-lifecycle.policy';
 
-const documentInclude = {
+const documentVersionInclude = {
+  attachment: { select: { id: true, name: true, originalFileName: true, mimeType: true, sizeBytes: true, sha256: true, createdAt: true, deletedAt: true } },
+  createdBy: { select: { id: true, fullName: true, email: true } },
+  approvedBy: { select: { id: true, fullName: true, email: true } },
+} satisfies Prisma.TechnicalDocumentVersionInclude;
+
+const documentRelations = {
   product: { select: { id: true, name: true, type: true } },
   release: { select: { id: true, version: true, title: true } },
   company: { select: { id: true, legalName: true, brandName: true } },
   opportunity: { select: { id: true, title: true } },
-  versions: { orderBy: { createdAt: 'desc' as const } },
+  owner: { select: { id: true, fullName: true, email: true } },
+};
+
+const documentInclude = {
+  ...documentRelations,
+  versions: { include: documentVersionInclude, orderBy: { createdAt: 'desc' as const } },
+} satisfies Prisma.TechnicalDocumentInclude;
+
+const documentListInclude = {
+  ...documentRelations,
+  versions: { include: documentVersionInclude, orderBy: { createdAt: 'desc' as const }, take: 1 },
 } satisfies Prisma.TechnicalDocumentInclude;
 
 const tenderInclude = {
@@ -281,7 +297,7 @@ export class TechnicalCenterService {
       ...(query.status && { status: this.enumValue(TechnicalDocumentStatus, query.status, 'status') }),
       ...(query.search && { OR: [{ title: { contains: query.search, mode: 'insensitive' } }, { description: { contains: query.search, mode: 'insensitive' } }] }),
     };
-    return this.page(query, () => this.prisma.technicalDocument.findMany({ where, include: documentInclude, orderBy: this.sort(query, ['updatedAt', 'title', 'effectiveFrom', 'expiresAt'], 'updatedAt'), skip: this.skip(query), take: query.limit }), () => this.prisma.technicalDocument.count({ where }));
+    return this.page(query, () => this.prisma.technicalDocument.findMany({ where, include: documentListInclude, orderBy: this.sort(query, ['updatedAt', 'title', 'effectiveFrom', 'expiresAt'], 'updatedAt'), skip: this.skip(query), take: query.limit }), () => this.prisma.technicalDocument.count({ where }));
   }
 
   async getDocument(id: string, user: CurrentUserPayload) {
@@ -324,6 +340,19 @@ export class TechnicalCenterService {
     const target = this.enumValue(TechnicalDocumentStatus, dto.status, 'status');
     assertTransition('technical-document', documentTransitions, current.status, target);
     if (['APPROVED', 'ACTIVE', 'SUPERSEDED'].includes(target)) this.require(user, 'technical-document:approve');
+    if ([TechnicalDocumentStatus.IN_REVIEW, TechnicalDocumentStatus.APPROVED].includes(target)) {
+      const latest = await this.prisma.technicalDocumentVersion.findFirst({
+        where: { organizationId: current.organizationId, documentId: id },
+        orderBy: { createdAt: 'desc' },
+        include: { attachment: { select: { id: true, deletedAt: true } } },
+      });
+      if (!latest?.attachment || latest.attachment.deletedAt) {
+        throw new BadRequestException({
+          code: 'DOCUMENT_VERSION_FILE_REQUIRED',
+          message: 'برای ارسال سند به بازبینی، ابتدا یک نسخه دارای فایل بارگذاری کنید.',
+        });
+      }
+    }
     await this.optimistic('technicalDocument', id, current.organizationId, dto.revision ?? current.revision, {
       status: target, updatedById: user.userId,
       ...(target === TechnicalDocumentStatus.ACTIVE && !current.effectiveFrom && { effectiveFrom: new Date() }),
@@ -353,6 +382,22 @@ export class TechnicalCenterService {
   async addDocumentVersion(documentId: string, dto: CreateDocumentVersionDto, user: CurrentUserPayload) {
     const document = await this.getDocument(documentId, user);
     this.assertMutable(document.archivedAt);
+    if (![TechnicalDocumentStatus.DRAFT, TechnicalDocumentStatus.IN_REVIEW].includes(document.status)) {
+      throw new BadRequestException({
+        code: 'DOCUMENT_VERSION_LOCKED',
+        message: 'افزودن نسخه فقط برای سند پیش‌نویس یا در حال بازبینی امکان‌پذیر است.',
+      });
+    }
+    const duplicate = await this.prisma.technicalDocumentVersion.findFirst({
+      where: { organizationId: document.organizationId, documentId, version: dto.version.trim() },
+      select: { id: true },
+    });
+    if (duplicate) {
+      throw new ConflictException({
+        code: 'DUPLICATE_DOCUMENT_VERSION',
+        message: 'این شماره نسخه قبلاً برای سند ثبت شده است.',
+      });
+    }
     if (dto.attachmentId) await this.assertAttachment(document.organizationId, dto.attachmentId, FileAttachmentEntityType.TECHNICAL_DOCUMENT, documentId);
     const row = await this.prisma.technicalDocumentVersion.create({ data: {
       organizationId: document.organizationId, documentId, version: dto.version.trim(), attachmentId: dto.attachmentId,
@@ -366,6 +411,7 @@ export class TechnicalCenterService {
     const document = await this.getDocument(documentId, user);
     return this.prisma.technicalDocumentVersion.findMany({
       where: { organizationId: document.organizationId, documentId },
+      include: documentVersionInclude,
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -374,6 +420,7 @@ export class TechnicalCenterService {
     const document = await this.getDocument(documentId, user);
     const row = await this.prisma.technicalDocumentVersion.findFirst({
       where: { id: versionId, organizationId: document.organizationId, documentId },
+      include: documentVersionInclude,
     });
     if (!row) throw new NotFoundException('Technical document version not found');
     return row;

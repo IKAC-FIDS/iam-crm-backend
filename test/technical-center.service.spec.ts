@@ -148,6 +148,9 @@ describe('TechnicalCenterService', () => {
     prisma.technicalDocument.findFirst
       .mockResolvedValueOnce({ ...document, status: TechnicalDocumentStatus.IN_REVIEW })
       .mockResolvedValueOnce({ ...document, status: TechnicalDocumentStatus.APPROVED, revision: 2 });
+    prisma.technicalDocumentVersion.findFirst.mockResolvedValue({
+      id: 'version', approvedAt: null, attachment: { id: 'attachment', deletedAt: null },
+    });
     await service.transitionDocument('doc', { status: 'APPROVED' }, user(['technical-document:approve']));
     expect(audit.recordTenantEvent).toHaveBeenCalledWith(expect.objectContaining({ action: 'technical-document.approved' }));
   });
@@ -271,6 +274,26 @@ describe('TechnicalCenterService', () => {
     prisma.tenderRequirement.findFirst.mockResolvedValue({ id: 'req', tenderId: 'tender', organizationId, status: TenderRequirementStatus.OPEN });
     await expect(service.updateRequirement('tender', 'req', { status: TenderRequirementStatus.BLOCKED }, user()))
       .rejects.toMatchObject({ response: expect.objectContaining({ code: 'REQUIREMENT_BLOCK_REASON_REQUIRED' }) });
+  });
+
+  it('does not send a technical document to review without a current version file', async () => {
+    const document = { id: 'doc', organizationId, title: 'Doc', documentType: 'ARCHITECTURE', ownerId: user().userId, status: TechnicalDocumentStatus.DRAFT, revision: 1, archivedAt: null, effectiveFrom: null, versions: [] };
+    prisma.technicalDocument.findFirst.mockResolvedValue(document);
+    prisma.technicalDocumentVersion.findFirst.mockResolvedValue(null);
+
+    await expect(service.transitionDocument('doc', { status: 'IN_REVIEW' }, user(['technical-document:manage'])))
+      .rejects.toMatchObject({ response: expect.objectContaining({ code: 'DOCUMENT_VERSION_FILE_REQUIRED' }) });
+    expect(prisma.technicalDocument.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('rejects duplicate technical document version numbers with a stable error code', async () => {
+    const document = { id: 'doc', organizationId, title: 'Doc', documentType: 'ARCHITECTURE', ownerId: user().userId, status: TechnicalDocumentStatus.DRAFT, revision: 1, archivedAt: null, versions: [] };
+    prisma.technicalDocument.findFirst.mockResolvedValue(document);
+    prisma.technicalDocumentVersion.findFirst.mockResolvedValue({ id: 'existing-version' });
+
+    await expect(service.addDocumentVersion('doc', { version: '1.0' }, user(['technical-document:manage'])))
+      .rejects.toMatchObject({ response: expect.objectContaining({ code: 'DUPLICATE_DOCUMENT_VERSION' }) });
+    expect(prisma.technicalDocumentVersion.create).not.toHaveBeenCalled();
   });
 
   it('updates qualification and audits consequential decisions', async () => {

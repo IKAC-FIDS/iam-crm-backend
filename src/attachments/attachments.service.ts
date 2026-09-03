@@ -264,6 +264,18 @@ export class AttachmentsService {
       true,
     );
 
+    if (attachment.entityType === FileAttachmentEntityType.TECHNICAL_DOCUMENT) {
+      const documentVersion = await this.prisma.technicalDocumentVersion.findFirst({
+        where: { attachmentId: attachment.id },
+        select: { id: true, version: true },
+      });
+      if (documentVersion) {
+        throw new BadRequestException(
+          `این فایل، فایل رسمی نسخه ${documentVersion.version} سند است و قابل حذف نیست.`,
+        );
+      }
+    }
+
     const deleted = await this.prisma.fileAttachment.update({
       where: { id },
       data: {
@@ -381,6 +393,13 @@ export class AttachmentsService {
           'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
           'application/vnd.ms-excel',
           'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'application/vnd.ms-powerpoint',
+          'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+          'application/zip',
+          'application/json',
+          'application/xml',
+          'text/xml',
+          'text/markdown',
           'image/webp',
           'text/plain',
           'text/csv',
