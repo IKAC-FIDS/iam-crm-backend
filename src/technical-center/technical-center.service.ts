@@ -340,7 +340,10 @@ export class TechnicalCenterService {
     const target = this.enumValue(TechnicalDocumentStatus, dto.status, 'status');
     assertTransition('technical-document', documentTransitions, current.status, target);
     if (['APPROVED', 'ACTIVE', 'SUPERSEDED'].includes(target)) this.require(user, 'technical-document:approve');
-    if ([TechnicalDocumentStatus.IN_REVIEW, TechnicalDocumentStatus.APPROVED].includes(target)) {
+    if (
+      target === TechnicalDocumentStatus.IN_REVIEW ||
+      target === TechnicalDocumentStatus.APPROVED
+    ) {
       const latest = await this.prisma.technicalDocumentVersion.findFirst({
         where: { organizationId: current.organizationId, documentId: id },
         orderBy: { createdAt: 'desc' },
@@ -382,7 +385,10 @@ export class TechnicalCenterService {
   async addDocumentVersion(documentId: string, dto: CreateDocumentVersionDto, user: CurrentUserPayload) {
     const document = await this.getDocument(documentId, user);
     this.assertMutable(document.archivedAt);
-    if (![TechnicalDocumentStatus.DRAFT, TechnicalDocumentStatus.IN_REVIEW].includes(document.status)) {
+    if (
+      document.status !== TechnicalDocumentStatus.DRAFT &&
+      document.status !== TechnicalDocumentStatus.IN_REVIEW
+    ) {
       throw new BadRequestException({
         code: 'DOCUMENT_VERSION_LOCKED',
         message: 'افزودن نسخه فقط برای سند پیش‌نویس یا در حال بازبینی امکان‌پذیر است.',
