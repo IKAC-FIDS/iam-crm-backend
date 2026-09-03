@@ -276,6 +276,17 @@ describe('TechnicalCenterService', () => {
       .rejects.toMatchObject({ response: expect.objectContaining({ code: 'REQUIREMENT_BLOCK_REASON_REQUIRED' }) });
   });
 
+  it('returns a stable conflict when a technical document is already linked to a tender', async () => {
+    const tender = { id: 'tender', organizationId, title: 'RFP', tenderType: 'RFP', ownerId: user().userId, status: TenderStatus.DRAFT, revision: 1, archivedAt: null, requirements: [], deliverables: [] };
+    prisma.tender.findFirst.mockResolvedValue(tender);
+    prisma.technicalDocument.findFirst.mockResolvedValue({ id: 'doc', organizationId, archivedAt: null });
+    prisma.tenderDeliverable.findFirst.mockResolvedValue({ id: 'existing-deliverable' });
+
+    await expect(service.addDeliverable('tender', { documentId: 'doc' }, user(['technical-tender:manage'])))
+      .rejects.toMatchObject({ response: expect.objectContaining({ code: 'DUPLICATE_TENDER_DELIVERABLE' }) });
+    expect(prisma.tenderDeliverable.create).not.toHaveBeenCalled();
+  });
+
   it('does not send a technical document to review without a current version file', async () => {
     const document = { id: 'doc', organizationId, title: 'Doc', documentType: 'ARCHITECTURE', ownerId: user().userId, status: TechnicalDocumentStatus.DRAFT, revision: 1, archivedAt: null, effectiveFrom: null, versions: [] };
     prisma.technicalDocument.findFirst.mockResolvedValue(document);

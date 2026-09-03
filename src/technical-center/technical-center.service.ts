@@ -759,6 +759,16 @@ export class TechnicalCenterService {
     this.assertTenderOpen(tender.status);
     const document = await this.prisma.technicalDocument.findFirst({ where: { id: dto.documentId, organizationId: tender.organizationId, archivedAt: null } });
     if (!document) throw new NotFoundException('Technical document not found');
+    const duplicate = await this.prisma.tenderDeliverable.findFirst({
+      where: { organizationId: tender.organizationId, tenderId, documentId: dto.documentId },
+      select: { id: true },
+    });
+    if (duplicate) {
+      throw new ConflictException({
+        code: 'DUPLICATE_TENDER_DELIVERABLE',
+        message: 'این سند قبلاً به اقلام تحویلی مناقصه متصل شده است.',
+      });
+    }
     const row = await this.prisma.tenderDeliverable.create({ data: { organizationId: tender.organizationId, tenderId, documentId: dto.documentId, label: dto.label?.trim(), required: dto.required ?? true } });
     await this.log('tender-deliverable', row.id, 'technical-tender.deliverable-created', tender.organizationId, user, undefined, row);
     return row;
