@@ -210,6 +210,7 @@ describe('TechnicalCenterService', () => {
     const ready = {
       id: 'tender', organizationId, title: 'RFP', tenderType: 'RFP', ownerId: user().userId,
       companyId: 'company', submissionDeadline: new Date(Date.now() + 86400000), status: TenderStatus.READY_FOR_SUBMISSION,
+      bidDecision: TenderBidDecision.BID, qualificationDecision: TenderQualificationDecision.GO,
       revision: 3, archivedAt: null, requirements: [], deliverables: [], reviews: [
         { id: 'technical', type: TenderReviewType.TECHNICAL, status: TenderReviewStatus.APPROVED },
         { id: 'commercial', type: TenderReviewType.COMMERCIAL, status: TenderReviewStatus.APPROVED },
@@ -287,6 +288,16 @@ describe('TechnicalCenterService', () => {
     await expect(service.updateTenderQualification('tender', { bidDecision: TenderBidDecision.NO_BID }, user())).rejects.toMatchObject({ response: expect.objectContaining({ code: 'QUALIFICATION_DECISION_REASON_REQUIRED' }) });
   });
 
+  it('does not enter preparation before participation and qualification are approved', async () => {
+    const tender = { id: 'tender', organizationId, status: TenderStatus.QUALIFICATION, revision: 1, archivedAt: null, bidDecision: TenderBidDecision.UNDECIDED, qualificationDecision: TenderQualificationDecision.PENDING, requirements: [], deliverables: [], reviews: [] };
+    prisma.tender.findFirst.mockResolvedValue(tender);
+    await expect(service.transitionTender('tender', { status: TenderStatus.PREPARING, revision: 1 }, user(['technical-tender:manage'])))
+      .rejects.toMatchObject({ response: expect.objectContaining({ code: 'TENDER_BID_DECISION_REQUIRED' }) });
+    prisma.tender.findFirst.mockResolvedValue({ ...tender, bidDecision: TenderBidDecision.BID });
+    await expect(service.transitionTender('tender', { status: TenderStatus.PREPARING, revision: 1 }, user(['technical-tender:manage'])))
+      .rejects.toMatchObject({ response: expect.objectContaining({ code: 'TENDER_QUALIFICATION_APPROVAL_REQUIRED' }) });
+  });
+
   it('rejects cross-tender parents and hierarchy cycles', async () => {
     const tender = { id: 'tender', organizationId, status: TenderStatus.PREPARING, requirements: [], deliverables: [], reviews: [] };
     prisma.tender.findFirst.mockResolvedValue(tender);
@@ -339,6 +350,7 @@ describe('TechnicalCenterService', () => {
     const base = {
       id: 'tender', organizationId, title: 'RFP', tenderType: 'RFP', ownerId: user().userId,
       companyId: 'company', submissionDeadline: new Date(Date.now() + 86400000), status: TenderStatus.COMMERCIAL_REVIEW,
+      bidDecision: TenderBidDecision.BID, qualificationDecision: TenderQualificationDecision.GO,
       revision: 1, archivedAt: null, requirements: [], reviews: [
         { id: 'commercial', type: TenderReviewType.COMMERCIAL, status: TenderReviewStatus.APPROVED },
         { id: 'technical', type: TenderReviewType.TECHNICAL, status: TenderReviewStatus.APPROVED },

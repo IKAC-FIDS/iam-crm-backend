@@ -2,12 +2,28 @@
 
 Phase 4.3 extends the existing Technical Center tender lifecycle without synchronizing it with the Opportunity pipeline.
 
+## User-facing process
+
+The detailed fourteen-state lifecycle is presented to users as eight understandable operational steps:
+
+1. Register and identify (`DRAFT`, `IDENTIFIED`)
+2. Initial qualification (`QUALIFICATION`)
+3. Prepare the response (`PREPARING`)
+4. Technical approval (`TECHNICAL_REVIEW`)
+5. Commercial approval (`COMMERCIAL_REVIEW`)
+6. Final control and submission (`READY_FOR_SUBMISSION`, `SUBMITTED`)
+7. Customer evaluation and clarification (`UNDER_EVALUATION`, `CLARIFICATION`)
+8. Result and archive (`WON`, `LOST`, `CANCELLED`, `ARCHIVED`)
+
+The UI shows the current operational step, its responsible role, the recommended next action, and the reason any next-state action is disabled. The backend lifecycle remains the authoritative enforcement layer.
+
 ## Readiness policy
 
 Readiness is derived on the server and is never persisted. `GET /technical/tenders/:id/readiness` returns `overallReady`, explicit blockers and warnings, and check summaries.
 
 A tender is ready only when:
 
+- the participation decision is `BID` and qualification is `GO` or `CONDITIONAL_GO`;
 - every mandatory requirement is `VERIFIED` (mandatory `NOT_APPLICABLE` is not accepted);
 - every unresolved mandatory requirement has an owner;
 - each required deliverable points to an `APPROVED` or `ACTIVE` Technical Document whose latest available version has an attachment;
@@ -18,6 +34,8 @@ A tender is ready only when:
 Overdue requirements and requirements due after the submission deadline are warnings. They do not mutate dates automatically. A blocked requirement requires a reason and records blocker actor/time. A deliverable is required by default, preserving conservative behavior for existing rows.
 
 The backend enforces readiness on transitions to `READY_FOR_SUBMISSION` and `SUBMITTED`, returning `TENDER_NOT_READY` with machine-readable blocker details.
+
+The transition from `QUALIFICATION` to `PREPARING` is also gated by the same participation/qualification decision. A `NO_BID` or `NO_GO` record should be closed through the cancellation path with an explicit reason instead of progressing into proposal preparation.
 
 ## Reviews
 

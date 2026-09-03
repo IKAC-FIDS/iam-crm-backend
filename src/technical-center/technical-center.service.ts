@@ -78,6 +78,9 @@ const tenderInclude = {
   company: { select: { id: true, legalName: true, brandName: true } },
   opportunity: { select: { id: true, title: true } },
   team: { select: { id: true, code: true, name: true } },
+  owner: { select: { id: true, fullName: true, email: true } },
+  technicalLead: { select: { id: true, fullName: true, email: true } },
+  commercialLead: { select: { id: true, fullName: true, email: true } },
   requirements: { include: {
     owner: { select: { id: true, fullName: true, email: true } },
     task: { select: { id: true, title: true, status: true, assignedToId: true } },
@@ -482,10 +485,10 @@ export class TechnicalCenterService {
     const conditions = dto.qualificationConditions ?? current.qualificationConditions;
     const reason = dto.decisionReason ?? current.decisionReason;
     if (nextDecision === TenderQualificationDecision.CONDITIONAL_GO && !conditions?.trim()) {
-      throw new BadRequestException({ code: 'QUALIFICATION_CONDITIONS_REQUIRED', message: 'Conditional GO requires explicit conditions' });
+      throw new BadRequestException({ code: 'QUALIFICATION_CONDITIONS_REQUIRED', message: 'برای «ادامه مشروط» باید شرایط ادامه را مشخص کنید' });
     }
     if ((nextDecision === TenderQualificationDecision.NO_GO || nextBidDecision === TenderBidDecision.NO_BID) && !reason?.trim()) {
-      throw new BadRequestException({ code: 'QUALIFICATION_DECISION_REASON_REQUIRED', message: 'NO GO and NO BID decisions require a reason' });
+      throw new BadRequestException({ code: 'QUALIFICATION_DECISION_REASON_REQUIRED', message: 'برای «عدم ادامه» یا «شرکت نمی‌کنیم» باید دلیل تصمیم را ثبت کنید' });
     }
     const { revision, ...input } = dto;
     const textFields = ['fitNotes', 'riskNotes', 'feasibilityNotes', 'qualificationSummary', 'qualificationConditions', 'decisionReason'] as const;
@@ -504,18 +507,26 @@ export class TechnicalCenterService {
     if (target === TenderStatus.SUBMITTED) this.require(user, 'technical-tender:submit');
     if (['WON', 'LOST', 'CANCELLED', 'ARCHIVED'].includes(target)) this.require(user, 'technical-tender:close');
     if ((target === TenderStatus.LOST || target === TenderStatus.CANCELLED) && !dto.reason?.trim()) {
-      throw new BadRequestException({ code: 'TENDER_CLOSE_REASON_REQUIRED', message: 'A reason is required for lost or cancelled tenders' });
+      throw new BadRequestException({ code: 'TENDER_CLOSE_REASON_REQUIRED', message: 'برای ثبت نتیجه «از دست رفته» یا لغو مناقصه باید دلیل را وارد کنید' });
     }
     if (this.isReopen(current.status, target) && !dto.reason?.trim()) {
-      throw new BadRequestException({ code: 'TENDER_REOPEN_REASON_REQUIRED', message: 'A reason is required when reopening a workflow step' });
+      throw new BadRequestException({ code: 'TENDER_REOPEN_REASON_REQUIRED', message: 'برای بازگشت به مرحله قبل باید دلیل اصلاح را ثبت کنید' });
+    }
+    if (current.status === TenderStatus.QUALIFICATION && target === TenderStatus.PREPARING) {
+      if (current.bidDecision !== TenderBidDecision.BID) {
+        throw new BadRequestException({ code: 'TENDER_BID_DECISION_REQUIRED', message: 'برای ورود به آماده‌سازی، تصمیم شرکت در مناقصه باید «شرکت می‌کنیم» باشد' });
+      }
+      if (!([TenderQualificationDecision.GO, TenderQualificationDecision.CONDITIONAL_GO] as TenderQualificationDecision[]).includes(current.qualificationDecision)) {
+        throw new BadRequestException({ code: 'TENDER_QUALIFICATION_APPROVAL_REQUIRED', message: 'برای ورود به آماده‌سازی، نتیجه ارزیابی اولیه باید «ادامه» یا «ادامه مشروط» باشد' });
+      }
     }
     if (current.status === TenderStatus.TECHNICAL_REVIEW && target === TenderStatus.COMMERCIAL_REVIEW) {
       const readiness = this.evaluateReadiness(current);
-      if (readiness.checks.technicalReview.status !== TenderReviewStatus.APPROVED) throw new BadRequestException({ code: 'TECHNICAL_REVIEW_NOT_APPROVED', message: 'Technical review must be approved before commercial review' });
+      if (readiness.checks.technicalReview.status !== TenderReviewStatus.APPROVED) throw new BadRequestException({ code: 'TECHNICAL_REVIEW_NOT_APPROVED', message: 'قبل از ورود به بازبینی تجاری، تأیید فنی را ثبت کنید' });
     }
     if (target === TenderStatus.READY_FOR_SUBMISSION || target === TenderStatus.SUBMITTED) {
       const readiness = this.evaluateReadiness(current);
-      if (!readiness.overallReady) throw new BadRequestException({ code: 'TENDER_NOT_READY', message: 'Tender is not ready for submission', details: { blockers: readiness.blockers, checks: readiness.checks } });
+      if (!readiness.overallReady) throw new BadRequestException({ code: 'TENDER_NOT_READY', message: 'مناقصه هنوز برای ارسال آماده نیست؛ موارد اعلام‌شده را تکمیل کنید', details: { blockers: readiness.blockers, checks: readiness.checks } });
     }
     const result = target === TenderStatus.WON ? TenderResult.WON : target === TenderStatus.LOST ? TenderResult.LOST : target === TenderStatus.CANCELLED ? TenderResult.CANCELLED : undefined;
     await this.optimistic('tender', id, current.organizationId, dto.revision ?? current.revision, {
@@ -726,11 +737,11 @@ export class TechnicalCenterService {
     const permission = dto.type === TenderReviewType.TECHNICAL ? 'technical-tender:review-technical' : 'technical-tender:review-commercial';
     this.require(user, permission);
     const expectedStatus = dto.type === TenderReviewType.TECHNICAL ? TenderStatus.TECHNICAL_REVIEW : TenderStatus.COMMERCIAL_REVIEW;
-    if (tender.status !== expectedStatus) throw new BadRequestException({ code: 'REVIEW_NOT_AVAILABLE_IN_CURRENT_STATUS', message: `This review can only be requested in ${expectedStatus}` });
+    if (tender.status !== expectedStatus) throw new BadRequestException({ code: 'REVIEW_NOT_AVAILABLE_IN_CURRENT_STATUS', message: `این بازبینی فقط در مرحله ${expectedStatus === TenderStatus.TECHNICAL_REVIEW ? 'بازبینی فنی' : 'بازبینی تجاری'} قابل درخواست است` });
     if (dto.reviewerId) await this.assertUser(tender.organizationId, dto.reviewerId);
     if (dto.revision !== undefined && dto.revision !== tender.revision) throw new ConflictException({ code: 'REVISION_CONFLICT', message: 'The tender was changed by another request' });
     const pending = tender.reviews.find((review) => review.type === dto.type && review.status === TenderReviewStatus.PENDING);
-    if (pending) throw new ConflictException({ code: 'REVIEW_ALREADY_PENDING', message: 'A pending review already exists for this review type' });
+    if (pending) throw new ConflictException({ code: 'REVIEW_ALREADY_PENDING', message: 'برای این نوع بازبینی یک درخواست در انتظار وجود دارد' });
     let row;
     try {
       row = await this.prisma.$transaction(async (tx) => {
@@ -742,7 +753,7 @@ export class TechnicalCenterService {
         });
       });
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') throw new ConflictException({ code: 'REVIEW_ALREADY_PENDING', message: 'A pending review already exists for this review type' });
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') throw new ConflictException({ code: 'REVIEW_ALREADY_PENDING', message: 'برای این نوع بازبینی یک درخواست در انتظار وجود دارد' });
       throw error;
     }
     await this.log('technical-tender', id, `technical-tender.review-${dto.type.toLowerCase()}-requested`, tender.organizationId, user, undefined, row, dto.comment);
@@ -757,17 +768,17 @@ export class TechnicalCenterService {
     if (!review) throw new NotFoundException('Tender review not found');
     const permission = review.type === TenderReviewType.TECHNICAL ? 'technical-tender:review-technical' : 'technical-tender:review-commercial';
     this.require(user, permission);
-    if (review.status !== TenderReviewStatus.PENDING) throw new ConflictException({ code: 'REVIEW_ALREADY_DECIDED', message: 'This review has already been decided' });
+    if (review.status !== TenderReviewStatus.PENDING) throw new ConflictException({ code: 'REVIEW_ALREADY_DECIDED', message: 'نتیجه این بازبینی قبلاً ثبت شده است' });
     if (dto.status !== TenderReviewStatus.APPROVED && dto.status !== TenderReviewStatus.REJECTED && dto.status !== TenderReviewStatus.CANCELLED) {
-      throw new BadRequestException({ code: 'INVALID_REVIEW_DECISION', message: 'Review decision must be approved, rejected, or cancelled' });
+      throw new BadRequestException({ code: 'INVALID_REVIEW_DECISION', message: 'نتیجه بازبینی باید تأیید، رد یا لغو باشد' });
     }
-    if (dto.status === TenderReviewStatus.REJECTED && !dto.comment?.trim()) throw new BadRequestException({ code: 'REVIEW_REJECTION_REASON_REQUIRED', message: 'A rejection comment is required' });
+    if (dto.status === TenderReviewStatus.REJECTED && !dto.comment?.trim()) throw new BadRequestException({ code: 'REVIEW_REJECTION_REASON_REQUIRED', message: 'برای رد بازبینی باید دلیل را ثبت کنید' });
     if (dto.revision !== undefined && dto.revision !== tender.revision) throw new ConflictException({ code: 'REVISION_CONFLICT', message: 'The tender was changed by another request' });
     const row = await this.prisma.$transaction(async (tx) => {
       const revision = await tx.tender.updateMany({ where: { id, organizationId: tender.organizationId, revision: tender.revision }, data: { revision: { increment: 1 }, updatedById: user.userId } });
       if (revision.count !== 1) throw new ConflictException({ code: 'REVISION_CONFLICT', message: 'The tender was changed by another request' });
       const decision = await tx.tenderReview.updateMany({ where: { id: reviewId, tenderId: id, organizationId: tender.organizationId, status: TenderReviewStatus.PENDING }, data: { status: dto.status, decidedById: user.userId, reviewedAt: new Date(), comment: dto.comment?.trim() } });
-      if (decision.count !== 1) throw new ConflictException({ code: 'REVIEW_ALREADY_DECIDED', message: 'This review has already been decided' });
+      if (decision.count !== 1) throw new ConflictException({ code: 'REVIEW_ALREADY_DECIDED', message: 'نتیجه این بازبینی قبلاً ثبت شده است' });
       return tx.tenderReview.findUniqueOrThrow({ where: { id: reviewId } });
     });
     await this.log('technical-tender', id, `technical-tender.review-${review.type.toLowerCase()}-${dto.status.toLowerCase()}`, tender.organizationId, user, review, row, dto.comment);
@@ -815,6 +826,8 @@ export class TechnicalCenterService {
     if (unresolved.length) blockers.push({ code: 'MANDATORY_REQUIREMENTS_INCOMPLETE', count: unresolved.length });
     if (mandatory.some((row: any) => row.status !== TenderRequirementStatus.VERIFIED && !row.ownerId)) blockers.push({ code: 'MANDATORY_REQUIREMENTS_UNASSIGNED', count: mandatory.filter((row: any) => row.status !== TenderRequirementStatus.VERIFIED && !row.ownerId).length });
     if (completedDeliverables.length !== requiredDeliverables.length) blockers.push({ code: 'REQUIRED_DELIVERABLES_INCOMPLETE', count: requiredDeliverables.length - completedDeliverables.length });
+    if (tender.bidDecision !== TenderBidDecision.BID) blockers.push({ code: 'TENDER_BID_DECISION_REQUIRED' });
+    if (!([TenderQualificationDecision.GO, TenderQualificationDecision.CONDITIONAL_GO] as TenderQualificationDecision[]).includes(tender.qualificationDecision)) blockers.push({ code: 'TENDER_QUALIFICATION_APPROVAL_REQUIRED' });
     if (technicalReview?.status !== TenderReviewStatus.APPROVED) blockers.push({ code: 'TECHNICAL_REVIEW_NOT_APPROVED' });
     if (commercialReview?.status !== TenderReviewStatus.APPROVED) blockers.push({ code: 'COMMERCIAL_REVIEW_NOT_APPROVED' });
     if (missingFields.length) blockers.push({ code: 'REQUIRED_TENDER_FIELDS_INCOMPLETE', fields: missingFields });
