@@ -61,6 +61,7 @@ describe('TechnicalCenterService', () => {
         create: jest.fn(), findFirst: jest.fn(), findMany: jest.fn().mockResolvedValue([]),
         count: jest.fn().mockResolvedValue(0), update: jest.fn(),
       },
+      fileAttachment: { groupBy: jest.fn().mockResolvedValue([]) },
       tender: {
         create: jest.fn(), findFirst: jest.fn(), findMany: jest.fn().mockResolvedValue([]),
         count: jest.fn().mockResolvedValue(0), updateMany: jest.fn().mockResolvedValue({ count: 1 }),
@@ -441,6 +442,20 @@ describe('TechnicalCenterService', () => {
     prisma.tenderRequirement.findFirst.mockResolvedValue({ id: 'req', tenderId: 'tender', organizationId, status: TenderRequirementStatus.OPEN });
     await expect(service.updateRequirement('tender', 'req', { status: TenderRequirementStatus.BLOCKED }, user()))
       .rejects.toMatchObject({ response: expect.objectContaining({ code: 'REQUIREMENT_BLOCK_REASON_REQUIRED' }) });
+  });
+
+  it('returns resource relations and artifact counts from the list API', async () => {
+    const resource = { id: 'resource', organizationId, title: 'SDK', resourceType: 'SDK', status: TechnicalResourceStatus.DRAFT, archivedAt: null };
+    prisma.technicalResource.findMany.mockResolvedValueOnce([resource]);
+    prisma.fileAttachment.groupBy.mockResolvedValueOnce([{ entityId: 'resource', _count: { _all: 2 } }]);
+    const result = await service.listResources({ page: 1, limit: 20 }, user());
+    expect(prisma.technicalResource.findMany).toHaveBeenCalledWith(expect.objectContaining({ include: expect.objectContaining({ product: expect.anything(), release: expect.anything(), owner: expect.anything() }) }));
+    expect(result.data[0]).toMatchObject({ id: 'resource', artifactCount: 2 });
+  });
+
+  it('requires URL for an external technical resource', async () => {
+    await expect(service.createResource({ title: 'مرجع', resourceType: 'EXTERNAL_LINK' }, user()))
+      .rejects.toMatchObject({ response: expect.objectContaining({ code: 'TECHNICAL_RESOURCE_URL_REQUIRED' }) });
   });
 
   it('rejects an invalid technical release support schedule', async () => {
