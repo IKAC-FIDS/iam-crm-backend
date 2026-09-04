@@ -90,6 +90,13 @@ const documentListInclude = {
   versions: { include: documentVersionInclude, orderBy: { createdAt: 'desc' as const }, take: 1 },
 } satisfies Prisma.TechnicalDocumentInclude;
 
+const releaseDetailInclude = {
+  product: { select: { id: true, name: true, type: true } },
+  createdBy: { select: { id: true, fullName: true, email: true } },
+  updatedBy: { select: { id: true, fullName: true, email: true } },
+  _count: { select: { knowledgeArticles: true, technicalDocuments: true, technicalResources: true } },
+} satisfies Prisma.TechnicalReleaseInclude;
+
 const tenderInclude = {
   company: { select: { id: true, legalName: true, brandName: true } },
   opportunity: { select: { id: true, title: true } },
@@ -128,12 +135,14 @@ export class TechnicalCenterService {
       organizationId,
       archivedAt: null,
       ...(query.productId && { productId: query.productId }),
-      ...(query.version && { version: query.version }),
+      ...(query.version && { version: { contains: query.version.trim(), mode: 'insensitive' } }),
       ...(query.status && { status: this.enumValue(TechnicalReleaseStatus, query.status, 'status') }),
       ...(query.search && {
         OR: [
           { title: { contains: query.search, mode: 'insensitive' } },
           { version: { contains: query.search, mode: 'insensitive' } },
+          { summary: { contains: query.search, mode: 'insensitive' } },
+          { product: { name: { contains: query.search, mode: 'insensitive' } } },
         ],
       }),
       ...(this.range(query) && { releaseDate: this.range(query) }),
@@ -149,7 +158,7 @@ export class TechnicalCenterService {
   async getRelease(id: string, user: CurrentUserPayload) {
     const row = await this.prisma.technicalRelease.findFirst({
       where: { id, organizationId: getCurrentOrganizationId(user) },
-      include: { product: true },
+      include: releaseDetailInclude,
     });
     if (!row) throw new NotFoundException('Technical release not found');
     return row;
@@ -159,15 +168,13 @@ export class TechnicalCenterService {
     const organizationId = getCurrentOrganizationId(user);
     await this.assertProduct(dto.productId);
     await this.assertReleaseVersionAvailable(organizationId, dto.productId, dto.version);
+    const schedule = this.releaseSchedule(dto);
     const row = await this.prisma.technicalRelease.create({ data: {
       organizationId, productId: dto.productId, version: dto.version.trim(), title: dto.title.trim(),
       summary: dto.summary?.trim(), releaseNotes: dto.releaseNotes?.trim(),
-      releaseDate: this.date(dto.releaseDate, 'releaseDate'),
-      supportStartDate: this.date(dto.supportStartDate, 'supportStartDate'),
-      supportEndDate: this.date(dto.supportEndDate, 'supportEndDate'),
-      endOfLifeDate: this.date(dto.endOfLifeDate, 'endOfLifeDate'),
+      ...schedule,
       createdById: user.userId, updatedById: user.userId,
-    }});
+    }, include: releaseDetailInclude });
     await this.log('technical-release', row.id, 'technical-release.created', organizationId, user, undefined, row);
     return row;
   }
@@ -175,6 +182,18 @@ export class TechnicalCenterService {
   async updateRelease(id: string, dto: UpdateReleaseDto, user: CurrentUserPayload) {
     const current = await this.getRelease(id, user);
     this.assertMutable(current.archivedAt);
+    if (
+      (current.status === TechnicalReleaseStatus.RELEASED ||
+        current.status === TechnicalReleaseStatus.DEPRECATED ||
+        current.status === TechnicalReleaseStatus.END_OF_LIFE) &&
+      ((dto.productId !== undefined && dto.productId !== current.productId) ||
+        (dto.version !== undefined && dto.version.trim() !== current.version))
+    ) {
+      throw new BadRequestException({
+        code: 'RELEASE_IDENTITY_LOCKED',
+        message: 'پس از انتشار، محصول و شماره نسخه قابل تغییر نیستند.',
+      });
+    }
     if (dto.productId) await this.assertProduct(dto.productId);
     if (dto.productId || dto.version) {
       await this.assertReleaseVersionAvailable(
@@ -185,14 +204,15 @@ export class TechnicalCenterService {
       );
     }
     const { revision, ...input } = dto;
+    const schedule = this.releaseSchedule(dto, current);
     await this.optimistic('technicalRelease', id, current.organizationId, revision ?? current.revision, {
       ...input,
       version: input.version?.trim(), title: input.title?.trim(), summary: input.summary?.trim(),
       releaseNotes: input.releaseNotes?.trim(),
-      releaseDate: this.date(input.releaseDate, 'releaseDate'),
-      supportStartDate: this.date(input.supportStartDate, 'supportStartDate'),
-      supportEndDate: this.date(input.supportEndDate, 'supportEndDate'),
-      endOfLifeDate: this.date(input.endOfLifeDate, 'endOfLifeDate'),
+      ...(input.releaseDate !== undefined && { releaseDate: schedule.releaseDate }),
+      ...(input.supportStartDate !== undefined && { supportStartDate: schedule.supportStartDate }),
+      ...(input.supportEndDate !== undefined && { supportEndDate: schedule.supportEndDate }),
+      ...(input.endOfLifeDate !== undefined && { endOfLifeDate: schedule.endOfLifeDate }),
       updatedById: user.userId,
     });
     const row = await this.getRelease(id, user);
@@ -205,6 +225,37 @@ export class TechnicalCenterService {
     const target = this.enumValue(TechnicalReleaseStatus, dto.status, 'status');
     assertTransition('technical-release', releaseTransitions, current.status, target);
     if (['RELEASED', 'DEPRECATED', 'END_OF_LIFE'].includes(target)) this.require(user, 'technical-release:publish');
+    if (
+      (target === TechnicalReleaseStatus.PLANNED ||
+        target === TechnicalReleaseStatus.RELEASED) &&
+      !current.releaseDate
+    ) {
+      throw new BadRequestException({
+        code: 'RELEASE_DATE_REQUIRED',
+        message: 'برای برنامه‌ریزی یا انتشار نسخه، تاریخ انتشار را مشخص کنید.',
+      });
+    }
+    if (
+      target === TechnicalReleaseStatus.RELEASED &&
+      current.releaseDate &&
+      current.releaseDate.getTime() > Date.now()
+    ) {
+      throw new BadRequestException({
+        code: 'RELEASE_DATE_IN_FUTURE',
+        message: 'تا پیش از رسیدن تاریخ برنامه‌ریزی‌شده، امکان ثبت وضعیت منتشرشده وجود ندارد.',
+      });
+    }
+    if (
+      (target === TechnicalReleaseStatus.DEPRECATED ||
+        target === TechnicalReleaseStatus.END_OF_LIFE ||
+        target === TechnicalReleaseStatus.ARCHIVED) &&
+      !dto.reason?.trim()
+    ) {
+      throw new BadRequestException({
+        code: 'RELEASE_TRANSITION_REASON_REQUIRED',
+        message: 'ثبت دلیل برای این تغییر وضعیت الزامی است.',
+      });
+    }
     await this.optimistic('technicalRelease', id, current.organizationId, dto.revision ?? current.revision, {
       status: target, updatedById: user.userId,
       ...(target === TechnicalReleaseStatus.RELEASED && !current.releaseDate && { releaseDate: new Date() }),
@@ -1017,8 +1068,32 @@ export class TechnicalCenterService {
     });
     if (duplicate) throw new ConflictException({
       code: 'DUPLICATE_RELEASE_VERSION',
-      message: 'This product already has a release with the same version in this tenant',
+      message: 'این شماره نسخه قبلاً برای محصول انتخاب‌شده ثبت شده است.',
     });
+  }
+
+  private releaseSchedule(
+    dto: Pick<CreateReleaseDto, 'releaseDate' | 'supportStartDate' | 'supportEndDate' | 'endOfLifeDate'>,
+    current?: { releaseDate: Date | null; supportStartDate: Date | null; supportEndDate: Date | null; endOfLifeDate: Date | null },
+  ) {
+    const schedule = {
+      releaseDate: dto.releaseDate !== undefined ? this.date(dto.releaseDate, 'releaseDate') : current?.releaseDate,
+      supportStartDate: dto.supportStartDate !== undefined ? this.date(dto.supportStartDate, 'supportStartDate') : current?.supportStartDate,
+      supportEndDate: dto.supportEndDate !== undefined ? this.date(dto.supportEndDate, 'supportEndDate') : current?.supportEndDate,
+      endOfLifeDate: dto.endOfLifeDate !== undefined ? this.date(dto.endOfLifeDate, 'endOfLifeDate') : current?.endOfLifeDate,
+    };
+    const ordered = [schedule.releaseDate, schedule.supportStartDate, schedule.supportEndDate, schedule.endOfLifeDate]
+      .filter((value): value is Date => Boolean(value));
+    if (ordered.some((value, index) => {
+      const previous = ordered[index - 1];
+      return previous !== undefined && value.getTime() < previous.getTime();
+    })) {
+      throw new BadRequestException({
+        code: 'RELEASE_DATE_ORDER_INVALID',
+        message: 'ترتیب تاریخ انتشار، شروع پشتیبانی، پایان پشتیبانی و پایان عمر معتبر نیست.',
+      });
+    }
+    return schedule;
   }
 
   private async assertScoped(model: 'company' | 'opportunity' | 'team' | 'tender', organizationId: string, id: string) {

@@ -100,6 +100,25 @@ describe('TechnicalCenterService', () => {
     expect(prisma.technicalRelease.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ organizationId }) }));
   });
 
+  it('applies partial version and broad search to the release list on the server', async () => {
+    await service.listReleases(
+      { page: 1, limit: 20, version: '2.4', search: 'gateway' },
+      user(),
+    );
+    expect(prisma.technicalRelease.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          organizationId,
+          version: { contains: '2.4', mode: 'insensitive' },
+          OR: expect.arrayContaining([
+            { summary: { contains: 'gateway', mode: 'insensitive' } },
+            { product: { name: { contains: 'gateway', mode: 'insensitive' } } },
+          ]),
+        }),
+      }),
+    );
+  });
+
   it('requires the privileged publish permission for release publication', async () => {
     prisma.technicalRelease.findFirst.mockResolvedValue({ ...release, status: TechnicalReleaseStatus.PLANNED });
     await expect(service.transitionRelease(release.id, { status: 'RELEASED' }, user(['technical-release:manage']))).rejects.toBeInstanceOf(ForbiddenException);
@@ -108,7 +127,11 @@ describe('TechnicalCenterService', () => {
 
   it('uses revision in lifecycle updates and records the transition', async () => {
     prisma.technicalRelease.findFirst
-      .mockResolvedValueOnce({ ...release, status: TechnicalReleaseStatus.PLANNED })
+      .mockResolvedValueOnce({
+        ...release,
+        status: TechnicalReleaseStatus.PLANNED,
+        releaseDate: new Date('2026-08-01'),
+      })
       .mockResolvedValueOnce({ ...release, status: TechnicalReleaseStatus.RELEASED, revision: 2 });
     await service.transitionRelease(release.id, { status: 'RELEASED', revision: 1 }, user(['technical-release:publish']));
     expect(prisma.technicalRelease.updateMany).toHaveBeenCalledWith(expect.objectContaining({ where: { id: release.id, organizationId, revision: 1 } }));
@@ -274,6 +297,49 @@ describe('TechnicalCenterService', () => {
     prisma.tenderRequirement.findFirst.mockResolvedValue({ id: 'req', tenderId: 'tender', organizationId, status: TenderRequirementStatus.OPEN });
     await expect(service.updateRequirement('tender', 'req', { status: TenderRequirementStatus.BLOCKED }, user()))
       .rejects.toMatchObject({ response: expect.objectContaining({ code: 'REQUIREMENT_BLOCK_REASON_REQUIRED' }) });
+  });
+
+  it('rejects an invalid technical release support schedule', async () => {
+    await expect(service.createRelease({
+      productId,
+      version: '2.0.0',
+      title: 'Release',
+      releaseDate: '2026-09-10',
+      supportEndDate: '2026-09-01',
+    }, user())).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'RELEASE_DATE_ORDER_INVALID' }),
+    });
+    expect(prisma.technicalRelease.create).not.toHaveBeenCalled();
+  });
+
+  it('requires a release date before moving a draft release to planned', async () => {
+    prisma.technicalRelease.findFirst.mockResolvedValue(release);
+    await expect(service.transitionRelease(release.id, { status: 'PLANNED' }, user(['technical-release:manage'])))
+      .rejects.toMatchObject({ response: expect.objectContaining({ code: 'RELEASE_DATE_REQUIRED' }) });
+    expect(prisma.technicalRelease.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('locks product and version identity after publication', async () => {
+    prisma.technicalRelease.findFirst.mockResolvedValue({ ...release, status: TechnicalReleaseStatus.RELEASED });
+    await expect(service.updateRelease(release.id, { version: '2.0.0' }, user(['technical-release:manage'])))
+      .rejects.toMatchObject({ response: expect.objectContaining({ code: 'RELEASE_IDENTITY_LOCKED' }) });
+    expect(prisma.technicalRelease.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('requires a reason for consequential release lifecycle changes', async () => {
+    prisma.technicalRelease.findFirst.mockResolvedValue({
+      ...release,
+      status: TechnicalReleaseStatus.RELEASED,
+      releaseDate: new Date('2026-08-01'),
+    });
+    await expect(service.transitionRelease(
+      release.id,
+      { status: 'DEPRECATED' },
+      user(['technical-release:publish']),
+    )).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'RELEASE_TRANSITION_REASON_REQUIRED' }),
+    });
+    expect(prisma.technicalRelease.updateMany).not.toHaveBeenCalled();
   });
 
   it('returns a stable conflict when a technical document is already linked to a tender', async () => {
