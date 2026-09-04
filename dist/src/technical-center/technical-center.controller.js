@@ -50,7 +50,7 @@ __decorate([
 __decorate([
     (0, common_1.Post)(),
     (0, permissions_decorator_1.Permissions)('technical-release:manage'),
-    openapi.ApiResponse({ status: 201 }),
+    openapi.ApiResponse({ status: 201, type: Object }),
     __param(0, (0, common_1.Body)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
@@ -101,6 +101,7 @@ let TechnicalKnowledgeController = class TechnicalKnowledgeController {
         this.service = service;
     }
     list(q, u) { return this.service.listKnowledge(q, u); }
+    categories(q, u) { return this.service.listKnowledgeCategories(q.search, u); }
     create(d, u) { return this.service.createKnowledge(d, u); }
     get(id, u) { return this.service.getKnowledge(id, u); }
     update(id, d, u) { return this.service.updateKnowledge(id, d, u); }
@@ -118,9 +119,19 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], TechnicalKnowledgeController.prototype, "list", null);
 __decorate([
+    (0, common_1.Get)('category-options'),
+    (0, permissions_decorator_1.Permissions)('technical-knowledge:view'),
+    openapi.ApiResponse({ status: 200 }),
+    __param(0, (0, common_1.Query)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [technical_center_dto_1.KnowledgeCategoryOptionsDto, Object]),
+    __metadata("design:returntype", void 0)
+], TechnicalKnowledgeController.prototype, "categories", null);
+__decorate([
     (0, common_1.Post)(),
     (0, permissions_decorator_1.Permissions)('technical-knowledge:manage'),
-    openapi.ApiResponse({ status: 201 }),
+    openapi.ApiResponse({ status: 201, type: Object }),
     __param(0, (0, common_1.Body)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
@@ -130,7 +141,7 @@ __decorate([
 __decorate([
     (0, common_1.Get)(':id'),
     (0, permissions_decorator_1.Permissions)('technical-knowledge:view'),
-    openapi.ApiResponse({ status: 200 }),
+    openapi.ApiResponse({ status: 200, type: Object }),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
@@ -140,7 +151,7 @@ __decorate([
 __decorate([
     (0, common_1.Patch)(':id'),
     (0, permissions_decorator_1.Permissions)('technical-knowledge:manage'),
-    openapi.ApiResponse({ status: 200 }),
+    openapi.ApiResponse({ status: 200, type: Object }),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
     __param(2, (0, current_user_decorator_1.CurrentUser)()),
@@ -151,7 +162,7 @@ __decorate([
 __decorate([
     (0, common_1.Post)(':id/transition'),
     (0, permissions_decorator_1.AnyPermission)('technical-knowledge:manage', 'technical-knowledge:publish'),
-    openapi.ApiResponse({ status: 201 }),
+    openapi.ApiResponse({ status: 201, type: Object }),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
     __param(2, (0, current_user_decorator_1.CurrentUser)()),

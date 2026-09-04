@@ -9,7 +9,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.lifecycleEnums = exports.DecideTenderReviewDto = exports.RequestTenderReviewDto = exports.CreateDeliverableDto = exports.CreateRequirementTaskDto = exports.LinkRequirementTaskDto = exports.RequirementDependencyDto = exports.UpdateRequirementDto = exports.CreateRequirementDto = exports.UpdateTenderQualificationDto = exports.UpdateTenderDto = exports.CreateTenderDto = exports.UpdateResourceDto = exports.CreateResourceDto = exports.CreateDocumentVersionDto = exports.UpdateDocumentDto = exports.CreateDocumentDto = exports.UpdateKnowledgeDto = exports.CreateKnowledgeDto = exports.UpdateReleaseDto = exports.CreateReleaseDto = exports.TenderTransitionDto = exports.DocumentTransitionDto = exports.KnowledgeTransitionDto = exports.ReleaseTransitionDto = exports.TransitionDto = exports.TechnicalDocumentListDto = exports.TechnicalListDto = void 0;
+exports.lifecycleEnums = exports.DecideTenderReviewDto = exports.RequestTenderReviewDto = exports.CreateDeliverableDto = exports.CreateRequirementTaskDto = exports.LinkRequirementTaskDto = exports.RequirementDependencyDto = exports.UpdateRequirementDto = exports.CreateRequirementDto = exports.UpdateTenderQualificationDto = exports.KnowledgeCategoryOptionsDto = exports.UpdateTenderDto = exports.CreateTenderDto = exports.UpdateResourceDto = exports.CreateResourceDto = exports.CreateDocumentVersionDto = exports.UpdateDocumentDto = exports.CreateDocumentDto = exports.UpdateKnowledgeDto = exports.CreateKnowledgeDto = exports.UpdateReleaseDto = exports.CreateReleaseDto = exports.TenderTransitionDto = exports.DocumentTransitionDto = exports.KnowledgeTransitionDto = exports.ReleaseTransitionDto = exports.TransitionDto = exports.TechnicalDocumentListDto = exports.TechnicalListDto = void 0;
 const openapi = require("@nestjs/swagger");
 const mapped_types_1 = require("@nestjs/mapped-types");
 const swagger_1 = require("@nestjs/swagger");
@@ -20,7 +20,7 @@ const pagination_dto_1 = require("../../common/pagination/pagination.dto");
 const api_date_string_validator_1 = require("../../common/validators/api-date-string.validator");
 class TechnicalListDto extends pagination_dto_1.PaginationDto {
     static _OPENAPI_METADATA_FACTORY() {
-        return { search: { required: false, type: () => String, maxLength: 200 }, productId: { required: false, type: () => String }, releaseId: { required: false, type: () => String }, companyId: { required: false, type: () => String }, opportunityId: { required: false, type: () => String }, ownerId: { required: false, type: () => String }, teamId: { required: false, type: () => String }, status: { required: false, type: () => String }, type: { required: false, type: () => String }, version: { required: false, type: () => String, maxLength: 80 }, category: { required: false, type: () => String, maxLength: 120 }, authorId: { required: false, type: () => String }, reviewDue: { required: false, type: () => String }, sort: { required: false, type: () => String, maxLength: 40 }, sortDirection: { required: false, type: () => Object, enum: ['asc', 'desc'] }, from: { required: false, type: () => String }, to: { required: false, type: () => String } };
+        return { search: { required: false, type: () => String, maxLength: 200 }, productId: { required: false, type: () => String }, releaseId: { required: false, type: () => String }, companyId: { required: false, type: () => String }, opportunityId: { required: false, type: () => String }, ownerId: { required: false, type: () => String }, teamId: { required: false, type: () => String }, status: { required: false, type: () => String }, type: { required: false, type: () => String }, version: { required: false, type: () => String, maxLength: 80 }, category: { required: false, type: () => String, maxLength: 120 }, visibility: { required: false, type: () => Object }, authorId: { required: false, type: () => String }, reviewDue: { required: false, type: () => String }, sort: { required: false, type: () => String, maxLength: 40 }, sortDirection: { required: false, type: () => Object, enum: ['asc', 'desc'] }, from: { required: false, type: () => String }, to: { required: false, type: () => String } };
     }
 }
 exports.TechnicalListDto = TechnicalListDto;
@@ -82,6 +82,11 @@ __decorate([
     (0, class_validator_1.MaxLength)(120),
     __metadata("design:type", String)
 ], TechnicalListDto.prototype, "category", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsEnum)(client_1.TechnicalVisibility),
+    __metadata("design:type", String)
+], TechnicalListDto.prototype, "visibility", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsUUID)(),
@@ -260,7 +265,7 @@ __decorate([
 ], UpdateReleaseDto.prototype, "revision", void 0);
 class CreateKnowledgeDto {
     static _OPENAPI_METADATA_FACTORY() {
-        return { title: { required: true, type: () => String, minLength: 1, maxLength: 200 }, slug: { required: true, type: () => String, minLength: 1, maxLength: 160 }, content: { required: true, type: () => String, minLength: 1, maxLength: 100000 }, summary: { required: false, type: () => String, maxLength: 1000 }, category: { required: false, type: () => String, maxLength: 120 }, visibility: { required: false, type: () => Object }, productId: { required: false, type: () => String }, releaseId: { required: false, type: () => String }, ownerId: { required: false, type: () => String }, reviewerId: { required: false, type: () => String }, nextReviewAt: { required: false, type: () => String } };
+        return { title: { required: true, type: () => String, minLength: 1, maxLength: 200 }, slug: { required: true, type: () => String, minLength: 1, maxLength: 160 }, content: { required: true, type: () => String, minLength: 1, maxLength: 100000 }, summary: { required: false, type: () => String, nullable: true, maxLength: 1000 }, category: { required: false, type: () => String, nullable: true, maxLength: 120 }, visibility: { required: false, type: () => Object }, productId: { required: false, type: () => String, nullable: true }, releaseId: { required: false, type: () => String, nullable: true }, ownerId: { required: false, type: () => String, nullable: true }, reviewerId: { required: false, type: () => String, nullable: true }, nextReviewAt: { required: false, type: () => String, nullable: true } };
     }
 }
 exports.CreateKnowledgeDto = CreateKnowledgeDto;
@@ -283,13 +288,13 @@ __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.MaxLength)(1000),
-    __metadata("design:type", String)
+    __metadata("design:type", Object)
 ], CreateKnowledgeDto.prototype, "summary", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.MaxLength)(120),
-    __metadata("design:type", String)
+    __metadata("design:type", Object)
 ], CreateKnowledgeDto.prototype, "category", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
@@ -299,27 +304,27 @@ __decorate([
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsUUID)(),
-    __metadata("design:type", String)
+    __metadata("design:type", Object)
 ], CreateKnowledgeDto.prototype, "productId", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsUUID)(),
-    __metadata("design:type", String)
+    __metadata("design:type", Object)
 ], CreateKnowledgeDto.prototype, "releaseId", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsUUID)(),
-    __metadata("design:type", String)
+    __metadata("design:type", Object)
 ], CreateKnowledgeDto.prototype, "ownerId", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsUUID)(),
-    __metadata("design:type", String)
+    __metadata("design:type", Object)
 ], CreateKnowledgeDto.prototype, "reviewerId", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, api_date_string_validator_1.IsApiDateString)(),
-    __metadata("design:type", String)
+    __metadata("design:type", Object)
 ], CreateKnowledgeDto.prototype, "nextReviewAt", void 0);
 class UpdateKnowledgeDto extends (0, mapped_types_1.PartialType)(CreateKnowledgeDto) {
     static _OPENAPI_METADATA_FACTORY() {
@@ -606,6 +611,18 @@ __decorate([
     (0, class_validator_1.Min)(1),
     __metadata("design:type", Number)
 ], UpdateTenderDto.prototype, "revision", void 0);
+class KnowledgeCategoryOptionsDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { search: { required: false, type: () => String, maxLength: 120 } };
+    }
+}
+exports.KnowledgeCategoryOptionsDto = KnowledgeCategoryOptionsDto;
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.MaxLength)(120),
+    __metadata("design:type", String)
+], KnowledgeCategoryOptionsDto.prototype, "search", void 0);
 class UpdateTenderQualificationDto {
     static _OPENAPI_METADATA_FACTORY() {
         return { bidDecision: { required: false, type: () => Object }, qualificationDecision: { required: false, type: () => Object }, fitScore: { required: false, type: () => Number, minimum: 0, maximum: 100 }, riskScore: { required: false, type: () => Number, minimum: 0, maximum: 100 }, feasibilityScore: { required: false, type: () => Number, minimum: 0, maximum: 100 }, fitNotes: { required: false, type: () => String, maxLength: 10000 }, riskNotes: { required: false, type: () => String, maxLength: 10000 }, feasibilityNotes: { required: false, type: () => String, maxLength: 10000 }, qualificationSummary: { required: false, type: () => String, maxLength: 20000 }, qualificationConditions: { required: false, type: () => String, maxLength: 20000 }, decisionReason: { required: false, type: () => String, maxLength: 10000 }, revision: { required: false, type: () => Number, minimum: 1 } };

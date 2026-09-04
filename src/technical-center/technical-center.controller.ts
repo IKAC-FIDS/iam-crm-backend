@@ -34,6 +34,7 @@ import {
   UpdateResourceDto,
   UpdateTenderDto,
   UpdateTenderQualificationDto,
+  KnowledgeCategoryOptionsDto,
 } from './dto/technical-center.dto';
 import { TechnicalCenterService } from './technical-center.service';
 import { AttachmentsService } from '../attachments/attachments.service';
@@ -58,6 +59,7 @@ export class TechnicalReleasesController {
 export class TechnicalKnowledgeController {
   constructor(private readonly service: TechnicalCenterService) {}
   @Get() @Permissions('technical-knowledge:view') list(@Query() q: TechnicalListDto, @CurrentUser() u: CurrentUserPayload) { return this.service.listKnowledge(q, u); }
+  @Get('category-options') @Permissions('technical-knowledge:view') categories(@Query() q: KnowledgeCategoryOptionsDto, @CurrentUser() u: CurrentUserPayload) { return this.service.listKnowledgeCategories(q.search, u); }
   @Post() @Permissions('technical-knowledge:manage') create(@Body() d: CreateKnowledgeDto, @CurrentUser() u: CurrentUserPayload) { return this.service.createKnowledge(d, u); }
   @Get(':id') @Permissions('technical-knowledge:view') get(@Param('id') id: string, @CurrentUser() u: CurrentUserPayload) { return this.service.getKnowledge(id, u); }
   @Patch(':id') @Permissions('technical-knowledge:manage') update(@Param('id') id: string, @Body() d: UpdateKnowledgeDto, @CurrentUser() u: CurrentUserPayload) { return this.service.updateKnowledge(id, d, u); }

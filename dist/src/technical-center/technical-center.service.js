@@ -42,6 +42,19 @@ const documentListInclude = {
     ...documentRelations,
     versions: { include: documentVersionInclude, orderBy: { createdAt: 'desc' }, take: 1 },
 };
+const releaseDetailInclude = {
+    product: { select: { id: true, name: true, type: true } },
+    createdBy: { select: { id: true, fullName: true, email: true } },
+    updatedBy: { select: { id: true, fullName: true, email: true } },
+    _count: { select: { knowledgeArticles: true, technicalDocuments: true, technicalResources: true } },
+};
+const knowledgeRelations = {
+    product: { select: { id: true, name: true, type: true } },
+    release: { select: { id: true, version: true, title: true } },
+    owner: { select: { id: true, fullName: true, email: true } },
+    author: { select: { id: true, fullName: true, email: true } },
+    reviewer: { select: { id: true, fullName: true, email: true } },
+};
 const tenderInclude = {
     company: { select: { id: true, legalName: true, brandName: true } },
     opportunity: { select: { id: true, title: true } },
@@ -77,12 +90,14 @@ let TechnicalCenterService = class TechnicalCenterService {
             organizationId,
             archivedAt: null,
             ...(query.productId && { productId: query.productId }),
-            ...(query.version && { version: query.version }),
+            ...(query.version && { version: { contains: query.version.trim(), mode: 'insensitive' } }),
             ...(query.status && { status: this.enumValue(client_1.TechnicalReleaseStatus, query.status, 'status') }),
             ...(query.search && {
                 OR: [
                     { title: { contains: query.search, mode: 'insensitive' } },
                     { version: { contains: query.search, mode: 'insensitive' } },
+                    { summary: { contains: query.search, mode: 'insensitive' } },
+                    { product: { name: { contains: query.search, mode: 'insensitive' } } },
                 ],
             }),
             ...(this.range(query) && { releaseDate: this.range(query) }),
@@ -97,7 +112,7 @@ let TechnicalCenterService = class TechnicalCenterService {
     async getRelease(id, user) {
         const row = await this.prisma.technicalRelease.findFirst({
             where: { id, organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user) },
-            include: { product: true },
+            include: releaseDetailInclude,
         });
         if (!row)
             throw new common_1.NotFoundException('Technical release not found');
@@ -107,35 +122,44 @@ let TechnicalCenterService = class TechnicalCenterService {
         const organizationId = (0, tenant_scope_util_1.getCurrentOrganizationId)(user);
         await this.assertProduct(dto.productId);
         await this.assertReleaseVersionAvailable(organizationId, dto.productId, dto.version);
+        const schedule = this.releaseSchedule(dto);
         const row = await this.prisma.technicalRelease.create({ data: {
                 organizationId, productId: dto.productId, version: dto.version.trim(), title: dto.title.trim(),
                 summary: dto.summary?.trim(), releaseNotes: dto.releaseNotes?.trim(),
-                releaseDate: this.date(dto.releaseDate, 'releaseDate'),
-                supportStartDate: this.date(dto.supportStartDate, 'supportStartDate'),
-                supportEndDate: this.date(dto.supportEndDate, 'supportEndDate'),
-                endOfLifeDate: this.date(dto.endOfLifeDate, 'endOfLifeDate'),
+                ...schedule,
                 createdById: user.userId, updatedById: user.userId,
-            } });
+            }, include: releaseDetailInclude });
         await this.log('technical-release', row.id, 'technical-release.created', organizationId, user, undefined, row);
         return row;
     }
     async updateRelease(id, dto, user) {
         const current = await this.getRelease(id, user);
         this.assertMutable(current.archivedAt);
+        if ((current.status === client_1.TechnicalReleaseStatus.RELEASED ||
+            current.status === client_1.TechnicalReleaseStatus.DEPRECATED ||
+            current.status === client_1.TechnicalReleaseStatus.END_OF_LIFE) &&
+            ((dto.productId !== undefined && dto.productId !== current.productId) ||
+                (dto.version !== undefined && dto.version.trim() !== current.version))) {
+            throw new common_1.BadRequestException({
+                code: 'RELEASE_IDENTITY_LOCKED',
+                message: 'پس از انتشار، محصول و شماره نسخه قابل تغییر نیستند.',
+            });
+        }
         if (dto.productId)
             await this.assertProduct(dto.productId);
         if (dto.productId || dto.version) {
             await this.assertReleaseVersionAvailable(current.organizationId, dto.productId ?? current.productId, dto.version ?? current.version, id);
         }
         const { revision, ...input } = dto;
+        const schedule = this.releaseSchedule(dto, current);
         await this.optimistic('technicalRelease', id, current.organizationId, revision ?? current.revision, {
             ...input,
             version: input.version?.trim(), title: input.title?.trim(), summary: input.summary?.trim(),
             releaseNotes: input.releaseNotes?.trim(),
-            releaseDate: this.date(input.releaseDate, 'releaseDate'),
-            supportStartDate: this.date(input.supportStartDate, 'supportStartDate'),
-            supportEndDate: this.date(input.supportEndDate, 'supportEndDate'),
-            endOfLifeDate: this.date(input.endOfLifeDate, 'endOfLifeDate'),
+            ...(input.releaseDate !== undefined && { releaseDate: schedule.releaseDate }),
+            ...(input.supportStartDate !== undefined && { supportStartDate: schedule.supportStartDate }),
+            ...(input.supportEndDate !== undefined && { supportEndDate: schedule.supportEndDate }),
+            ...(input.endOfLifeDate !== undefined && { endOfLifeDate: schedule.endOfLifeDate }),
             updatedById: user.userId,
         });
         const row = await this.getRelease(id, user);
@@ -148,6 +172,31 @@ let TechnicalCenterService = class TechnicalCenterService {
         (0, technical_lifecycle_policy_1.assertTransition)('technical-release', technical_lifecycle_policy_1.releaseTransitions, current.status, target);
         if (['RELEASED', 'DEPRECATED', 'END_OF_LIFE'].includes(target))
             this.require(user, 'technical-release:publish');
+        if ((target === client_1.TechnicalReleaseStatus.PLANNED ||
+            target === client_1.TechnicalReleaseStatus.RELEASED) &&
+            !current.releaseDate) {
+            throw new common_1.BadRequestException({
+                code: 'RELEASE_DATE_REQUIRED',
+                message: 'برای برنامه‌ریزی یا انتشار نسخه، تاریخ انتشار را مشخص کنید.',
+            });
+        }
+        if (target === client_1.TechnicalReleaseStatus.RELEASED &&
+            current.releaseDate &&
+            current.releaseDate.getTime() > Date.now()) {
+            throw new common_1.BadRequestException({
+                code: 'RELEASE_DATE_IN_FUTURE',
+                message: 'تا پیش از رسیدن تاریخ برنامه‌ریزی‌شده، امکان ثبت وضعیت منتشرشده وجود ندارد.',
+            });
+        }
+        if ((target === client_1.TechnicalReleaseStatus.DEPRECATED ||
+            target === client_1.TechnicalReleaseStatus.END_OF_LIFE ||
+            target === client_1.TechnicalReleaseStatus.ARCHIVED) &&
+            !dto.reason?.trim()) {
+            throw new common_1.BadRequestException({
+                code: 'RELEASE_TRANSITION_REASON_REQUIRED',
+                message: 'ثبت دلیل برای این تغییر وضعیت الزامی است.',
+            });
+        }
         await this.optimistic('technicalRelease', id, current.organizationId, dto.revision ?? current.revision, {
             status: target, updatedById: user.userId,
             ...(target === client_1.TechnicalReleaseStatus.RELEASED && !current.releaseDate && { releaseDate: new Date() }),
@@ -160,25 +209,55 @@ let TechnicalCenterService = class TechnicalCenterService {
     }
     async listKnowledge(query, user) {
         const organizationId = (0, tenant_scope_util_1.getCurrentOrganizationId)(user);
+        const now = new Date();
         const where = {
             organizationId, archivedAt: null,
             ...(query.productId && { productId: query.productId }),
             ...(query.releaseId && { releaseId: query.releaseId }),
             ...(query.ownerId && { ownerId: query.ownerId }),
             ...(query.authorId && { authorId: query.authorId }),
-            ...(query.category && { category: query.category }),
-            ...(query.reviewDue === 'true' && { nextReviewAt: { lte: new Date() } }),
+            ...(query.category && { category: { contains: query.category.trim(), mode: 'insensitive' } }),
+            ...(query.visibility && { visibility: query.visibility }),
+            ...(query.reviewDue === 'true' && { nextReviewAt: { lte: now } }),
+            ...(query.reviewDue === 'false' && { AND: [{ OR: [{ nextReviewAt: null }, { nextReviewAt: { gt: now } }] }] }),
             ...(query.status && { status: this.enumValue(client_1.KnowledgeBaseStatus, query.status, 'status') }),
             ...(query.search && { OR: [
                     { title: { contains: query.search, mode: 'insensitive' } },
+                    { slug: { contains: query.search, mode: 'insensitive' } },
                     { summary: { contains: query.search, mode: 'insensitive' } },
                     { content: { contains: query.search, mode: 'insensitive' } },
+                    { category: { contains: query.search, mode: 'insensitive' } },
+                    { product: { name: { contains: query.search, mode: 'insensitive' } } },
+                    { release: { title: { contains: query.search, mode: 'insensitive' } } },
                 ] }),
         };
-        return this.page(query, () => this.prisma.knowledgeBaseArticle.findMany({ where, orderBy: this.sort(query, ['updatedAt', 'title', 'nextReviewAt'], 'updatedAt'), skip: this.skip(query), take: query.limit }), () => this.prisma.knowledgeBaseArticle.count({ where }));
+        return this.page(query, () => this.prisma.knowledgeBaseArticle.findMany({ where, include: knowledgeRelations, orderBy: this.sort(query, ['updatedAt', 'title', 'nextReviewAt', 'publishedAt'], 'updatedAt'), skip: this.skip(query), take: query.limit }), () => this.prisma.knowledgeBaseArticle.count({ where }));
+    }
+    async listKnowledgeCategories(search, user) {
+        const rows = await this.prisma.knowledgeBaseArticle.findMany({
+            where: {
+                organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
+                archivedAt: null,
+                category: {
+                    not: null,
+                    ...(search?.trim() && { contains: search.trim(), mode: 'insensitive' }),
+                },
+            },
+            select: { category: true },
+            distinct: ['category'],
+            orderBy: { category: 'asc' },
+            take: 50,
+        });
+        return rows
+            .map((row) => row.category?.trim())
+            .filter((category) => Boolean(category))
+            .map((category) => ({ id: category, label: category }));
     }
     async getKnowledge(id, user) {
-        const row = await this.prisma.knowledgeBaseArticle.findFirst({ where: { id, organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user) } });
+        const row = await this.prisma.knowledgeBaseArticle.findFirst({
+            where: { id, organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user) },
+            include: knowledgeRelations,
+        });
         if (!row)
             throw new common_1.NotFoundException('Knowledge article not found');
         return row;
@@ -186,25 +265,38 @@ let TechnicalCenterService = class TechnicalCenterService {
     async createKnowledge(dto, user) {
         const organizationId = (0, tenant_scope_util_1.getCurrentOrganizationId)(user);
         await this.validateLinks(organizationId, dto);
+        await this.assertKnowledgeSlugAvailable(organizationId, dto.slug);
         const row = await this.prisma.knowledgeBaseArticle.create({ data: {
                 ...dto, title: dto.title.trim(), slug: dto.slug.trim().toLowerCase(), content: dto.content.trim(),
-                summary: dto.summary?.trim(), category: dto.category?.trim(), nextReviewAt: this.date(dto.nextReviewAt, 'nextReviewAt'),
+                summary: this.nullableTrim(dto.summary), category: this.nullableTrim(dto.category), nextReviewAt: this.nullableDate(dto.nextReviewAt, 'nextReviewAt'),
                 organizationId, authorId: user.userId,
-            } });
+            }, include: knowledgeRelations });
         await this.log('technical-knowledge', row.id, 'technical-knowledge.created', organizationId, user, undefined, row);
         return row;
     }
     async updateKnowledge(id, dto, user) {
         const current = await this.getKnowledge(id, user);
         this.assertMutable(current.archivedAt);
+        if (current.status === client_1.KnowledgeBaseStatus.PUBLISHED) {
+            throw new common_1.BadRequestException({
+                code: 'PUBLISHED_KNOWLEDGE_LOCKED',
+                message: 'برای ویرایش مقاله منتشرشده، ابتدا آن را به وضعیت بازبینی برگردانید.',
+            });
+        }
         const links = dto.productId !== undefined || dto.releaseId !== undefined
-            ? { ...dto, productId: dto.productId ?? current.productId, releaseId: dto.releaseId ?? current.releaseId }
+            ? {
+                ...dto,
+                productId: dto.productId !== undefined ? dto.productId : current.productId,
+                releaseId: dto.releaseId !== undefined ? dto.releaseId : current.releaseId,
+            }
             : dto;
         await this.validateLinks(current.organizationId, links);
+        if (dto.slug !== undefined)
+            await this.assertKnowledgeSlugAvailable(current.organizationId, dto.slug, id);
         const row = await this.prisma.knowledgeBaseArticle.update({ where: { id }, data: {
                 ...dto, title: dto.title?.trim(), slug: dto.slug?.trim().toLowerCase(), content: dto.content?.trim(),
-                summary: dto.summary?.trim(), category: dto.category?.trim(), nextReviewAt: this.date(dto.nextReviewAt, 'nextReviewAt'),
-            } });
+                summary: this.nullableTrim(dto.summary), category: this.nullableTrim(dto.category), nextReviewAt: this.nullableDate(dto.nextReviewAt, 'nextReviewAt'),
+            }, include: knowledgeRelations });
         await this.log('technical-knowledge', id, 'technical-knowledge.updated', current.organizationId, user, current, row);
         return row;
     }
@@ -214,12 +306,24 @@ let TechnicalCenterService = class TechnicalCenterService {
         (0, technical_lifecycle_policy_1.assertTransition)('technical-knowledge', technical_lifecycle_policy_1.knowledgeTransitions, current.status, target);
         if (target === client_1.KnowledgeBaseStatus.PUBLISHED)
             this.require(user, 'technical-knowledge:publish');
+        if (target === client_1.KnowledgeBaseStatus.ARCHIVED && !dto.reason?.trim()) {
+            throw new common_1.BadRequestException({
+                code: 'KNOWLEDGE_ARCHIVE_REASON_REQUIRED',
+                message: 'برای بایگانی مقاله، ثبت دلیل الزامی است.',
+            });
+        }
+        if (target === client_1.KnowledgeBaseStatus.PUBLISHED && current.nextReviewAt && current.nextReviewAt.getTime() <= Date.now()) {
+            throw new common_1.BadRequestException({
+                code: 'KNOWLEDGE_REVIEW_DATE_INVALID',
+                message: 'تاریخ بازبینی بعدی مقاله باید در آینده باشد.',
+            });
+        }
         const now = new Date();
         const row = await this.prisma.knowledgeBaseArticle.update({ where: { id }, data: {
                 status: target,
                 ...(target === client_1.KnowledgeBaseStatus.PUBLISHED && { publishedAt: now, lastReviewedAt: now }),
                 ...(target === client_1.KnowledgeBaseStatus.ARCHIVED && { archivedAt: now }),
-            } });
+            }, include: knowledgeRelations });
         const action = target === 'PUBLISHED' ? 'technical-knowledge.published' : target === 'ARCHIVED' ? 'technical-knowledge.archived' : 'technical-knowledge.transitioned';
         await this.log('technical-knowledge', id, action, current.organizationId, user, current, row, dto.reason);
         return row;
@@ -986,8 +1090,44 @@ let TechnicalCenterService = class TechnicalCenterService {
         if (duplicate)
             throw new common_1.ConflictException({
                 code: 'DUPLICATE_RELEASE_VERSION',
-                message: 'This product already has a release with the same version in this tenant',
+                message: 'این شماره نسخه قبلاً برای محصول انتخاب‌شده ثبت شده است.',
             });
+    }
+    async assertKnowledgeSlugAvailable(organizationId, slug, excludeId) {
+        const normalized = slug.trim().toLowerCase();
+        const duplicate = await this.prisma.knowledgeBaseArticle.findFirst({
+            where: {
+                organizationId,
+                slug: normalized,
+                ...(excludeId && { id: { not: excludeId } }),
+            },
+            select: { id: true },
+        });
+        if (duplicate)
+            throw new common_1.ConflictException({
+                code: 'DUPLICATE_KNOWLEDGE_SLUG',
+                message: 'این نامک قبلاً برای مقاله دیگری استفاده شده است.',
+            });
+    }
+    releaseSchedule(dto, current) {
+        const schedule = {
+            releaseDate: dto.releaseDate !== undefined ? this.date(dto.releaseDate, 'releaseDate') : current?.releaseDate,
+            supportStartDate: dto.supportStartDate !== undefined ? this.date(dto.supportStartDate, 'supportStartDate') : current?.supportStartDate,
+            supportEndDate: dto.supportEndDate !== undefined ? this.date(dto.supportEndDate, 'supportEndDate') : current?.supportEndDate,
+            endOfLifeDate: dto.endOfLifeDate !== undefined ? this.date(dto.endOfLifeDate, 'endOfLifeDate') : current?.endOfLifeDate,
+        };
+        const ordered = [schedule.releaseDate, schedule.supportStartDate, schedule.supportEndDate, schedule.endOfLifeDate]
+            .filter((value) => Boolean(value));
+        if (ordered.some((value, index) => {
+            const previous = ordered[index - 1];
+            return previous !== undefined && value.getTime() < previous.getTime();
+        })) {
+            throw new common_1.BadRequestException({
+                code: 'RELEASE_DATE_ORDER_INVALID',
+                message: 'ترتیب تاریخ انتشار، شروع پشتیبانی، پایان پشتیبانی و پایان عمر معتبر نیست.',
+            });
+        }
+        return schedule;
     }
     async assertScoped(model, organizationId, id) {
         const row = await this.prisma[model].findFirst({ where: { id, organizationId }, select: { id: true } });
@@ -1028,6 +1168,8 @@ let TechnicalCenterService = class TechnicalCenterService {
         return value;
     }
     date(value, field) { return value === undefined ? undefined : (0, api_date_util_1.parseApiDate)(value, field); }
+    nullableDate(value, field) { return value === null ? null : this.date(value, field); }
+    nullableTrim(value) { return value === null ? null : value?.trim(); }
     range(query) { return (0, api_date_util_1.parseApiDateRange)(query.from, query.to, 'from', 'to'); }
     skip(query) { return ((query.page ?? 1) - 1) * (query.limit ?? 20); }
     sort(query, allowed, fallback) {

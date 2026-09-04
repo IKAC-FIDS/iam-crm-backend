@@ -51,6 +51,7 @@ export class TechnicalListDto extends PaginationDto {
   @IsOptional() @IsString() type?: string;
   @IsOptional() @IsString() @MaxLength(80) version?: string;
   @IsOptional() @IsString() @MaxLength(120) category?: string;
+  @IsOptional() @IsEnum(TechnicalVisibility) visibility?: TechnicalVisibility;
   @IsOptional() @IsUUID() authorId?: string;
   @IsOptional() @IsBooleanString() reviewDue?: string;
   @IsOptional() @IsString() @MaxLength(40) sort?: string;
@@ -104,14 +105,14 @@ export class CreateKnowledgeDto {
   @IsString() @Length(1, 200) title!: string;
   @IsString() @Length(1, 160) slug!: string;
   @IsString() @Length(1, 100000) content!: string;
-  @IsOptional() @IsString() @MaxLength(1000) summary?: string;
-  @IsOptional() @IsString() @MaxLength(120) category?: string;
+  @IsOptional() @IsString() @MaxLength(1000) summary?: string | null;
+  @IsOptional() @IsString() @MaxLength(120) category?: string | null;
   @IsOptional() @IsEnum(TechnicalVisibility) visibility?: TechnicalVisibility;
-  @IsOptional() @IsUUID() productId?: string;
-  @IsOptional() @IsUUID() releaseId?: string;
-  @IsOptional() @IsUUID() ownerId?: string;
-  @IsOptional() @IsUUID() reviewerId?: string;
-  @IsOptional() @IsApiDateString() nextReviewAt?: string;
+  @IsOptional() @IsUUID() productId?: string | null;
+  @IsOptional() @IsUUID() releaseId?: string | null;
+  @IsOptional() @IsUUID() ownerId?: string | null;
+  @IsOptional() @IsUUID() reviewerId?: string | null;
+  @IsOptional() @IsApiDateString() nextReviewAt?: string | null;
 }
 export class UpdateKnowledgeDto extends PartialType(CreateKnowledgeDto) {}
 
@@ -175,6 +176,10 @@ export class CreateTenderDto {
 }
 export class UpdateTenderDto extends PartialType(CreateTenderDto) {
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) revision?: number;
+}
+
+export class KnowledgeCategoryOptionsDto {
+  @IsOptional() @IsString() @MaxLength(120) search?: string;
 }
 
 export class UpdateTenderQualificationDto {

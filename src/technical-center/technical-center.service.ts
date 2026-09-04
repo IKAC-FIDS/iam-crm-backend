@@ -97,6 +97,14 @@ const releaseDetailInclude = {
   _count: { select: { knowledgeArticles: true, technicalDocuments: true, technicalResources: true } },
 } satisfies Prisma.TechnicalReleaseInclude;
 
+const knowledgeRelations = {
+  product: { select: { id: true, name: true, type: true } },
+  release: { select: { id: true, version: true, title: true } },
+  owner: { select: { id: true, fullName: true, email: true } },
+  author: { select: { id: true, fullName: true, email: true } },
+  reviewer: { select: { id: true, fullName: true, email: true } },
+} satisfies Prisma.KnowledgeBaseArticleInclude;
+
 const tenderInclude = {
   company: { select: { id: true, legalName: true, brandName: true } },
   opportunity: { select: { id: true, title: true } },
@@ -269,26 +277,57 @@ export class TechnicalCenterService {
 
   async listKnowledge(query: TechnicalListDto, user: CurrentUserPayload) {
     const organizationId = getCurrentOrganizationId(user);
+    const now = new Date();
     const where: Prisma.KnowledgeBaseArticleWhereInput = {
       organizationId, archivedAt: null,
       ...(query.productId && { productId: query.productId }),
       ...(query.releaseId && { releaseId: query.releaseId }),
       ...(query.ownerId && { ownerId: query.ownerId }),
       ...(query.authorId && { authorId: query.authorId }),
-      ...(query.category && { category: query.category }),
-      ...(query.reviewDue === 'true' && { nextReviewAt: { lte: new Date() } }),
+      ...(query.category && { category: { contains: query.category.trim(), mode: 'insensitive' } }),
+      ...(query.visibility && { visibility: query.visibility }),
+      ...(query.reviewDue === 'true' && { nextReviewAt: { lte: now } }),
+      ...(query.reviewDue === 'false' && { AND: [{ OR: [{ nextReviewAt: null }, { nextReviewAt: { gt: now } }] }] }),
       ...(query.status && { status: this.enumValue(KnowledgeBaseStatus, query.status, 'status') }),
       ...(query.search && { OR: [
         { title: { contains: query.search, mode: 'insensitive' } },
+        { slug: { contains: query.search, mode: 'insensitive' } },
         { summary: { contains: query.search, mode: 'insensitive' } },
         { content: { contains: query.search, mode: 'insensitive' } },
+        { category: { contains: query.search, mode: 'insensitive' } },
+        { product: { name: { contains: query.search, mode: 'insensitive' } } },
+        { release: { title: { contains: query.search, mode: 'insensitive' } } },
       ] }),
     };
-    return this.page(query, () => this.prisma.knowledgeBaseArticle.findMany({ where, orderBy: this.sort(query, ['updatedAt', 'title', 'nextReviewAt'], 'updatedAt'), skip: this.skip(query), take: query.limit }), () => this.prisma.knowledgeBaseArticle.count({ where }));
+    return this.page(query, () => this.prisma.knowledgeBaseArticle.findMany({ where, include: knowledgeRelations, orderBy: this.sort(query, ['updatedAt', 'title', 'nextReviewAt', 'publishedAt'], 'updatedAt'), skip: this.skip(query), take: query.limit }), () => this.prisma.knowledgeBaseArticle.count({ where }));
+  }
+
+  async listKnowledgeCategories(search: string | undefined, user: CurrentUserPayload) {
+    const rows = await this.prisma.knowledgeBaseArticle.findMany({
+      where: {
+        organizationId: getCurrentOrganizationId(user),
+        archivedAt: null,
+        category: {
+          not: null,
+          ...(search?.trim() && { contains: search.trim(), mode: 'insensitive' }),
+        },
+      },
+      select: { category: true },
+      distinct: ['category'],
+      orderBy: { category: 'asc' },
+      take: 50,
+    });
+    return rows
+      .map((row) => row.category?.trim())
+      .filter((category): category is string => Boolean(category))
+      .map((category) => ({ id: category, label: category }));
   }
 
   async getKnowledge(id: string, user: CurrentUserPayload) {
-    const row = await this.prisma.knowledgeBaseArticle.findFirst({ where: { id, organizationId: getCurrentOrganizationId(user) } });
+    const row = await this.prisma.knowledgeBaseArticle.findFirst({
+      where: { id, organizationId: getCurrentOrganizationId(user) },
+      include: knowledgeRelations,
+    });
     if (!row) throw new NotFoundException('Knowledge article not found');
     return row;
   }
@@ -296,11 +335,12 @@ export class TechnicalCenterService {
   async createKnowledge(dto: CreateKnowledgeDto, user: CurrentUserPayload) {
     const organizationId = getCurrentOrganizationId(user);
     await this.validateLinks(organizationId, dto);
+    await this.assertKnowledgeSlugAvailable(organizationId, dto.slug);
     const row = await this.prisma.knowledgeBaseArticle.create({ data: {
       ...dto, title: dto.title.trim(), slug: dto.slug.trim().toLowerCase(), content: dto.content.trim(),
-      summary: dto.summary?.trim(), category: dto.category?.trim(), nextReviewAt: this.date(dto.nextReviewAt, 'nextReviewAt'),
+      summary: this.nullableTrim(dto.summary), category: this.nullableTrim(dto.category), nextReviewAt: this.nullableDate(dto.nextReviewAt, 'nextReviewAt'),
       organizationId, authorId: user.userId,
-    }});
+    }, include: knowledgeRelations });
     await this.log('technical-knowledge', row.id, 'technical-knowledge.created', organizationId, user, undefined, row);
     return row;
   }
@@ -308,14 +348,25 @@ export class TechnicalCenterService {
   async updateKnowledge(id: string, dto: UpdateKnowledgeDto, user: CurrentUserPayload) {
     const current = await this.getKnowledge(id, user);
     this.assertMutable(current.archivedAt);
+    if (current.status === KnowledgeBaseStatus.PUBLISHED) {
+      throw new BadRequestException({
+        code: 'PUBLISHED_KNOWLEDGE_LOCKED',
+        message: 'برای ویرایش مقاله منتشرشده، ابتدا آن را به وضعیت بازبینی برگردانید.',
+      });
+    }
     const links = dto.productId !== undefined || dto.releaseId !== undefined
-      ? { ...dto, productId: dto.productId ?? current.productId, releaseId: dto.releaseId ?? current.releaseId }
+      ? {
+          ...dto,
+          productId: dto.productId !== undefined ? dto.productId : current.productId,
+          releaseId: dto.releaseId !== undefined ? dto.releaseId : current.releaseId,
+        }
       : dto;
     await this.validateLinks(current.organizationId, links);
+    if (dto.slug !== undefined) await this.assertKnowledgeSlugAvailable(current.organizationId, dto.slug, id);
     const row = await this.prisma.knowledgeBaseArticle.update({ where: { id }, data: {
       ...dto, title: dto.title?.trim(), slug: dto.slug?.trim().toLowerCase(), content: dto.content?.trim(),
-      summary: dto.summary?.trim(), category: dto.category?.trim(), nextReviewAt: this.date(dto.nextReviewAt, 'nextReviewAt'),
-    }});
+      summary: this.nullableTrim(dto.summary), category: this.nullableTrim(dto.category), nextReviewAt: this.nullableDate(dto.nextReviewAt, 'nextReviewAt'),
+    }, include: knowledgeRelations });
     await this.log('technical-knowledge', id, 'technical-knowledge.updated', current.organizationId, user, current, row);
     return row;
   }
@@ -325,12 +376,24 @@ export class TechnicalCenterService {
     const target = this.enumValue(KnowledgeBaseStatus, dto.status, 'status');
     assertTransition('technical-knowledge', knowledgeTransitions, current.status, target);
     if (target === KnowledgeBaseStatus.PUBLISHED) this.require(user, 'technical-knowledge:publish');
+    if (target === KnowledgeBaseStatus.ARCHIVED && !dto.reason?.trim()) {
+      throw new BadRequestException({
+        code: 'KNOWLEDGE_ARCHIVE_REASON_REQUIRED',
+        message: 'برای بایگانی مقاله، ثبت دلیل الزامی است.',
+      });
+    }
+    if (target === KnowledgeBaseStatus.PUBLISHED && current.nextReviewAt && current.nextReviewAt.getTime() <= Date.now()) {
+      throw new BadRequestException({
+        code: 'KNOWLEDGE_REVIEW_DATE_INVALID',
+        message: 'تاریخ بازبینی بعدی مقاله باید در آینده باشد.',
+      });
+    }
     const now = new Date();
     const row = await this.prisma.knowledgeBaseArticle.update({ where: { id }, data: {
       status: target,
       ...(target === KnowledgeBaseStatus.PUBLISHED && { publishedAt: now, lastReviewedAt: now }),
       ...(target === KnowledgeBaseStatus.ARCHIVED && { archivedAt: now }),
-    }});
+    }, include: knowledgeRelations });
     const action = target === 'PUBLISHED' ? 'technical-knowledge.published' : target === 'ARCHIVED' ? 'technical-knowledge.archived' : 'technical-knowledge.transitioned';
     await this.log('technical-knowledge', id, action, current.organizationId, user, current, row, dto.reason);
     return row;
@@ -1072,6 +1135,22 @@ export class TechnicalCenterService {
     });
   }
 
+  private async assertKnowledgeSlugAvailable(organizationId: string, slug: string, excludeId?: string) {
+    const normalized = slug.trim().toLowerCase();
+    const duplicate = await this.prisma.knowledgeBaseArticle.findFirst({
+      where: {
+        organizationId,
+        slug: normalized,
+        ...(excludeId && { id: { not: excludeId } }),
+      },
+      select: { id: true },
+    });
+    if (duplicate) throw new ConflictException({
+      code: 'DUPLICATE_KNOWLEDGE_SLUG',
+      message: 'این نامک قبلاً برای مقاله دیگری استفاده شده است.',
+    });
+  }
+
   private releaseSchedule(
     dto: Pick<CreateReleaseDto, 'releaseDate' | 'supportStartDate' | 'supportEndDate' | 'endOfLifeDate'>,
     current?: { releaseDate: Date | null; supportStartDate: Date | null; supportEndDate: Date | null; endOfLifeDate: Date | null },
@@ -1135,6 +1214,8 @@ export class TechnicalCenterService {
   }
 
   private date(value: string | undefined, field: string) { return value === undefined ? undefined : parseApiDate(value, field); }
+  private nullableDate(value: string | null | undefined, field: string) { return value === null ? null : this.date(value, field); }
+  private nullableTrim(value: string | null | undefined) { return value === null ? null : value?.trim(); }
   private range(query: TechnicalListDto) { return parseApiDateRange(query.from, query.to, 'from', 'to'); }
   private skip(query: TechnicalListDto) { return ((query.page ?? 1) - 1) * (query.limit ?? 20); }
   private sort(query: TechnicalListDto, allowed: string[], fallback: string) {

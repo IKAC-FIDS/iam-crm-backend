@@ -157,7 +157,119 @@ describe('TechnicalCenterService', () => {
   it('applies tenant isolation to knowledge lookup', async () => {
     prisma.knowledgeBaseArticle.findFirst.mockResolvedValue(null);
     await expect(service.getKnowledge('foreign', user())).rejects.toThrow('Knowledge article not found');
-    expect(prisma.knowledgeBaseArticle.findFirst).toHaveBeenCalledWith({ where: { id: 'foreign', organizationId } });
+    expect(prisma.knowledgeBaseArticle.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'foreign', organizationId },
+      include: expect.objectContaining({ product: expect.any(Object), author: expect.any(Object) }),
+    }));
+  });
+
+  it('applies knowledge visibility, category and not-due filters on the server', async () => {
+    await service.listKnowledge({
+      page: 1,
+      limit: 20,
+      category: 'راهنما',
+      visibility: 'RESTRICTED',
+      reviewDue: 'false',
+    }, user());
+    expect(prisma.knowledgeBaseArticle.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        organizationId,
+        visibility: 'RESTRICTED',
+        category: { contains: 'راهنما', mode: 'insensitive' },
+        AND: expect.any(Array),
+      }),
+      include: expect.objectContaining({ reviewer: expect.any(Object), release: expect.any(Object) }),
+    }));
+  });
+
+  it('returns tenant-scoped distinct knowledge category options', async () => {
+    prisma.knowledgeBaseArticle.findMany.mockResolvedValue([
+      { category: 'راهنما' },
+      { category: 'عملیات' },
+    ]);
+    await expect(service.listKnowledgeCategories('را', user())).resolves.toEqual([
+      { id: 'راهنما', label: 'راهنما' },
+      { id: 'عملیات', label: 'عملیات' },
+    ]);
+    expect(prisma.knowledgeBaseArticle.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ organizationId, archivedAt: null }),
+      distinct: ['category'],
+    }));
+  });
+
+  it('rejects duplicate article slugs with a stable error code', async () => {
+    prisma.knowledgeBaseArticle.findFirst.mockResolvedValue({ id: 'duplicate' });
+    await expect(service.createKnowledge({
+      title: 'راهنما',
+      slug: 'Guide',
+      content: 'محتوا',
+    }, user())).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'DUPLICATE_KNOWLEDGE_SLUG' }),
+    });
+    expect(prisma.knowledgeBaseArticle.create).not.toHaveBeenCalled();
+  });
+
+  it('requires review mode before editing a published article', async () => {
+    prisma.knowledgeBaseArticle.findFirst.mockResolvedValue({
+      id: 'kb',
+      organizationId,
+      status: KnowledgeBaseStatus.PUBLISHED,
+      archivedAt: null,
+    });
+    await expect(service.updateKnowledge('kb', { title: 'عنوان جدید' }, user()))
+      .rejects.toMatchObject({
+        response: expect.objectContaining({ code: 'PUBLISHED_KNOWLEDGE_LOCKED' }),
+      });
+    expect(prisma.knowledgeBaseArticle.update).not.toHaveBeenCalled();
+  });
+
+  it('allows optional knowledge metadata and relations to be cleared explicitly', async () => {
+    prisma.knowledgeBaseArticle.findFirst.mockResolvedValue({
+      id: 'kb',
+      organizationId,
+      status: KnowledgeBaseStatus.DRAFT,
+      archivedAt: null,
+      productId,
+      releaseId: release.id,
+    });
+    prisma.knowledgeBaseArticle.update.mockResolvedValue({ id: 'kb' });
+    await service.updateKnowledge('kb', {
+      summary: null,
+      category: null,
+      productId: null,
+      releaseId: null,
+      ownerId: null,
+      reviewerId: null,
+      nextReviewAt: null,
+    }, user());
+    expect(prisma.knowledgeBaseArticle.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        summary: null,
+        category: null,
+        productId: null,
+        releaseId: null,
+        ownerId: null,
+        reviewerId: null,
+        nextReviewAt: null,
+      }),
+    }));
+  });
+
+  it('requires a reason to archive a knowledge article', async () => {
+    prisma.knowledgeBaseArticle.findFirst.mockResolvedValue({
+      id: 'kb',
+      organizationId,
+      status: KnowledgeBaseStatus.DRAFT,
+      archivedAt: null,
+    });
+    await expect(service.transitionKnowledge(
+      'kb',
+      { status: 'ARCHIVED' },
+      user(['technical-knowledge:manage']),
+    )).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'KNOWLEDGE_ARCHIVE_REASON_REQUIRED' }),
+    });
+    expect(prisma.knowledgeBaseArticle.update).not.toHaveBeenCalled();
   });
 
   it('validates document owner membership and enforces approval lifecycle', async () => {
@@ -300,6 +412,7 @@ describe('TechnicalCenterService', () => {
   });
 
   it('rejects an invalid technical release support schedule', async () => {
+    prisma.technicalRelease.findFirst.mockResolvedValueOnce(null);
     await expect(service.createRelease({
       productId,
       version: '2.0.0',
