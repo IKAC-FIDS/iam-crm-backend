@@ -184,6 +184,15 @@ let AttachmentsService = AttachmentsService_1 = class AttachmentsService {
     async remove(id, user) {
         const attachment = await this.getActiveAttachment(id, user);
         await this.assertEntityAccess(attachment.entityType, attachment.entityId, user, true);
+        if (attachment.entityType === client_1.FileAttachmentEntityType.TECHNICAL_DOCUMENT) {
+            const documentVersion = await this.prisma.technicalDocumentVersion.findFirst({
+                where: { attachmentId: attachment.id },
+                select: { id: true, version: true },
+            });
+            if (documentVersion) {
+                throw new common_1.BadRequestException(`این فایل، فایل رسمی نسخه ${documentVersion.version} سند است و قابل حذف نیست.`);
+            }
+        }
         const deleted = await this.prisma.fileAttachment.update({
             where: { id },
             data: {
@@ -270,6 +279,13 @@ let AttachmentsService = AttachmentsService_1 = class AttachmentsService {
             'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
             'application/vnd.ms-excel',
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.ms-powerpoint',
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            'application/zip',
+            'application/json',
+            'application/xml',
+            'text/xml',
+            'text/markdown',
             'image/webp',
             'text/plain',
             'text/csv',

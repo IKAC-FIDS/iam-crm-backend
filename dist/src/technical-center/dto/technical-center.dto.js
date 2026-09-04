@@ -691,7 +691,7 @@ __decorate([
 ], UpdateTenderQualificationDto.prototype, "revision", void 0);
 class CreateRequirementDto {
     static _OPENAPI_METADATA_FACTORY() {
-        return { title: { required: true, type: () => String, minLength: 1, maxLength: 200 }, category: { required: false, type: () => String, maxLength: 120 }, description: { required: false, type: () => String, maxLength: 10000 }, section: { required: false, type: () => String, maxLength: 120 }, page: { required: false, type: () => String, maxLength: 40 }, referenceId: { required: false, type: () => String, maxLength: 120 }, notes: { required: false, type: () => String, maxLength: 10000 }, parentRequirementId: { required: false, type: () => String, nullable: true }, dependencyIds: { required: false, type: () => [String] }, mandatory: { required: false, type: () => Boolean }, ownerId: { required: false, type: () => String, nullable: true }, dueDate: { required: false, type: () => String }, response: { required: false, type: () => String, maxLength: 20000 } };
+        return { title: { required: true, type: () => String, minLength: 1, maxLength: 200 }, category: { required: false, type: () => String, maxLength: 120 }, description: { required: false, type: () => String, maxLength: 10000 }, section: { required: false, type: () => String, maxLength: 120 }, page: { required: false, type: () => String, maxLength: 40 }, referenceId: { required: false, type: () => String, maxLength: 120 }, notes: { required: false, type: () => String, maxLength: 10000 }, parentRequirementId: { required: false, type: () => String, nullable: true }, dependencyIds: { required: false, type: () => [String] }, mandatory: { required: false, type: () => Boolean }, ownerId: { required: false, type: () => String, nullable: true }, dueDate: { required: false, type: () => String }, response: { required: false, type: () => String, maxLength: 20000 }, status: { required: false, type: () => Object }, blockedReason: { required: false, type: () => String, maxLength: 2000 } };
     }
 }
 exports.CreateRequirementDto = CreateRequirementDto;
@@ -768,23 +768,23 @@ __decorate([
     (0, class_validator_1.MaxLength)(20000),
     __metadata("design:type", String)
 ], CreateRequirementDto.prototype, "response", void 0);
-class UpdateRequirementDto extends (0, mapped_types_1.PartialType)(CreateRequirementDto) {
-    static _OPENAPI_METADATA_FACTORY() {
-        return { status: { required: false, type: () => Object }, blockedReason: { required: false, type: () => String, maxLength: 2000 } };
-    }
-}
-exports.UpdateRequirementDto = UpdateRequirementDto;
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsEnum)(client_1.TenderRequirementStatus),
     __metadata("design:type", String)
-], UpdateRequirementDto.prototype, "status", void 0);
+], CreateRequirementDto.prototype, "status", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.MaxLength)(2000),
     __metadata("design:type", String)
-], UpdateRequirementDto.prototype, "blockedReason", void 0);
+], CreateRequirementDto.prototype, "blockedReason", void 0);
+class UpdateRequirementDto extends (0, mapped_types_1.PartialType)(CreateRequirementDto) {
+    static _OPENAPI_METADATA_FACTORY() {
+        return {};
+    }
+}
+exports.UpdateRequirementDto = UpdateRequirementDto;
 class RequirementDependencyDto {
     static _OPENAPI_METADATA_FACTORY() {
         return { dependsOnRequirementId: { required: true, type: () => String } };

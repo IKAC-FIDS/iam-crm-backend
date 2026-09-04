@@ -22,17 +22,33 @@ const prisma_service_1 = require("../prisma/prisma.service");
 const notifications_service_1 = require("../notifications/notifications.service");
 const tasks_service_1 = require("../tasks/tasks.service");
 const technical_lifecycle_policy_1 = require("./technical-lifecycle.policy");
-const documentInclude = {
+const documentVersionInclude = {
+    attachment: { select: { id: true, name: true, originalFileName: true, mimeType: true, sizeBytes: true, sha256: true, createdAt: true, deletedAt: true } },
+    createdBy: { select: { id: true, fullName: true, email: true } },
+    approvedBy: { select: { id: true, fullName: true, email: true } },
+};
+const documentRelations = {
     product: { select: { id: true, name: true, type: true } },
     release: { select: { id: true, version: true, title: true } },
     company: { select: { id: true, legalName: true, brandName: true } },
     opportunity: { select: { id: true, title: true } },
-    versions: { orderBy: { createdAt: 'desc' } },
+    owner: { select: { id: true, fullName: true, email: true } },
+};
+const documentInclude = {
+    ...documentRelations,
+    versions: { include: documentVersionInclude, orderBy: { createdAt: 'desc' } },
+};
+const documentListInclude = {
+    ...documentRelations,
+    versions: { include: documentVersionInclude, orderBy: { createdAt: 'desc' }, take: 1 },
 };
 const tenderInclude = {
     company: { select: { id: true, legalName: true, brandName: true } },
     opportunity: { select: { id: true, title: true } },
     team: { select: { id: true, code: true, name: true } },
+    owner: { select: { id: true, fullName: true, email: true } },
+    technicalLead: { select: { id: true, fullName: true, email: true } },
+    commercialLead: { select: { id: true, fullName: true, email: true } },
     requirements: { include: {
             owner: { select: { id: true, fullName: true, email: true } },
             task: { select: { id: true, title: true, status: true, assignedToId: true } },
@@ -220,7 +236,7 @@ let TechnicalCenterService = class TechnicalCenterService {
             ...(query.status && { status: this.enumValue(client_1.TechnicalDocumentStatus, query.status, 'status') }),
             ...(query.search && { OR: [{ title: { contains: query.search, mode: 'insensitive' } }, { description: { contains: query.search, mode: 'insensitive' } }] }),
         };
-        return this.page(query, () => this.prisma.technicalDocument.findMany({ where, include: documentInclude, orderBy: this.sort(query, ['updatedAt', 'title', 'effectiveFrom', 'expiresAt'], 'updatedAt'), skip: this.skip(query), take: query.limit }), () => this.prisma.technicalDocument.count({ where }));
+        return this.page(query, () => this.prisma.technicalDocument.findMany({ where, include: documentListInclude, orderBy: this.sort(query, ['updatedAt', 'title', 'effectiveFrom', 'expiresAt'], 'updatedAt'), skip: this.skip(query), take: query.limit }), () => this.prisma.technicalDocument.count({ where }));
     }
     async getDocument(id, user) {
         const row = await this.prisma.technicalDocument.findFirst({ where: { id, organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user) }, include: documentInclude });
@@ -261,6 +277,20 @@ let TechnicalCenterService = class TechnicalCenterService {
         (0, technical_lifecycle_policy_1.assertTransition)('technical-document', technical_lifecycle_policy_1.documentTransitions, current.status, target);
         if (['APPROVED', 'ACTIVE', 'SUPERSEDED'].includes(target))
             this.require(user, 'technical-document:approve');
+        if (target === client_1.TechnicalDocumentStatus.IN_REVIEW ||
+            target === client_1.TechnicalDocumentStatus.APPROVED) {
+            const latest = await this.prisma.technicalDocumentVersion.findFirst({
+                where: { organizationId: current.organizationId, documentId: id },
+                orderBy: { createdAt: 'desc' },
+                include: { attachment: { select: { id: true, deletedAt: true } } },
+            });
+            if (!latest?.attachment || latest.attachment.deletedAt) {
+                throw new common_1.BadRequestException({
+                    code: 'DOCUMENT_VERSION_FILE_REQUIRED',
+                    message: 'برای ارسال سند به بازبینی، ابتدا یک نسخه دارای فایل بارگذاری کنید.',
+                });
+            }
+        }
         await this.optimistic('technicalDocument', id, current.organizationId, dto.revision ?? current.revision, {
             status: target, updatedById: user.userId,
             ...(target === client_1.TechnicalDocumentStatus.ACTIVE && !current.effectiveFrom && { effectiveFrom: new Date() }),
@@ -289,6 +319,23 @@ let TechnicalCenterService = class TechnicalCenterService {
     async addDocumentVersion(documentId, dto, user) {
         const document = await this.getDocument(documentId, user);
         this.assertMutable(document.archivedAt);
+        if (document.status !== client_1.TechnicalDocumentStatus.DRAFT &&
+            document.status !== client_1.TechnicalDocumentStatus.IN_REVIEW) {
+            throw new common_1.BadRequestException({
+                code: 'DOCUMENT_VERSION_LOCKED',
+                message: 'افزودن نسخه فقط برای سند پیش‌نویس یا در حال بازبینی امکان‌پذیر است.',
+            });
+        }
+        const duplicate = await this.prisma.technicalDocumentVersion.findFirst({
+            where: { organizationId: document.organizationId, documentId, version: dto.version.trim() },
+            select: { id: true },
+        });
+        if (duplicate) {
+            throw new common_1.ConflictException({
+                code: 'DUPLICATE_DOCUMENT_VERSION',
+                message: 'این شماره نسخه قبلاً برای سند ثبت شده است.',
+            });
+        }
         if (dto.attachmentId)
             await this.assertAttachment(document.organizationId, dto.attachmentId, client_1.FileAttachmentEntityType.TECHNICAL_DOCUMENT, documentId);
         const row = await this.prisma.technicalDocumentVersion.create({ data: {
@@ -302,6 +349,7 @@ let TechnicalCenterService = class TechnicalCenterService {
         const document = await this.getDocument(documentId, user);
         return this.prisma.technicalDocumentVersion.findMany({
             where: { organizationId: document.organizationId, documentId },
+            include: documentVersionInclude,
             orderBy: { createdAt: 'desc' },
         });
     }
@@ -309,6 +357,7 @@ let TechnicalCenterService = class TechnicalCenterService {
         const document = await this.getDocument(documentId, user);
         const row = await this.prisma.technicalDocumentVersion.findFirst({
             where: { id: versionId, organizationId: document.organizationId, documentId },
+            include: documentVersionInclude,
         });
         if (!row)
             throw new common_1.NotFoundException('Technical document version not found');
@@ -415,10 +464,10 @@ let TechnicalCenterService = class TechnicalCenterService {
         const conditions = dto.qualificationConditions ?? current.qualificationConditions;
         const reason = dto.decisionReason ?? current.decisionReason;
         if (nextDecision === client_1.TenderQualificationDecision.CONDITIONAL_GO && !conditions?.trim()) {
-            throw new common_1.BadRequestException({ code: 'QUALIFICATION_CONDITIONS_REQUIRED', message: 'Conditional GO requires explicit conditions' });
+            throw new common_1.BadRequestException({ code: 'QUALIFICATION_CONDITIONS_REQUIRED', message: 'برای «ادامه مشروط» باید شرایط ادامه را مشخص کنید' });
         }
         if ((nextDecision === client_1.TenderQualificationDecision.NO_GO || nextBidDecision === client_1.TenderBidDecision.NO_BID) && !reason?.trim()) {
-            throw new common_1.BadRequestException({ code: 'QUALIFICATION_DECISION_REASON_REQUIRED', message: 'NO GO and NO BID decisions require a reason' });
+            throw new common_1.BadRequestException({ code: 'QUALIFICATION_DECISION_REASON_REQUIRED', message: 'برای «عدم ادامه» یا «شرکت نمی‌کنیم» باید دلیل تصمیم را ثبت کنید' });
         }
         const { revision, ...input } = dto;
         const textFields = ['fitNotes', 'riskNotes', 'feasibilityNotes', 'qualificationSummary', 'qualificationConditions', 'decisionReason'];
@@ -440,20 +489,28 @@ let TechnicalCenterService = class TechnicalCenterService {
         if (['WON', 'LOST', 'CANCELLED', 'ARCHIVED'].includes(target))
             this.require(user, 'technical-tender:close');
         if ((target === client_1.TenderStatus.LOST || target === client_1.TenderStatus.CANCELLED) && !dto.reason?.trim()) {
-            throw new common_1.BadRequestException({ code: 'TENDER_CLOSE_REASON_REQUIRED', message: 'A reason is required for lost or cancelled tenders' });
+            throw new common_1.BadRequestException({ code: 'TENDER_CLOSE_REASON_REQUIRED', message: 'برای ثبت نتیجه «از دست رفته» یا لغو مناقصه باید دلیل را وارد کنید' });
         }
         if (this.isReopen(current.status, target) && !dto.reason?.trim()) {
-            throw new common_1.BadRequestException({ code: 'TENDER_REOPEN_REASON_REQUIRED', message: 'A reason is required when reopening a workflow step' });
+            throw new common_1.BadRequestException({ code: 'TENDER_REOPEN_REASON_REQUIRED', message: 'برای بازگشت به مرحله قبل باید دلیل اصلاح را ثبت کنید' });
+        }
+        if (current.status === client_1.TenderStatus.QUALIFICATION && target === client_1.TenderStatus.PREPARING) {
+            if (current.bidDecision !== client_1.TenderBidDecision.BID) {
+                throw new common_1.BadRequestException({ code: 'TENDER_BID_DECISION_REQUIRED', message: 'برای ورود به آماده‌سازی، تصمیم شرکت در مناقصه باید «شرکت می‌کنیم» باشد' });
+            }
+            if (![client_1.TenderQualificationDecision.GO, client_1.TenderQualificationDecision.CONDITIONAL_GO].includes(current.qualificationDecision)) {
+                throw new common_1.BadRequestException({ code: 'TENDER_QUALIFICATION_APPROVAL_REQUIRED', message: 'برای ورود به آماده‌سازی، نتیجه ارزیابی اولیه باید «ادامه» یا «ادامه مشروط» باشد' });
+            }
         }
         if (current.status === client_1.TenderStatus.TECHNICAL_REVIEW && target === client_1.TenderStatus.COMMERCIAL_REVIEW) {
             const readiness = this.evaluateReadiness(current);
             if (readiness.checks.technicalReview.status !== client_1.TenderReviewStatus.APPROVED)
-                throw new common_1.BadRequestException({ code: 'TECHNICAL_REVIEW_NOT_APPROVED', message: 'Technical review must be approved before commercial review' });
+                throw new common_1.BadRequestException({ code: 'TECHNICAL_REVIEW_NOT_APPROVED', message: 'قبل از ورود به بازبینی تجاری، تأیید فنی را ثبت کنید' });
         }
         if (target === client_1.TenderStatus.READY_FOR_SUBMISSION || target === client_1.TenderStatus.SUBMITTED) {
             const readiness = this.evaluateReadiness(current);
             if (!readiness.overallReady)
-                throw new common_1.BadRequestException({ code: 'TENDER_NOT_READY', message: 'Tender is not ready for submission', details: { blockers: readiness.blockers, checks: readiness.checks } });
+                throw new common_1.BadRequestException({ code: 'TENDER_NOT_READY', message: 'مناقصه هنوز برای ارسال آماده نیست؛ موارد اعلام‌شده را تکمیل کنید', details: { blockers: readiness.blockers, checks: readiness.checks } });
         }
         const result = target === client_1.TenderStatus.WON ? client_1.TenderResult.WON : target === client_1.TenderStatus.LOST ? client_1.TenderResult.LOST : target === client_1.TenderStatus.CANCELLED ? client_1.TenderResult.CANCELLED : undefined;
         await this.optimistic('tender', id, current.organizationId, dto.revision ?? current.revision, {
@@ -478,11 +535,15 @@ let TechnicalCenterService = class TechnicalCenterService {
             await this.assertRequirementParent(tenderId, undefined, dto.parentRequirementId, tender.organizationId);
         if (dto.dependencyIds?.length)
             await this.assertRequirementIds(tenderId, dto.dependencyIds, tender.organizationId);
+        if (dto.status === client_1.TenderRequirementStatus.BLOCKED && !dto.blockedReason?.trim()) {
+            throw new common_1.BadRequestException({ code: 'REQUIREMENT_BLOCK_REASON_REQUIRED', message: 'A reason is required when blocking a requirement' });
+        }
         const { dependencyIds, ...input } = dto;
         const row = await this.prisma.tenderRequirement.create({ data: {
                 ...input, title: dto.title.trim(), category: dto.category?.trim(), description: dto.description?.trim(), response: dto.response?.trim(),
-                section: dto.section?.trim(), page: dto.page?.trim(), referenceId: dto.referenceId?.trim(), notes: dto.notes?.trim(),
+                section: dto.section?.trim(), page: dto.page?.trim(), referenceId: dto.referenceId?.trim(), notes: dto.notes?.trim(), blockedReason: dto.blockedReason?.trim(),
                 dueDate: this.date(dto.dueDate, 'dueDate'), organizationId: tender.organizationId, tenderId,
+                ...(dto.status === client_1.TenderRequirementStatus.BLOCKED && { blockedAt: new Date(), blockedById: user.userId }),
                 ...(dependencyIds?.length && { dependencies: { create: [...new Set(dependencyIds)].map((dependsOnRequirementId) => ({ dependsOnRequirementId })) } }),
             } });
         await this.log('tender-requirement', row.id, 'technical-tender.requirement-created', tender.organizationId, user, undefined, row);
@@ -586,6 +647,19 @@ let TechnicalCenterService = class TechnicalCenterService {
         await this.log('tender-requirement', requirementId, 'technical-tender.requirement-task-linked', tender.organizationId, user, requirement, row);
         return row;
     }
+    async listTenderCurrencyOptions() {
+        const rates = await this.prisma.currencyExchangeRate.findMany({
+            select: { baseCurrency: true, quoteCurrency: true },
+        });
+        const codes = new Set(['IRR']);
+        for (const rate of rates) {
+            if (rate.baseCurrency?.trim())
+                codes.add(rate.baseCurrency.trim().toUpperCase());
+            if (rate.quoteCurrency?.trim())
+                codes.add(rate.quoteCurrency.trim().toUpperCase());
+        }
+        return [...codes].sort((left, right) => left === 'IRR' ? -1 : right === 'IRR' ? 1 : left.localeCompare(right)).map((code) => ({ id: code, label: code }));
+    }
     async createRequirementTask(tenderId, requirementId, dto, user) {
         const tender = await this.getTender(tenderId, user);
         this.assertTenderOpen(tender.status);
@@ -624,6 +698,16 @@ let TechnicalCenterService = class TechnicalCenterService {
         const document = await this.prisma.technicalDocument.findFirst({ where: { id: dto.documentId, organizationId: tender.organizationId, archivedAt: null } });
         if (!document)
             throw new common_1.NotFoundException('Technical document not found');
+        const duplicate = await this.prisma.tenderDeliverable.findFirst({
+            where: { organizationId: tender.organizationId, tenderId, documentId: dto.documentId },
+            select: { id: true },
+        });
+        if (duplicate) {
+            throw new common_1.ConflictException({
+                code: 'DUPLICATE_TENDER_DELIVERABLE',
+                message: 'این سند قبلاً به اقلام تحویلی مناقصه متصل شده است.',
+            });
+        }
         const row = await this.prisma.tenderDeliverable.create({ data: { organizationId: tender.organizationId, tenderId, documentId: dto.documentId, label: dto.label?.trim(), required: dto.required ?? true } });
         await this.log('tender-deliverable', row.id, 'technical-tender.deliverable-created', tender.organizationId, user, undefined, row);
         return row;
@@ -653,14 +737,14 @@ let TechnicalCenterService = class TechnicalCenterService {
         this.require(user, permission);
         const expectedStatus = dto.type === client_1.TenderReviewType.TECHNICAL ? client_1.TenderStatus.TECHNICAL_REVIEW : client_1.TenderStatus.COMMERCIAL_REVIEW;
         if (tender.status !== expectedStatus)
-            throw new common_1.BadRequestException({ code: 'REVIEW_NOT_AVAILABLE_IN_CURRENT_STATUS', message: `This review can only be requested in ${expectedStatus}` });
+            throw new common_1.BadRequestException({ code: 'REVIEW_NOT_AVAILABLE_IN_CURRENT_STATUS', message: `این بازبینی فقط در مرحله ${expectedStatus === client_1.TenderStatus.TECHNICAL_REVIEW ? 'بازبینی فنی' : 'بازبینی تجاری'} قابل درخواست است` });
         if (dto.reviewerId)
             await this.assertUser(tender.organizationId, dto.reviewerId);
         if (dto.revision !== undefined && dto.revision !== tender.revision)
             throw new common_1.ConflictException({ code: 'REVISION_CONFLICT', message: 'The tender was changed by another request' });
         const pending = tender.reviews.find((review) => review.type === dto.type && review.status === client_1.TenderReviewStatus.PENDING);
         if (pending)
-            throw new common_1.ConflictException({ code: 'REVIEW_ALREADY_PENDING', message: 'A pending review already exists for this review type' });
+            throw new common_1.ConflictException({ code: 'REVIEW_ALREADY_PENDING', message: 'برای این نوع بازبینی یک درخواست در انتظار وجود دارد' });
         let row;
         try {
             row = await this.prisma.$transaction(async (tx) => {
@@ -675,7 +759,7 @@ let TechnicalCenterService = class TechnicalCenterService {
         }
         catch (error) {
             if (error instanceof client_1.Prisma.PrismaClientKnownRequestError && error.code === 'P2002')
-                throw new common_1.ConflictException({ code: 'REVIEW_ALREADY_PENDING', message: 'A pending review already exists for this review type' });
+                throw new common_1.ConflictException({ code: 'REVIEW_ALREADY_PENDING', message: 'برای این نوع بازبینی یک درخواست در انتظار وجود دارد' });
             throw error;
         }
         await this.log('technical-tender', id, `technical-tender.review-${dto.type.toLowerCase()}-requested`, tender.organizationId, user, undefined, row, dto.comment);
@@ -692,12 +776,12 @@ let TechnicalCenterService = class TechnicalCenterService {
         const permission = review.type === client_1.TenderReviewType.TECHNICAL ? 'technical-tender:review-technical' : 'technical-tender:review-commercial';
         this.require(user, permission);
         if (review.status !== client_1.TenderReviewStatus.PENDING)
-            throw new common_1.ConflictException({ code: 'REVIEW_ALREADY_DECIDED', message: 'This review has already been decided' });
+            throw new common_1.ConflictException({ code: 'REVIEW_ALREADY_DECIDED', message: 'نتیجه این بازبینی قبلاً ثبت شده است' });
         if (dto.status !== client_1.TenderReviewStatus.APPROVED && dto.status !== client_1.TenderReviewStatus.REJECTED && dto.status !== client_1.TenderReviewStatus.CANCELLED) {
-            throw new common_1.BadRequestException({ code: 'INVALID_REVIEW_DECISION', message: 'Review decision must be approved, rejected, or cancelled' });
+            throw new common_1.BadRequestException({ code: 'INVALID_REVIEW_DECISION', message: 'نتیجه بازبینی باید تأیید، رد یا لغو باشد' });
         }
         if (dto.status === client_1.TenderReviewStatus.REJECTED && !dto.comment?.trim())
-            throw new common_1.BadRequestException({ code: 'REVIEW_REJECTION_REASON_REQUIRED', message: 'A rejection comment is required' });
+            throw new common_1.BadRequestException({ code: 'REVIEW_REJECTION_REASON_REQUIRED', message: 'برای رد بازبینی باید دلیل را ثبت کنید' });
         if (dto.revision !== undefined && dto.revision !== tender.revision)
             throw new common_1.ConflictException({ code: 'REVISION_CONFLICT', message: 'The tender was changed by another request' });
         const row = await this.prisma.$transaction(async (tx) => {
@@ -706,7 +790,7 @@ let TechnicalCenterService = class TechnicalCenterService {
                 throw new common_1.ConflictException({ code: 'REVISION_CONFLICT', message: 'The tender was changed by another request' });
             const decision = await tx.tenderReview.updateMany({ where: { id: reviewId, tenderId: id, organizationId: tender.organizationId, status: client_1.TenderReviewStatus.PENDING }, data: { status: dto.status, decidedById: user.userId, reviewedAt: new Date(), comment: dto.comment?.trim() } });
             if (decision.count !== 1)
-                throw new common_1.ConflictException({ code: 'REVIEW_ALREADY_DECIDED', message: 'This review has already been decided' });
+                throw new common_1.ConflictException({ code: 'REVIEW_ALREADY_DECIDED', message: 'نتیجه این بازبینی قبلاً ثبت شده است' });
             return tx.tenderReview.findUniqueOrThrow({ where: { id: reviewId } });
         });
         await this.log('technical-tender', id, `technical-tender.review-${review.type.toLowerCase()}-${dto.status.toLowerCase()}`, tender.organizationId, user, review, row, dto.comment);
@@ -754,6 +838,10 @@ let TechnicalCenterService = class TechnicalCenterService {
             blockers.push({ code: 'MANDATORY_REQUIREMENTS_UNASSIGNED', count: mandatory.filter((row) => row.status !== client_1.TenderRequirementStatus.VERIFIED && !row.ownerId).length });
         if (completedDeliverables.length !== requiredDeliverables.length)
             blockers.push({ code: 'REQUIRED_DELIVERABLES_INCOMPLETE', count: requiredDeliverables.length - completedDeliverables.length });
+        if (tender.bidDecision !== client_1.TenderBidDecision.BID)
+            blockers.push({ code: 'TENDER_BID_DECISION_REQUIRED' });
+        if (![client_1.TenderQualificationDecision.GO, client_1.TenderQualificationDecision.CONDITIONAL_GO].includes(tender.qualificationDecision))
+            blockers.push({ code: 'TENDER_QUALIFICATION_APPROVAL_REQUIRED' });
         if (technicalReview?.status !== client_1.TenderReviewStatus.APPROVED)
             blockers.push({ code: 'TECHNICAL_REVIEW_NOT_APPROVED' });
         if (commercialReview?.status !== client_1.TenderReviewStatus.APPROVED)

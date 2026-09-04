@@ -16,12 +16,16 @@ exports.TechnicalTendersController = exports.TechnicalResourcesController = expo
 const openapi = require("@nestjs/swagger");
 const common_1 = require("@nestjs/common");
 const swagger_1 = require("@nestjs/swagger");
+const platform_express_1 = require("@nestjs/platform-express");
+const multer_1 = require("multer");
+const client_1 = require("@prisma/client");
 const current_user_decorator_1 = require("../common/decorators/current-user.decorator");
 const permissions_decorator_1 = require("../common/decorators/permissions.decorator");
 const jwt_auth_guard_1 = require("../common/guards/jwt-auth.guard");
 const permissions_guard_1 = require("../common/guards/permissions.guard");
 const technical_center_dto_1 = require("./dto/technical-center.dto");
 const technical_center_service_1 = require("./technical-center.service");
+const attachments_service_1 = require("../attachments/attachments.service");
 let TechnicalReleasesController = class TechnicalReleasesController {
     constructor(service) {
         this.service = service;
@@ -163,8 +167,9 @@ exports.TechnicalKnowledgeController = TechnicalKnowledgeController = __decorate
     __metadata("design:paramtypes", [technical_center_service_1.TechnicalCenterService])
 ], TechnicalKnowledgeController);
 let TechnicalDocumentsController = class TechnicalDocumentsController {
-    constructor(service) {
+    constructor(service, attachments) {
         this.service = service;
+        this.attachments = attachments;
     }
     list(q, u) { return this.service.listDocuments(q, u); }
     create(d, u) { return this.service.createDocument(d, u); }
@@ -173,6 +178,28 @@ let TechnicalDocumentsController = class TechnicalDocumentsController {
     transition(id, d, u) { return this.service.transitionDocument(id, d, u); }
     versions(id, u) { return this.service.listDocumentVersions(id, u); }
     version(id, d, u) { return this.service.addDocumentVersion(id, d, u); }
+    async uploadVersion(id, d, file, u) {
+        const attachment = await this.attachments.upload({
+            entityType: client_1.FileAttachmentEntityType.TECHNICAL_DOCUMENT,
+            entityId: id,
+            description: `فایل نسخه ${d.version}`,
+        }, file, u);
+        try {
+            return await this.service.addDocumentVersion(id, {
+                ...d,
+                attachmentId: attachment.id,
+                contentHash: d.contentHash?.trim() || attachment.sha256 || undefined,
+            }, u);
+        }
+        catch (error) {
+            try {
+                await this.attachments.remove(attachment.id, u);
+            }
+            catch {
+            }
+            throw error;
+        }
+    }
     getVersion(id, versionId, u) { return this.service.getDocumentVersion(id, versionId, u); }
 };
 exports.TechnicalDocumentsController = TechnicalDocumentsController;
@@ -231,7 +258,7 @@ __decorate([
 __decorate([
     (0, common_1.Get)(':id/versions'),
     (0, permissions_decorator_1.Permissions)('technical-document:view'),
-    openapi.ApiResponse({ status: 200 }),
+    openapi.ApiResponse({ status: 200, type: [Object] }),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
@@ -250,9 +277,28 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], TechnicalDocumentsController.prototype, "version", null);
 __decorate([
+    (0, common_1.Post)(':id/versions/upload'),
+    (0, permissions_decorator_1.Permissions)('technical-document:manage'),
+    (0, swagger_1.ApiConsumes)('multipart/form-data'),
+    (0, swagger_1.ApiBody)({ schema: { type: 'object', required: ['version', 'file'], properties: {
+                version: { type: 'string', maxLength: 80 },
+                file: { type: 'string', format: 'binary' },
+                contentHash: { type: 'string', maxLength: 128 },
+            } } }),
+    (0, common_1.UseInterceptors)((0, platform_express_1.FileInterceptor)('file', { storage: (0, multer_1.memoryStorage)(), limits: { fileSize: 25 * 1024 * 1024 } })),
+    openapi.ApiResponse({ status: 201 }),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, common_1.UploadedFile)()),
+    __param(3, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, technical_center_dto_1.CreateDocumentVersionDto, Object, Object]),
+    __metadata("design:returntype", Promise)
+], TechnicalDocumentsController.prototype, "uploadVersion", null);
+__decorate([
     (0, common_1.Get)(':id/versions/:versionId'),
     (0, permissions_decorator_1.Permissions)('technical-document:view'),
-    openapi.ApiResponse({ status: 200 }),
+    openapi.ApiResponse({ status: 200, type: Object }),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Param)('versionId')),
     __param(2, (0, current_user_decorator_1.CurrentUser)()),
@@ -265,7 +311,8 @@ exports.TechnicalDocumentsController = TechnicalDocumentsController = __decorate
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, permissions_guard_1.PermissionsGuard),
     (0, swagger_1.ApiTags)('Technical documents'),
     (0, common_1.Controller)('technical/documents'),
-    __metadata("design:paramtypes", [technical_center_service_1.TechnicalCenterService])
+    __metadata("design:paramtypes", [technical_center_service_1.TechnicalCenterService,
+        attachments_service_1.AttachmentsService])
 ], TechnicalDocumentsController);
 let TechnicalResourcesController = class TechnicalResourcesController {
     constructor(service) {
@@ -330,6 +377,7 @@ let TechnicalTendersController = class TechnicalTendersController {
         this.service = service;
     }
     list(q, u) { return this.service.listTenders(q, u); }
+    currencyOptions() { return this.service.listTenderCurrencyOptions(); }
     create(d, u) { return this.service.createTender(d, u); }
     get(id, u) { return this.service.getTender(id, u); }
     update(id, d, u) { return this.service.updateTender(id, d, u); }
@@ -363,6 +411,14 @@ __decorate([
     __metadata("design:paramtypes", [technical_center_dto_1.TechnicalListDto, Object]),
     __metadata("design:returntype", void 0)
 ], TechnicalTendersController.prototype, "list", null);
+__decorate([
+    (0, common_1.Get)('currency-options'),
+    (0, permissions_decorator_1.AnyPermission)('technical-tender:view', 'technical-tender:manage'),
+    openapi.ApiResponse({ status: 200 }),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], TechnicalTendersController.prototype, "currencyOptions", null);
 __decorate([
     (0, common_1.Post)(),
     (0, permissions_decorator_1.Permissions)('technical-tender:manage'),
