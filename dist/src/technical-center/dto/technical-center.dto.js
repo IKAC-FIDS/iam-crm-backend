@@ -265,7 +265,7 @@ __decorate([
 ], UpdateReleaseDto.prototype, "revision", void 0);
 class CreateKnowledgeDto {
     static _OPENAPI_METADATA_FACTORY() {
-        return { title: { required: true, type: () => String, minLength: 1, maxLength: 200 }, slug: { required: true, type: () => String, minLength: 1, maxLength: 160 }, content: { required: true, type: () => String, minLength: 1, maxLength: 100000 }, summary: { required: false, type: () => String, nullable: true, maxLength: 1000 }, category: { required: false, type: () => String, nullable: true, maxLength: 120 }, visibility: { required: false, type: () => Object }, productId: { required: false, type: () => String, nullable: true }, releaseId: { required: false, type: () => String, nullable: true }, ownerId: { required: false, type: () => String, nullable: true }, reviewerId: { required: false, type: () => String, nullable: true }, nextReviewAt: { required: false, type: () => String, nullable: true } };
+        return { title: { required: true, type: () => String, minLength: 1, maxLength: 200 }, slug: { required: true, type: () => String, minLength: 1, maxLength: 160 }, content: { required: false, type: () => String, nullable: true, minLength: 1, maxLength: 100000 }, contentType: { required: false, type: () => Object }, externalUrl: { required: false, type: () => String, nullable: true, maxLength: 2000 }, summary: { required: false, type: () => String, nullable: true, maxLength: 1000 }, category: { required: false, type: () => String, nullable: true, maxLength: 120 }, visibility: { required: false, type: () => Object }, productId: { required: false, type: () => String, nullable: true }, releaseId: { required: false, type: () => String, nullable: true }, ownerId: { required: false, type: () => String, nullable: true }, reviewerId: { required: false, type: () => String, nullable: true }, nextReviewAt: { required: false, type: () => String, nullable: true } };
     }
 }
 exports.CreateKnowledgeDto = CreateKnowledgeDto;
@@ -280,10 +280,22 @@ __decorate([
     __metadata("design:type", String)
 ], CreateKnowledgeDto.prototype, "slug", void 0);
 __decorate([
+    (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.Length)(1, 100000),
-    __metadata("design:type", String)
+    __metadata("design:type", Object)
 ], CreateKnowledgeDto.prototype, "content", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsEnum)(client_1.KnowledgeContentType),
+    __metadata("design:type", String)
+], CreateKnowledgeDto.prototype, "contentType", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsUrl)({ require_protocol: true }, { message: 'externalUrl must be a valid URL' }),
+    (0, class_validator_1.MaxLength)(2000),
+    __metadata("design:type", Object)
+], CreateKnowledgeDto.prototype, "externalUrl", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),

@@ -9,6 +9,7 @@ import {
 import {
   FileAttachmentEntityType,
   KnowledgeBaseStatus,
+  KnowledgeContentType,
   NotificationEntityType,
   NotificationPriority,
   NotificationType,
@@ -334,10 +335,11 @@ export class TechnicalCenterService {
 
   async createKnowledge(dto: CreateKnowledgeDto, user: CurrentUserPayload) {
     const organizationId = getCurrentOrganizationId(user);
+    const contentSource = this.normalizeKnowledgeContent(dto);
     await this.validateLinks(organizationId, dto);
     await this.assertKnowledgeSlugAvailable(organizationId, dto.slug);
     const row = await this.prisma.knowledgeBaseArticle.create({ data: {
-      ...dto, title: dto.title.trim(), slug: dto.slug.trim().toLowerCase(), content: dto.content.trim(),
+      ...dto, ...contentSource, title: dto.title.trim(), slug: dto.slug.trim().toLowerCase(),
       summary: this.nullableTrim(dto.summary), category: this.nullableTrim(dto.category), nextReviewAt: this.nullableDate(dto.nextReviewAt, 'nextReviewAt'),
       organizationId, authorId: user.userId,
     }, include: knowledgeRelations });
@@ -362,9 +364,10 @@ export class TechnicalCenterService {
         }
       : dto;
     await this.validateLinks(current.organizationId, links);
+    const contentSource = this.normalizeKnowledgeContent(dto, current);
     if (dto.slug !== undefined) await this.assertKnowledgeSlugAvailable(current.organizationId, dto.slug, id);
     const row = await this.prisma.knowledgeBaseArticle.update({ where: { id }, data: {
-      ...dto, title: dto.title?.trim(), slug: dto.slug?.trim().toLowerCase(), content: dto.content?.trim(),
+      ...dto, ...contentSource, title: dto.title?.trim(), slug: dto.slug?.trim().toLowerCase(),
       summary: this.nullableTrim(dto.summary), category: this.nullableTrim(dto.category), nextReviewAt: this.nullableDate(dto.nextReviewAt, 'nextReviewAt'),
     }, include: knowledgeRelations });
     await this.log('technical-knowledge', id, 'technical-knowledge.updated', current.organizationId, user, current, row);
@@ -1149,6 +1152,26 @@ export class TechnicalCenterService {
       code: 'DUPLICATE_KNOWLEDGE_SLUG',
       message: 'این نامک قبلاً برای مقاله دیگری استفاده شده است.',
     });
+  }
+
+  private normalizeKnowledgeContent(
+    dto: Pick<CreateKnowledgeDto, 'contentType' | 'content' | 'externalUrl'>,
+    current?: { contentType: KnowledgeContentType; content: string | null; externalUrl: string | null },
+  ) {
+    const contentType = dto.contentType ?? current?.contentType ?? KnowledgeContentType.ARTICLE;
+    const content = dto.content === undefined ? current?.content ?? null : this.nullableTrim(dto.content);
+    const externalUrl = dto.externalUrl === undefined ? current?.externalUrl ?? null : this.nullableTrim(dto.externalUrl);
+    if (contentType === KnowledgeContentType.ARTICLE && !content) {
+      throw new BadRequestException({ code: 'KNOWLEDGE_CONTENT_REQUIRED', message: 'برای محتوای داخلی، متن مقاله الزامی است.' });
+    }
+    if (contentType === KnowledgeContentType.EXTERNAL_LINK && !externalUrl) {
+      throw new BadRequestException({ code: 'KNOWLEDGE_EXTERNAL_URL_REQUIRED', message: 'برای محتوای لینک‌شده، آدرس منبع الزامی است.' });
+    }
+    return {
+      contentType,
+      content: contentType === KnowledgeContentType.ARTICLE ? content : null,
+      externalUrl: contentType === KnowledgeContentType.EXTERNAL_LINK ? externalUrl : null,
+    };
   }
 
   private releaseSchedule(

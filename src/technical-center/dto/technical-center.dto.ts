@@ -2,6 +2,7 @@ import { PartialType } from '@nestjs/mapped-types';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
   KnowledgeBaseStatus,
+  KnowledgeContentType,
   TechnicalConfidentiality,
   TechnicalDocumentStatus,
   TechnicalReleaseStatus,
@@ -104,7 +105,9 @@ export class UpdateReleaseDto extends PartialType(CreateReleaseDto) {
 export class CreateKnowledgeDto {
   @IsString() @Length(1, 200) title!: string;
   @IsString() @Length(1, 160) slug!: string;
-  @IsString() @Length(1, 100000) content!: string;
+  @IsOptional() @IsString() @Length(1, 100000) content?: string | null;
+  @IsOptional() @IsEnum(KnowledgeContentType) contentType?: KnowledgeContentType;
+  @IsOptional() @IsUrl({ require_protocol: true }, { message: 'externalUrl must be a valid URL' }) @MaxLength(2000) externalUrl?: string | null;
   @IsOptional() @IsString() @MaxLength(1000) summary?: string | null;
   @IsOptional() @IsString() @MaxLength(120) category?: string | null;
   @IsOptional() @IsEnum(TechnicalVisibility) visibility?: TechnicalVisibility;

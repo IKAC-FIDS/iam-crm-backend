@@ -1619,6 +1619,15 @@
           "content": {
             "maxLength": 100000,
             "minLength": 1,
+            "nullable": true,
+            "type": "string"
+          },
+          "contentType": {
+            "type": "object"
+          },
+          "externalUrl": {
+            "maxLength": 2000,
+            "nullable": true,
             "type": "string"
           },
           "nextReviewAt": {
@@ -1662,8 +1671,7 @@
         },
         "required": [
           "title",
-          "slug",
-          "content"
+          "slug"
         ],
         "type": "object"
       },

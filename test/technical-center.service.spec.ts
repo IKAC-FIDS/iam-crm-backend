@@ -1,6 +1,7 @@
 import { ForbiddenException } from '@nestjs/common';
 import {
   KnowledgeBaseStatus,
+  KnowledgeContentType,
   TechnicalDocumentStatus,
   TechnicalConfidentiality,
   TechnicalReleaseStatus,
@@ -231,6 +232,9 @@ describe('TechnicalCenterService', () => {
       archivedAt: null,
       productId,
       releaseId: release.id,
+      contentType: KnowledgeContentType.ARTICLE,
+      content: 'متن مقاله',
+      externalUrl: null,
     });
     prisma.knowledgeBaseArticle.update.mockResolvedValue({ id: 'kb' });
     await service.updateKnowledge('kb', {
@@ -253,6 +257,34 @@ describe('TechnicalCenterService', () => {
         nextReviewAt: null,
       }),
     }));
+  });
+
+  it('stores an external knowledge source without duplicating article content', async () => {
+    prisma.knowledgeBaseArticle.findFirst.mockResolvedValueOnce(null);
+    prisma.knowledgeBaseArticle.create.mockResolvedValue({ id: 'kb-link' });
+    await service.createKnowledge({
+      title: 'راهنما',
+      slug: 'guide',
+      contentType: KnowledgeContentType.EXTERNAL_LINK,
+      externalUrl: 'https://docs.google.com/document/d/example',
+    }, user());
+    expect(prisma.knowledgeBaseArticle.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        contentType: KnowledgeContentType.EXTERNAL_LINK,
+        externalUrl: 'https://docs.google.com/document/d/example',
+        content: null,
+      }),
+    }));
+  });
+
+  it('rejects external knowledge without a source URL', async () => {
+    await expect(service.createKnowledge({
+      title: 'راهنما',
+      slug: 'guide',
+      contentType: KnowledgeContentType.EXTERNAL_LINK,
+    }, user())).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'KNOWLEDGE_EXTERNAL_URL_REQUIRED' }),
+    });
   });
 
   it('requires a reason to archive a knowledge article', async () => {

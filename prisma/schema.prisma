@@ -2578,6 +2578,11 @@ enum KnowledgeBaseStatus {
   ARCHIVED
 }
 
+enum KnowledgeContentType {
+  ARTICLE
+  EXTERNAL_LINK
+}
+
 enum TechnicalVisibility {
   INTERNAL
   RESTRICTED
@@ -2720,31 +2725,33 @@ model TechnicalRelease {
 }
 
 model KnowledgeBaseArticle {
-  id             String              @id @default(uuid())
+  id             String               @id @default(uuid())
   organizationId String
-  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  organization   Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   title          String
   slug           String
   summary        String?
-  content        String
-  status         KnowledgeBaseStatus @default(DRAFT)
+  content        String?
+  contentType    KnowledgeContentType @default(ARTICLE)
+  externalUrl    String?
+  status         KnowledgeBaseStatus  @default(DRAFT)
   category       String?
-  visibility     TechnicalVisibility @default(INTERNAL)
+  visibility     TechnicalVisibility  @default(INTERNAL)
   productId      String?
-  product        ProductCatalogItem? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  product        ProductCatalogItem?  @relation(fields: [productId], references: [id], onDelete: SetNull)
   releaseId      String?
-  release        TechnicalRelease?   @relation(fields: [releaseId], references: [id], onDelete: SetNull)
+  release        TechnicalRelease?    @relation(fields: [releaseId], references: [id], onDelete: SetNull)
   ownerId        String?
-  owner          User?               @relation("KnowledgeArticleOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  owner          User?                @relation("KnowledgeArticleOwner", fields: [ownerId], references: [id], onDelete: SetNull)
   authorId       String
-  author         User                @relation("KnowledgeArticleAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+  author         User                 @relation("KnowledgeArticleAuthor", fields: [authorId], references: [id], onDelete: Restrict)
   reviewerId     String?
-  reviewer       User?               @relation("KnowledgeArticleReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+  reviewer       User?                @relation("KnowledgeArticleReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
   publishedAt    DateTime?
   lastReviewedAt DateTime?
   nextReviewAt   DateTime?
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
   archivedAt     DateTime?
 
   @@unique([organizationId, slug])
