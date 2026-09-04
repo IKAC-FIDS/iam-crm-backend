@@ -132,6 +132,12 @@ let AttachmentsService = AttachmentsService_1 = class AttachmentsService {
                         entityId: dto.entityId, relationType: dto.relationType ?? client_1.ArtifactRelationType.ATTACHMENT,
                         createdById: user.userId,
                     } });
+                if (dto.entityType === client_1.FileAttachmentEntityType.TECHNICAL_RESOURCE) {
+                    await tx.technicalResource.update({
+                        where: { id: dto.entityId },
+                        data: { attachmentId: created.id, checksum: sha256 },
+                    });
+                }
                 return created;
             });
         }

@@ -85,6 +85,10 @@ function setup(meetingStatus: MeetingStatus | null = MeetingStatus.COMPLETED) {
     companyLegalDocument: {
       findFirst: jest.fn().mockResolvedValue({ id: 'legal-1' }),
     },
+    technicalResource: {
+      findFirst: jest.fn().mockResolvedValue({ id: 'resource-1' }),
+      update: jest.fn().mockResolvedValue({ id: 'resource-1' }),
+    },
     artifactLink: { create: jest.fn().mockResolvedValue({ id: 'link-1' }) },
   };
   Object.assign(prisma, { $transaction: jest.fn(async (callback: (tx: typeof prisma) => unknown) => callback(prisma)) });
@@ -117,6 +121,28 @@ function setup(meetingStatus: MeetingStatus | null = MeetingStatus.COMPLETED) {
 }
 
 describe('AttachmentsService meeting attachments', () => {
+  it('stores the generated SHA-256 as technical resource metadata', async () => {
+    const { service, prisma } = setup();
+
+    await service.upload(
+      {
+        entityType: FileAttachmentEntityType.TECHNICAL_RESOURCE,
+        entityId: 'resource-1',
+      },
+      file,
+      user,
+    );
+
+    expect(prisma.technicalResource.update).toHaveBeenCalledWith({
+      where: { id: 'resource-1' },
+      data: {
+        attachmentId,
+        checksum:
+          '90e63d85fa1ab2c8ed65222f3ebd794b1e524b4b7cf84bec451542d0451b2985',
+      },
+    });
+  });
+
   it('accepts an upload for a completed meeting and audits meeting metadata', async () => {
     const { service, prisma, audit } = setup();
 

@@ -183,6 +183,12 @@ export class AttachmentsService {
           entityId: dto.entityId, relationType: dto.relationType ?? ArtifactRelationType.ATTACHMENT,
           createdById: user.userId,
         } });
+        if (dto.entityType === FileAttachmentEntityType.TECHNICAL_RESOURCE) {
+          await tx.technicalResource.update({
+            where: { id: dto.entityId },
+            data: { attachmentId: created.id, checksum: sha256 },
+          });
+        }
         return created;
       });
     } catch (error) {
