@@ -55,6 +55,12 @@ const knowledgeRelations = {
     author: { select: { id: true, fullName: true, email: true } },
     reviewer: { select: { id: true, fullName: true, email: true } },
 };
+const resourceRelations = {
+    product: { select: { id: true, name: true, type: true } },
+    release: { select: { id: true, version: true, title: true } },
+    owner: { select: { id: true, fullName: true, email: true } },
+    attachment: { select: { id: true, name: true, originalFileName: true, mimeType: true, sizeBytes: true, sha256: true, deletedAt: true } },
+};
 const tenderInclude = {
     company: { select: { id: true, legalName: true, brandName: true } },
     opportunity: { select: { id: true, title: true } },
@@ -479,27 +485,31 @@ let TechnicalCenterService = class TechnicalCenterService {
             ...(query.type && { resourceType: this.enumValue(client_1.TechnicalResourceType, query.type, 'type') }),
             ...(query.search && { OR: [{ title: { contains: query.search, mode: 'insensitive' } }, { description: { contains: query.search, mode: 'insensitive' } }] }),
         };
-        return this.page(query, () => this.prisma.technicalResource.findMany({ where, orderBy: this.sort(query, ['updatedAt', 'title', 'version'], 'updatedAt'), skip: this.skip(query), take: query.limit }), () => this.prisma.technicalResource.count({ where }));
+        const page = await this.page(query, () => this.prisma.technicalResource.findMany({ where, include: resourceRelations, orderBy: this.sort(query, ['updatedAt', 'title', 'version'], 'updatedAt'), skip: this.skip(query), take: query.limit }), () => this.prisma.technicalResource.count({ where }));
+        return { ...page, data: await this.withResourceArtifactCounts(page.data, organizationId) };
     }
     async getResource(id, user) {
-        const row = await this.prisma.technicalResource.findFirst({ where: { id, organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user) } });
+        const organizationId = (0, tenant_scope_util_1.getCurrentOrganizationId)(user);
+        const row = await this.prisma.technicalResource.findFirst({ where: { id, organizationId }, include: resourceRelations });
         if (!row)
             throw new common_1.NotFoundException('Technical resource not found');
-        return row;
+        return (await this.withResourceArtifactCounts([row], organizationId))[0];
     }
     async createResource(dto, user) {
         const organizationId = (0, tenant_scope_util_1.getCurrentOrganizationId)(user);
+        this.assertResourceSource(dto.resourceType, dto.url);
         await this.validateLinks(organizationId, dto);
         const row = await this.prisma.technicalResource.create({ data: {
                 ...dto, title: dto.title.trim(), description: dto.description?.trim(), version: dto.version?.trim(), checksum: dto.checksum?.trim(),
                 organizationId, createdById: user.userId, updatedById: user.userId,
-            } });
+            }, include: resourceRelations });
         await this.log('technical-resource', row.id, 'technical-resource.created', organizationId, user, undefined, row);
         return row;
     }
     async updateResource(id, dto, user) {
         const current = await this.getResource(id, user);
         this.assertMutable(current.archivedAt);
+        this.assertResourceSource(dto.resourceType ?? current.resourceType, dto.url ?? current.url);
         const links = dto.productId !== undefined || dto.releaseId !== undefined
             ? { ...dto, productId: dto.productId ?? current.productId, releaseId: dto.releaseId ?? current.releaseId }
             : dto;
@@ -651,7 +661,7 @@ let TechnicalCenterService = class TechnicalCenterService {
                 dueDate: this.date(dto.dueDate, 'dueDate'), organizationId: tender.organizationId, tenderId,
                 ...(dto.status === client_1.TenderRequirementStatus.BLOCKED && { blockedAt: new Date(), blockedById: user.userId }),
                 ...(dependencyIds?.length && { dependencies: { create: [...new Set(dependencyIds)].map((dependsOnRequirementId) => ({ dependsOnRequirementId })) } }),
-            } });
+            }, include: resourceRelations });
         await this.log('tender-requirement', row.id, 'technical-tender.requirement-created', tender.organizationId, user, undefined, row);
         return row;
     }
@@ -1110,6 +1120,30 @@ let TechnicalCenterService = class TechnicalCenterService {
                 code: 'DUPLICATE_KNOWLEDGE_SLUG',
                 message: 'این نامک قبلاً برای مقاله دیگری استفاده شده است.',
             });
+    }
+    async withResourceArtifactCounts(rows, organizationId) {
+        if (!rows.length)
+            return rows.map((row) => ({ ...row, artifactCount: 0 }));
+        const counts = await this.prisma.fileAttachment.groupBy({
+            by: ['entityId'],
+            where: {
+                organizationId,
+                entityType: client_1.FileAttachmentEntityType.TECHNICAL_RESOURCE,
+                entityId: { in: rows.map((row) => row.id) },
+                deletedAt: null,
+            },
+            _count: { _all: true },
+        });
+        const byId = new Map(counts.map((entry) => [entry.entityId, entry._count._all]));
+        return rows.map((row) => ({ ...row, artifactCount: byId.get(row.id) ?? 0 }));
+    }
+    assertResourceSource(resourceType, url) {
+        if (resourceType === client_1.TechnicalResourceType.EXTERNAL_LINK && !url?.trim()) {
+            throw new common_1.BadRequestException({
+                code: 'TECHNICAL_RESOURCE_URL_REQUIRED',
+                message: 'برای منبع از نوع پیوند خارجی، ثبت URL الزامی است.',
+            });
+        }
     }
     normalizeKnowledgeContent(dto, current) {
         const contentType = dto.contentType ?? current?.contentType ?? client_1.KnowledgeContentType.ARTICLE;
