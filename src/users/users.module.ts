@@ -3,9 +3,10 @@ import { UsersService } from './users.service';
 import { UsersController } from './users.controller';
 import { OrganizationMembershipsModule } from '../organization-memberships/organization-memberships.module';
 import { QuotaModule } from '../quota/quota.module';
+import { ProfileMediaModule } from '../profile-media/profile-media.module';
 
 @Module({
-  imports: [OrganizationMembershipsModule, QuotaModule],
+  imports: [OrganizationMembershipsModule, QuotaModule, ProfileMediaModule],
   providers: [UsersService],
   controllers: [UsersController],
   exports: [UsersService],

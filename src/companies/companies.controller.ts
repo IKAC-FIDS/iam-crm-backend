@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   GoneException,
   Param,
@@ -8,8 +9,16 @@ import {
   Patch,
   Post,
   Query,
+  Res,
+  StreamableFile,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import type { Response } from 'express';
+import { memoryStorage } from 'multer';
+import { PROFILE_MEDIA_MAX_BYTES } from '../profile-media/profile-media.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { Permissions } from '../common/decorators/permissions.decorator';
@@ -74,6 +83,39 @@ export class CompaniesController {
   @Permissions('company:view')
   findOne(@Param('id') id: string, @CurrentUser() user: CurrentUserPayload) {
     return this.companiesService.findOne(id, user);
+  }
+
+  @Get(':id/logo')
+  @Permissions('company:view')
+  async getLogo(
+    @Param('id') id: string,
+    @CurrentUser() user: CurrentUserPayload,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const media = await this.companiesService.getLogo(id, user);
+    response.setHeader('Content-Type', media.mimeType);
+    response.setHeader('Cache-Control', 'private, max-age=300');
+    return new StreamableFile(media.stream);
+  }
+
+  @Post(':id/logo')
+  @Permissions('company:update')
+  @UseInterceptors(FileInterceptor('file', {
+    storage: memoryStorage(),
+    limits: { fileSize: PROFILE_MEDIA_MAX_BYTES },
+  }))
+  uploadLogo(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.companiesService.updateLogo(id, file, user);
+  }
+
+  @Delete(':id/logo')
+  @Permissions('company:update')
+  removeLogo(@Param('id') id: string, @CurrentUser() user: CurrentUserPayload) {
+    return this.companiesService.removeLogo(id, user);
   }
 
   @Post()

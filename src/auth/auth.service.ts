@@ -36,6 +36,7 @@ export interface AuthUserResponse {
   roleId: string | null;
   roleCode: string;
   roleName: string;
+  avatarObjectKey: string | null;
 }
 
 export interface AuthAccessResponse {
@@ -280,6 +281,7 @@ export class AuthService {
         roleId: assignedRole?.id ?? null,
         roleCode: assignedRole?.code ?? effectiveRole,
         roleName: assignedRole?.name ?? effectiveRole,
+        avatarObjectKey: user.avatarObjectKey,
       },
     };
   }

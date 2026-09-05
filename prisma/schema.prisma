@@ -422,6 +422,12 @@ model User {
   teamId       String?
   teamRef      Team?    @relation("UserPrimaryTeam", fields: [teamId], references: [id], onDelete: SetNull)
   isActive     Boolean  @default(true)
+  avatarStorageProvider AttachmentStorageProvider?
+  avatarBucket          String?
+  avatarObjectKey       String?
+  avatarStoragePath     String?
+  avatarMimeType        String?
+  avatarOriginalName    String?
 
   organizationId String       @default("00000000-0000-4000-8000-000000000001")
   organization   Organization @relation(fields: [organizationId], references: [id])
@@ -877,6 +883,12 @@ model Company {
   activityStatus     CompanyActivityStatus @default(UNKNOWN)
   activityGroup      String?
   marketSize         String?
+  logoStorageProvider AttachmentStorageProvider?
+  logoBucket          String?
+  logoObjectKey       String?
+  logoStoragePath     String?
+  logoMimeType        String?
+  logoOriginalName    String?
 
   industryId  String?
   industryRef Industry? @relation("CompanyIndustry", fields: [industryId], references: [id], onDelete: SetNull)

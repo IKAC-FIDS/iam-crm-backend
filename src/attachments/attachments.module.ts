@@ -26,6 +26,6 @@ import { QuotaModule } from '../quota/quota.module';
       },
     },
   ],
-  exports: [AttachmentsService],
+  exports: [AttachmentsService, ATTACHMENT_STORAGE],
 })
 export class AttachmentsModule {}

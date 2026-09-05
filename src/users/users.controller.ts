@@ -1,4 +1,8 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Res, StreamableFile, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import type { Response } from 'express';
+import { memoryStorage } from 'multer';
+import { PROFILE_MEDIA_MAX_BYTES } from '../profile-media/profile-media.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { AnyPermission, Permissions } from '../common/decorators/permissions.decorator';
@@ -62,6 +66,36 @@ export class UsersController {
   @Permissions('user:view')
   findOne(@Param('id') id: string, @CurrentUser() actor: CurrentUserPayload) {
     return this.usersService.findOne(id, actor);
+  }
+
+  @Get(':id/avatar')
+  async getAvatar(
+    @Param('id') id: string,
+    @CurrentUser() actor: CurrentUserPayload,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const media = await this.usersService.getAvatar(id, actor);
+    response.setHeader('Content-Type', media.mimeType);
+    response.setHeader('Cache-Control', 'private, max-age=300');
+    return new StreamableFile(media.stream);
+  }
+
+  @Post(':id/avatar')
+  @UseInterceptors(FileInterceptor('file', {
+    storage: memoryStorage(),
+    limits: { fileSize: PROFILE_MEDIA_MAX_BYTES },
+  }))
+  uploadAvatar(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+    @CurrentUser() actor: CurrentUserPayload,
+  ) {
+    return this.usersService.updateAvatar(id, file, actor);
+  }
+
+  @Delete(':id/avatar')
+  removeAvatar(@Param('id') id: string, @CurrentUser() actor: CurrentUserPayload) {
+    return this.usersService.removeAvatar(id, actor);
   }
 
   // ============================================================

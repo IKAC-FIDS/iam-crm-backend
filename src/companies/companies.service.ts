@@ -34,6 +34,7 @@ import { CompanyAccessService } from './company-access.service';
 import { QuotaService } from '../quota/quota.service';
 import { FindCompanyOptionsDto } from './dto/find-company-options.dto';
 import { isPhoneLikeSearch, normalizeCompanyPhone } from './company-phone.util';
+import { ProfileMediaService } from '../profile-media/profile-media.service';
 
 const companyOptionSelect = {
   id: true,
@@ -52,7 +53,62 @@ export class CompaniesService {
     private audit: AuditLogService,
     private companyAccess: CompanyAccessService,
     private quota: QuotaService,
+    private readonly profileMedia: ProfileMediaService,
   ) {}
+
+  async getLogo(id: string, user: CurrentUserPayload) {
+    const company = await this.prisma.company.findFirst({
+      where: { id, organizationId: getCurrentOrganizationId(user) },
+      select: { logoObjectKey: true, logoStoragePath: true, logoBucket: true, logoMimeType: true },
+    });
+    if (!company) throw new NotFoundException('Company not found');
+    if (!company.logoObjectKey || !company.logoMimeType) throw new NotFoundException('Company logo not found');
+    return {
+      mimeType: company.logoMimeType,
+      stream: await this.profileMedia.getStream({
+        objectKey: company.logoObjectKey,
+        storagePath: company.logoStoragePath,
+        bucket: company.logoBucket,
+      }),
+    };
+  }
+
+  async updateLogo(id: string, file: Express.Multer.File | undefined, user: CurrentUserPayload) {
+    const organizationId = getCurrentOrganizationId(user);
+    const company = await this.prisma.company.findFirst({ where: { id, organizationId } });
+    if (!company) throw new NotFoundException('Company not found');
+    const saved = await this.profileMedia.save('companies', id, file);
+    const updated = await this.prisma.company.update({
+        where: { id },
+        data: {
+          logoStorageProvider: saved.storageProvider,
+          logoBucket: saved.bucket,
+          logoObjectKey: saved.objectKey,
+          logoStoragePath: saved.storagePath,
+          logoMimeType: saved.mimeType,
+          logoOriginalName: saved.originalName,
+        },
+      }).catch(async (error) => {
+      await this.profileMedia.delete(saved);
+      throw error;
+    });
+    await this.profileMedia.delete({ objectKey: company.logoObjectKey, storagePath: company.logoStoragePath, bucket: company.logoBucket }).catch(() => undefined);
+    await this.audit.record({ actorId: user.userId, organizationId, entityType: 'company', entityId: id, action: 'company.logo_updated' });
+    return updated;
+  }
+
+  async removeLogo(id: string, user: CurrentUserPayload) {
+    const organizationId = getCurrentOrganizationId(user);
+    const company = await this.prisma.company.findFirst({ where: { id, organizationId } });
+    if (!company) throw new NotFoundException('Company not found');
+    const updated = await this.prisma.company.update({
+      where: { id },
+      data: { logoStorageProvider: null, logoBucket: null, logoObjectKey: null, logoStoragePath: null, logoMimeType: null, logoOriginalName: null },
+    });
+    await this.profileMedia.delete({ objectKey: company.logoObjectKey, storagePath: company.logoStoragePath, bucket: company.logoBucket }).catch(() => undefined);
+    await this.audit.record({ actorId: user.userId, organizationId, entityType: 'company', entityId: id, action: 'company.logo_removed' });
+    return updated;
+  }
 
   async findOptions(
     user: CurrentUserPayload,
@@ -233,6 +289,7 @@ export class CompaniesService {
               id: true,
               fullName: true,
               team: true,
+              avatarObjectKey: true,
             },
           },
           industryRef: {
@@ -278,7 +335,7 @@ export class CompaniesService {
     const company = await this.prisma.company.findFirst({
       where: { id, organizationId: getCurrentOrganizationId(user) },
       include: {
-        owner: { select: { id: true, fullName: true, team: true } },
+        owner: { select: { id: true, fullName: true, team: true, avatarObjectKey: true } },
         industryRef: true,
         sourceRef: true,
         people: true,
