@@ -53,6 +53,7 @@ const prisma_service_1 = require("../prisma/prisma.service");
 const permissions_guard_1 = require("../common/guards/permissions.guard");
 const organization_memberships_service_1 = require("../organization-memberships/organization-memberships.service");
 const quota_service_1 = require("../quota/quota.service");
+const profile_media_service_1 = require("../profile-media/profile-media.service");
 const safeUserSelect = {
     id: true,
     fullName: true,
@@ -80,6 +81,7 @@ const safeUserSelect = {
         },
     },
     isActive: true,
+    avatarObjectKey: true,
     createdAt: true,
     updatedAt: true,
 };
@@ -91,14 +93,71 @@ const ownerOptionSelect = {
     roleId: true,
     teamId: true,
     team: true,
+    avatarObjectKey: true,
     teamRef: { select: { id: true, code: true, name: true } },
 };
 let UsersService = class UsersService {
-    constructor(prisma, audit, memberships, quota) {
+    constructor(prisma, audit, memberships, quota, profileMedia) {
         this.prisma = prisma;
         this.audit = audit;
         this.memberships = memberships;
         this.quota = quota;
+        this.profileMedia = profileMedia;
+    }
+    canManageAvatar(id, actor) {
+        return id === actor.userId || actor.tenantContext?.permissions.includes('user:manage');
+    }
+    canViewAvatar(id, actor) {
+        return this.canManageAvatar(id, actor) || actor.tenantContext?.permissions.includes('user:view');
+    }
+    async getAvatar(id, actor) {
+        if (!this.canViewAvatar(id, actor))
+            throw new common_1.ForbiddenException('شما اجازه مشاهده این تصویر را ندارید');
+        const user = await this.prisma.user.findFirst({
+            where: { id, organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(actor) },
+            select: { avatarObjectKey: true, avatarStoragePath: true, avatarBucket: true, avatarMimeType: true },
+        });
+        if (!user)
+            throw new common_1.NotFoundException('User not found');
+        if (!user.avatarObjectKey || !user.avatarMimeType)
+            throw new common_1.NotFoundException('User avatar not found');
+        return { mimeType: user.avatarMimeType, stream: await this.profileMedia.getStream({ objectKey: user.avatarObjectKey, storagePath: user.avatarStoragePath, bucket: user.avatarBucket }) };
+    }
+    async updateAvatar(id, file, actor) {
+        if (!this.canManageAvatar(id, actor))
+            throw new common_1.ForbiddenException('شما اجازه تغییر این تصویر را ندارید');
+        const organizationId = (0, tenant_scope_util_1.getCurrentOrganizationId)(actor);
+        const user = await this.prisma.user.findFirst({ where: { id, organizationId } });
+        if (!user)
+            throw new common_1.NotFoundException('User not found');
+        const saved = await this.profileMedia.save('users', id, file);
+        const updated = await this.prisma.user.update({
+            where: { id },
+            data: { avatarStorageProvider: saved.storageProvider, avatarBucket: saved.bucket, avatarObjectKey: saved.objectKey, avatarStoragePath: saved.storagePath, avatarMimeType: saved.mimeType, avatarOriginalName: saved.originalName },
+            select: safeUserSelect,
+        }).catch(async (error) => {
+            await this.profileMedia.delete(saved);
+            throw error;
+        });
+        await this.profileMedia.delete({ objectKey: user.avatarObjectKey, storagePath: user.avatarStoragePath, bucket: user.avatarBucket }).catch(() => undefined);
+        await this.audit.record({ actorId: actor.userId, organizationId, entityType: 'user', entityId: id, action: 'user.avatar_updated' });
+        return updated;
+    }
+    async removeAvatar(id, actor) {
+        if (!this.canManageAvatar(id, actor))
+            throw new common_1.ForbiddenException('شما اجازه تغییر این تصویر را ندارید');
+        const organizationId = (0, tenant_scope_util_1.getCurrentOrganizationId)(actor);
+        const user = await this.prisma.user.findFirst({ where: { id, organizationId } });
+        if (!user)
+            throw new common_1.NotFoundException('User not found');
+        const updated = await this.prisma.user.update({
+            where: { id },
+            data: { avatarStorageProvider: null, avatarBucket: null, avatarObjectKey: null, avatarStoragePath: null, avatarMimeType: null, avatarOriginalName: null },
+            select: safeUserSelect,
+        });
+        await this.profileMedia.delete({ objectKey: user.avatarObjectKey, storagePath: user.avatarStoragePath, bucket: user.avatarBucket }).catch(() => undefined);
+        await this.audit.record({ actorId: actor.userId, organizationId, entityType: 'user', entityId: id, action: 'user.avatar_removed' });
+        return updated;
     }
     async create(dto, actor) {
         const passwordHash = await bcrypt.hash(dto.password, 10);
@@ -542,6 +601,7 @@ exports.UsersService = UsersService = __decorate([
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
         audit_log_service_1.AuditLogService,
         organization_memberships_service_1.OrganizationMembershipsService,
-        quota_service_1.QuotaService])
+        quota_service_1.QuotaService,
+        profile_media_service_1.ProfileMediaService])
 ], UsersService);
 //# sourceMappingURL=users.service.js.map

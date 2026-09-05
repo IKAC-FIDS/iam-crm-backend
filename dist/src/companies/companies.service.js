@@ -22,6 +22,7 @@ const prisma_service_1 = require("../prisma/prisma.service");
 const company_access_service_1 = require("./company-access.service");
 const quota_service_1 = require("../quota/quota.service");
 const company_phone_util_1 = require("./company-phone.util");
+const profile_media_service_1 = require("../profile-media/profile-media.service");
 const companyOptionSelect = {
     id: true,
     legalName: true,
@@ -32,11 +33,67 @@ const companyOptionSelect = {
     parentCompanyId: true,
 };
 let CompaniesService = class CompaniesService {
-    constructor(prisma, audit, companyAccess, quota) {
+    constructor(prisma, audit, companyAccess, quota, profileMedia) {
         this.prisma = prisma;
         this.audit = audit;
         this.companyAccess = companyAccess;
         this.quota = quota;
+        this.profileMedia = profileMedia;
+    }
+    async getLogo(id, user) {
+        const company = await this.prisma.company.findFirst({
+            where: { id, organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user) },
+            select: { logoObjectKey: true, logoStoragePath: true, logoBucket: true, logoMimeType: true },
+        });
+        if (!company)
+            throw new common_1.NotFoundException('Company not found');
+        if (!company.logoObjectKey || !company.logoMimeType)
+            throw new common_1.NotFoundException('Company logo not found');
+        return {
+            mimeType: company.logoMimeType,
+            stream: await this.profileMedia.getStream({
+                objectKey: company.logoObjectKey,
+                storagePath: company.logoStoragePath,
+                bucket: company.logoBucket,
+            }),
+        };
+    }
+    async updateLogo(id, file, user) {
+        const organizationId = (0, tenant_scope_util_1.getCurrentOrganizationId)(user);
+        const company = await this.prisma.company.findFirst({ where: { id, organizationId } });
+        if (!company)
+            throw new common_1.NotFoundException('Company not found');
+        const saved = await this.profileMedia.save('companies', id, file);
+        const updated = await this.prisma.company.update({
+            where: { id },
+            data: {
+                logoStorageProvider: saved.storageProvider,
+                logoBucket: saved.bucket,
+                logoObjectKey: saved.objectKey,
+                logoStoragePath: saved.storagePath,
+                logoMimeType: saved.mimeType,
+                logoOriginalName: saved.originalName,
+            },
+        }).catch(async (error) => {
+            await this.profileMedia.delete(saved);
+            throw error;
+        });
+        await this.profileMedia.delete({ objectKey: company.logoObjectKey, storagePath: company.logoStoragePath, bucket: company.logoBucket }).catch(() => undefined);
+        await this.audit.record({ actorId: user.userId, organizationId, entityType: 'company', entityId: id, action: 'company.logo_updated' });
+        return updated;
+    }
+    async removeLogo(id, user) {
+        const organizationId = (0, tenant_scope_util_1.getCurrentOrganizationId)(user);
+        const company = await this.prisma.company.findFirst({ where: { id, organizationId } });
+        if (!company)
+            throw new common_1.NotFoundException('Company not found');
+        const updated = await this.prisma.company.update({
+            where: { id },
+            data: { logoStorageProvider: null, logoBucket: null, logoObjectKey: null, logoStoragePath: null, logoMimeType: null, logoOriginalName: null },
+        });
+        await this.profileMedia.delete({ objectKey: company.logoObjectKey, storagePath: company.logoStoragePath, bucket: company.logoBucket }).catch(() => undefined);
+        await this.audit.record({ actorId: user.userId, organizationId, entityType: 'company', entityId: id, action: 'company.logo_removed' });
+        return updated;
     }
     async findOptions(user, query) {
         const page = query.page ?? 1;
@@ -181,6 +238,7 @@ let CompaniesService = class CompaniesService {
                             id: true,
                             fullName: true,
                             team: true,
+                            avatarObjectKey: true,
                         },
                     },
                     industryRef: {
@@ -223,7 +281,7 @@ let CompaniesService = class CompaniesService {
         const company = await this.prisma.company.findFirst({
             where: { id, organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user) },
             include: {
-                owner: { select: { id: true, fullName: true, team: true } },
+                owner: { select: { id: true, fullName: true, team: true, avatarObjectKey: true } },
                 industryRef: true,
                 sourceRef: true,
                 people: true,
@@ -836,6 +894,7 @@ exports.CompaniesService = CompaniesService = __decorate([
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
         audit_log_service_1.AuditLogService,
         company_access_service_1.CompanyAccessService,
-        quota_service_1.QuotaService])
+        quota_service_1.QuotaService,
+        profile_media_service_1.ProfileMediaService])
 ], CompaniesService);
 //# sourceMappingURL=companies.service.js.map

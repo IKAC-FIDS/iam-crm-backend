@@ -15,6 +15,9 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.CompaniesController = void 0;
 const openapi = require("@nestjs/swagger");
 const common_1 = require("@nestjs/common");
+const platform_express_1 = require("@nestjs/platform-express");
+const multer_1 = require("multer");
+const profile_media_service_1 = require("../profile-media/profile-media.service");
 const jwt_auth_guard_1 = require("../common/guards/jwt-auth.guard");
 const permissions_guard_1 = require("../common/guards/permissions.guard");
 const permissions_decorator_1 = require("../common/decorators/permissions.decorator");
@@ -54,6 +57,18 @@ let CompaniesController = class CompaniesController {
     }
     findOne(id, user) {
         return this.companiesService.findOne(id, user);
+    }
+    async getLogo(id, user, response) {
+        const media = await this.companiesService.getLogo(id, user);
+        response.setHeader('Content-Type', media.mimeType);
+        response.setHeader('Cache-Control', 'private, max-age=300');
+        return new common_1.StreamableFile(media.stream);
+    }
+    uploadLogo(id, file, user) {
+        return this.companiesService.updateLogo(id, file, user);
+    }
+    removeLogo(id, user) {
+        return this.companiesService.removeLogo(id, user);
     }
     create(dto, user) {
         return this.companiesService.create(dto, user);
@@ -123,6 +138,42 @@ __decorate([
     __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", void 0)
 ], CompaniesController.prototype, "findOne", null);
+__decorate([
+    (0, common_1.Get)(':id/logo'),
+    (0, permissions_decorator_1.Permissions)('company:view'),
+    openapi.ApiResponse({ status: 200 }),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __param(2, (0, common_1.Res)({ passthrough: true })),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object, Object]),
+    __metadata("design:returntype", Promise)
+], CompaniesController.prototype, "getLogo", null);
+__decorate([
+    (0, common_1.Post)(':id/logo'),
+    (0, permissions_decorator_1.Permissions)('company:update'),
+    (0, common_1.UseInterceptors)((0, platform_express_1.FileInterceptor)('file', {
+        storage: (0, multer_1.memoryStorage)(),
+        limits: { fileSize: profile_media_service_1.PROFILE_MEDIA_MAX_BYTES },
+    })),
+    openapi.ApiResponse({ status: 201 }),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.UploadedFile)()),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object, Object]),
+    __metadata("design:returntype", void 0)
+], CompaniesController.prototype, "uploadLogo", null);
+__decorate([
+    (0, common_1.Delete)(':id/logo'),
+    (0, permissions_decorator_1.Permissions)('company:update'),
+    openapi.ApiResponse({ status: 200 }),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", void 0)
+], CompaniesController.prototype, "removeLogo", null);
 __decorate([
     (0, common_1.Post)(),
     (0, permissions_decorator_1.Permissions)('company:create'),

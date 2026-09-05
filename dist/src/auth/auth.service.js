@@ -210,6 +210,7 @@ let AuthService = AuthService_1 = class AuthService {
                 roleId: assignedRole?.id ?? null,
                 roleCode: assignedRole?.code ?? effectiveRole,
                 roleName: assignedRole?.name ?? effectiveRole,
+                avatarObjectKey: user.avatarObjectKey,
             },
         };
     }

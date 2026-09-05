@@ -12,12 +12,13 @@ const users_service_1 = require("./users.service");
 const users_controller_1 = require("./users.controller");
 const organization_memberships_module_1 = require("../organization-memberships/organization-memberships.module");
 const quota_module_1 = require("../quota/quota.module");
+const profile_media_module_1 = require("../profile-media/profile-media.module");
 let UsersModule = class UsersModule {
 };
 exports.UsersModule = UsersModule;
 exports.UsersModule = UsersModule = __decorate([
     (0, common_1.Module)({
-        imports: [organization_memberships_module_1.OrganizationMembershipsModule, quota_module_1.QuotaModule],
+        imports: [organization_memberships_module_1.OrganizationMembershipsModule, quota_module_1.QuotaModule, profile_media_module_1.ProfileMediaModule],
         providers: [users_service_1.UsersService],
         controllers: [users_controller_1.UsersController],
         exports: [users_service_1.UsersService],

@@ -17,12 +17,13 @@ const company_legal_documents_service_1 = require("./company-legal-documents.ser
 const quota_module_1 = require("../quota/quota.module");
 const company_overview_controller_1 = require("./company-overview.controller");
 const company_overview_service_1 = require("./company-overview.service");
+const profile_media_module_1 = require("../profile-media/profile-media.module");
 let CompaniesModule = class CompaniesModule {
 };
 exports.CompaniesModule = CompaniesModule;
 exports.CompaniesModule = CompaniesModule = __decorate([
     (0, common_1.Module)({
-        imports: [pipeline_config_module_1.PipelineConfigModule, attachments_module_1.AttachmentsModule, quota_module_1.QuotaModule],
+        imports: [pipeline_config_module_1.PipelineConfigModule, attachments_module_1.AttachmentsModule, quota_module_1.QuotaModule, profile_media_module_1.ProfileMediaModule],
         providers: [
             companies_service_1.CompaniesService,
             company_legal_documents_service_1.CompanyLegalDocumentsService,
