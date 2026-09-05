@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import { ProfileMediaService } from './profile-media.service';
+import { ProfileMediaService } from '../src/profile-media/profile-media.service';
 
 describe('ProfileMediaService', () => {
   const storage = { save: jest.fn(), delete: jest.fn(), getStream: jest.fn() };
