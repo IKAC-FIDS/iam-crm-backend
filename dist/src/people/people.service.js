@@ -194,7 +194,7 @@ let PeopleService = class PeopleService {
         await this.validateCompanyAccess(dto.companyId, user);
         const { contacts, socials, jobTitle, personaRole, ...personData } = dto;
         const normalizedContacts = await Promise.all((contacts ?? []).map(async (contact) => {
-            const normalizedType = await this.resolveContactTypeReference(contact.typeOptionId, contact.type, true);
+            const normalizedType = await this.resolveContactTypeReference(contact.typeOptionId);
             const value = contact.value.trim();
             if (!value) {
                 throw new common_1.BadRequestException('مقدار تماس الزامی است');
@@ -293,59 +293,16 @@ let PeopleService = class PeopleService {
     async assertCompanyReadable(companyId, user) {
         await this.companyAccess.assertCompanyReadable(companyId, user);
     }
-    async resolveContactTypeReference(typeOptionId, type, required = false) {
-        if (typeOptionId) {
-            const option = await this.prisma.lookupOption.findFirst({
-                where: {
-                    id: typeOptionId,
-                    group: 'contact_types',
-                    isActive: true,
-                },
-            });
-            if (!option) {
-                throw new common_1.BadRequestException('نوع تماس انتخاب‌شده معتبر یا فعال نیست');
-            }
-            return {
-                typeOptionId: option.id,
-                typeCode: option.code,
-            };
-        }
-        const normalizedType = type?.trim();
-        if (normalizedType) {
-            const option = await this.prisma.lookupOption.findFirst({
-                where: {
-                    group: 'contact_types',
-                    isActive: true,
-                    OR: [
-                        {
-                            code: {
-                                equals: normalizedType,
-                                mode: 'insensitive',
-                            },
-                        },
-                        {
-                            label: {
-                                equals: normalizedType,
-                                mode: 'insensitive',
-                            },
-                        },
-                    ],
-                },
-            });
-            if (!option) {
-                throw new common_1.BadRequestException('نوع تماس باید از گزینه‌های پایه contact_types انتخاب شود. مقدار متنی آزاد مجاز نیست');
-            }
-            return {
-                typeOptionId: option.id,
-                typeCode: option.code,
-            };
-        }
-        if (required) {
-            throw new common_1.BadRequestException('typeOptionId یا type الزامی است');
+    async resolveContactTypeReference(typeOptionId) {
+        const option = await this.prisma.lookupOption.findUnique({
+            where: { id: typeOptionId },
+        });
+        if (!option || option.group !== 'contact_types' || !option.isActive) {
+            throw new common_1.BadRequestException('نوع تماس انتخاب‌شده معتبر یا فعال نیست');
         }
         return {
-            typeOptionId: null,
-            typeCode: '',
+            typeOptionId: option.id,
+            typeCode: option.code,
         };
     }
     async resolveSocialPlatformReference(platformOptionId, platform, required = false) {

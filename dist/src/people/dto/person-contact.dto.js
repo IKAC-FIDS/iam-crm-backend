@@ -14,20 +14,14 @@ const openapi = require("@nestjs/swagger");
 const class_validator_1 = require("class-validator");
 class CreatePersonContactDto {
     static _OPENAPI_METADATA_FACTORY() {
-        return { typeOptionId: { required: false, type: () => String }, type: { required: false, type: () => String, description: "Deprecated compatibility input.\nPrefer typeOptionId.\nIf sent, it must match LookupOption.code or LookupOption.label in group = contact_types." }, value: { required: true, type: () => String }, isPrimary: { required: false, type: () => Boolean }, note: { required: false, type: () => String } };
+        return { typeOptionId: { required: true, type: () => String }, value: { required: true, type: () => String }, isPrimary: { required: false, type: () => Boolean }, note: { required: false, type: () => String } };
     }
 }
 exports.CreatePersonContactDto = CreatePersonContactDto;
 __decorate([
-    (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsUUID)(),
     __metadata("design:type", String)
 ], CreatePersonContactDto.prototype, "typeOptionId", void 0);
-__decorate([
-    (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
-], CreatePersonContactDto.prototype, "type", void 0);
 __decorate([
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
@@ -44,7 +38,7 @@ __decorate([
 ], CreatePersonContactDto.prototype, "note", void 0);
 class UpdatePersonContactDto {
     static _OPENAPI_METADATA_FACTORY() {
-        return { typeOptionId: { required: false, type: () => String }, type: { required: false, type: () => String, description: "Deprecated compatibility input.\nPrefer typeOptionId." }, value: { required: false, type: () => String }, isPrimary: { required: false, type: () => Boolean }, note: { required: false, type: () => String } };
+        return { typeOptionId: { required: false, type: () => String }, value: { required: false, type: () => String }, isPrimary: { required: false, type: () => Boolean }, note: { required: false, type: () => String } };
     }
 }
 exports.UpdatePersonContactDto = UpdatePersonContactDto;
@@ -53,11 +47,6 @@ __decorate([
     (0, class_validator_1.IsUUID)(),
     __metadata("design:type", String)
 ], UpdatePersonContactDto.prototype, "typeOptionId", void 0);
-__decorate([
-    (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
-], UpdatePersonContactDto.prototype, "type", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),

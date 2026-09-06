@@ -36,6 +36,7 @@ let MeetingsController = class MeetingsController {
     update(id, dto, user) { return this.service.update(id, dto, user); }
     complete(id, dto, user) { return this.service.complete(id, dto, user); }
     cancel(id, dto, user) { return this.service.cancel(id, dto, user); }
+    notifyAssignees(id, user) { return this.service.notifyAssignees(id, user); }
 };
 exports.MeetingsController = MeetingsController;
 __decorate([
@@ -109,6 +110,16 @@ __decorate([
     __metadata("design:paramtypes", [String, cancel_meeting_dto_1.CancelMeetingDto, Object]),
     __metadata("design:returntype", void 0)
 ], MeetingsController.prototype, "cancel", null);
+__decorate([
+    (0, common_1.Post)(':id/notify-assignees'),
+    (0, permissions_decorator_1.Permissions)('meeting:update'),
+    openapi.ApiResponse({ status: 201 }),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", void 0)
+], MeetingsController.prototype, "notifyAssignees", null);
 exports.MeetingsController = MeetingsController = __decorate([
     (0, common_1.Controller)('meetings'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, permissions_guard_1.PermissionsGuard),

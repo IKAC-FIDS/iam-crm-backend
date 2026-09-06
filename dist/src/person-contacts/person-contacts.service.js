@@ -42,7 +42,7 @@ let PersonContactsService = class PersonContactsService {
     }
     async create(personId, dto, user) {
         await this.assertPersonMutable(personId, user);
-        const normalizedType = await this.resolveContactTypeReference(dto.typeOptionId, dto.type, true);
+        const normalizedType = await this.resolveContactTypeReference(dto.typeOptionId);
         const value = dto.value.trim();
         if (!value) {
             throw new common_1.BadRequestException('مقدار تماس الزامی است');
@@ -110,8 +110,8 @@ let PersonContactsService = class PersonContactsService {
         let nextTypeOptionId = contact.typeOptionId;
         let nextTypeCode = contact.type;
         let nextValue = contact.value;
-        if (dto.typeOptionId !== undefined || dto.type !== undefined) {
-            const normalizedType = await this.resolveContactTypeReference(dto.typeOptionId, dto.type, true);
+        if (dto.typeOptionId !== undefined) {
+            const normalizedType = await this.resolveContactTypeReference(dto.typeOptionId);
             nextTypeOptionId = normalizedType.typeOptionId;
             nextTypeCode = normalizedType.typeCode;
             updateData.typeOptionId = normalizedType.typeOptionId;
@@ -130,7 +130,7 @@ let PersonContactsService = class PersonContactsService {
         if (dto.note !== undefined) {
             updateData.note = dto.note?.trim() || null;
         }
-        if (dto.typeOptionId !== undefined || dto.type !== undefined || dto.value !== undefined) {
+        if (dto.typeOptionId !== undefined || dto.value !== undefined) {
             await this.assertNoDuplicateContact(contact.personId, nextTypeOptionId, nextTypeCode, nextValue, id);
         }
         if (dto.isPrimary) {
@@ -163,59 +163,16 @@ let PersonContactsService = class PersonContactsService {
             where: { id },
         });
     }
-    async resolveContactTypeReference(typeOptionId, type, required = false) {
-        if (typeOptionId) {
-            const option = await this.prisma.lookupOption.findFirst({
-                where: {
-                    id: typeOptionId,
-                    group: 'contact_types',
-                    isActive: true,
-                },
-            });
-            if (!option) {
-                throw new common_1.BadRequestException('نوع تماس انتخاب‌شده معتبر یا فعال نیست');
-            }
-            return {
-                typeOptionId: option.id,
-                typeCode: option.code,
-            };
-        }
-        const normalizedType = type?.trim();
-        if (normalizedType) {
-            const option = await this.prisma.lookupOption.findFirst({
-                where: {
-                    group: 'contact_types',
-                    isActive: true,
-                    OR: [
-                        {
-                            code: {
-                                equals: normalizedType,
-                                mode: 'insensitive',
-                            },
-                        },
-                        {
-                            label: {
-                                equals: normalizedType,
-                                mode: 'insensitive',
-                            },
-                        },
-                    ],
-                },
-            });
-            if (!option) {
-                throw new common_1.BadRequestException('نوع تماس باید از گزینه‌های پایه contact_types انتخاب شود. مقدار متنی آزاد مجاز نیست');
-            }
-            return {
-                typeOptionId: option.id,
-                typeCode: option.code,
-            };
-        }
-        if (required) {
-            throw new common_1.BadRequestException('typeOptionId یا type الزامی است');
+    async resolveContactTypeReference(typeOptionId) {
+        const option = await this.prisma.lookupOption.findUnique({
+            where: { id: typeOptionId },
+        });
+        if (!option || option.group !== 'contact_types' || !option.isActive) {
+            throw new common_1.BadRequestException('نوع تماس انتخاب‌شده معتبر یا فعال نیست');
         }
         return {
-            typeOptionId: null,
-            typeCode: '',
+            typeOptionId: option.id,
+            typeCode: option.code,
         };
     }
     async assertNoDuplicateContact(personId, typeOptionId, typeCode, value, excludeId) {

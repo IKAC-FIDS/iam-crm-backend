@@ -55,12 +55,15 @@ const entitlements_module_1 = require("./entitlements/entitlements.module");
 const quota_module_1 = require("./quota/quota.module");
 const technical_center_module_1 = require("./technical-center/technical-center.module");
 const artifacts_module_1 = require("./artifacts/artifacts.module");
+const email_module_1 = require("./email/email.module");
+const notification_core_module_1 = require("./notification-core/notification-core.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
 exports.AppModule = AppModule = __decorate([
     (0, common_1.Module)({
         imports: [
+            notification_core_module_1.NotificationCoreModule,
             config_1.ConfigModule.forRoot({
                 isGlobal: true,
                 validationSchema: env_validator_1.envValidationSchema,
@@ -120,6 +123,7 @@ exports.AppModule = AppModule = __decorate([
             quota_module_1.QuotaModule,
             technical_center_module_1.TechnicalCenterModule,
             artifacts_module_1.ArtifactsModule,
+            email_module_1.EmailModule,
         ],
         providers: [
             {

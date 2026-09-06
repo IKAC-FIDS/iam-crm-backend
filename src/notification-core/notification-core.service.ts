@@ -2,10 +2,14 @@ import { Injectable } from "@nestjs/common"
 import { Prisma, type NotificationEvent } from "@prisma/client"
 import { PrismaService } from "../prisma/prisma.service"
 import type { PublishNotificationEventInput } from "./notification-core.types"
+import { NotificationRuleEngineService } from "./notification-rule-engine.service"
 
 @Injectable()
 export class NotificationCoreService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly ruleEngine: NotificationRuleEngineService,
+  ) {}
 
   async publish(input: PublishNotificationEventInput): Promise<NotificationEvent> {
     const create = () =>
@@ -53,5 +57,11 @@ export class NotificationCoreService {
 
       throw error
     }
+  }
+
+  async publishAndEvaluate(input: PublishNotificationEventInput) {
+    const event = await this.publish(input)
+    const evaluation = await this.ruleEngine.evaluateEvent(event)
+    return { event, evaluation }
   }
 }

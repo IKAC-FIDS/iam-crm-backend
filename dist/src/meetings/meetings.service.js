@@ -16,6 +16,8 @@ const audit_log_service_1 = require("../audit-log/audit-log.service");
 const api_date_util_1 = require("../common/dates/api-date.util");
 const tenant_scope_util_1 = require("../common/tenant/tenant-scope.util");
 const prisma_service_1 = require("../prisma/prisma.service");
+const email_service_1 = require("../email/email.service");
+const meeting_email_template_1 = require("./meeting-email.template");
 const meetingInclude = {
     type: { select: { id: true, code: true, label: true, description: true, sortOrder: true, isActive: true } },
     company: { select: { id: true, legalName: true, brandName: true } },
@@ -28,9 +30,10 @@ const meetingInclude = {
     attendees: { include: { person: { select: { id: true, fullName: true, title: true, companyId: true } } } },
 };
 let MeetingsService = class MeetingsService {
-    constructor(prisma, audit) {
+    constructor(prisma, audit, email) {
         this.prisma = prisma;
         this.audit = audit;
+        this.email = email;
     }
     findTypes() { return this.prisma.lookupOption.findMany({ where: { group: 'meeting-types', isActive: true }, orderBy: [{ sortOrder: 'asc' }, { label: 'asc' }] }); }
     async findAll(query, user) {
@@ -117,6 +120,73 @@ let MeetingsService = class MeetingsService {
         await this.audit.record({ actorId: user.userId, entityType: 'meeting', entityId: id, action: 'meeting.cancelled', before: current, after: updated });
         return updated;
     }
+    async notifyAssignees(id, user) {
+        const organizationId = (0, tenant_scope_util_1.getCurrentOrganizationId)(user);
+        const meeting = await this.get(id, user);
+        if (meeting.status !== client_1.MeetingStatus.SCHEDULED)
+            throw new common_1.BadRequestException('فقط برای جلسه برنامه‌ریزی‌شده می‌توان اعلان ارسال کرد');
+        await this.email.assertConfigured(organizationId);
+        const organization = await this.prisma.organization.findUnique({
+            where: { id: organizationId },
+            select: { locale: true, timezone: true },
+        });
+        const recipients = [];
+        const seen = new Set();
+        for (const assignment of meeting.assignees) {
+            const recipient = assignment.user;
+            const email = recipient.email?.trim().toLowerCase() || null;
+            if (!email) {
+                recipients.push({ userId: recipient.id, email: null, status: 'SKIPPED', reason: 'NO_EMAIL' });
+                continue;
+            }
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                recipients.push({ userId: recipient.id, email, status: 'SKIPPED', reason: 'INVALID_EMAIL' });
+                continue;
+            }
+            if (seen.has(email)) {
+                recipients.push({ userId: recipient.id, email, status: 'SKIPPED', reason: 'DUPLICATE_EMAIL' });
+                continue;
+            }
+            seen.add(email);
+            const message = (0, meeting_email_template_1.meetingAssigneeEmail)({
+                recipientName: recipient.fullName,
+                title: meeting.title,
+                companyName: meeting.company.brandName || meeting.company.legalName,
+                startAt: meeting.startAt,
+                endAt: meeting.endAt,
+                mode: meeting.mode,
+                location: meeting.location,
+                meetingUrl: meeting.meetingUrl,
+                agenda: meeting.agenda,
+                description: meeting.description,
+                locale: organization?.locale,
+                timeZone: organization?.timezone,
+            });
+            try {
+                await this.email.send(organizationId, { to: email, ...message });
+                recipients.push({ userId: recipient.id, email, status: 'SENT' });
+            }
+            catch {
+                recipients.push({ userId: recipient.id, email, status: 'FAILED', reason: 'SEND_FAILED' });
+            }
+        }
+        const result = {
+            total: recipients.length,
+            sent: recipients.filter((item) => item.status === 'SENT').length,
+            skipped: recipients.filter((item) => item.status === 'SKIPPED').length,
+            failed: recipients.filter((item) => item.status === 'FAILED').length,
+            recipients,
+        };
+        await this.audit.record({
+            actorId: user.userId,
+            organizationId,
+            entityType: 'meeting',
+            entityId: meeting.id,
+            action: 'meeting.assignee_email_notification_sent',
+            metadata: result,
+        }).catch(() => undefined);
+        return result;
+    }
     buildWhere(q, user) {
         const now = new Date();
         const and = [{ organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user) }];
@@ -194,6 +264,6 @@ let MeetingsService = class MeetingsService {
 exports.MeetingsService = MeetingsService;
 exports.MeetingsService = MeetingsService = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [prisma_service_1.PrismaService, audit_log_service_1.AuditLogService])
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService, audit_log_service_1.AuditLogService, email_service_1.EmailService])
 ], MeetingsService);
 //# sourceMappingURL=meetings.service.js.map
