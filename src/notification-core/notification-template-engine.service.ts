@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common"
-import { NotificationChannel, type NotificationEvent } from "@prisma/client"
+import { NotificationChannel, type NotificationEvent, type NotificationTemplate } from "@prisma/client"
 import { PrismaService } from "../prisma/prisma.service"
 import {
   NOTIFICATION_TEMPLATE_VARIABLES,
@@ -75,6 +75,18 @@ export class NotificationTemplateEngineService {
     const context = await this.buildContext(event, recipientUserId, organization)
     const rendered = this.render({ subject: template.subject, body: template.body, context })
     return { template, ...rendered }
+  }
+
+  async renderStoredTemplate(event: NotificationEvent, recipientUserId: string, template: NotificationTemplate) {
+    if (template.organizationId !== event.organizationId || template.eventName !== event.eventName) {
+      throw new BadRequestException("Notification template does not match delivery event")
+    }
+    const organization = await this.prisma.organization.findUnique({
+      where: { id: event.organizationId }, select: { id: true, name: true, locale: true },
+    })
+    if (!organization) throw new NotFoundException("Notification organization not found")
+    const context = await this.buildContext(event, recipientUserId, organization)
+    return this.render({ subject: template.subject, body: template.body, context })
   }
 
   preview(eventName: string, subject: string | null | undefined, body: string) {

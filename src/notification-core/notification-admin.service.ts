@@ -13,6 +13,7 @@ import type {
   UpdateNotificationTemplateDto,
 } from "./dto/notification-admin.dto"
 import { NotificationTemplateEngineService } from "./notification-template-engine.service"
+import { SmsSettingsService } from "./sms/sms-settings.service"
 
 const events = Object.entries(NOTIFICATION_EVENT_CATALOG).flatMap(([service, actions]) =>
   Object.entries(actions).map(([action, eventName]) => ({ eventName, service, action })),
@@ -24,6 +25,7 @@ export class NotificationAdminService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly templateEngine: NotificationTemplateEngineService,
+    private readonly smsSettings: SmsSettingsService,
   ) {}
 
   catalog() {
@@ -196,7 +198,7 @@ export class NotificationAdminService {
     const emailConfigured = Boolean(email?.smtpEnabled && email.smtpHost && email.smtpPort && email.smtpFromEmail)
     return [
       { channel: "EMAIL", available: emailConfigured, configured: emailConfigured, usable: emailConfigured, provider: email?.smtpHost || null, configurationPath: "/admin/email-settings" },
-      { channel: "SMS", available: false, configured: false, usable: false, provider: null, configurationPath: null },
+      await this.smsSettings.status(organizationId),
       { channel: "PUSH", available: false, configured: false, usable: false, provider: null, configurationPath: null },
       { channel: "IN_APP", available: true, configured: true, usable: true, provider: "Notification Center", configurationPath: null },
     ]

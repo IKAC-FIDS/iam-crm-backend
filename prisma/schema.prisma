@@ -607,6 +607,7 @@ model Organization {
   notificationCoreRules       NotificationRule[]       @relation("NotificationCoreRules")
   notificationCoreTemplates   NotificationTemplate[]   @relation("NotificationCoreTemplates")
   notificationCorePreferences NotificationPreference[] @relation("NotificationCorePreferences")
+  notificationSmsSettings     NotificationSmsSettings?
 
   @@index([status])
   @@index([createdAt])
@@ -3212,4 +3213,21 @@ model NotificationPreference {
   @@unique([organizationId, userId, eventName, channel])
   @@index([userId, eventName])
   @@map("notification_preferences")
+}
+
+model NotificationSmsSettings {
+  id             String       @id @default(uuid())
+  organizationId String       @unique
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  provider       String
+  apiUrl         String
+  apiKeyEnc      String?
+  senderNumber   String
+  enabled        Boolean      @default(false)
+  timeoutMs      Int          @default(10000)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([organizationId, enabled])
+  @@map("notification_sms_settings")
 }
