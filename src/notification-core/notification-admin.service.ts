@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common"
-import type { Prisma } from "@prisma/client"
+import { NotificationChannel, type Prisma } from "@prisma/client"
 import type { CurrentUserPayload } from "../common/decorators/current-user.decorator"
 import { createPaginationMeta } from "../common/pagination/pagination.util"
 import { tenantScope } from "../common/tenant/tenant-scope.util"
@@ -9,8 +9,10 @@ import type {
   CreateNotificationTemplateDto,
   NotificationDeliveryQueryDto,
   NotificationTemplateQueryDto,
+  PreviewNotificationTemplateDto,
   UpdateNotificationTemplateDto,
 } from "./dto/notification-admin.dto"
+import { NotificationTemplateEngineService } from "./notification-template-engine.service"
 
 const events = Object.entries(NOTIFICATION_EVENT_CATALOG).flatMap(([service, actions]) =>
   Object.entries(actions).map(([action, eventName]) => ({ eventName, service, action })),
@@ -19,7 +21,10 @@ const allowedEvents = new Set<string>(events.map((item) => item.eventName))
 
 @Injectable()
 export class NotificationAdminService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly templateEngine: NotificationTemplateEngineService,
+  ) {}
 
   catalog() {
     return { events }
@@ -33,6 +38,7 @@ export class NotificationAdminService {
         ...(query.eventName ? { eventName: query.eventName } : {}),
         ...(query.channel ? { channel: query.channel } : {}),
         ...(query.locale ? { locale: query.locale } : {}),
+        ...(query.isActive !== undefined ? { isActive: query.isActive } : {}),
         ...(query.search?.trim()
           ? { OR: [{ subject: { contains: query.search.trim(), mode: "insensitive" } }, { body: { contains: query.search.trim(), mode: "insensitive" } }] }
           : {}),
@@ -48,34 +54,101 @@ export class NotificationAdminService {
     return item
   }
 
-  createTemplate(dto: CreateNotificationTemplateDto, user: CurrentUserPayload) {
+  async createTemplate(dto: CreateNotificationTemplateDto, user: CurrentUserPayload) {
     const { organizationId } = tenantScope.require(user)
     this.assertEvent(dto.eventName)
-    return this.prisma.notificationTemplate.create({ data: {
-      organizationId, eventName: dto.eventName, channel: dto.channel,
-      locale: dto.locale?.trim() || "fa-IR", subject: dto.subject?.trim() || null,
-      body: dto.body.trim(), isActive: dto.isActive ?? true, version: dto.version ?? 1,
-    } })
+    const locale = dto.locale?.trim() || "fa-IR"
+    const subject = dto.channel === NotificationChannel.SMS ? null : dto.subject?.trim() || null
+    const body = dto.body.trim()
+    this.templateEngine.validate(dto.eventName, subject, body)
+    return this.prisma.$transaction(async (tx) => {
+      const latest = await tx.notificationTemplate.findFirst({
+        where: { organizationId, eventName: dto.eventName, channel: dto.channel, locale },
+        orderBy: { version: "desc" },
+        select: { version: true },
+      })
+      const isActive = dto.isActive ?? true
+      if (isActive) {
+        await tx.notificationTemplate.updateMany({
+          where: { organizationId, eventName: dto.eventName, channel: dto.channel, locale, isActive: true },
+          data: { isActive: false },
+        })
+      }
+      return tx.notificationTemplate.create({ data: {
+        organizationId, eventName: dto.eventName, channel: dto.channel, locale,
+        subject, body, isActive, version: (latest?.version ?? 0) + 1,
+      } })
+    })
   }
 
   async updateTemplate(id: string, dto: UpdateNotificationTemplateDto, user: CurrentUserPayload) {
-    await this.getTemplate(id, user)
+    const previous = await this.getTemplate(id, user)
     if (dto.eventName) this.assertEvent(dto.eventName)
-    return this.prisma.notificationTemplate.update({ where: { id }, data: {
-      ...(dto.eventName !== undefined ? { eventName: dto.eventName } : {}),
-      ...(dto.channel !== undefined ? { channel: dto.channel } : {}),
-      ...(dto.locale !== undefined ? { locale: dto.locale.trim() } : {}),
-      ...(dto.subject !== undefined ? { subject: dto.subject?.trim() || null } : {}),
-      ...(dto.body !== undefined ? { body: dto.body.trim() } : {}),
-      ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
-      ...(dto.version !== undefined ? { version: dto.version } : {}),
-    } })
+    const eventName = dto.eventName ?? previous.eventName
+    const channel = dto.channel ?? previous.channel
+    const locale = dto.locale?.trim() || previous.locale
+    const subject = channel === NotificationChannel.SMS
+      ? null
+      : dto.subject !== undefined ? dto.subject?.trim() || null : previous.subject
+    const body = dto.body?.trim() ?? previous.body
+    this.templateEngine.validate(eventName, subject, body)
+    return this.prisma.$transaction(async (tx) => {
+      const latest = await tx.notificationTemplate.findFirst({
+        where: { organizationId: previous.organizationId, eventName, channel, locale },
+        orderBy: { version: "desc" },
+        select: { version: true },
+      })
+      const isActive = dto.isActive ?? true
+      if (isActive) {
+        await tx.notificationTemplate.updateMany({
+          where: { organizationId: previous.organizationId, eventName, channel, locale, isActive: true },
+          data: { isActive: false },
+        })
+      }
+      return tx.notificationTemplate.create({ data: {
+        organizationId: previous.organizationId, eventName, channel, locale,
+        subject, body, isActive, version: (latest?.version ?? 0) + 1,
+      } })
+    })
   }
 
   async removeTemplate(id: string, user: CurrentUserPayload) {
     await this.getTemplate(id, user)
-    await this.prisma.notificationTemplate.delete({ where: { id } })
-    return { deleted: true }
+    await this.prisma.notificationTemplate.update({ where: { id }, data: { isActive: false } })
+    return { deleted: false, deactivated: true }
+  }
+
+  templateVariables(eventName: string) {
+    this.assertEvent(eventName)
+    return { eventName, variables: this.templateEngine.variables(eventName) }
+  }
+
+  previewTemplate(dto: PreviewNotificationTemplateDto) {
+    this.assertEvent(dto.eventName)
+    const subject = dto.channel === NotificationChannel.SMS ? null : dto.subject
+    return {
+      eventName: dto.eventName,
+      channel: dto.channel,
+      locale: dto.locale?.trim() || "fa-IR",
+      ...this.templateEngine.preview(dto.eventName, subject, dto.body),
+    }
+  }
+
+  async activateTemplate(id: string, user: CurrentUserPayload) {
+    const template = await this.getTemplate(id, user)
+    return this.prisma.$transaction(async (tx) => {
+      await tx.notificationTemplate.updateMany({
+        where: {
+          organizationId: template.organizationId,
+          eventName: template.eventName,
+          channel: template.channel,
+          locale: template.locale,
+          isActive: true,
+        },
+        data: { isActive: false },
+      })
+      return tx.notificationTemplate.update({ where: { id: template.id }, data: { isActive: true } })
+    })
   }
 
   async listDeliveries(query: NotificationDeliveryQueryDto, user: CurrentUserPayload) {

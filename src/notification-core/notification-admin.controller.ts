@@ -3,7 +3,7 @@ import { CurrentUser, type CurrentUserPayload } from "../common/decorators/curre
 import { Permissions } from "../common/decorators/permissions.decorator"
 import { JwtAuthGuard } from "../common/guards/jwt-auth.guard"
 import { PermissionsGuard } from "../common/guards/permissions.guard"
-import { CreateNotificationTemplateDto, NotificationDeliveryQueryDto, NotificationTemplateQueryDto, UpdateNotificationTemplateDto } from "./dto/notification-admin.dto"
+import { CreateNotificationTemplateDto, NotificationDeliveryQueryDto, NotificationTemplateQueryDto, PreviewNotificationTemplateDto, UpdateNotificationTemplateDto } from "./dto/notification-admin.dto"
 import { NotificationAdminService } from "./notification-admin.service"
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
@@ -13,6 +13,9 @@ export class NotificationAdminController {
   constructor(private readonly admin: NotificationAdminService) {}
   @Get("catalog") catalog() { return this.admin.catalog() }
   @Get("templates") templates(@Query() query: NotificationTemplateQueryDto, @CurrentUser() user: CurrentUserPayload) { return this.admin.listTemplates(query, user) }
+  @Get("templates/variables") variables(@Query("eventName") eventName: string) { return this.admin.templateVariables(eventName) }
+  @Post("templates/preview") preview(@Body() dto: PreviewNotificationTemplateDto) { return this.admin.previewTemplate(dto) }
+  @Post("templates/:id/activate") activate(@Param("id") id: string, @CurrentUser() user: CurrentUserPayload) { return this.admin.activateTemplate(id, user) }
   @Get("templates/:id") template(@Param("id") id: string, @CurrentUser() user: CurrentUserPayload) { return this.admin.getTemplate(id, user) }
   @Post("templates") createTemplate(@Body() dto: CreateNotificationTemplateDto, @CurrentUser() user: CurrentUserPayload) { return this.admin.createTemplate(dto, user) }
   @Patch("templates/:id") updateTemplate(@Param("id") id: string, @Body() dto: UpdateNotificationTemplateDto, @CurrentUser() user: CurrentUserPayload) { return this.admin.updateTemplate(id, dto, user) }
@@ -28,6 +31,9 @@ export class NotificationAdminController {
 export class NotificationTemplatesController {
   constructor(private readonly admin: NotificationAdminService) {}
   @Get() list(@Query() query: NotificationTemplateQueryDto, @CurrentUser() user: CurrentUserPayload) { return this.admin.listTemplates(query, user) }
+  @Get("variables") variables(@Query("eventName") eventName: string) { return this.admin.templateVariables(eventName) }
+  @Post("preview") preview(@Body() dto: PreviewNotificationTemplateDto) { return this.admin.previewTemplate(dto) }
+  @Post(":id/activate") activate(@Param("id") id: string, @CurrentUser() user: CurrentUserPayload) { return this.admin.activateTemplate(id, user) }
   @Get(":id") get(@Param("id") id: string, @CurrentUser() user: CurrentUserPayload) { return this.admin.getTemplate(id, user) }
   @Post() create(@Body() dto: CreateNotificationTemplateDto, @CurrentUser() user: CurrentUserPayload) { return this.admin.createTemplate(dto, user) }
   @Patch(":id") update(@Param("id") id: string, @Body() dto: UpdateNotificationTemplateDto, @CurrentUser() user: CurrentUserPayload) { return this.admin.updateTemplate(id, dto, user) }

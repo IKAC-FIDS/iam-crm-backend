@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common"
+import { Injectable, NotFoundException } from "@nestjs/common"
 import {
   NotificationDeliveryStatus,
   NotificationRecipientType,
@@ -8,10 +8,14 @@ import {
   Prisma,
 } from "@prisma/client"
 import { PrismaService } from "../prisma/prisma.service"
+import { NotificationTemplateEngineService } from "./notification-template-engine.service"
 
 @Injectable()
 export class NotificationRuleEngineService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly templateEngine: NotificationTemplateEngineService,
+  ) {}
 
   async evaluateEvent(event: NotificationEvent) {
     const rules = await this.prisma.notificationRule.findMany({
@@ -52,12 +56,14 @@ export class NotificationRuleEngineService {
             ].join(":")
 
             try {
+              const rendered = await this.templateEngine.renderDelivery(event, recipientUserId, channel)
               await this.prisma.notificationDelivery.create({
                 data: {
                   eventId: event.id,
                   ruleId: rule.id,
                   recipientRuleId: recipientRule.id,
                   recipientUserId,
+                  templateId: rendered.template.id,
                   channel,
                   status: NotificationDeliveryStatus.PENDING,
                   deduplicationKey,
@@ -65,6 +71,10 @@ export class NotificationRuleEngineService {
               })
               created += 1
             } catch (error) {
+              if (error instanceof NotFoundException) {
+                unresolved += 1
+                continue
+              }
               if (
                 error instanceof Prisma.PrismaClientKnownRequestError &&
                 error.code === "P2002"
