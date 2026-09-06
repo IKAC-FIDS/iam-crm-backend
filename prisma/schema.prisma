@@ -615,6 +615,15 @@ model OrganizationSettings {
   dateFormat             OrganizationDateFormat     @default(YYYY_MM_DD)
   firstDayOfWeek         Int                        @default(6)
   emailSenderDisplayName String?
+  smtpEnabled            Boolean @default(false)
+  smtpHost               String?
+  smtpPort               Int?
+  smtpSecure             Boolean @default(true)
+  smtpUsername           String?
+  smtpPasswordEnc        String?
+  smtpFromEmail          String?
+  smtpFromName           String?
+  smtpReplyTo            String?
   allowPasswordLogin     Boolean                    @default(true)
   allowPasskeyLogin      Boolean                    @default(true)
 

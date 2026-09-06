@@ -46,6 +46,7 @@ import { EntitlementsModule } from './entitlements/entitlements.module';
 import { QuotaModule } from './quota/quota.module';
 import { TechnicalCenterModule } from './technical-center/technical-center.module';
 import { ArtifactsModule } from './artifacts/artifacts.module';
+import { EmailModule } from './email/email.module';
 
 @Module({
   imports: [
@@ -108,6 +109,7 @@ import { ArtifactsModule } from './artifacts/artifacts.module';
     QuotaModule,
     TechnicalCenterModule,
     ArtifactsModule,
+    EmailModule,
   ],
   providers: [
     {
