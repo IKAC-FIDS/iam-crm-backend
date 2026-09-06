@@ -35,7 +35,12 @@ export class EmailService {
   async assertConfigured(organizationId: string) {
     const settings = await this.prisma.organizationSettings.findUnique({ where: { organizationId } });
     if (!settings?.smtpEnabled || !settings.smtpHost || !settings.smtpPort || !settings.smtpFromEmail) throw new BadRequestException('سرویس ایمیل فعال یا کامل نیست');
-    return settings;
+    return {
+      ...settings,
+      smtpHost: settings.smtpHost,
+      smtpPort: settings.smtpPort,
+      smtpFromEmail: settings.smtpFromEmail,
+    };
   }
 
   async sendTest(organizationId: string, actorId: string, to: string) {
