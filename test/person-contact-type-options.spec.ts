@@ -3,6 +3,7 @@ import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { PersonContactsService } from '../src/person-contacts/person-contacts.service';
 import { CreatePersonContactDto } from '../src/people/dto/person-contact.dto';
+import { LookupsService } from '../src/lookups/lookups.service';
 import { tenantUser } from './helpers/tenant-user';
 
 const organizationId = '00000000-0000-4000-8000-000000000001';
@@ -153,6 +154,23 @@ describe('person contact type option contract', () => {
     await expect(service.findByPerson(personId, user)).resolves.toEqual([legacy]);
     expect(prisma.personContact.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ include: { typeOption: true } }),
+    );
+  });
+});
+
+describe('contact type lookup route', () => {
+  it('maps the public contact-types route to the contact_types storage group', async () => {
+    const prisma = {
+      lookupOption: { findMany: jest.fn().mockResolvedValue([]) },
+    };
+    const service = new LookupsService(prisma as any);
+
+    await service.findAll('contact-types');
+
+    expect(prisma.lookupOption.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { group: 'contact_types', isActive: true },
+      }),
     );
   });
 });
