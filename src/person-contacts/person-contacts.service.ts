@@ -85,11 +85,7 @@ export class PersonContactsService {
   ) {
     await this.assertPersonMutable(personId, user);
 
-    const normalizedType = await this.resolveContactTypeReference(
-      dto.typeOptionId,
-      dto.type,
-      true,
-    );
+    const normalizedType = await this.resolveContactTypeReference(dto.typeOptionId);
 
     const value = dto.value.trim();
 
@@ -187,12 +183,8 @@ export class PersonContactsService {
     let nextTypeCode = contact.type;
     let nextValue = contact.value;
 
-    if (dto.typeOptionId !== undefined || dto.type !== undefined) {
-      const normalizedType = await this.resolveContactTypeReference(
-        dto.typeOptionId,
-        dto.type,
-        true,
-      );
+    if (dto.typeOptionId !== undefined) {
+      const normalizedType = await this.resolveContactTypeReference(dto.typeOptionId);
 
       nextTypeOptionId = normalizedType.typeOptionId;
       nextTypeCode = normalizedType.typeCode;
@@ -219,7 +211,7 @@ export class PersonContactsService {
       updateData.note = dto.note?.trim() || null;
     }
 
-    if (dto.typeOptionId !== undefined || dto.type !== undefined || dto.value !== undefined) {
+    if (dto.typeOptionId !== undefined || dto.value !== undefined) {
       await this.assertNoDuplicateContact(
         contact.personId,
         nextTypeOptionId,
@@ -265,75 +257,22 @@ export class PersonContactsService {
   }
 
   private async resolveContactTypeReference(
-    typeOptionId?: string,
-    type?: string,
-    required = false,
+    typeOptionId: string,
   ): Promise<{
-    typeOptionId: string | null;
+    typeOptionId: string;
     typeCode: string;
   }> {
-    if (typeOptionId) {
-      const option = await this.prisma.lookupOption.findFirst({
-        where: {
-          id: typeOptionId,
-          group: 'contact_types',
-          isActive: true,
-        },
-      });
+    const option = await this.prisma.lookupOption.findUnique({
+      where: { id: typeOptionId },
+    });
 
-      if (!option) {
-        throw new BadRequestException('نوع تماس انتخاب‌شده معتبر یا فعال نیست');
-      }
-
-      return {
-        typeOptionId: option.id,
-        typeCode: option.code,
-      };
-    }
-
-    const normalizedType = type?.trim();
-
-    if (normalizedType) {
-      const option = await this.prisma.lookupOption.findFirst({
-        where: {
-          group: 'contact_types',
-          isActive: true,
-          OR: [
-            {
-              code: {
-                equals: normalizedType,
-                mode: 'insensitive',
-              },
-            },
-            {
-              label: {
-                equals: normalizedType,
-                mode: 'insensitive',
-              },
-            },
-          ],
-        },
-      });
-
-      if (!option) {
-        throw new BadRequestException(
-          'نوع تماس باید از گزینه‌های پایه contact_types انتخاب شود. مقدار متنی آزاد مجاز نیست',
-        );
-      }
-
-      return {
-        typeOptionId: option.id,
-        typeCode: option.code,
-      };
-    }
-
-    if (required) {
-      throw new BadRequestException('typeOptionId یا type الزامی است');
+    if (!option || option.group !== 'contact_types' || !option.isActive) {
+      throw new BadRequestException('نوع تماس انتخاب‌شده معتبر یا فعال نیست');
     }
 
     return {
-      typeOptionId: null,
-      typeCode: '',
+      typeOptionId: option.id,
+      typeCode: option.code,
     };
   }
 

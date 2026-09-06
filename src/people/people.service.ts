@@ -207,8 +207,6 @@ export class PeopleService {
       (contacts ?? []).map(async (contact) => {
         const normalizedType = await this.resolveContactTypeReference(
           contact.typeOptionId,
-          contact.type,
-          true,
         );
 
         const value = contact.value.trim();
@@ -345,75 +343,22 @@ export class PeopleService {
     await this.companyAccess.assertCompanyReadable(companyId, user);
   }
 private async resolveContactTypeReference(
-  typeOptionId?: string,
-  type?: string,
-  required = false,
+  typeOptionId: string,
 ): Promise<{
-  typeOptionId: string | null;
+  typeOptionId: string;
   typeCode: string;
 }> {
-  if (typeOptionId) {
-    const option = await this.prisma.lookupOption.findFirst({
-      where: {
-        id: typeOptionId,
-        group: 'contact_types',
-        isActive: true,
-      },
-    });
+  const option = await this.prisma.lookupOption.findUnique({
+    where: { id: typeOptionId },
+  });
 
-    if (!option) {
-      throw new BadRequestException('نوع تماس انتخاب‌شده معتبر یا فعال نیست');
-    }
-
-    return {
-      typeOptionId: option.id,
-      typeCode: option.code,
-    };
-  }
-
-  const normalizedType = type?.trim();
-
-  if (normalizedType) {
-    const option = await this.prisma.lookupOption.findFirst({
-      where: {
-        group: 'contact_types',
-        isActive: true,
-        OR: [
-          {
-            code: {
-              equals: normalizedType,
-              mode: 'insensitive',
-            },
-          },
-          {
-            label: {
-              equals: normalizedType,
-              mode: 'insensitive',
-            },
-          },
-        ],
-      },
-    });
-
-    if (!option) {
-      throw new BadRequestException(
-        'نوع تماس باید از گزینه‌های پایه contact_types انتخاب شود. مقدار متنی آزاد مجاز نیست',
-      );
-    }
-
-    return {
-      typeOptionId: option.id,
-      typeCode: option.code,
-    };
-  }
-
-  if (required) {
-    throw new BadRequestException('typeOptionId یا type الزامی است');
+  if (!option || option.group !== 'contact_types' || !option.isActive) {
+    throw new BadRequestException('نوع تماس انتخاب‌شده معتبر یا فعال نیست');
   }
 
   return {
-    typeOptionId: null,
-    typeCode: '',
+    typeOptionId: option.id,
+    typeCode: option.code,
   };
 }
 
