@@ -47,9 +47,11 @@ import { QuotaModule } from './quota/quota.module';
 import { TechnicalCenterModule } from './technical-center/technical-center.module';
 import { ArtifactsModule } from './artifacts/artifacts.module';
 import { EmailModule } from './email/email.module';
+import { NotificationCoreModule } from './notification-core/notification-core.module';
 
 @Module({
   imports: [
+    NotificationCoreModule,
     ConfigModule.forRoot({
       isGlobal: true,
       validationSchema: envValidationSchema,

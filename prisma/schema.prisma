@@ -411,17 +411,17 @@ enum OrganizationDomainVerificationMethod {
 // ============================================================
 
 model User {
-  id           String   @id @default(uuid())
-  fullName     String
-  email        String   @unique
-  passwordHash String
-  role         UserRole @default(REP)
-  roleId       String?
-  assignedRole Role?    @relation(fields: [roleId], references: [id], onDelete: SetNull)
-  team         String?
-  teamId       String?
-  teamRef      Team?    @relation("UserPrimaryTeam", fields: [teamId], references: [id], onDelete: SetNull)
-  isActive     Boolean  @default(true)
+  id                    String                     @id @default(uuid())
+  fullName              String
+  email                 String                     @unique
+  passwordHash          String
+  role                  UserRole                   @default(REP)
+  roleId                String?
+  assignedRole          Role?                      @relation(fields: [roleId], references: [id], onDelete: SetNull)
+  team                  String?
+  teamId                String?
+  teamRef               Team?                      @relation("UserPrimaryTeam", fields: [teamId], references: [id], onDelete: SetNull)
+  isActive              Boolean                    @default(true)
   avatarStorageProvider AttachmentStorageProvider?
   avatarBucket          String?
   avatarObjectKey       String?
@@ -504,6 +504,10 @@ model User {
   artifactLinksCreated              ArtifactLink[]             @relation("ArtifactLinkCreatedBy")
   taskReviewArtifactsAdded          TaskReviewArtifact[]       @relation("TaskReviewArtifactAddedBy")
   platformAuthority                 PlatformAuthority?
+
+  notificationCoreEventActions NotificationEvent[]      @relation("NotificationCoreEventActor")
+  notificationCoreDeliveries   NotificationDelivery[]   @relation("NotificationCoreDeliveryRecipient")
+  notificationCorePreferences  NotificationPreference[] @relation("NotificationCorePreferences")
 
   @@index([organizationId])
   @@index([teamId])
@@ -599,6 +603,11 @@ model Organization {
   tenders             Tender[]
   tenderReviews       TenderReview[]
 
+  notificationCoreEvents      NotificationEvent[]      @relation("NotificationCoreEvents")
+  notificationCoreRules       NotificationRule[]       @relation("NotificationCoreRules")
+  notificationCoreTemplates   NotificationTemplate[]   @relation("NotificationCoreTemplates")
+  notificationCorePreferences NotificationPreference[] @relation("NotificationCorePreferences")
+
   @@index([status])
   @@index([createdAt])
   @@map("organizations")
@@ -615,10 +624,10 @@ model OrganizationSettings {
   dateFormat             OrganizationDateFormat     @default(YYYY_MM_DD)
   firstDayOfWeek         Int                        @default(6)
   emailSenderDisplayName String?
-  smtpEnabled            Boolean @default(false)
+  smtpEnabled            Boolean                    @default(false)
   smtpHost               String?
   smtpPort               Int?
-  smtpSecure             Boolean @default(true)
+  smtpSecure             Boolean                    @default(true)
   smtpUsername           String?
   smtpPasswordEnc        String?
   smtpFromEmail          String?
@@ -879,19 +888,19 @@ model Company {
   id       String @id @default(uuid())
   leadCode String @unique @default(uuid())
 
-  legalName          String
-  brandName          String?
-  registrationNo     String?
-  registrationNumber String?
-  nationalId         String?
-  economicCode       String?
-  establishmentDate  DateTime?
-  foundedYear        Int?
-  companyType        String?
-  ownership          CompanyOwnership?
-  activityStatus     CompanyActivityStatus @default(UNKNOWN)
-  activityGroup      String?
-  marketSize         String?
+  legalName           String
+  brandName           String?
+  registrationNo      String?
+  registrationNumber  String?
+  nationalId          String?
+  economicCode        String?
+  establishmentDate   DateTime?
+  foundedYear         Int?
+  companyType         String?
+  ownership           CompanyOwnership?
+  activityStatus      CompanyActivityStatus      @default(UNKNOWN)
+  activityGroup       String?
+  marketSize          String?
   logoStorageProvider AttachmentStorageProvider?
   logoBucket          String?
   logoObjectKey       String?
@@ -3048,4 +3057,159 @@ model TenderReview {
   @@index([organizationId, tenderId, type, createdAt])
   @@index([organizationId, reviewerId, status])
   @@map("tender_reviews")
+}
+
+enum NotificationChannel {
+  EMAIL
+  SMS
+  PUSH
+  IN_APP
+}
+
+enum NotificationDeliveryStatus {
+  PENDING
+  PROCESSING
+  SENT
+  DELIVERED
+  FAILED
+  RETRYING
+  SKIPPED
+}
+
+enum NotificationRecipientType {
+  USER
+  ROLE
+  TEAM
+  ASSIGNEE
+  OWNER
+  CREATOR
+  MANAGER
+}
+
+model NotificationEvent {
+  id             String                 @id @default(uuid())
+  organizationId String
+  organization   Organization           @relation("NotificationCoreEvents", fields: [organizationId], references: [id], onDelete: Cascade)
+  eventName      String
+  aggregateType  String
+  aggregateId    String
+  actorId        String?
+  actor          User?                  @relation("NotificationCoreEventActor", fields: [actorId], references: [id], onDelete: SetNull)
+  payload        Json                   @default("{}")
+  idempotencyKey String?
+  occurredAt     DateTime               @default(now())
+  createdAt      DateTime               @default(now())
+  deliveries     NotificationDelivery[]
+
+  @@unique([organizationId, idempotencyKey])
+  @@index([organizationId, eventName, occurredAt])
+  @@index([aggregateType, aggregateId])
+  @@index([actorId])
+  @@map("notification_events")
+}
+
+model NotificationRule {
+  id             String                      @id @default(uuid())
+  organizationId String
+  organization   Organization                @relation("NotificationCoreRules", fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  eventName      String
+  enabled        Boolean                     @default(true)
+  mandatory      Boolean                     @default(false)
+  priority       Int                         @default(100)
+  conditions     Json?
+  createdAt      DateTime                    @default(now())
+  updatedAt      DateTime                    @updatedAt
+  recipientRules NotificationRecipientRule[]
+  deliveries     NotificationDelivery[]
+
+  @@index([organizationId, eventName, enabled])
+  @@map("notification_rules")
+}
+
+model NotificationRecipientRule {
+  id         String                    @id @default(uuid())
+  ruleId     String
+  rule       NotificationRule          @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  type       NotificationRecipientType
+  targetId   String?
+  channels   NotificationChannel[]
+  enabled    Boolean                   @default(true)
+  createdAt  DateTime                  @default(now())
+  updatedAt  DateTime                  @updatedAt
+  deliveries NotificationDelivery[]
+
+  @@index([ruleId, enabled])
+  @@index([type, targetId])
+  @@map("notification_recipient_rules")
+}
+
+model NotificationTemplate {
+  id             String                 @id @default(uuid())
+  organizationId String
+  organization   Organization           @relation("NotificationCoreTemplates", fields: [organizationId], references: [id], onDelete: Cascade)
+  eventName      String
+  channel        NotificationChannel
+  locale         String                 @default("fa-IR")
+  subject        String?
+  body           String
+  isActive       Boolean                @default(true)
+  version        Int                    @default(1)
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  deliveries     NotificationDelivery[]
+
+  @@unique([organizationId, eventName, channel, locale, version])
+  @@index([organizationId, eventName, channel, isActive])
+  @@map("notification_templates")
+}
+
+model NotificationDelivery {
+  id                String                     @id @default(uuid())
+  eventId           String
+  event             NotificationEvent          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  ruleId            String?
+  rule              NotificationRule?          @relation(fields: [ruleId], references: [id], onDelete: SetNull)
+  recipientRuleId   String?
+  recipientRule     NotificationRecipientRule? @relation(fields: [recipientRuleId], references: [id], onDelete: SetNull)
+  recipientUserId   String?
+  recipientUser     User?                      @relation("NotificationCoreDeliveryRecipient", fields: [recipientUserId], references: [id], onDelete: SetNull)
+  templateId        String?
+  template          NotificationTemplate?      @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  channel           NotificationChannel
+  status            NotificationDeliveryStatus @default(PENDING)
+  destination       String?
+  deduplicationKey  String                     @unique
+  attemptCount      Int                        @default(0)
+  providerMessageId String?
+  failureCode       String?
+  failureMessage    String?
+  lastAttemptAt     DateTime?
+  sentAt            DateTime?
+  deliveredAt       DateTime?
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
+
+  @@index([eventId])
+  @@index([ruleId])
+  @@index([recipientUserId, status, createdAt])
+  @@index([channel, status, createdAt])
+  @@map("notification_deliveries")
+}
+
+model NotificationPreference {
+  id             String              @id @default(uuid())
+  organizationId String
+  organization   Organization        @relation("NotificationCorePreferences", fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User                @relation("NotificationCorePreferences", fields: [userId], references: [id], onDelete: Cascade)
+  eventName      String
+  channel        NotificationChannel
+  enabled        Boolean             @default(true)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  @@unique([organizationId, userId, eventName, channel])
+  @@index([userId, eventName])
+  @@map("notification_preferences")
 }
