@@ -20,4 +20,5 @@ export class MeetingsController {
   @Patch(':id') @Permissions('meeting:update') update(@Param('id') id: string, @Body() dto: UpdateMeetingDto, @CurrentUser() user: CurrentUserPayload) { return this.service.update(id, dto, user); }
   @Patch(':id/complete') @Permissions('meeting:complete') complete(@Param('id') id: string, @Body() dto: CompleteMeetingDto, @CurrentUser() user: CurrentUserPayload) { return this.service.complete(id, dto, user); }
   @Patch(':id/cancel') @Permissions('meeting:cancel') cancel(@Param('id') id: string, @Body() dto: CancelMeetingDto, @CurrentUser() user: CurrentUserPayload) { return this.service.cancel(id, dto, user); }
+  @Post(':id/notify-assignees') @Permissions('meeting:update') notifyAssignees(@Param('id') id: string, @CurrentUser() user: CurrentUserPayload) { return this.service.notifyAssignees(id, user); }
 }

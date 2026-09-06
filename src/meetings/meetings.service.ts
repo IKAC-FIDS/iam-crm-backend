@@ -10,6 +10,8 @@ import { CompleteMeetingDto } from './dto/complete-meeting.dto';
 import { CreateMeetingDto } from './dto/create-meeting.dto';
 import { FindMeetingsDto } from './dto/find-meetings.dto';
 import { UpdateMeetingDto } from './dto/update-meeting.dto';
+import { EmailService } from '../email/email.service';
+import { meetingAssigneeEmail } from './meeting-email.template';
 
 const meetingInclude = {
   type: { select: { id: true, code: true, label: true, description: true, sortOrder: true, isActive: true } },
@@ -25,7 +27,7 @@ const meetingInclude = {
 
 @Injectable()
 export class MeetingsService {
-  constructor(private readonly prisma: PrismaService, private readonly audit: AuditLogService) {}
+  constructor(private readonly prisma: PrismaService, private readonly audit: AuditLogService, private readonly email: EmailService) {}
 
   findTypes() { return this.prisma.lookupOption.findMany({ where: { group: 'meeting-types', isActive: true }, orderBy: [{ sortOrder: 'asc' }, { label: 'asc' }] }); }
 
@@ -102,6 +104,79 @@ export class MeetingsService {
     if (current.status !== MeetingStatus.SCHEDULED) throw new BadRequestException('Completed meeting cannot be cancelled');
     const updated = await this.prisma.meeting.update({ where: { id }, data: { status: MeetingStatus.CANCELLED, cancelledAt: new Date(), cancelledById: user.userId, cancellationReason: dto.cancellationReason?.trim() || null }, include: meetingInclude });
     await this.audit.record({ actorId: user.userId, entityType: 'meeting', entityId: id, action: 'meeting.cancelled', before: current, after: updated }); return updated;
+  }
+
+  async notifyAssignees(id: string, user: CurrentUserPayload) {
+    const organizationId = getCurrentOrganizationId(user);
+    const meeting = await this.get(id, user);
+    if (meeting.status !== MeetingStatus.SCHEDULED) throw new BadRequestException('فقط برای جلسه برنامه‌ریزی‌شده می‌توان اعلان ارسال کرد');
+    await this.email.assertConfigured(organizationId);
+    const organization = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { locale: true, timezone: true },
+    });
+    const recipients: Array<{
+      userId: string;
+      email: string | null;
+      status: 'SENT' | 'SKIPPED' | 'FAILED';
+      reason?: 'NO_EMAIL' | 'INVALID_EMAIL' | 'DUPLICATE_EMAIL' | 'SEND_FAILED';
+    }> = [];
+    const seen = new Set<string>();
+
+    for (const assignment of meeting.assignees) {
+      const recipient = assignment.user;
+      const email = recipient.email?.trim().toLowerCase() || null;
+      if (!email) {
+        recipients.push({ userId: recipient.id, email: null, status: 'SKIPPED', reason: 'NO_EMAIL' });
+        continue;
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        recipients.push({ userId: recipient.id, email, status: 'SKIPPED', reason: 'INVALID_EMAIL' });
+        continue;
+      }
+      if (seen.has(email)) {
+        recipients.push({ userId: recipient.id, email, status: 'SKIPPED', reason: 'DUPLICATE_EMAIL' });
+        continue;
+      }
+      seen.add(email);
+      const message = meetingAssigneeEmail({
+        recipientName: recipient.fullName,
+        title: meeting.title,
+        companyName: meeting.company.brandName || meeting.company.legalName,
+        startAt: meeting.startAt,
+        endAt: meeting.endAt,
+        mode: meeting.mode,
+        location: meeting.location,
+        meetingUrl: meeting.meetingUrl,
+        agenda: meeting.agenda,
+        description: meeting.description,
+        locale: organization?.locale,
+        timeZone: organization?.timezone,
+      });
+      try {
+        await this.email.send(organizationId, { to: email, ...message });
+        recipients.push({ userId: recipient.id, email, status: 'SENT' });
+      } catch {
+        recipients.push({ userId: recipient.id, email, status: 'FAILED', reason: 'SEND_FAILED' });
+      }
+    }
+
+    const result = {
+      total: recipients.length,
+      sent: recipients.filter((item) => item.status === 'SENT').length,
+      skipped: recipients.filter((item) => item.status === 'SKIPPED').length,
+      failed: recipients.filter((item) => item.status === 'FAILED').length,
+      recipients,
+    };
+    await this.audit.record({
+      actorId: user.userId,
+      organizationId,
+      entityType: 'meeting',
+      entityId: meeting.id,
+      action: 'meeting.assignee_email_notification_sent',
+      metadata: result,
+    }).catch(() => undefined);
+    return result;
   }
 
   private buildWhere(q: FindMeetingsDto, user: CurrentUserPayload): Prisma.MeetingWhereInput {

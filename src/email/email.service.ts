@@ -27,10 +27,15 @@ export class EmailService {
   }
 
   async send(organizationId: string, message: { to: string; subject: string; text?: string; html?: string }) {
-    const settings = await this.prisma.organizationSettings.findUnique({ where: { organizationId } });
-    if (!settings?.smtpEnabled || !settings.smtpHost || !settings.smtpPort || !settings.smtpFromEmail) throw new BadRequestException('سرویس ایمیل فعال یا کامل نیست');
+    const settings = await this.assertConfigured(organizationId);
     const transport = createTransport({ host: settings.smtpHost, port: settings.smtpPort, secure: settings.smtpSecure, auth: settings.smtpUsername ? { user: settings.smtpUsername, pass: settings.smtpPasswordEnc ? this.secrets.decryptSecret(settings.smtpPasswordEnc) : '' } : undefined });
     return transport.sendMail({ from: settings.smtpFromName ? `"${settings.smtpFromName.replace(/["\r\n]/g, '')}" <${settings.smtpFromEmail}>` : settings.smtpFromEmail, replyTo: settings.smtpReplyTo || undefined, ...message });
+  }
+
+  async assertConfigured(organizationId: string) {
+    const settings = await this.prisma.organizationSettings.findUnique({ where: { organizationId } });
+    if (!settings?.smtpEnabled || !settings.smtpHost || !settings.smtpPort || !settings.smtpFromEmail) throw new BadRequestException('سرویس ایمیل فعال یا کامل نیست');
+    return settings;
   }
 
   async sendTest(organizationId: string, actorId: string, to: string) {

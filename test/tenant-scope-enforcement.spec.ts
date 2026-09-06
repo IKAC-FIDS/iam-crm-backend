@@ -173,7 +173,7 @@ describe('fix 000085 Tenant Scope enforcement', () => {
       meeting: { findFirst: jest.fn().mockResolvedValue(null) },
     };
     await expect(
-      new MeetingsService(meetingPrisma as any, {} as any).findOne(
+      new MeetingsService(meetingPrisma as any, {} as any, {} as any).findOne(
         'meeting-b',
         tenantA,
       ),
