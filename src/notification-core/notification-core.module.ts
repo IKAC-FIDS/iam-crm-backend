@@ -4,11 +4,13 @@ import { NotificationCoreService } from "./notification-core.service"
 import { NotificationRuleEngineService } from "./notification-rule-engine.service"
 import { NotificationRulesController } from "./notification-rules.controller"
 import { NotificationRulesService } from "./notification-rules.service"
+import { NotificationAdminController, NotificationDeliveriesController, NotificationTemplatesController } from "./notification-admin.controller"
+import { NotificationAdminService } from "./notification-admin.service"
 
 @Module({
   imports: [PrismaModule],
-  controllers: [NotificationRulesController],
-  providers: [NotificationCoreService, NotificationRulesService, NotificationRuleEngineService],
+  controllers: [NotificationRulesController, NotificationAdminController, NotificationTemplatesController, NotificationDeliveriesController],
+  providers: [NotificationCoreService, NotificationRulesService, NotificationRuleEngineService, NotificationAdminService],
   exports: [NotificationCoreService, NotificationRulesService, NotificationRuleEngineService],
 })
 export class NotificationCoreModule {}

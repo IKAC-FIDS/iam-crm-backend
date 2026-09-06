@@ -1,0 +1,44 @@
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common"
+import { CurrentUser, type CurrentUserPayload } from "../common/decorators/current-user.decorator"
+import { Permissions } from "../common/decorators/permissions.decorator"
+import { JwtAuthGuard } from "../common/guards/jwt-auth.guard"
+import { PermissionsGuard } from "../common/guards/permissions.guard"
+import { CreateNotificationTemplateDto, NotificationDeliveryQueryDto, NotificationTemplateQueryDto, UpdateNotificationTemplateDto } from "./dto/notification-admin.dto"
+import { NotificationAdminService } from "./notification-admin.service"
+
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@Permissions("notification:manage")
+@Controller("admin/notifications")
+export class NotificationAdminController {
+  constructor(private readonly admin: NotificationAdminService) {}
+  @Get("catalog") catalog() { return this.admin.catalog() }
+  @Get("templates") templates(@Query() query: NotificationTemplateQueryDto, @CurrentUser() user: CurrentUserPayload) { return this.admin.listTemplates(query, user) }
+  @Get("templates/:id") template(@Param("id") id: string, @CurrentUser() user: CurrentUserPayload) { return this.admin.getTemplate(id, user) }
+  @Post("templates") createTemplate(@Body() dto: CreateNotificationTemplateDto, @CurrentUser() user: CurrentUserPayload) { return this.admin.createTemplate(dto, user) }
+  @Patch("templates/:id") updateTemplate(@Param("id") id: string, @Body() dto: UpdateNotificationTemplateDto, @CurrentUser() user: CurrentUserPayload) { return this.admin.updateTemplate(id, dto, user) }
+  @Delete("templates/:id") removeTemplate(@Param("id") id: string, @CurrentUser() user: CurrentUserPayload) { return this.admin.removeTemplate(id, user) }
+  @Get("deliveries") deliveries(@Query() query: NotificationDeliveryQueryDto, @CurrentUser() user: CurrentUserPayload) { return this.admin.listDeliveries(query, user) }
+  @Get("deliveries/:id") delivery(@Param("id") id: string, @CurrentUser() user: CurrentUserPayload) { return this.admin.getDelivery(id, user) }
+  @Get("channels/status") channels(@CurrentUser() user: CurrentUserPayload) { return this.admin.channelStatus(user) }
+}
+
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@Permissions("notification:manage")
+@Controller("admin/notification-templates")
+export class NotificationTemplatesController {
+  constructor(private readonly admin: NotificationAdminService) {}
+  @Get() list(@Query() query: NotificationTemplateQueryDto, @CurrentUser() user: CurrentUserPayload) { return this.admin.listTemplates(query, user) }
+  @Get(":id") get(@Param("id") id: string, @CurrentUser() user: CurrentUserPayload) { return this.admin.getTemplate(id, user) }
+  @Post() create(@Body() dto: CreateNotificationTemplateDto, @CurrentUser() user: CurrentUserPayload) { return this.admin.createTemplate(dto, user) }
+  @Patch(":id") update(@Param("id") id: string, @Body() dto: UpdateNotificationTemplateDto, @CurrentUser() user: CurrentUserPayload) { return this.admin.updateTemplate(id, dto, user) }
+  @Delete(":id") remove(@Param("id") id: string, @CurrentUser() user: CurrentUserPayload) { return this.admin.removeTemplate(id, user) }
+}
+
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@Permissions("notification:manage")
+@Controller("admin/notification-deliveries")
+export class NotificationDeliveriesController {
+  constructor(private readonly admin: NotificationAdminService) {}
+  @Get() list(@Query() query: NotificationDeliveryQueryDto, @CurrentUser() user: CurrentUserPayload) { return this.admin.listDeliveries(query, user) }
+  @Get(":id") get(@Param("id") id: string, @CurrentUser() user: CurrentUserPayload) { return this.admin.getDelivery(id, user) }
+}

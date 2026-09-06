@@ -1,0 +1,52 @@
+import { Type } from "class-transformer"
+import {
+  IsBoolean,
+  IsEnum,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Max,
+  Min,
+} from "class-validator"
+import { NotificationChannel, NotificationDeliveryStatus } from "@prisma/client"
+
+export class NotificationTemplateQueryDto {
+  @IsOptional() @IsString() eventName?: string
+  @IsOptional() @IsEnum(NotificationChannel) channel?: NotificationChannel
+  @IsOptional() @IsString() locale?: string
+  @IsOptional() @IsString() search?: string
+}
+
+export class CreateNotificationTemplateDto {
+  @IsString() @IsNotEmpty() eventName!: string
+  @IsEnum(NotificationChannel) channel!: NotificationChannel
+  @IsOptional() @IsString() locale?: string
+  @IsOptional() @IsString() subject?: string | null
+  @IsString() @IsNotEmpty() body!: string
+  @IsOptional() @IsBoolean() isActive?: boolean
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) version?: number
+}
+
+export class UpdateNotificationTemplateDto {
+  @IsOptional() @IsString() @IsNotEmpty() eventName?: string
+  @IsOptional() @IsEnum(NotificationChannel) channel?: NotificationChannel
+  @IsOptional() @IsString() locale?: string
+  @IsOptional() @IsString() subject?: string | null
+  @IsOptional() @IsString() @IsNotEmpty() body?: string
+  @IsOptional() @IsBoolean() isActive?: boolean
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) version?: number
+}
+
+export class NotificationDeliveryQueryDto {
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) page = 1
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) pageSize = 20
+  @IsOptional() @IsString() eventName?: string
+  @IsOptional() @IsEnum(NotificationChannel) channel?: NotificationChannel
+  @IsOptional() @IsEnum(NotificationDeliveryStatus) status?: NotificationDeliveryStatus
+  @IsOptional() @IsUUID() recipientUserId?: string
+  @IsOptional() @IsString() dateFrom?: string
+  @IsOptional() @IsString() dateTo?: string
+  @IsOptional() @IsString() search?: string
+}
