@@ -301,6 +301,26 @@ let NotificationsService = class NotificationsService {
             },
         }));
     }
+    async createInternal(input, tx) {
+        const recipient = await tx.user.findFirst({ where: {
+                id: input.recipientId, isActive: true,
+                organizationMemberships: { some: { organizationId: input.organizationId, status: client_1.OrganizationMembershipStatus.ACTIVE } },
+            }, select: { id: true } });
+        if (!recipient)
+            return null;
+        const notification = await tx.notification.create({ data: {
+                organizationId: input.organizationId, recipientId: input.recipientId,
+                actorId: input.actorId, title: this.requiredText(input.title, 'عنوان اعلان الزامی است'),
+                body: input.body, type: input.type, priority: input.priority,
+                entityType: input.entityType, entityId: input.entityId, actionUrl: input.actionUrl,
+                metadata: input.metadata,
+            } });
+        await this.audit.record({ organizationId: input.organizationId, actorId: input.actorId,
+            entityType: 'notification', entityId: notification.id, action: 'notification.created',
+            metadata: { ...input.metadata, recipientId: input.recipientId, type: input.type },
+        }, tx);
+        return notification;
+    }
     buildWhere(query, user) {
         const and = [
             {

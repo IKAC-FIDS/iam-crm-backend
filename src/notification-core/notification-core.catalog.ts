@@ -47,6 +47,9 @@ const meetingVariables: NotificationTemplateVariable[] = [
 ]
 
 const taskVariables: NotificationTemplateVariable[] = [
+  { key: "task.priority", token: "{{task.priority}}", label: "اولویت کار", type: "string" },
+  { key: "task.dueDate", token: "{{task.dueDate}}", label: "مهلت کار", type: "date" },
+  { key: "task.opportunity.title", token: "{{task.opportunity.title}}", label: "عنوان فرصت", type: "string" },
   { key: "task.id", token: "{{task.id}}", label: "شناسه کار", type: "string" },
   { key: "task.title", token: "{{task.title}}", label: "عنوان کار", type: "string" },
   { key: "task.description", token: "{{task.description}}", label: "شرح کار", type: "string" },

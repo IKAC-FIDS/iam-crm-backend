@@ -12,6 +12,7 @@ import { FindMeetingsDto } from './dto/find-meetings.dto';
 import { UpdateMeetingDto } from './dto/update-meeting.dto';
 import { EmailService } from '../email/email.service';
 import { meetingAssigneeEmail } from './meeting-email.template';
+import { NotificationCoreService } from '../notification-core/notification-core.service';
 
 const meetingInclude = {
   type: { select: { id: true, code: true, label: true, description: true, sortOrder: true, isActive: true } },
@@ -27,7 +28,7 @@ const meetingInclude = {
 
 @Injectable()
 export class MeetingsService {
-  constructor(private readonly prisma: PrismaService, private readonly audit: AuditLogService, private readonly email: EmailService) {}
+  constructor(private readonly prisma: PrismaService, private readonly audit: AuditLogService, private readonly email: EmailService, private readonly notificationCore: NotificationCoreService) {}
 
   findTypes() { return this.prisma.lookupOption.findMany({ where: { group: 'meeting-types', isActive: true }, orderBy: [{ sortOrder: 'asc' }, { label: 'asc' }] }); }
 
@@ -58,6 +59,7 @@ export class MeetingsService {
       }, include: meetingInclude,
     }));
     await this.audit.record({ actorId: user.userId, entityType: 'meeting', entityId: meeting.id, action: 'meeting.created', after: meeting });
+    await this.notificationCore.publishDomainEvent({ organizationId, eventName: 'MEETING.CREATED', aggregateType: 'MEETING', aggregateId: meeting.id, actorId: user.userId, idempotencyKey: `MEETING.CREATED:${meeting.id}` });
     return meeting;
   }
 
@@ -87,6 +89,7 @@ export class MeetingsService {
     await this.audit.record({ actorId: user.userId, entityType: 'meeting', entityId: id, action: 'meeting.updated', before: current, after: updated });
     if (dto.assigneeUserIds) await this.audit.record({ actorId: user.userId, entityType: 'meeting', entityId: id, action: 'meeting.assignees_changed' });
     if (dto.attendeePersonIds) await this.audit.record({ actorId: user.userId, entityType: 'meeting', entityId: id, action: 'meeting.attendees_changed' });
+    await this.notificationCore.publishDomainEvent({ organizationId: getCurrentOrganizationId(user), eventName: 'MEETING.UPDATED', aggregateType: 'MEETING', aggregateId: id, actorId: user.userId, idempotencyKey: `MEETING.UPDATED:${id}:${updated.updatedAt.toISOString()}` });
     return updated;
   }
 
@@ -103,7 +106,9 @@ export class MeetingsService {
     if (current.status === MeetingStatus.CANCELLED) return current;
     if (current.status !== MeetingStatus.SCHEDULED) throw new BadRequestException('Completed meeting cannot be cancelled');
     const updated = await this.prisma.meeting.update({ where: { id }, data: { status: MeetingStatus.CANCELLED, cancelledAt: new Date(), cancelledById: user.userId, cancellationReason: dto.cancellationReason?.trim() || null }, include: meetingInclude });
-    await this.audit.record({ actorId: user.userId, entityType: 'meeting', entityId: id, action: 'meeting.cancelled', before: current, after: updated }); return updated;
+    await this.audit.record({ actorId: user.userId, entityType: 'meeting', entityId: id, action: 'meeting.cancelled', before: current, after: updated });
+    await this.notificationCore.publishDomainEvent({ organizationId: getCurrentOrganizationId(user), eventName: 'MEETING.CANCELLED', aggregateType: 'MEETING', aggregateId: id, actorId: user.userId, idempotencyKey: `MEETING.CANCELLED:${id}` });
+    return updated;
   }
 
   async notifyAssignees(id: string, user: CurrentUserPayload) {

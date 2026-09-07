@@ -65,6 +65,7 @@ function createService(prisma: ReturnType<typeof createPrismaService>) {
     prisma as any,
     { record: jest.fn() } as any,
     { notifyUser: jest.fn() } as any,
+    { publishDomainEvent: jest.fn() } as any,
   );
 }
 
@@ -262,12 +263,15 @@ describe('TasksService work-management rules', () => {
     prisma.task.update.mockResolvedValue(updated);
     const audit = { record: jest.fn() };
     const notifications = { notifyUser: jest.fn() };
-    const service = new TasksService(prisma as any, audit as any, notifications as any);
+    const core = { publishDomainEvent: jest.fn() };
+    const service = new TasksService(prisma as any, audit as any, notifications as any, core as any);
 
     await service.reassign('task-1', { assignmentScope: TaskAssignmentScope.ORGANIZATION, assigneeId: 'user-2', reason: 'Capacity' }, user);
 
     expect(audit.record).toHaveBeenCalledWith(expect.objectContaining({ action: 'task.reassigned', before: expect.objectContaining({ assignedToId: user.userId }), after: expect.objectContaining({ assignedToId: 'user-2' }), metadata: { reason: 'Capacity' } }));
-    expect(notifications.notifyUser).toHaveBeenCalled();
+    expect(notifications.notifyUser).not.toHaveBeenCalled();
+    expect(core.publishDomainEvent).toHaveBeenCalledTimes(1);
+    expect(core.publishDomainEvent).toHaveBeenCalledWith(expect.objectContaining({ eventName: 'TASK.REASSIGNED', aggregateId: 'task-1' }));
   });
 
   it('creates a linked child without changing the parent assignment', async () => {
@@ -411,7 +415,7 @@ describe('TasksService permission-driven assignment', () => {
     prisma.user.findFirst.mockResolvedValue({ id: 'user-2', isActive: true, role: UserRole.REP, teamId: null });
     prisma.task.update.mockResolvedValue(task({ assignedToId: 'user-2', assignmentScope: TaskAssignmentScope.ORGANIZATION }));
     const audit = { record: jest.fn() };
-    const service = new TasksService(prisma as any, audit as any, { notifyUser: jest.fn() } as any);
+    const service = new TasksService(prisma as any, audit as any, { notifyUser: jest.fn() } as any, { publishDomainEvent: jest.fn() } as any);
     await service.reassign('task-1', { assignmentScope: TaskAssignmentScope.ORGANIZATION, assigneeId: 'user-2' }, actor(UserRole.REP, ['task:reassign']));
     expect(audit.record).toHaveBeenCalledWith(expect.objectContaining({ action: 'task.reassigned' }));
   });

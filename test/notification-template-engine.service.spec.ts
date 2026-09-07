@@ -81,7 +81,7 @@ describe("NotificationTemplateEngineService", () => {
     const result = await service.renderDelivery(event, "recipient-1", NotificationChannel.SMS)
     expect(result.body).toBe("سلام علی")
     expect(result.template.id).toBe("template-1")
-    expect(prisma.user.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "recipient-1", organizationId, isActive: true } }))
+    expect(prisma.user.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "recipient-1", organizationMemberships: { some: { organizationId, status: 'ACTIVE' } }, isActive: true } }))
     expect(prisma.meeting.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "meeting-1", organizationId } }))
   })
 })

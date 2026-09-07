@@ -12,6 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.TasksService = void 0;
 const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
+const notification_core_service_1 = require("../notification-core/notification-core.service");
 const notifications_service_1 = require("../notifications/notifications.service");
 const audit_log_service_1 = require("../audit-log/audit-log.service");
 const prisma_service_1 = require("../prisma/prisma.service");
@@ -114,10 +115,11 @@ const taskInclude = {
     _count: { select: { subtasks: true, reviewRounds: true } },
 };
 let TasksService = class TasksService {
-    constructor(prisma, audit, notifications) {
+    constructor(prisma, audit, notifications, notificationCore) {
         this.prisma = prisma;
         this.audit = audit;
         this.notifications = notifications;
+        this.notificationCore = notificationCore;
     }
     async findAll(query, user) {
         const page = query.page ?? 1;
@@ -407,7 +409,7 @@ let TasksService = class TasksService {
             });
         }
         if (updated.assignedToId && updated.assignedToId !== current.assignedToId)
-            await this.notifyTaskAssigned(updated, user);
+            await this.notifyTaskAssigned(updated, user, current.assignedToId ? 'TASK.REASSIGNED' : 'TASK.ASSIGNED');
         if (updated.reviewerId && updated.reviewerId !== current.reviewerId)
             await this.notifyReviewUser(updated.reviewerId, user, updated, 'شما به‌عنوان بازبین کار تعیین شدید', 'REVIEWER_ASSIGNED');
         return updated;
@@ -501,7 +503,7 @@ let TasksService = class TasksService {
             metadata: { reason: dto.reason?.trim() || undefined },
         });
         if (updated.assignedToId && updated.assignedToId !== current.assignedToId)
-            await this.notifyTaskAssigned(updated, user);
+            await this.notifyTaskAssigned(updated, user, current.assignedToId ? 'TASK.REASSIGNED' : 'TASK.ASSIGNED');
         return updated;
     }
     async findSubtasks(id, user) {
@@ -551,7 +553,7 @@ let TasksService = class TasksService {
             entityType: 'task', entityId: parent.id, action: 'task.subtask_created',
             after: { subtaskId: child.id, assigneeId: child.assignedToId, assignmentScope: child.assignmentScope },
         });
-        await this.notifyTaskAssigned(child, user, 'زیرکار جدید به شما ارجاع شد');
+        await this.notifyTaskAssigned(child, user);
         return child;
     }
     async complete(id, dto, user) {
@@ -1497,22 +1499,14 @@ let TasksService = class TasksService {
         }
         return normalized;
     }
-    async notifyTaskAssigned(task, user, title = 'کار جدید به شما ارجاع شد') {
-        if (!task.assignedToId) {
+    async notifyTaskAssigned(task, user, eventName = 'TASK.ASSIGNED') {
+        if (!task.assignedToId)
             return;
-        }
-        await this.notifications.notifyUser({
-            organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
-            recipientId: task.assignedToId,
-            actorId: user.userId,
-            type: client_1.NotificationType.TASK_ASSIGNED,
-            priority: client_1.NotificationPriority.NORMAL,
-            title,
-            body: task.title,
-            entityType: client_1.NotificationEntityType.TASK,
-            entityId: task.id,
-            actionUrl: `/tasks/${task.id}`,
-            skipSelf: true,
+        await this.notificationCore.publishDomainEvent({
+            organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user), eventName, aggregateType: 'TASK',
+            aggregateId: task.id, actorId: user.userId,
+            idempotencyKey: `${eventName}:${task.id}:${task.updatedAt?.toISOString() ?? task.assignedToId}`,
+            payload: { assigneeUserIds: [task.assignedToId] },
         });
     }
     async notifyParentReady(parentTaskId, organizationId, user) {
@@ -1531,21 +1525,11 @@ let TasksService = class TasksService {
         });
     }
     async notifyTaskCompleted(task, user) {
-        if (!task.createdById) {
-            return;
-        }
-        await this.notifications.notifyUser({
-            organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
-            recipientId: task.createdById,
-            actorId: user.userId,
-            type: client_1.NotificationType.TASK_COMPLETED,
-            priority: client_1.NotificationPriority.NORMAL,
-            title: 'یک کار تکمیل شد',
-            body: task.title,
-            entityType: client_1.NotificationEntityType.TASK,
-            entityId: task.id,
-            actionUrl: `/tasks/${task.id}`,
-            skipSelf: true,
+        await this.notificationCore.publishDomainEvent({
+            organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user), eventName: 'TASK.COMPLETED', aggregateType: 'TASK',
+            aggregateId: task.id, actorId: user.userId,
+            idempotencyKey: `TASK.COMPLETED:${task.id}:${task.updatedAt?.toISOString() ?? 'completed'}`,
+            payload: { creatorUserId: task.createdById },
         });
     }
     async notifyTaskRescheduled(task, user) {
@@ -1575,6 +1559,7 @@ exports.TasksService = TasksService = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
         audit_log_service_1.AuditLogService,
-        notifications_service_1.NotificationsService])
+        notifications_service_1.NotificationsService,
+        notification_core_service_1.NotificationCoreService])
 ], TasksService);
 //# sourceMappingURL=tasks.service.js.map

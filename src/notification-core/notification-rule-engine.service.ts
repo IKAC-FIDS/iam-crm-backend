@@ -7,7 +7,7 @@ import {
   type NotificationRecipientRule,
   Prisma,
 } from "@prisma/client"
-import { PrismaService } from "../prisma/prisma.service"
+import { PrismaService, type TenantTransactionClient } from "../prisma/prisma.service"
 import { NotificationTemplateEngineService } from "./notification-template-engine.service"
 
 @Injectable()
@@ -17,8 +17,8 @@ export class NotificationRuleEngineService {
     private readonly templateEngine: NotificationTemplateEngineService,
   ) {}
 
-  async evaluateEvent(event: NotificationEvent) {
-    const rules = await this.prisma.notificationRule.findMany({
+  async evaluateEvent(event: NotificationEvent, db: TenantTransactionClient = this.prisma) {
+    const rules = await db.notificationRule.findMany({
       where: {
         organizationId: event.organizationId,
         eventName: event.eventName,
@@ -39,7 +39,7 @@ export class NotificationRuleEngineService {
 
     for (const rule of rules) {
       for (const recipientRule of rule.recipientRules) {
-        const recipientIds = await this.resolveRecipientIds(event, recipientRule)
+        const recipientIds = await this.resolveRecipientIds(event, recipientRule, db)
         if (!recipientIds.length) {
           unresolved += recipientRule.channels.length
           continue
@@ -56,8 +56,9 @@ export class NotificationRuleEngineService {
             ].join(":")
 
             try {
-              const rendered = await this.templateEngine.renderDelivery(event, recipientUserId, channel)
-              await this.prisma.notificationDelivery.create({
+              const rendered = await this.templateEngine.renderDelivery(event, recipientUserId, channel, db)
+              const inserted = await db.notificationDelivery.createMany({
+                skipDuplicates: true,
                 data: {
                   eventId: event.id,
                   ruleId: rule.id,
@@ -69,7 +70,8 @@ export class NotificationRuleEngineService {
                   deduplicationKey,
                 },
               })
-              created += 1
+              if (inserted.count) created += 1
+              else duplicate += 1
             } catch (error) {
               if (error instanceof NotFoundException) {
                 unresolved += 1
@@ -95,37 +97,38 @@ export class NotificationRuleEngineService {
   private async resolveRecipientIds(
     event: NotificationEvent,
     rule: NotificationRecipientRule,
+    db: TenantTransactionClient,
   ): Promise<string[]> {
     switch (rule.type) {
       case NotificationRecipientType.USER:
-        return this.activeUsers(event.organizationId, rule.targetId ? [rule.targetId] : [])
+        return this.activeUsers(event.organizationId, rule.targetId ? [rule.targetId] : [], db)
 
       case NotificationRecipientType.ROLE:
-        return this.usersByRole(event.organizationId, rule.targetId)
+        return this.usersByRole(event.organizationId, rule.targetId, db)
 
       case NotificationRecipientType.TEAM:
-        return this.usersByTeam(event.organizationId, rule.targetId)
+        return this.usersByTeam(event.organizationId, rule.targetId, db)
 
       case NotificationRecipientType.ASSIGNEE:
-        return this.aggregateAssignees(event)
+        return this.aggregateAssignees(event, db)
 
       case NotificationRecipientType.CREATOR:
-        return this.aggregateCreator(event)
+        return this.aggregateCreator(event, db)
 
       case NotificationRecipientType.OWNER:
-        return this.payloadIds(event, "ownerUserId")
+        return this.payloadIds(event, "ownerUserId", db)
 
       case NotificationRecipientType.MANAGER:
-        return this.aggregateManagers(event)
+        return this.aggregateManagers(event, db)
 
       default:
         return []
     }
   }
 
-  private async usersByRole(organizationId: string, roleId: string | null) {
+  private async usersByRole(organizationId: string, roleId: string | null, db: TenantTransactionClient) {
     if (!roleId) return []
-    const users = await this.prisma.user.findMany({
+    const users = await db.user.findMany({
       where: {
         isActive: true,
         OR: [
@@ -146,9 +149,9 @@ export class NotificationRuleEngineService {
     return this.unique(users.map((item) => item.id))
   }
 
-  private async usersByTeam(organizationId: string, teamId: string | null) {
+  private async usersByTeam(organizationId: string, teamId: string | null, db: TenantTransactionClient) {
     if (!teamId) return []
-    const users = await this.prisma.user.findMany({
+    const users = await db.user.findMany({
       where: {
         isActive: true,
         OR: [
@@ -169,63 +172,63 @@ export class NotificationRuleEngineService {
     return this.unique(users.map((item) => item.id))
   }
 
-  private async aggregateAssignees(event: NotificationEvent) {
+  private async aggregateAssignees(event: NotificationEvent, db: TenantTransactionClient) {
     if (event.aggregateType === "MEETING") {
-      const rows = await this.prisma.meetingAssignee.findMany({
+      const rows = await db.meetingAssignee.findMany({
         where: {
           meetingId: event.aggregateId,
           meeting: { organizationId: event.organizationId },
         },
         select: { userId: true },
       })
-      return this.activeUsers(event.organizationId, rows.map((row) => row.userId))
+      return this.activeUsers(event.organizationId, rows.map((row) => row.userId), db)
     }
 
     if (event.aggregateType === "TASK") {
-      const task = await this.prisma.task.findFirst({
+      const task = await db.task.findFirst({
         where: { id: event.aggregateId, organizationId: event.organizationId },
         select: { assignedToId: true },
       })
       return this.activeUsers(
         event.organizationId,
-        task?.assignedToId ? [task.assignedToId] : [],
+        task?.assignedToId ? [task.assignedToId] : [], db,
       )
     }
 
-    return this.payloadIds(event, "assigneeUserIds")
+    return this.payloadIds(event, "assigneeUserIds", db)
   }
 
-  private async aggregateCreator(event: NotificationEvent) {
+  private async aggregateCreator(event: NotificationEvent, db: TenantTransactionClient) {
     if (event.aggregateType === "MEETING") {
-      const meeting = await this.prisma.meeting.findFirst({
+      const meeting = await db.meeting.findFirst({
         where: { id: event.aggregateId, organizationId: event.organizationId },
         select: { createdById: true },
       })
       return this.activeUsers(
         event.organizationId,
-        meeting?.createdById ? [meeting.createdById] : [],
+        meeting?.createdById ? [meeting.createdById] : [], db,
       )
     }
 
     if (event.aggregateType === "TASK") {
-      const task = await this.prisma.task.findFirst({
+      const task = await db.task.findFirst({
         where: { id: event.aggregateId, organizationId: event.organizationId },
         select: { createdById: true },
       })
       return this.activeUsers(
         event.organizationId,
-        task?.createdById ? [task.createdById] : [],
+        task?.createdById ? [task.createdById] : [], db,
       )
     }
 
-    return this.payloadIds(event, "creatorUserId")
+    return this.payloadIds(event, "creatorUserId", db)
   }
 
-  private async aggregateManagers(event: NotificationEvent) {
+  private async aggregateManagers(event: NotificationEvent, db: TenantTransactionClient) {
     let teamIds: string[] = []
 
     if (event.aggregateType === "TASK") {
-      const task = await this.prisma.task.findFirst({
+      const task = await db.task.findFirst({
         where: { id: event.aggregateId, organizationId: event.organizationId },
         select: { teamId: true, assignedTo: { select: { teamId: true } } },
       })
@@ -233,7 +236,7 @@ export class NotificationRuleEngineService {
         (value): value is string => Boolean(value),
       )
     } else if (event.aggregateType === "MEETING") {
-      const rows = await this.prisma.meetingAssignee.findMany({
+      const rows = await db.meetingAssignee.findMany({
         where: {
           meetingId: event.aggregateId,
           meeting: { organizationId: event.organizationId },
@@ -245,9 +248,9 @@ export class NotificationRuleEngineService {
         .filter((value): value is string => Boolean(value))
     }
 
-    if (!teamIds.length) return this.payloadIds(event, "managerUserIds")
+    if (!teamIds.length) return this.payloadIds(event, "managerUserIds", db)
 
-    const teams = await this.prisma.team.findMany({
+    const teams = await db.team.findMany({
       where: {
         id: { in: this.unique(teamIds) },
         organizationId: event.organizationId,
@@ -259,11 +262,11 @@ export class NotificationRuleEngineService {
       event.organizationId,
       teams
         .map((team) => team.managerId)
-        .filter((value): value is string => Boolean(value)),
+        .filter((value): value is string => Boolean(value)), db,
     )
   }
 
-  private async payloadIds(event: NotificationEvent, key: string) {
+  private async payloadIds(event: NotificationEvent, key: string, db: TenantTransactionClient) {
     const payload =
       event.payload && typeof event.payload === "object" && !Array.isArray(event.payload)
         ? (event.payload as Record<string, unknown>)
@@ -274,14 +277,14 @@ export class NotificationRuleEngineService {
       : typeof value === "string"
         ? [value]
         : []
-    return this.activeUsers(event.organizationId, ids)
+    return this.activeUsers(event.organizationId, ids, db)
   }
 
-  private async activeUsers(organizationId: string, ids: string[]) {
+  private async activeUsers(organizationId: string, ids: string[], db: TenantTransactionClient) {
     const uniqueIds = this.unique(ids)
     if (!uniqueIds.length) return []
-    const users = await this.prisma.user.findMany({
-      where: { id: { in: uniqueIds }, organizationId, isActive: true },
+    const users = await db.user.findMany({
+      where: { id: { in: uniqueIds }, organizationMemberships: { some: { organizationId, status: OrganizationMembershipStatus.ACTIVE } }, isActive: true },
       select: { id: true },
     })
     return users.map((user) => user.id)

@@ -9,5 +9,5 @@ export type NotificationDispatchResult = {
 
 export interface NotificationChannelHandler {
   readonly channel: NotificationChannel
-  dispatch(deliveryId: string): Promise<NotificationDispatchResult>
+  dispatch(deliveryId: string, organizationId?: string): Promise<NotificationDispatchResult>
 }

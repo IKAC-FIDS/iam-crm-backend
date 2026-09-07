@@ -12,10 +12,11 @@ const meetings_controller_1 = require("./meetings.controller");
 const meeting_reminder_service_1 = require("./meeting-reminder.service");
 const meetings_service_1 = require("./meetings.service");
 const email_module_1 = require("../email/email.module");
+const notification_core_module_1 = require("../notification-core/notification-core.module");
 let MeetingsModule = class MeetingsModule {
 };
 exports.MeetingsModule = MeetingsModule;
 exports.MeetingsModule = MeetingsModule = __decorate([
-    (0, common_1.Module)({ imports: [email_module_1.EmailModule], controllers: [meetings_controller_1.MeetingsController], providers: [meetings_service_1.MeetingsService, meeting_reminder_service_1.MeetingReminderService], exports: [meetings_service_1.MeetingsService] })
+    (0, common_1.Module)({ imports: [email_module_1.EmailModule, notification_core_module_1.NotificationCoreModule], controllers: [meetings_controller_1.MeetingsController], providers: [meetings_service_1.MeetingsService, meeting_reminder_service_1.MeetingReminderService], exports: [meetings_service_1.MeetingsService] })
 ], MeetingsModule);
 //# sourceMappingURL=meetings.module.js.map

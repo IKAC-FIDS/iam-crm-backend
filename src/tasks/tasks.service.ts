@@ -17,6 +17,7 @@ import {
   TaskStatus,
   UserRole,
 } from '@prisma/client';
+import { NotificationCoreService } from '../notification-core/notification-core.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { AuditLogService } from '../audit-log/audit-log.service';
 import { CurrentUserPayload } from '../common/decorators/current-user.decorator';
@@ -200,6 +201,7 @@ export class TasksService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditLogService,
     private readonly notifications: NotificationsService,
+    private readonly notificationCore: NotificationCoreService,
   ) {}
 
   async findAll(query: FindTasksDto, user: CurrentUserPayload) {
@@ -516,7 +518,7 @@ export class TasksService {
       });
     }
 
-    if (updated.assignedToId && updated.assignedToId !== current.assignedToId) await this.notifyTaskAssigned(updated, user);
+    if (updated.assignedToId && updated.assignedToId !== current.assignedToId) await this.notifyTaskAssigned(updated, user, current.assignedToId ? 'TASK.REASSIGNED' : 'TASK.ASSIGNED');
     if (updated.reviewerId && updated.reviewerId !== current.reviewerId) await this.notifyReviewUser(updated.reviewerId, user, updated, 'شما به‌عنوان بازبین کار تعیین شدید', 'REVIEWER_ASSIGNED');
 
     return updated;
@@ -626,7 +628,7 @@ export class TasksService {
       after: { assignedToId: updated.assignedToId, teamId: updated.teamId, assignmentScope: updated.assignmentScope },
       metadata: { reason: dto.reason?.trim() || undefined },
     });
-    if (updated.assignedToId && updated.assignedToId !== current.assignedToId) await this.notifyTaskAssigned(updated, user);
+    if (updated.assignedToId && updated.assignedToId !== current.assignedToId) await this.notifyTaskAssigned(updated, user, current.assignedToId ? 'TASK.REASSIGNED' : 'TASK.ASSIGNED');
     return updated;
   }
 
@@ -677,7 +679,7 @@ export class TasksService {
       entityType: 'task', entityId: parent.id, action: 'task.subtask_created',
       after: { subtaskId: child.id, assigneeId: child.assignedToId, assignmentScope: child.assignmentScope },
     });
-    await this.notifyTaskAssigned(child, user, 'زیرکار جدید به شما ارجاع شد');
+    await this.notifyTaskAssigned(child, user);
     return child;
   }
 
@@ -1780,30 +1782,16 @@ export class TasksService {
   }
 
 private async notifyTaskAssigned(
-  task: {
-    id: string;
-    title: string;
-    assignedToId: string | null;
-  },
+  task: { id: string; title: string; assignedToId: string | null; updatedAt?: Date },
   user: CurrentUserPayload,
-  title = 'کار جدید به شما ارجاع شد',
+  eventName: 'TASK.ASSIGNED' | 'TASK.REASSIGNED' = 'TASK.ASSIGNED',
 ) {
-  if (!task.assignedToId) {
-    return;
-  }
-
-  await this.notifications.notifyUser({
-    organizationId: getCurrentOrganizationId(user),
-    recipientId: task.assignedToId,
-    actorId: user.userId,
-    type: NotificationType.TASK_ASSIGNED,
-    priority: NotificationPriority.NORMAL,
-    title,
-    body: task.title,
-    entityType: NotificationEntityType.TASK,
-    entityId: task.id,
-    actionUrl: `/tasks/${task.id}`,
-    skipSelf: true,
+  if (!task.assignedToId) return;
+  await this.notificationCore.publishDomainEvent({
+    organizationId: getCurrentOrganizationId(user), eventName, aggregateType: 'TASK',
+    aggregateId: task.id, actorId: user.userId,
+    idempotencyKey: `${eventName}:${task.id}:${task.updatedAt?.toISOString() ?? task.assignedToId}`,
+    payload: { assigneeUserIds: [task.assignedToId] },
   });
 }
 
@@ -1823,29 +1811,14 @@ private async notifyParentReady(parentTaskId: string, organizationId: string, us
 }
 
 private async notifyTaskCompleted(
-  task: {
-    id: string;
-    title: string;
-    createdById: string | null;
-  },
+  task: { id: string; title: string; createdById: string | null; updatedAt?: Date },
   user: CurrentUserPayload,
 ) {
-  if (!task.createdById) {
-    return;
-  }
-
-  await this.notifications.notifyUser({
-    organizationId: getCurrentOrganizationId(user),
-    recipientId: task.createdById,
-    actorId: user.userId,
-    type: NotificationType.TASK_COMPLETED,
-    priority: NotificationPriority.NORMAL,
-    title: 'یک کار تکمیل شد',
-    body: task.title,
-    entityType: NotificationEntityType.TASK,
-    entityId: task.id,
-    actionUrl: `/tasks/${task.id}`,
-    skipSelf: true,
+  await this.notificationCore.publishDomainEvent({
+    organizationId: getCurrentOrganizationId(user), eventName: 'TASK.COMPLETED', aggregateType: 'TASK',
+    aggregateId: task.id, actorId: user.userId,
+    idempotencyKey: `TASK.COMPLETED:${task.id}:${task.updatedAt?.toISOString() ?? 'completed'}`,
+    payload: { creatorUserId: task.createdById },
   });
 }
 

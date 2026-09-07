@@ -62,6 +62,7 @@ export class NotificationAdminService {
     const locale = dto.locale?.trim() || "fa-IR"
     const subject = dto.channel === NotificationChannel.SMS ? null : dto.subject?.trim() || null
     const body = dto.body.trim()
+    this.requireInAppSubject(dto.channel, subject)
     this.templateEngine.validate(dto.eventName, subject, body)
     return this.prisma.$transaction(async (tx) => {
       const latest = await tx.notificationTemplate.findFirst({
@@ -93,6 +94,7 @@ export class NotificationAdminService {
       ? null
       : dto.subject !== undefined ? dto.subject?.trim() || null : previous.subject
     const body = dto.body?.trim() ?? previous.body
+    this.requireInAppSubject(channel, subject)
     this.templateEngine.validate(eventName, subject, body)
     return this.prisma.$transaction(async (tx) => {
       const latest = await tx.notificationTemplate.findFirst({
@@ -138,6 +140,7 @@ export class NotificationAdminService {
 
   async activateTemplate(id: string, user: CurrentUserPayload) {
     const template = await this.getTemplate(id, user)
+    this.requireInAppSubject(template.channel, template.subject)
     return this.prisma.$transaction(async (tx) => {
       await tx.notificationTemplate.updateMany({
         where: {
@@ -200,12 +203,15 @@ export class NotificationAdminService {
       { channel: "EMAIL", available: emailConfigured, configured: emailConfigured, usable: emailConfigured, provider: email?.smtpHost || null, configurationPath: "/admin/email-settings" },
       await this.smsSettings.status(organizationId),
       { channel: "PUSH", available: false, configured: false, usable: false, provider: null, configurationPath: null },
-      { channel: "IN_APP", available: true, configured: true, usable: true, provider: "Notification Center", configurationPath: null },
+      { channel: "IN_APP", available: true, configured: true, enabled: true, usable: true, provider: "Notification Center", configurationPath: null },
     ]
   }
 
   private assertEvent(eventName: string) {
     if (!allowedEvents.has(eventName)) throw new BadRequestException(`Unsupported notification event: ${eventName}`)
+  }
+  private requireInAppSubject(channel: NotificationChannel, subject: string | null | undefined) {
+    if (channel === NotificationChannel.IN_APP && !subject?.trim()) throw new BadRequestException('عنوان قالب اعلان داخل سامانه الزامی است');
   }
   private date(value: string, field: string) {
     const result = new Date(value)

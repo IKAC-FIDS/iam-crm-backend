@@ -16,11 +16,14 @@ import { SmsSettingsService } from "./sms/sms-settings.service"
 import { SmsNotificationChannelHandler } from "./sms/sms-notification-channel.handler"
 import { NotificationDeliveryDispatcher } from "./notification-delivery-dispatcher.service"
 import { SmsAdminController } from "./sms/sms-admin.controller"
+import { NotificationsModule } from '../notifications/notifications.module'
+import { InAppNotificationChannelHandler } from './in-app/in-app-notification-channel.handler'
+import { InAppNotificationMetadataMapper, NotificationActionUrlResolver } from './in-app/notification-action-url.resolver'
 
 @Module({
-  imports: [PrismaModule, SsoModule, AuditLogModule],
+  imports: [PrismaModule, SsoModule, AuditLogModule, NotificationsModule],
   controllers: [NotificationRulesController, NotificationAdminController, NotificationTemplatesController, NotificationDeliveriesController, SmsAdminController],
-  providers: [NotificationCoreService, NotificationRulesService, NotificationRuleEngineService, NotificationAdminService, NotificationTemplateEngineService, GenericHttpSmsProvider, SmsProviderRegistry, SmsRecipientResolver, SmsSettingsService, SmsNotificationChannelHandler, NotificationDeliveryDispatcher],
+  providers: [InAppNotificationChannelHandler, InAppNotificationMetadataMapper, NotificationActionUrlResolver, NotificationCoreService, NotificationRulesService, NotificationRuleEngineService, NotificationAdminService, NotificationTemplateEngineService, GenericHttpSmsProvider, SmsProviderRegistry, SmsRecipientResolver, SmsSettingsService, SmsNotificationChannelHandler, NotificationDeliveryDispatcher],
   exports: [NotificationCoreService, NotificationRulesService, NotificationRuleEngineService, NotificationTemplateEngineService, NotificationDeliveryDispatcher],
 })
 export class NotificationCoreModule {}

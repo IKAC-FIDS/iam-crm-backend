@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common"
 import { NotificationChannel, type NotificationEvent, type NotificationTemplate } from "@prisma/client"
-import { PrismaService } from "../prisma/prisma.service"
+import { PrismaService, type TenantTransactionClient } from "../prisma/prisma.service"
 import {
   NOTIFICATION_TEMPLATE_VARIABLES,
   type NotificationEventName,
@@ -57,8 +57,8 @@ export class NotificationTemplateEngineService {
     }
   }
 
-  async resolve(organizationId: string, eventName: string, channel: NotificationChannel, locale: string) {
-    const template = await this.prisma.notificationTemplate.findFirst({
+  async resolve(organizationId: string, eventName: string, channel: NotificationChannel, locale: string, db: TenantTransactionClient = this.prisma) {
+    const template = await db.notificationTemplate.findFirst({
       where: { organizationId, eventName, channel, locale, isActive: true },
       orderBy: [{ version: "desc" }, { createdAt: "desc" }],
     })
@@ -66,26 +66,26 @@ export class NotificationTemplateEngineService {
     return template
   }
 
-  async renderDelivery(event: NotificationEvent, recipientUserId: string, channel: NotificationChannel) {
-    const organization = await this.prisma.organization.findUnique({
+  async renderDelivery(event: NotificationEvent, recipientUserId: string, channel: NotificationChannel, db: TenantTransactionClient = this.prisma) {
+    const organization = await db.organization.findUnique({
       where: { id: event.organizationId }, select: { id: true, name: true, locale: true },
     })
     if (!organization) throw new NotFoundException("Notification organization not found")
-    const template = await this.resolve(event.organizationId, event.eventName, channel, organization.locale || "fa-IR")
-    const context = await this.buildContext(event, recipientUserId, organization)
+    const template = await this.resolve(event.organizationId, event.eventName, channel, organization.locale || "fa-IR", db)
+    const context = await this.buildContext(event, recipientUserId, organization, db)
     const rendered = this.render({ subject: template.subject, body: template.body, context })
     return { template, ...rendered }
   }
 
-  async renderStoredTemplate(event: NotificationEvent, recipientUserId: string, template: NotificationTemplate) {
+  async renderStoredTemplate(event: NotificationEvent, recipientUserId: string, template: NotificationTemplate, db: TenantTransactionClient = this.prisma) {
     if (template.organizationId !== event.organizationId || template.eventName !== event.eventName) {
       throw new BadRequestException("Notification template does not match delivery event")
     }
-    const organization = await this.prisma.organization.findUnique({
+    const organization = await db.organization.findUnique({
       where: { id: event.organizationId }, select: { id: true, name: true, locale: true },
     })
     if (!organization) throw new NotFoundException("Notification organization not found")
-    const context = await this.buildContext(event, recipientUserId, organization)
+    const context = await this.buildContext(event, recipientUserId, organization, db)
     return this.render({ subject: template.subject, body: template.body, context })
   }
 
@@ -98,15 +98,16 @@ export class NotificationTemplateEngineService {
     event: NotificationEvent,
     recipientUserId: string,
     organization: { id: string; name: string; locale: string },
+    db: TenantTransactionClient = this.prisma,
   ): Promise<TemplateContext> {
     const [user, actor] = await Promise.all([
-      this.prisma.user.findFirst({ where: { id: recipientUserId, organizationId: event.organizationId, isActive: true }, select: { id: true, fullName: true, email: true } }),
-      event.actorId ? this.prisma.user.findFirst({ where: { id: event.actorId, organizationId: event.organizationId }, select: { id: true, fullName: true } }) : null,
+      db.user.findFirst({ where: { id: recipientUserId, organizationMemberships: { some: { organizationId: event.organizationId, status: 'ACTIVE' } }, isActive: true }, select: { id: true, fullName: true, email: true } }),
+      event.actorId ? db.user.findFirst({ where: { id: event.actorId, organizationMemberships: { some: { organizationId: event.organizationId, status: 'ACTIVE' } } }, select: { id: true, fullName: true } }) : null,
     ])
     if (!user) throw new NotFoundException("Notification recipient not found")
     const base: TemplateContext = { user, actor, organization: { id: organization.id, name: organization.name } }
     if (event.aggregateType === "MEETING") {
-      const meeting = await this.prisma.meeting.findFirst({
+      const meeting = await db.meeting.findFirst({
         where: { id: event.aggregateId, organizationId: event.organizationId },
         select: { id: true, title: true, startAt: true, endAt: true, location: true, agenda: true, company: { select: { id: true, name: true } } },
       })
@@ -114,12 +115,12 @@ export class NotificationTemplateEngineService {
       return { ...base, meeting }
     }
     if (event.aggregateType === "TASK") {
-      const task = await this.prisma.task.findFirst({
+      const task = await db.task.findFirst({
         where: { id: event.aggregateId, organizationId: event.organizationId },
-        select: { id: true, title: true, description: true, dueAt: true, company: { select: { id: true, name: true } } },
+        select: { id: true, title: true, description: true, dueAt: true, priority: true, opportunity: { select: { title: true } }, company: { select: { id: true, name: true } } },
       })
       if (!task) throw new NotFoundException("Notification task not found")
-      return { ...base, task }
+      return { ...base, task: { ...task, dueDate: task.dueAt } }
     }
     return base
   }
@@ -131,7 +132,7 @@ export class NotificationTemplateEngineService {
       organization: { id: "preview-organization", name: "سازمان نمونه" },
     }
     if (eventName.startsWith("MEETING.")) return { ...base, meeting: { id: "preview-meeting", title: "بررسی قرارداد", startAt: "۱۴۰۵/۰۶/۱۵، ۱۰:۰۰", endAt: "۱۴۰۵/۰۶/۱۵، ۱۱:۰۰", location: "اتاق جلسات", agenda: "مرور شرایط قرارداد", company: { id: "preview-company", name: "شرکت نمونه" } } }
-    if (eventName.startsWith("TASK.")) return { ...base, task: { id: "preview-task", title: "پیگیری پیشنهاد", description: "تماس با مشتری", dueAt: "۱۴۰۵/۰۶/۲۰، ۱۲:۰۰", company: { id: "preview-company", name: "شرکت نمونه" } } }
+    if (eventName.startsWith("TASK.")) return { ...base, task: { id: "preview-task", title: "پیگیری پیشنهاد", description: "تماس با مشتری", dueAt: "۱۴۰۵/۰۶/۲۰، ۱۲:۰۰", dueDate: "۱۴۰۵/۰۶/۲۰، ۱۲:۰۰", priority: "MEDIUM", opportunity: { title: "فرصت نمونه" }, company: { id: "preview-company", name: "شرکت نمونه" } } }
     return base
   }
 

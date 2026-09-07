@@ -21,7 +21,7 @@ function setup(overrides: Record<string, unknown> = {}) {
   };
   prisma.$transaction = jest.fn((callback: any) => typeof callback === 'function' ? callback(prisma) : Promise.all(callback));
   const audit = { record: jest.fn() }, notifications = { notifyUser: jest.fn() };
-  return { service: new TasksService(prisma, audit as any, notifications as any), prisma, audit, notifications, current, round };
+  return { service: new TasksService(prisma, audit as any, notifications as any, { publishDomainEvent: jest.fn() } as any), prisma, audit, notifications, current, round };
 }
 
 describe('Phase 4.6 task review workflow', () => {

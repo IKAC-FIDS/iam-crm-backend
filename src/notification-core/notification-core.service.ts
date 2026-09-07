@@ -1,67 +1,49 @@
-import { Injectable } from "@nestjs/common"
+import { Injectable, Logger } from "@nestjs/common"
 import { Prisma, type NotificationEvent } from "@prisma/client"
-import { PrismaService } from "../prisma/prisma.service"
+import { PrismaService, type TenantTransactionClient } from "../prisma/prisma.service"
+import { NotificationDeliveryDispatcher } from './notification-delivery-dispatcher.service'
+import { notificationTenantContext } from './in-app/notification-tenant-context'
 import type { PublishNotificationEventInput } from "./notification-core.types"
 import { NotificationRuleEngineService } from "./notification-rule-engine.service"
 
 @Injectable()
 export class NotificationCoreService {
+  private readonly logger = new Logger(NotificationCoreService.name)
   constructor(
     private readonly prisma: PrismaService,
     private readonly ruleEngine: NotificationRuleEngineService,
+    private readonly dispatcher: NotificationDeliveryDispatcher,
   ) {}
 
-  async publish(input: PublishNotificationEventInput): Promise<NotificationEvent> {
-    const create = () =>
-      this.prisma.notificationEvent.create({
-        data: {
-          organizationId: input.organizationId,
-          eventName: input.eventName,
-          aggregateType: input.aggregateType,
-          aggregateId: input.aggregateId,
-          actorId: input.actorId ?? null,
-          payload: (input.payload ?? {}) as Prisma.InputJsonValue,
-          idempotencyKey: input.idempotencyKey ?? null,
-          occurredAt: input.occurredAt ?? new Date(),
-        },
-      })
-
-    if (!input.idempotencyKey) {
-      return create()
+  async publish(input: PublishNotificationEventInput, db: TenantTransactionClient = this.prisma): Promise<NotificationEvent> {
+    const data = {
+      organizationId: input.organizationId, eventName: input.eventName,
+      aggregateType: input.aggregateType, aggregateId: input.aggregateId,
+      actorId: input.actorId ?? null, payload: (input.payload ?? {}) as Prisma.InputJsonValue,
+      idempotencyKey: input.idempotencyKey ?? null, occurredAt: input.occurredAt ?? new Date(),
     }
-
-    const existing = await this.prisma.notificationEvent.findFirst({
-      where: {
-        organizationId: input.organizationId,
-        idempotencyKey: input.idempotencyKey,
-      },
-    })
-    if (existing) return existing
-
-    try {
-      return await create()
-    } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === "P2002"
-      ) {
-        const raced = await this.prisma.notificationEvent.findFirst({
-          where: {
-            organizationId: input.organizationId,
-            idempotencyKey: input.idempotencyKey,
-          },
-        })
-
-        if (raced) return raced
-      }
-
-      throw error
-    }
+    if (!input.idempotencyKey) return db.notificationEvent.create({ data })
+    // ON CONFLICT avoids aborting the surrounding PostgreSQL transaction on a replay/race.
+    await db.notificationEvent.createMany({ data, skipDuplicates: true })
+    return db.notificationEvent.findFirstOrThrow({ where: {
+      organizationId: input.organizationId, idempotencyKey: input.idempotencyKey,
+    } })
   }
 
   async publishAndEvaluate(input: PublishNotificationEventInput) {
-    const event = await this.publish(input)
-    const evaluation = await this.ruleEngine.evaluateEvent(event)
+    const context = notificationTenantContext(input.organizationId, input.actorId ?? undefined)
+    const event = await this.prisma.withTenantTransaction(context, tx => this.publish(input, tx))
+    const evaluation = await this.prisma.withTenantTransaction(context, tx => this.ruleEngine.evaluateEvent(event, tx))
+    const pending = await this.prisma.withTenantTransaction(context, tx => tx.notificationDelivery.findMany({
+      where: { eventId: event.id, event: { organizationId: input.organizationId }, channel: 'IN_APP', status: { in: ['PENDING', 'RETRYING'] } }, select: { id: true },
+    }))
+    for (const delivery of pending) await this.dispatcher.dispatch(delivery.id, input.organizationId)
     return { event, evaluation }
+  }
+
+  /** A notification failure must not turn a committed domain action into an apparent failure. */
+  async publishDomainEvent(input: PublishNotificationEventInput) {
+    try { return await this.publishAndEvaluate(input) }
+    catch { this.logger.error(`Notification event processing failed event=${input.eventName} aggregateId=${input.aggregateId} organizationId=${input.organizationId}`); return null }
   }
 }

@@ -48,7 +48,7 @@ export class AuditLogService {
     private requestContext: AuditRequestContextService,
     private exporter: ReportExportService,
   ) {}
-  record(input: RecordAuditInput) {
+  record(input: RecordAuditInput, db: Pick<Prisma.TransactionClient, 'auditLog'> = this.prisma) {
     const context = this.requestContext.getContext();
     const organizationId =
       input.organizationId !== undefined
@@ -62,7 +62,7 @@ export class AuditLogService {
     const durationMs = input.durationMs ?? null;
     if (durationMs !== null && (!Number.isSafeInteger(durationMs) || durationMs < 0))
       throw new BadRequestException("durationMs must be a non-negative integer");
-    return this.prisma.auditLog.create({
+    return db.auditLog.create({
       data: {
         actorId: input.actorId ?? context?.actorUserId ?? null,
         actorType:

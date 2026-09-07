@@ -18,6 +18,7 @@ const tenant_scope_util_1 = require("../common/tenant/tenant-scope.util");
 const prisma_service_1 = require("../prisma/prisma.service");
 const email_service_1 = require("../email/email.service");
 const meeting_email_template_1 = require("./meeting-email.template");
+const notification_core_service_1 = require("../notification-core/notification-core.service");
 const meetingInclude = {
     type: { select: { id: true, code: true, label: true, description: true, sortOrder: true, isActive: true } },
     company: { select: { id: true, legalName: true, brandName: true } },
@@ -30,10 +31,11 @@ const meetingInclude = {
     attendees: { include: { person: { select: { id: true, fullName: true, title: true, companyId: true } } } },
 };
 let MeetingsService = class MeetingsService {
-    constructor(prisma, audit, email) {
+    constructor(prisma, audit, email, notificationCore) {
         this.prisma = prisma;
         this.audit = audit;
         this.email = email;
+        this.notificationCore = notificationCore;
     }
     findTypes() { return this.prisma.lookupOption.findMany({ where: { group: 'meeting-types', isActive: true }, orderBy: [{ sortOrder: 'asc' }, { label: 'asc' }] }); }
     async findAll(query, user) {
@@ -61,6 +63,7 @@ let MeetingsService = class MeetingsService {
             }, include: meetingInclude,
         }));
         await this.audit.record({ actorId: user.userId, entityType: 'meeting', entityId: meeting.id, action: 'meeting.created', after: meeting });
+        await this.notificationCore.publishDomainEvent({ organizationId, eventName: 'MEETING.CREATED', aggregateType: 'MEETING', aggregateId: meeting.id, actorId: user.userId, idempotencyKey: `MEETING.CREATED:${meeting.id}` });
         return meeting;
     }
     async update(id, dto, user) {
@@ -98,6 +101,7 @@ let MeetingsService = class MeetingsService {
             await this.audit.record({ actorId: user.userId, entityType: 'meeting', entityId: id, action: 'meeting.assignees_changed' });
         if (dto.attendeePersonIds)
             await this.audit.record({ actorId: user.userId, entityType: 'meeting', entityId: id, action: 'meeting.attendees_changed' });
+        await this.notificationCore.publishDomainEvent({ organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user), eventName: 'MEETING.UPDATED', aggregateType: 'MEETING', aggregateId: id, actorId: user.userId, idempotencyKey: `MEETING.UPDATED:${id}:${updated.updatedAt.toISOString()}` });
         return updated;
     }
     async complete(id, dto, user) {
@@ -118,6 +122,7 @@ let MeetingsService = class MeetingsService {
             throw new common_1.BadRequestException('Completed meeting cannot be cancelled');
         const updated = await this.prisma.meeting.update({ where: { id }, data: { status: client_1.MeetingStatus.CANCELLED, cancelledAt: new Date(), cancelledById: user.userId, cancellationReason: dto.cancellationReason?.trim() || null }, include: meetingInclude });
         await this.audit.record({ actorId: user.userId, entityType: 'meeting', entityId: id, action: 'meeting.cancelled', before: current, after: updated });
+        await this.notificationCore.publishDomainEvent({ organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user), eventName: 'MEETING.CANCELLED', aggregateType: 'MEETING', aggregateId: id, actorId: user.userId, idempotencyKey: `MEETING.CANCELLED:${id}` });
         return updated;
     }
     async notifyAssignees(id, user) {
@@ -264,6 +269,6 @@ let MeetingsService = class MeetingsService {
 exports.MeetingsService = MeetingsService;
 exports.MeetingsService = MeetingsService = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [prisma_service_1.PrismaService, audit_log_service_1.AuditLogService, email_service_1.EmailService])
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService, audit_log_service_1.AuditLogService, email_service_1.EmailService, notification_core_service_1.NotificationCoreService])
 ], MeetingsService);
 //# sourceMappingURL=meetings.service.js.map

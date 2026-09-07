@@ -23,7 +23,7 @@ let AuditLogService = class AuditLogService {
         this.requestContext = requestContext;
         this.exporter = exporter;
     }
-    record(input) {
+    record(input, db = this.prisma) {
         const context = this.requestContext.getContext();
         const organizationId = input.organizationId !== undefined
             ? input.organizationId
@@ -36,7 +36,7 @@ let AuditLogService = class AuditLogService {
         const durationMs = input.durationMs ?? null;
         if (durationMs !== null && (!Number.isSafeInteger(durationMs) || durationMs < 0))
             throw new common_1.BadRequestException("durationMs must be a non-negative integer");
-        return this.prisma.auditLog.create({
+        return db.auditLog.create({
             data: {
                 actorId: input.actorId ?? context?.actorUserId ?? null,
                 actorType: input.actorType ??
