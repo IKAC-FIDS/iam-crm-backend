@@ -30,8 +30,9 @@ let NotificationAdminService = class NotificationAdminService {
         return { events };
     }
     listTemplates(query, user) {
-        const { organizationId } = tenant_scope_util_1.tenantScope.require(user);
-        return this.prisma.notificationTemplate.findMany({
+        const context = tenant_scope_util_1.tenantScope.require(user);
+        const { organizationId } = context;
+        return this.prisma.withTenantTransaction(context, (tx) => tx.notificationTemplate.findMany({
             where: {
                 organizationId,
                 ...(query.eventName ? { eventName: query.eventName } : {}),
@@ -43,24 +44,26 @@ let NotificationAdminService = class NotificationAdminService {
                     : {}),
             },
             orderBy: [{ updatedAt: "desc" }, { version: "desc" }],
-        });
+        }));
     }
     async getTemplate(id, user) {
-        const { organizationId } = tenant_scope_util_1.tenantScope.require(user);
-        const item = await this.prisma.notificationTemplate.findFirst({ where: { id, organizationId } });
+        const context = tenant_scope_util_1.tenantScope.require(user);
+        const { organizationId } = context;
+        const item = await this.prisma.withTenantTransaction(context, (tx) => tx.notificationTemplate.findFirst({ where: { id, organizationId } }));
         if (!item)
             throw new common_1.NotFoundException("Notification template not found");
         return item;
     }
     async createTemplate(dto, user) {
-        const { organizationId } = tenant_scope_util_1.tenantScope.require(user);
+        const context = tenant_scope_util_1.tenantScope.require(user);
+        const { organizationId } = context;
         this.assertEvent(dto.eventName);
         const locale = dto.locale?.trim() || "fa-IR";
         const subject = dto.channel === client_1.NotificationChannel.SMS ? null : dto.subject?.trim() || null;
         const body = dto.body.trim();
         this.requireInAppSubject(dto.channel, subject);
         this.templateEngine.validate(dto.eventName, subject, body);
-        return this.prisma.$transaction(async (tx) => {
+        return this.prisma.withTenantTransaction(context, async (tx) => {
             const latest = await tx.notificationTemplate.findFirst({
                 where: { organizationId, eventName: dto.eventName, channel: dto.channel, locale },
                 orderBy: { version: "desc" },
@@ -80,6 +83,7 @@ let NotificationAdminService = class NotificationAdminService {
         });
     }
     async updateTemplate(id, dto, user) {
+        const context = tenant_scope_util_1.tenantScope.require(user);
         const previous = await this.getTemplate(id, user);
         if (dto.eventName)
             this.assertEvent(dto.eventName);
@@ -92,7 +96,7 @@ let NotificationAdminService = class NotificationAdminService {
         const body = dto.body?.trim() ?? previous.body;
         this.requireInAppSubject(channel, subject);
         this.templateEngine.validate(eventName, subject, body);
-        return this.prisma.$transaction(async (tx) => {
+        return this.prisma.withTenantTransaction(context, async (tx) => {
             const latest = await tx.notificationTemplate.findFirst({
                 where: { organizationId: previous.organizationId, eventName, channel, locale },
                 orderBy: { version: "desc" },
@@ -112,8 +116,11 @@ let NotificationAdminService = class NotificationAdminService {
         });
     }
     async removeTemplate(id, user) {
-        await this.getTemplate(id, user);
-        await this.prisma.notificationTemplate.update({ where: { id }, data: { isActive: false } });
+        const context = tenant_scope_util_1.tenantScope.require(user);
+        const { organizationId } = context;
+        const updated = await this.prisma.withTenantTransaction(context, (tx) => tx.notificationTemplate.updateMany({ where: { id, organizationId }, data: { isActive: false } }));
+        if (!updated.count)
+            throw new common_1.NotFoundException("Notification template not found");
         return { deleted: false, deactivated: true };
     }
     templateVariables(eventName) {
@@ -131,9 +138,10 @@ let NotificationAdminService = class NotificationAdminService {
         };
     }
     async activateTemplate(id, user) {
+        const context = tenant_scope_util_1.tenantScope.require(user);
         const template = await this.getTemplate(id, user);
         this.requireInAppSubject(template.channel, template.subject);
-        return this.prisma.$transaction(async (tx) => {
+        return this.prisma.withTenantTransaction(context, async (tx) => {
             await tx.notificationTemplate.updateMany({
                 where: {
                     organizationId: template.organizationId,
@@ -148,7 +156,8 @@ let NotificationAdminService = class NotificationAdminService {
         });
     }
     async listDeliveries(query, user) {
-        const { organizationId } = tenant_scope_util_1.tenantScope.require(user);
+        const context = tenant_scope_util_1.tenantScope.require(user);
+        const { organizationId } = context;
         const page = query.page || 1, limit = query.pageSize || 20;
         const createdAt = {};
         if (query.dateFrom)
@@ -171,18 +180,19 @@ let NotificationAdminService = class NotificationAdminService {
                                 ] } } },
                 ] } : {}),
         };
-        const [data, total] = await this.prisma.$transaction([
-            this.prisma.notificationDelivery.findMany({ where, include: {
+        const [data, total] = await this.prisma.withTenantTransaction(context, (tx) => Promise.all([
+            tx.notificationDelivery.findMany({ where, include: {
                     event: { select: { eventName: true, occurredAt: true } },
                     recipientUser: { select: { id: true, fullName: true, email: true } },
                 }, orderBy: { createdAt: "desc" }, skip: (page - 1) * limit, take: limit }),
-            this.prisma.notificationDelivery.count({ where }),
-        ]);
+            tx.notificationDelivery.count({ where }),
+        ]));
         return { data, meta: (0, pagination_util_1.createPaginationMeta)(page, limit, total) };
     }
     async getDelivery(id, user) {
-        const { organizationId } = tenant_scope_util_1.tenantScope.require(user);
-        const item = await this.prisma.notificationDelivery.findFirst({ where: { id, event: { organizationId } }, include: { event: true, recipientUser: { select: { id: true, fullName: true, email: true } }, rule: { select: { id: true, name: true } }, template: true } });
+        const context = tenant_scope_util_1.tenantScope.require(user);
+        const { organizationId } = context;
+        const item = await this.prisma.withTenantTransaction(context, (tx) => tx.notificationDelivery.findFirst({ where: { id, event: { organizationId } }, include: { event: true, recipientUser: { select: { id: true, fullName: true, email: true } }, rule: { select: { id: true, name: true } }, template: true } }));
         if (!item)
             throw new common_1.NotFoundException("Notification delivery not found");
         return item;
