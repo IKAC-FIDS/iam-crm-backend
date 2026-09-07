@@ -73,15 +73,18 @@ describe("NotificationTemplateEngineService", () => {
   it("builds tenant-scoped context and links the exact template", async () => {
     const { prisma, service } = setup()
     prisma.organization.findUnique.mockResolvedValue({ id: organizationId, name: "نشان", locale: "fa-IR" })
-    prisma.notificationTemplate.findFirst.mockResolvedValue({ id: "template-1", subject: null, body: "سلام {{user.fullName}}", version: 1 })
+    prisma.notificationTemplate.findFirst.mockResolvedValue({ id: "template-1", subject: null, body: "سلام {{user.fullName}}؛ {{meeting.company.name}}", version: 1 })
     prisma.user.findFirst
       .mockResolvedValueOnce({ id: "recipient-1", fullName: "علی", email: "a@example.com" })
       .mockResolvedValueOnce({ id: "actor-1", fullName: "مدیر" })
-    prisma.meeting.findFirst.mockResolvedValue({ id: "meeting-1", title: "جلسه", startAt: new Date(), endAt: new Date(), location: null, agenda: null, company: { id: "company-1", name: "شرکت" } })
+    prisma.meeting.findFirst.mockResolvedValue({ id: "meeting-1", title: "جلسه", startAt: new Date(), endAt: new Date(), location: null, agenda: null, company: { id: "company-1", legalName: "شرکت حقوقی", brandName: "برند شرکت" } })
     const result = await service.renderDelivery(event, "recipient-1", NotificationChannel.SMS)
-    expect(result.body).toBe("سلام علی")
+    expect(result.body).toBe("سلام علی؛ برند شرکت")
     expect(result.template.id).toBe("template-1")
     expect(prisma.user.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "recipient-1", organizationMemberships: { some: { organizationId, status: 'ACTIVE' } }, isActive: true } }))
     expect(prisma.meeting.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "meeting-1", organizationId } }))
+    expect(prisma.meeting.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      select: expect.objectContaining({ company: { select: { id: true, legalName: true, brandName: true } } }),
+    }))
   })
 })

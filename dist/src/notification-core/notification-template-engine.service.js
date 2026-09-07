@@ -109,20 +109,37 @@ let NotificationTemplateEngineService = class NotificationTemplateEngineService 
         if (event.aggregateType === "MEETING") {
             const meeting = await db.meeting.findFirst({
                 where: { id: event.aggregateId, organizationId: event.organizationId },
-                select: { id: true, title: true, startAt: true, endAt: true, location: true, agenda: true, company: { select: { id: true, name: true } } },
+                select: { id: true, title: true, startAt: true, endAt: true, location: true, agenda: true, company: { select: { id: true, legalName: true, brandName: true } } },
             });
             if (!meeting)
                 throw new common_1.NotFoundException("Notification meeting not found");
-            return { ...base, meeting };
+            return {
+                ...base,
+                meeting: {
+                    ...meeting,
+                    company: meeting.company
+                        ? { id: meeting.company.id, name: meeting.company.brandName || meeting.company.legalName }
+                        : null,
+                },
+            };
         }
         if (event.aggregateType === "TASK") {
             const task = await db.task.findFirst({
                 where: { id: event.aggregateId, organizationId: event.organizationId },
-                select: { id: true, title: true, description: true, dueAt: true, priority: true, opportunity: { select: { title: true } }, company: { select: { id: true, name: true } } },
+                select: { id: true, title: true, description: true, dueAt: true, priority: true, opportunity: { select: { title: true } }, company: { select: { id: true, legalName: true, brandName: true } } },
             });
             if (!task)
                 throw new common_1.NotFoundException("Notification task not found");
-            return { ...base, task: { ...task, dueDate: task.dueAt } };
+            return {
+                ...base,
+                task: {
+                    ...task,
+                    dueDate: task.dueAt,
+                    company: task.company
+                        ? { id: task.company.id, name: task.company.brandName || task.company.legalName }
+                        : null,
+                },
+            };
         }
         return base;
     }
