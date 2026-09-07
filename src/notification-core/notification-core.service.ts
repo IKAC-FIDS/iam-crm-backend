@@ -35,7 +35,7 @@ export class NotificationCoreService {
     const event = await this.prisma.withTenantTransaction(context, tx => this.publish(input, tx))
     const evaluation = await this.prisma.withTenantTransaction(context, tx => this.ruleEngine.evaluateEvent(event, tx))
     const pending = await this.prisma.withTenantTransaction(context, tx => tx.notificationDelivery.findMany({
-      where: { eventId: event.id, event: { organizationId: input.organizationId }, channel: 'IN_APP', status: { in: ['PENDING', 'RETRYING'] } }, select: { id: true },
+      where: { eventId: event.id, event: { organizationId: input.organizationId }, channel: { in: ['IN_APP', 'EMAIL', 'SMS'] }, status: { in: ['PENDING', 'RETRYING'] } }, select: { id: true },
     }))
     for (const delivery of pending) await this.dispatcher.dispatch(delivery.id, input.organizationId)
     return { event, evaluation }
@@ -44,6 +44,10 @@ export class NotificationCoreService {
   /** A notification failure must not turn a committed domain action into an apparent failure. */
   async publishDomainEvent(input: PublishNotificationEventInput) {
     try { return await this.publishAndEvaluate(input) }
-    catch { this.logger.error(`Notification event processing failed event=${input.eventName} aggregateId=${input.aggregateId} organizationId=${input.organizationId}`); return null }
+    catch (error) {
+      const detail = error instanceof Error ? error.stack ?? error.message : String(error)
+      this.logger.error(`Notification event processing failed event=${input.eventName} aggregateId=${input.aggregateId} organizationId=${input.organizationId}`, detail)
+      return null
+    }
   }
 }

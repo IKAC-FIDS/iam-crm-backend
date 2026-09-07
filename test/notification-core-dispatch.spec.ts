@@ -20,7 +20,7 @@ describe('Notification Core automatic inbox dispatch', () => {
     expect(await engine.evaluateEvent(event)).toMatchObject({ created: 0, duplicate: 3 });
     expect(keys.size).toBe(3);
   });
-  it('evaluates the published event in tenant scope and routes pending IN_APP records through the shared dispatcher', async () => {
+  it('evaluates the published event in tenant scope and routes all implemented channels through the shared dispatcher', async () => {
     const event = { id: 'event-1', organizationId: 'org-a', eventName: 'TASK.ASSIGNED' };
     const tx = {
       notificationEvent: { create: jest.fn().mockResolvedValue(event) },
@@ -32,7 +32,7 @@ describe('Notification Core automatic inbox dispatch', () => {
     const core = new NotificationCoreService(prisma as any, rules as any, dispatcher as any);
     await core.publishAndEvaluate({ organizationId: 'org-a', eventName: 'TASK.ASSIGNED', aggregateType: 'TASK', aggregateId: 'task-1' });
     expect(rules.evaluateEvent).toHaveBeenCalledWith(event, tx);
-    expect(tx.notificationDelivery.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ channel: 'IN_APP', event: { organizationId: 'org-a' } }) }));
+    expect(tx.notificationDelivery.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ channel: { in: ['IN_APP', 'EMAIL', 'SMS'] }, event: { organizationId: 'org-a' } }) }));
     expect(dispatcher.dispatch).toHaveBeenCalledWith('delivery-1', 'org-a');
     expect(prisma.withTenantTransaction).toHaveBeenCalledWith(expect.objectContaining({ organizationId: 'org-a', platformAdmin: false }), expect.any(Function));
   });

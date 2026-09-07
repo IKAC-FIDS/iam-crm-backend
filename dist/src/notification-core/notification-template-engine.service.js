@@ -87,7 +87,12 @@ let NotificationTemplateEngineService = class NotificationTemplateEngineService 
         if (!organization)
             throw new common_1.NotFoundException("Notification organization not found");
         const context = await this.buildContext(event, recipientUserId, organization, db);
-        return this.render({ subject: template.subject, body: template.body, context });
+        const rendered = this.render({ subject: template.subject, body: template.body, context });
+        return {
+            ...rendered,
+            subject: rendered.subject?.replace(PLACEHOLDER, "—") ?? null,
+            body: rendered.body.replace(PLACEHOLDER, "—"),
+        };
     }
     preview(eventName, subject, body) {
         this.validate(eventName, subject, body);

@@ -14,11 +14,12 @@ const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../prisma/prisma.service");
 const sms_notification_channel_handler_1 = require("./sms/sms-notification-channel.handler");
 const in_app_notification_channel_handler_1 = require("./in-app/in-app-notification-channel.handler");
+const email_notification_channel_handler_1 = require("./email/email-notification-channel.handler");
 const notification_tenant_context_1 = require("./in-app/notification-tenant-context");
 let NotificationDeliveryDispatcher = class NotificationDeliveryDispatcher {
-    constructor(prisma, sms, inApp) {
+    constructor(prisma, sms, inApp, email) {
         this.prisma = prisma;
-        this.handlers = new Map([[sms.channel, sms], [inApp.channel, inApp]]);
+        this.handlers = new Map([[sms.channel, sms], [inApp.channel, inApp], [email.channel, email]]);
     }
     async dispatch(deliveryId, organizationId) {
         const delivery = await this.prisma.withTenantTransaction((0, notification_tenant_context_1.notificationTenantContext)(organizationId), tx => tx.notificationDelivery.findFirst({ where: { id: deliveryId, event: { organizationId } }, select: { id: true, channel: true } }));
@@ -33,6 +34,6 @@ let NotificationDeliveryDispatcher = class NotificationDeliveryDispatcher {
 exports.NotificationDeliveryDispatcher = NotificationDeliveryDispatcher;
 exports.NotificationDeliveryDispatcher = NotificationDeliveryDispatcher = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [prisma_service_1.PrismaService, sms_notification_channel_handler_1.SmsNotificationChannelHandler, in_app_notification_channel_handler_1.InAppNotificationChannelHandler])
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService, sms_notification_channel_handler_1.SmsNotificationChannelHandler, in_app_notification_channel_handler_1.InAppNotificationChannelHandler, email_notification_channel_handler_1.EmailNotificationChannelHandler])
 ], NotificationDeliveryDispatcher);
 //# sourceMappingURL=notification-delivery-dispatcher.service.js.map

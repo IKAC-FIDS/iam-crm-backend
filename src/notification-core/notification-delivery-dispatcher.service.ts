@@ -3,13 +3,14 @@ import { PrismaService } from "../prisma/prisma.service"
 import type { NotificationChannelHandler } from "./notification-channel-handler"
 import { SmsNotificationChannelHandler } from "./sms/sms-notification-channel.handler"
 import { InAppNotificationChannelHandler } from './in-app/in-app-notification-channel.handler'
+import { EmailNotificationChannelHandler } from './email/email-notification-channel.handler'
 import { notificationTenantContext } from './in-app/notification-tenant-context'
 
 @Injectable()
 export class NotificationDeliveryDispatcher {
   private readonly handlers: Map<string, NotificationChannelHandler>
-  constructor(private readonly prisma: PrismaService, sms: SmsNotificationChannelHandler, inApp: InAppNotificationChannelHandler) {
-    this.handlers = new Map<string, NotificationChannelHandler>([[sms.channel, sms], [inApp.channel, inApp]])
+  constructor(private readonly prisma: PrismaService, sms: SmsNotificationChannelHandler, inApp: InAppNotificationChannelHandler, email: EmailNotificationChannelHandler) {
+    this.handlers = new Map<string, NotificationChannelHandler>([[sms.channel, sms], [inApp.channel, inApp], [email.channel, email]])
   }
   async dispatch(deliveryId: string, organizationId: string) {
     const delivery = await this.prisma.withTenantTransaction(notificationTenantContext(organizationId), tx => tx.notificationDelivery.findFirst({ where: { id: deliveryId, event: { organizationId } }, select: { id: true, channel: true } }))

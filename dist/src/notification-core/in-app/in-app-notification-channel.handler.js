@@ -57,7 +57,7 @@ let InAppNotificationChannelHandler = InAppNotificationChannelHandler_1 = class 
                     return skip('IN_APP_TEMPLATE_NOT_FOUND');
                 this.templates.validate(delivery.event.eventName, template.subject, template.body);
                 const rendered = await this.templates.renderStoredTemplate(delivery.event, recipient.id, template, tx);
-                if (!rendered.subject?.trim() || rendered.missingVariables.length)
+                if (!rendered.subject?.trim())
                     return skip('INVALID_TEMPLATE_CONTEXT');
                 const actionUrl = this.urls.resolve(delivery.event);
                 if (!actionUrl)

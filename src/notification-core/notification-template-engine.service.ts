@@ -86,7 +86,12 @@ export class NotificationTemplateEngineService {
     })
     if (!organization) throw new NotFoundException("Notification organization not found")
     const context = await this.buildContext(event, recipientUserId, organization, db)
-    return this.render({ subject: template.subject, body: template.body, context })
+    const rendered = this.render({ subject: template.subject, body: template.body, context })
+    return {
+      ...rendered,
+      subject: rendered.subject?.replace(PLACEHOLDER, "—") ?? null,
+      body: rendered.body.replace(PLACEHOLDER, "—"),
+    }
   }
 
   preview(eventName: string, subject: string | null | undefined, body: string) {

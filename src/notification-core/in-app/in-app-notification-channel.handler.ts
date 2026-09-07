@@ -38,7 +38,7 @@ export class InAppNotificationChannelHandler implements NotificationChannelHandl
         if (!template || template.channel !== this.channel || !template.isActive || template.organizationId !== organizationId || template.eventName !== delivery.event.eventName) return skip('IN_APP_TEMPLATE_NOT_FOUND');
         this.templates.validate(delivery.event.eventName, template.subject, template.body);
         const rendered = await this.templates.renderStoredTemplate(delivery.event, recipient.id, template, tx);
-        if (!rendered.subject?.trim() || rendered.missingVariables.length) return skip('INVALID_TEMPLATE_CONTEXT');
+        if (!rendered.subject?.trim()) return skip('INVALID_TEMPLATE_CONTEXT');
         const actionUrl = this.urls.resolve(delivery.event);
         if (!actionUrl) return skip('INVALID_ACTION_URL');
         const actor = delivery.event.actorId ? await tx.user.findFirst({ where: { id: delivery.event.actorId,
