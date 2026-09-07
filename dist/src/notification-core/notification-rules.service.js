@@ -31,18 +31,18 @@ let NotificationRulesService = class NotificationRulesService {
     }
     list(user) {
         const tenant = tenant_scope_util_1.tenantScope.require(user);
-        return this.prisma.notificationRule.findMany({
+        return this.prisma.withTenantTransaction(tenant, (tx) => tx.notificationRule.findMany({
             where: { organizationId: tenant.organizationId },
             include: ruleInclude,
             orderBy: [{ priority: "asc" }, { createdAt: "desc" }],
-        });
+        }));
     }
     async get(id, user) {
         const tenant = tenant_scope_util_1.tenantScope.require(user);
-        const rule = await this.prisma.notificationRule.findFirst({
+        const rule = await this.prisma.withTenantTransaction(tenant, (tx) => tx.notificationRule.findFirst({
             where: { id, organizationId: tenant.organizationId },
             include: ruleInclude,
-        });
+        }));
         if (!rule)
             throw new common_1.NotFoundException("Notification rule not found");
         return rule;
@@ -51,7 +51,7 @@ let NotificationRulesService = class NotificationRulesService {
         const tenant = tenant_scope_util_1.tenantScope.require(user);
         this.validateEvent(dto.eventName);
         await this.validateRecipients(dto.recipientRules, tenant.organizationId);
-        return this.prisma.notificationRule.create({
+        return this.prisma.withTenantTransaction(tenant, (tx) => tx.notificationRule.create({
             data: {
                 organizationId: tenant.organizationId,
                 name: dto.name.trim(),
@@ -64,7 +64,7 @@ let NotificationRulesService = class NotificationRulesService {
                 },
             },
             include: ruleInclude,
-        });
+        }));
     }
     async update(id, dto, user) {
         const tenant = tenant_scope_util_1.tenantScope.require(user);
@@ -74,7 +74,7 @@ let NotificationRulesService = class NotificationRulesService {
         if (dto.recipientRules) {
             await this.validateRecipients(dto.recipientRules, tenant.organizationId);
         }
-        return this.prisma.$transaction(async (tx) => {
+        return this.prisma.withTenantTransaction(tenant, async (tx) => {
             if (dto.recipientRules) {
                 await tx.notificationRecipientRule.deleteMany({ where: { ruleId: id } });
             }
@@ -99,8 +99,10 @@ let NotificationRulesService = class NotificationRulesService {
         });
     }
     async remove(id, user) {
-        await this.get(id, user);
-        await this.prisma.notificationRule.delete({ where: { id } });
+        const tenant = tenant_scope_util_1.tenantScope.require(user);
+        const deleted = await this.prisma.withTenantTransaction(tenant, (tx) => tx.notificationRule.deleteMany({ where: { id, organizationId: tenant.organizationId } }));
+        if (!deleted.count)
+            throw new common_1.NotFoundException("Notification rule not found");
         return { deleted: true };
     }
     catalog() {

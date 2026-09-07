@@ -40,19 +40,21 @@ export class NotificationRulesService {
 
   list(user: CurrentUserPayload) {
     const tenant = tenantScope.require(user)
-    return this.prisma.notificationRule.findMany({
+    return this.prisma.withTenantTransaction(tenant, (tx) => tx.notificationRule.findMany({
       where: { organizationId: tenant.organizationId },
       include: ruleInclude,
       orderBy: [{ priority: "asc" }, { createdAt: "desc" }],
-    })
+    }))
   }
 
   async get(id: string, user: CurrentUserPayload) {
     const tenant = tenantScope.require(user)
-    const rule = await this.prisma.notificationRule.findFirst({
-      where: { id, organizationId: tenant.organizationId },
-      include: ruleInclude,
-    })
+    const rule = await this.prisma.withTenantTransaction(tenant, (tx) =>
+      tx.notificationRule.findFirst({
+        where: { id, organizationId: tenant.organizationId },
+        include: ruleInclude,
+      }),
+    )
     if (!rule) throw new NotFoundException("Notification rule not found")
     return rule
   }
@@ -62,7 +64,7 @@ export class NotificationRulesService {
     this.validateEvent(dto.eventName)
     await this.validateRecipients(dto.recipientRules, tenant.organizationId)
 
-    return this.prisma.notificationRule.create({
+    return this.prisma.withTenantTransaction(tenant, (tx) => tx.notificationRule.create({
       data: {
         organizationId: tenant.organizationId,
         name: dto.name.trim(),
@@ -77,7 +79,7 @@ export class NotificationRulesService {
         },
       },
       include: ruleInclude,
-    })
+    }))
   }
 
   async update(
@@ -92,7 +94,7 @@ export class NotificationRulesService {
       await this.validateRecipients(dto.recipientRules, tenant.organizationId)
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    return this.prisma.withTenantTransaction(tenant, async (tx) => {
       if (dto.recipientRules) {
         await tx.notificationRecipientRule.deleteMany({ where: { ruleId: id } })
       }
@@ -121,8 +123,11 @@ export class NotificationRulesService {
   }
 
   async remove(id: string, user: CurrentUserPayload) {
-    await this.get(id, user)
-    await this.prisma.notificationRule.delete({ where: { id } })
+    const tenant = tenantScope.require(user)
+    const deleted = await this.prisma.withTenantTransaction(tenant, (tx) =>
+      tx.notificationRule.deleteMany({ where: { id, organizationId: tenant.organizationId } }),
+    )
+    if (!deleted.count) throw new NotFoundException("Notification rule not found")
     return { deleted: true }
   }
 
