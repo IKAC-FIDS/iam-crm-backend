@@ -2,6 +2,9 @@ FROM node:20-bookworm-slim AS builder
 
 WORKDIR /app
 
+ARG NPM_CONFIG_REGISTRY=https://package-mirror.liara.ir/repository/npm/
+ENV NPM_CONFIG_REGISTRY=${NPM_CONFIG_REGISTRY}
+
 RUN apt-get update \
     && apt-get install -y --no-install-recommends openssl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
@@ -15,9 +18,13 @@ RUN npx prisma generate
 COPY . .
 RUN npm run build
 
+
 FROM node:20-bookworm-slim AS runtime
 
 WORKDIR /app
+
+ARG NPM_CONFIG_REGISTRY=https://package-mirror.liara.ir/repository/npm/
+ENV NPM_CONFIG_REGISTRY=${NPM_CONFIG_REGISTRY}
 
 ENV NODE_ENV=production
 
