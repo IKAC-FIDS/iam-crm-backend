@@ -18,13 +18,15 @@ const prisma_service_1 = require("../prisma/prisma.service");
 const notification_core_catalog_1 = require("./notification-core.catalog");
 const notification_template_engine_service_1 = require("./notification-template-engine.service");
 const sms_settings_service_1 = require("./sms/sms-settings.service");
+const push_settings_service_1 = require("./push/push-settings.service");
 const events = Object.entries(notification_core_catalog_1.NOTIFICATION_EVENT_CATALOG).flatMap(([service, actions]) => Object.entries(actions).map(([action, eventName]) => ({ eventName, service, action })));
 const allowedEvents = new Set(events.map((item) => item.eventName));
 let NotificationAdminService = class NotificationAdminService {
-    constructor(prisma, templateEngine, smsSettings) {
+    constructor(prisma, templateEngine, smsSettings, pushSettings) {
         this.prisma = prisma;
         this.templateEngine = templateEngine;
         this.smsSettings = smsSettings;
+        this.pushSettings = pushSettings;
     }
     catalog() {
         return { events };
@@ -204,7 +206,7 @@ let NotificationAdminService = class NotificationAdminService {
         return [
             { channel: "EMAIL", available: emailConfigured, configured: emailConfigured, usable: emailConfigured, provider: email?.smtpHost || null, configurationPath: "/admin/email-settings" },
             await this.smsSettings.status(organizationId),
-            { channel: "PUSH", available: false, configured: false, usable: false, provider: null, configurationPath: null },
+            await this.pushSettings.status(tenant_scope_util_1.tenantScope.require(user)),
             { channel: "IN_APP", available: true, configured: true, enabled: true, usable: true, provider: "Notification Center", configurationPath: null },
         ];
     }
@@ -228,6 +230,7 @@ exports.NotificationAdminService = NotificationAdminService = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
         notification_template_engine_service_1.NotificationTemplateEngineService,
-        sms_settings_service_1.SmsSettingsService])
+        sms_settings_service_1.SmsSettingsService,
+        push_settings_service_1.PushSettingsService])
 ], NotificationAdminService);
 //# sourceMappingURL=notification-admin.service.js.map

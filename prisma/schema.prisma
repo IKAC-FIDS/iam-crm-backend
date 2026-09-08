@@ -505,9 +505,10 @@ model User {
   taskReviewArtifactsAdded          TaskReviewArtifact[]       @relation("TaskReviewArtifactAddedBy")
   platformAuthority                 PlatformAuthority?
 
-  notificationCoreEventActions NotificationEvent[]      @relation("NotificationCoreEventActor")
-  notificationCoreDeliveries   NotificationDelivery[]   @relation("NotificationCoreDeliveryRecipient")
-  notificationCorePreferences  NotificationPreference[] @relation("NotificationCorePreferences")
+  notificationCoreEventActions NotificationEvent[]        @relation("NotificationCoreEventActor")
+  notificationCoreDeliveries   NotificationDelivery[]     @relation("NotificationCoreDeliveryRecipient")
+  notificationCorePreferences  NotificationPreference[]   @relation("NotificationCorePreferences")
+  notificationPushEndpoints    NotificationPushEndpoint[]
 
   @@index([organizationId])
   @@index([teamId])
@@ -603,11 +604,13 @@ model Organization {
   tenders             Tender[]
   tenderReviews       TenderReview[]
 
-  notificationCoreEvents      NotificationEvent[]      @relation("NotificationCoreEvents")
-  notificationCoreRules       NotificationRule[]       @relation("NotificationCoreRules")
-  notificationCoreTemplates   NotificationTemplate[]   @relation("NotificationCoreTemplates")
-  notificationCorePreferences NotificationPreference[] @relation("NotificationCorePreferences")
+  notificationCoreEvents      NotificationEvent[]        @relation("NotificationCoreEvents")
+  notificationCoreRules       NotificationRule[]         @relation("NotificationCoreRules")
+  notificationCoreTemplates   NotificationTemplate[]     @relation("NotificationCoreTemplates")
+  notificationCorePreferences NotificationPreference[]   @relation("NotificationCorePreferences")
   notificationSmsSettings     NotificationSmsSettings?
+  notificationPushSettings    NotificationPushSettings?
+  notificationPushEndpoints   NotificationPushEndpoint[]
 
   @@index([status])
   @@index([createdAt])
@@ -3230,4 +3233,50 @@ model NotificationSmsSettings {
 
   @@index([organizationId, enabled])
   @@map("notification_sms_settings")
+}
+
+enum NotificationPushEndpointType {
+  WEB
+  ANDROID
+  IOS
+  OTHER
+}
+
+model NotificationPushSettings {
+  id             String       @id @default(uuid())
+  organizationId String       @unique
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  provider       String       @default("WEB_PUSH")
+  publicKey      String?
+  privateKeyEnc  String?
+  subject        String?
+  enabled        Boolean      @default(false)
+  timeoutMs      Int          @default(10000)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([organizationId, enabled])
+  @@map("notification_push_settings")
+}
+
+model NotificationPushEndpoint {
+  id                 String                       @id @default(uuid())
+  organizationId     String
+  organization       Organization                 @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId             String
+  user               User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider           String                       @default("WEB_PUSH")
+  endpointType       NotificationPushEndpointType @default(WEB)
+  externalEndpointId String
+  endpointEnc        String
+  metadata           Json?
+  active             Boolean                      @default(true)
+  lastSeenAt         DateTime                     @default(now())
+  createdAt          DateTime                     @default(now())
+  updatedAt          DateTime                     @updatedAt
+
+  @@unique([organizationId, provider, externalEndpointId])
+  @@index([organizationId])
+  @@index([organizationId, userId, provider, active])
+  @@map("notification_push_endpoints")
 }

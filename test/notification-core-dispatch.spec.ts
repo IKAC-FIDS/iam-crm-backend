@@ -32,8 +32,22 @@ describe('Notification Core automatic inbox dispatch', () => {
     const core = new NotificationCoreService(prisma as any, rules as any, dispatcher as any);
     await core.publishAndEvaluate({ organizationId: 'org-a', eventName: 'TASK.ASSIGNED', aggregateType: 'TASK', aggregateId: 'task-1' });
     expect(rules.evaluateEvent).toHaveBeenCalledWith(event, tx);
-    expect(tx.notificationDelivery.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ channel: { in: ['IN_APP', 'EMAIL', 'SMS'] }, event: { organizationId: 'org-a' } }) }));
+    expect(tx.notificationDelivery.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ channel: { in: ['IN_APP', 'EMAIL', 'SMS', 'PUSH'] }, event: { organizationId: 'org-a' } }) }));
     expect(dispatcher.dispatch).toHaveBeenCalledWith('delivery-1', 'org-a');
     expect(prisma.withTenantTransaction).toHaveBeenCalledWith(expect.objectContaining({ organizationId: 'org-a', platformAdmin: false }), expect.any(Function));
+  });
+  it('continues dispatching independent channels after one delivery fails', async () => {
+    const event = { id: 'event-1', organizationId: 'org-a', eventName: 'TASK.ASSIGNED' };
+    const tx = {
+      notificationEvent: { create: jest.fn().mockResolvedValue(event) },
+      notificationDelivery: { findMany: jest.fn().mockResolvedValue([{ id: 'push-delivery' }, { id: 'email-delivery' }]) },
+    };
+    const prisma = { withTenantTransaction: jest.fn(async (_context, callback) => callback(tx)) };
+    const rules = { evaluateEvent: jest.fn().mockResolvedValue({ created: 2 }) };
+    const dispatcher = { dispatch: jest.fn().mockRejectedValueOnce(new Error('push failed')).mockResolvedValueOnce({ sent: true, status: 'SENT' }) };
+    const core = new NotificationCoreService(prisma as any, rules as any, dispatcher as any);
+    await core.publishAndEvaluate({ organizationId: 'org-a', eventName: 'TASK.ASSIGNED', aggregateType: 'TASK', aggregateId: 'task-1' });
+    expect(dispatcher.dispatch).toHaveBeenNthCalledWith(1, 'push-delivery', 'org-a');
+    expect(dispatcher.dispatch).toHaveBeenNthCalledWith(2, 'email-delivery', 'org-a');
   });
 });

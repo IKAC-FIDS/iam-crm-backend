@@ -30,14 +30,19 @@ const in_app_notification_channel_handler_1 = require("./in-app/in-app-notificat
 const notification_action_url_resolver_1 = require("./in-app/notification-action-url.resolver");
 const email_module_1 = require("../email/email.module");
 const email_notification_channel_handler_1 = require("./email/email-notification-channel.handler");
+const push_controller_1 = require("./push/push.controller");
+const push_notification_channel_handler_1 = require("./push/push-notification-channel.handler");
+const push_provider_registry_1 = require("./push/push-provider.registry");
+const push_settings_service_1 = require("./push/push-settings.service");
+const web_push_provider_1 = require("./push/web-push.provider");
 let NotificationCoreModule = class NotificationCoreModule {
 };
 exports.NotificationCoreModule = NotificationCoreModule;
 exports.NotificationCoreModule = NotificationCoreModule = __decorate([
     (0, common_1.Module)({
         imports: [prisma_module_1.PrismaModule, sso_module_1.SsoModule, audit_log_module_1.AuditLogModule, notifications_module_1.NotificationsModule, email_module_1.EmailModule],
-        controllers: [notification_rules_controller_1.NotificationRulesController, notification_admin_controller_1.NotificationAdminController, notification_admin_controller_1.NotificationTemplatesController, notification_admin_controller_1.NotificationDeliveriesController, sms_admin_controller_1.SmsAdminController],
-        providers: [email_notification_channel_handler_1.EmailNotificationChannelHandler, in_app_notification_channel_handler_1.InAppNotificationChannelHandler, notification_action_url_resolver_1.InAppNotificationMetadataMapper, notification_action_url_resolver_1.NotificationActionUrlResolver, notification_core_service_1.NotificationCoreService, notification_rules_service_1.NotificationRulesService, notification_rule_engine_service_1.NotificationRuleEngineService, notification_admin_service_1.NotificationAdminService, notification_template_engine_service_1.NotificationTemplateEngineService, generic_http_sms_provider_1.GenericHttpSmsProvider, sms_provider_registry_1.SmsProviderRegistry, sms_recipient_resolver_service_1.SmsRecipientResolver, sms_settings_service_1.SmsSettingsService, sms_notification_channel_handler_1.SmsNotificationChannelHandler, notification_delivery_dispatcher_service_1.NotificationDeliveryDispatcher],
+        controllers: [notification_rules_controller_1.NotificationRulesController, notification_admin_controller_1.NotificationAdminController, notification_admin_controller_1.NotificationTemplatesController, notification_admin_controller_1.NotificationDeliveriesController, sms_admin_controller_1.SmsAdminController, push_controller_1.PushAdminController, push_controller_1.PushSubscriptionController],
+        providers: [push_notification_channel_handler_1.PushNotificationChannelHandler, push_provider_registry_1.PushProviderRegistry, push_settings_service_1.PushSettingsService, web_push_provider_1.WebPushProvider, email_notification_channel_handler_1.EmailNotificationChannelHandler, in_app_notification_channel_handler_1.InAppNotificationChannelHandler, notification_action_url_resolver_1.InAppNotificationMetadataMapper, notification_action_url_resolver_1.NotificationActionUrlResolver, notification_core_service_1.NotificationCoreService, notification_rules_service_1.NotificationRulesService, notification_rule_engine_service_1.NotificationRuleEngineService, notification_admin_service_1.NotificationAdminService, notification_template_engine_service_1.NotificationTemplateEngineService, generic_http_sms_provider_1.GenericHttpSmsProvider, sms_provider_registry_1.SmsProviderRegistry, sms_recipient_resolver_service_1.SmsRecipientResolver, sms_settings_service_1.SmsSettingsService, sms_notification_channel_handler_1.SmsNotificationChannelHandler, notification_delivery_dispatcher_service_1.NotificationDeliveryDispatcher],
         exports: [notification_core_service_1.NotificationCoreService, notification_rules_service_1.NotificationRulesService, notification_rule_engine_service_1.NotificationRuleEngineService, notification_template_engine_service_1.NotificationTemplateEngineService, notification_delivery_dispatcher_service_1.NotificationDeliveryDispatcher],
     })
 ], NotificationCoreModule);

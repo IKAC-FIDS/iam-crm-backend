@@ -21,11 +21,16 @@ import { InAppNotificationChannelHandler } from './in-app/in-app-notification-ch
 import { InAppNotificationMetadataMapper, NotificationActionUrlResolver } from './in-app/notification-action-url.resolver'
 import { EmailModule } from '../email/email.module'
 import { EmailNotificationChannelHandler } from './email/email-notification-channel.handler'
+import { PushAdminController, PushSubscriptionController } from './push/push.controller'
+import { PushNotificationChannelHandler } from './push/push-notification-channel.handler'
+import { PushProviderRegistry } from './push/push-provider.registry'
+import { PushSettingsService } from './push/push-settings.service'
+import { WebPushProvider } from './push/web-push.provider'
 
 @Module({
   imports: [PrismaModule, SsoModule, AuditLogModule, NotificationsModule, EmailModule],
-  controllers: [NotificationRulesController, NotificationAdminController, NotificationTemplatesController, NotificationDeliveriesController, SmsAdminController],
-  providers: [EmailNotificationChannelHandler, InAppNotificationChannelHandler, InAppNotificationMetadataMapper, NotificationActionUrlResolver, NotificationCoreService, NotificationRulesService, NotificationRuleEngineService, NotificationAdminService, NotificationTemplateEngineService, GenericHttpSmsProvider, SmsProviderRegistry, SmsRecipientResolver, SmsSettingsService, SmsNotificationChannelHandler, NotificationDeliveryDispatcher],
+  controllers: [NotificationRulesController, NotificationAdminController, NotificationTemplatesController, NotificationDeliveriesController, SmsAdminController, PushAdminController, PushSubscriptionController],
+  providers: [PushNotificationChannelHandler, PushProviderRegistry, PushSettingsService, WebPushProvider, EmailNotificationChannelHandler, InAppNotificationChannelHandler, InAppNotificationMetadataMapper, NotificationActionUrlResolver, NotificationCoreService, NotificationRulesService, NotificationRuleEngineService, NotificationAdminService, NotificationTemplateEngineService, GenericHttpSmsProvider, SmsProviderRegistry, SmsRecipientResolver, SmsSettingsService, SmsNotificationChannelHandler, NotificationDeliveryDispatcher],
   exports: [NotificationCoreService, NotificationRulesService, NotificationRuleEngineService, NotificationTemplateEngineService, NotificationDeliveryDispatcher],
 })
 export class NotificationCoreModule {}

@@ -42,10 +42,17 @@ let NotificationCoreService = NotificationCoreService_1 = class NotificationCore
         const event = await this.prisma.withTenantTransaction(context, tx => this.publish(input, tx));
         const evaluation = await this.prisma.withTenantTransaction(context, tx => this.ruleEngine.evaluateEvent(event, tx));
         const pending = await this.prisma.withTenantTransaction(context, tx => tx.notificationDelivery.findMany({
-            where: { eventId: event.id, event: { organizationId: input.organizationId }, channel: { in: ['IN_APP', 'EMAIL', 'SMS'] }, status: { in: ['PENDING', 'RETRYING'] } }, select: { id: true },
+            where: { eventId: event.id, event: { organizationId: input.organizationId }, channel: { in: ['IN_APP', 'EMAIL', 'SMS', 'PUSH'] }, status: { in: ['PENDING', 'RETRYING'] } }, select: { id: true },
         }));
-        for (const delivery of pending)
-            await this.dispatcher.dispatch(delivery.id, input.organizationId);
+        for (const delivery of pending) {
+            try {
+                await this.dispatcher.dispatch(delivery.id, input.organizationId);
+            }
+            catch (error) {
+                const detail = error instanceof Error ? error.stack ?? error.message : String(error);
+                this.logger.error(`Notification delivery failed deliveryId=${delivery.id} organizationId=${input.organizationId}`, detail);
+            }
+        }
         return { event, evaluation };
     }
     async publishDomainEvent(input) {
