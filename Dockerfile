@@ -4,12 +4,16 @@ WORKDIR /app
 
 ARG NPM_CONFIG_REGISTRY=https://package-mirror.liara.ir/repository/npm/
 ENV NPM_CONFIG_REGISTRY=${NPM_CONFIG_REGISTRY}
+ENV NPM_CONFIG_REPLACE_REGISTRY_HOST=always
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends openssl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 COPY package*.json ./
+
+RUN npm config get registry
+RUN npm config get replace-registry-host
 RUN npm ci
 
 COPY prisma ./prisma
@@ -25,6 +29,7 @@ WORKDIR /app
 
 ARG NPM_CONFIG_REGISTRY=https://package-mirror.liara.ir/repository/npm/
 ENV NPM_CONFIG_REGISTRY=${NPM_CONFIG_REGISTRY}
+ENV NPM_CONFIG_REPLACE_REGISTRY_HOST=always
 
 ENV NODE_ENV=production
 
