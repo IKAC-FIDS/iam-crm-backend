@@ -1,5 +1,6 @@
 import { NotificationCoreService } from '../src/notification-core/notification-core.service';
 import { NotificationRuleEngineService } from '../src/notification-core/notification-rule-engine.service';
+import { NotificationPolicyEvaluatorService } from '../src/notification-core/policy/notification-policy-evaluator.service';
 
 describe('Notification Core automatic inbox dispatch', () => {
   it('keeps channel deliveries separate and re-evaluates without duplicates', async () => {
@@ -14,7 +15,7 @@ describe('Notification Core automatic inbox dispatch', () => {
       }) },
     };
     const templates = { renderDelivery: jest.fn().mockResolvedValue({ template: { id: 'template-1' } }) };
-    const engine = new NotificationRuleEngineService(db as any, templates as any);
+    const engine = new NotificationRuleEngineService(db as any, templates as any, {} as any, { hasConditions: jest.fn().mockReturnValue(false) } as any);
     const event = { id: 'event-1', organizationId: 'org-a', eventName: 'TASK.ASSIGNED' } as any;
     expect(await engine.evaluateEvent(event)).toMatchObject({ created: 3, duplicate: 0 });
     expect(await engine.evaluateEvent(event)).toMatchObject({ created: 0, duplicate: 3 });
@@ -49,5 +50,23 @@ describe('Notification Core automatic inbox dispatch', () => {
     await core.publishAndEvaluate({ organizationId: 'org-a', eventName: 'TASK.ASSIGNED', aggregateType: 'TASK', aggregateId: 'task-1' });
     expect(dispatcher.dispatch).toHaveBeenNthCalledWith(1, 'push-delivery', 'org-a');
     expect(dispatcher.dispatch).toHaveBeenNthCalledWith(2, 'email-delivery', 'org-a');
+  });
+  it('creates deliveries only for matching conditional rules within the event tenant', async () => {
+    const recipient = { id: 'recipient-1', type: 'USER', targetId: 'user-1', channels: ['EMAIL'], enabled: true };
+    const db = {
+      notificationRule: { findMany: jest.fn().mockResolvedValue([
+        { id: 'high-rule', conditions: { version: 1, logic: 'AND', conditions: [{ field: 'task.priority', operator: 'EQ', value: 'HIGH' }] }, recipientRules: [recipient] },
+        { id: 'low-rule', conditions: { version: 1, logic: 'AND', conditions: [{ field: 'task.priority', operator: 'EQ', value: 'LOW' }] }, recipientRules: [recipient] },
+      ]) },
+      user: { findMany: jest.fn().mockResolvedValue([{ id: 'user-1' }]) },
+      notificationDelivery: { createMany: jest.fn().mockResolvedValue({ count: 1 }) },
+    };
+    const templates = { renderDelivery: jest.fn().mockResolvedValue({ template: { id: 'template-1' } }) };
+    const contextBuilder = { build: jest.fn().mockResolvedValue({ event: { name: 'TASK.ASSIGNED' }, actor: { id: null, roleId: null, teamId: null }, organization: { id: 'org-a' }, task: { id: 'task-1', title: 'کار', priority: 'HIGH', status: 'TODO', assigneeId: 'user-1', teamId: null, creatorId: null }, meeting: null, opportunity: null }) };
+    const engine = new NotificationRuleEngineService(db as any, templates as any, contextBuilder as any, new NotificationPolicyEvaluatorService());
+    const result = await engine.evaluateEvent({ id: 'event-1', organizationId: 'org-a', eventName: 'TASK.ASSIGNED', aggregateType: 'TASK', aggregateId: 'task-1' } as any);
+    expect(db.notificationRule.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { organizationId: 'org-a', eventName: 'TASK.ASSIGNED', enabled: true } }));
+    expect(result).toMatchObject({ rules: 2, matchedRules: 1, created: 1 });
+    expect(db.notificationDelivery.createMany).toHaveBeenCalledTimes(1);
   });
 });

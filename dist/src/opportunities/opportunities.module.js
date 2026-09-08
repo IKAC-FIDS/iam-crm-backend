@@ -20,12 +20,13 @@ const opportunity_payments_service_1 = require("./opportunity-payments.service")
 const opportunities_controller_1 = require("./opportunities.controller");
 const opportunities_service_1 = require("./opportunities.service");
 const quota_module_1 = require("../quota/quota.module");
+const notification_core_module_1 = require("../notification-core/notification-core.module");
 let OpportunitiesModule = class OpportunitiesModule {
 };
 exports.OpportunitiesModule = OpportunitiesModule;
 exports.OpportunitiesModule = OpportunitiesModule = __decorate([
     (0, common_1.Module)({
-        imports: [pipeline_config_module_1.PipelineConfigModule, attachments_module_1.AttachmentsModule, quota_module_1.QuotaModule],
+        imports: [pipeline_config_module_1.PipelineConfigModule, attachments_module_1.AttachmentsModule, quota_module_1.QuotaModule, notification_core_module_1.NotificationCoreModule],
         controllers: [
             opportunities_controller_1.OpportunitiesController,
             company_opportunities_controller_1.CompanyOpportunitiesController,

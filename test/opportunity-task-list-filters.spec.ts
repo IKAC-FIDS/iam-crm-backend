@@ -27,6 +27,7 @@ describe('activeOnly opportunity filtering', () => {
         {} as any,
         {} as any,
         quotaMock() as any,
+        {} as any,
       ),
     };
   }
@@ -77,6 +78,7 @@ describe('activeOnly opportunity filtering', () => {
       {} as any,
       {} as any,
       quotaMock() as any,
+      {} as any,
     );
     const result = await service.findAll(
       { activeOnly: 'true', page: 1, limit: 20 },

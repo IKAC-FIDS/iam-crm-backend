@@ -23,6 +23,7 @@ const api_date_util_1 = require("../common/dates/api-date.util");
 const ownership_scope_dto_1 = require("../common/dto/ownership-scope.dto");
 const active_opportunity_scope_1 = require("../common/opportunities/active-opportunity-scope");
 const quota_service_1 = require("../quota/quota.service");
+const notification_core_service_1 = require("../notification-core/notification-core.service");
 const opportunityInclude = {
     company: {
         select: {
@@ -113,11 +114,12 @@ const opportunityInclude = {
     },
 };
 let OpportunitiesService = class OpportunitiesService {
-    constructor(prisma, pipelineConfig, audit, quota) {
+    constructor(prisma, pipelineConfig, audit, quota, notificationCore) {
         this.prisma = prisma;
         this.pipelineConfig = pipelineConfig;
         this.audit = audit;
         this.quota = quota;
+        this.notificationCore = notificationCore;
     }
     async findAll(query, user) {
         const page = query.page ?? 1;
@@ -427,6 +429,15 @@ let OpportunitiesService = class OpportunitiesService {
             metadata: {
                 note: dto.note,
             },
+        });
+        await this.notificationCore.publishDomainEvent({
+            organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
+            eventName: 'OPPORTUNITY.STAGE_CHANGED',
+            aggregateType: 'OPPORTUNITY',
+            aggregateId: id,
+            actorId: user.userId,
+            idempotencyKey: `OPPORTUNITY.STAGE_CHANGED:${id}:${updated.updatedAt.toISOString()}`,
+            payload: { fromStage: current.stage.code, toStage: target.code },
         });
         return updated;
     }
@@ -897,6 +908,7 @@ exports.OpportunitiesService = OpportunitiesService = __decorate([
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
         pipeline_config_service_1.PipelineConfigService,
         audit_log_service_1.AuditLogService,
-        quota_service_1.QuotaService])
+        quota_service_1.QuotaService,
+        notification_core_service_1.NotificationCoreService])
 ], OpportunitiesService);
 //# sourceMappingURL=opportunities.service.js.map

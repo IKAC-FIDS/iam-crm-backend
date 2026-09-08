@@ -14,10 +14,14 @@ const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
 const prisma_service_1 = require("../prisma/prisma.service");
 const notification_template_engine_service_1 = require("./notification-template-engine.service");
+const notification_policy_context_builder_service_1 = require("./policy/notification-policy-context-builder.service");
+const notification_policy_evaluator_service_1 = require("./policy/notification-policy-evaluator.service");
 let NotificationRuleEngineService = class NotificationRuleEngineService {
-    constructor(prisma, templateEngine) {
+    constructor(prisma, templateEngine, contextBuilder, policyEvaluator) {
         this.prisma = prisma;
         this.templateEngine = templateEngine;
+        this.contextBuilder = contextBuilder;
+        this.policyEvaluator = policyEvaluator;
     }
     async evaluateEvent(event, db = this.prisma) {
         const rules = await db.notificationRule.findMany({
@@ -37,7 +41,13 @@ let NotificationRuleEngineService = class NotificationRuleEngineService {
         let created = 0;
         let duplicate = 0;
         let unresolved = 0;
+        let matchedRules = 0;
+        const needsPolicyContext = rules.some(rule => this.policyEvaluator.hasConditions(rule.conditions));
+        const policyContext = needsPolicyContext ? await this.contextBuilder.build(event, db) : null;
         for (const rule of rules) {
+            if (policyContext && !this.policyEvaluator.evaluate(rule.conditions, policyContext).matches)
+                continue;
+            matchedRules += 1;
             for (const recipientRule of rule.recipientRules) {
                 const recipientIds = await this.resolveRecipientIds(event, recipientRule, db);
                 if (!recipientIds.length) {
@@ -89,7 +99,7 @@ let NotificationRuleEngineService = class NotificationRuleEngineService {
                 }
             }
         }
-        return { rules: rules.length, created, duplicate, unresolved };
+        return { rules: rules.length, matchedRules, created, duplicate, unresolved };
     }
     async resolveRecipientIds(event, rule, db) {
         switch (rule.type) {
@@ -259,6 +269,8 @@ exports.NotificationRuleEngineService = NotificationRuleEngineService;
 exports.NotificationRuleEngineService = NotificationRuleEngineService = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
-        notification_template_engine_service_1.NotificationTemplateEngineService])
+        notification_template_engine_service_1.NotificationTemplateEngineService,
+        notification_policy_context_builder_service_1.NotificationPolicyContextBuilder,
+        notification_policy_evaluator_service_1.NotificationPolicyEvaluatorService])
 ], NotificationRuleEngineService);
 //# sourceMappingURL=notification-rule-engine.service.js.map

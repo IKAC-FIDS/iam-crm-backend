@@ -9,12 +9,16 @@ import {
 } from "@prisma/client"
 import { PrismaService, type TenantTransactionClient } from "../prisma/prisma.service"
 import { NotificationTemplateEngineService } from "./notification-template-engine.service"
+import { NotificationPolicyContextBuilder } from "./policy/notification-policy-context-builder.service"
+import { NotificationPolicyEvaluatorService } from "./policy/notification-policy-evaluator.service"
 
 @Injectable()
 export class NotificationRuleEngineService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly templateEngine: NotificationTemplateEngineService,
+    private readonly contextBuilder: NotificationPolicyContextBuilder,
+    private readonly policyEvaluator: NotificationPolicyEvaluatorService,
   ) {}
 
   async evaluateEvent(event: NotificationEvent, db: TenantTransactionClient = this.prisma) {
@@ -36,8 +40,13 @@ export class NotificationRuleEngineService {
     let created = 0
     let duplicate = 0
     let unresolved = 0
+    let matchedRules = 0
+    const needsPolicyContext = rules.some(rule => this.policyEvaluator.hasConditions(rule.conditions))
+    const policyContext = needsPolicyContext ? await this.contextBuilder.build(event, db) : null
 
     for (const rule of rules) {
+      if (policyContext && !this.policyEvaluator.evaluate(rule.conditions, policyContext).matches) continue
+      matchedRules += 1
       for (const recipientRule of rule.recipientRules) {
         const recipientIds = await this.resolveRecipientIds(event, recipientRule, db)
         if (!recipientIds.length) {
@@ -91,7 +100,7 @@ export class NotificationRuleEngineService {
       }
     }
 
-    return { rules: rules.length, created, duplicate, unresolved }
+    return { rules: rules.length, matchedRules, created, duplicate, unresolved }
   }
 
   private async resolveRecipientIds(

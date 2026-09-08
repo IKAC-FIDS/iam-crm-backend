@@ -29,6 +29,7 @@ import { parseApiDate, parseApiDateRange } from '../common/dates/api-date.util';
 import { OwnershipScope } from '../common/dto/ownership-scope.dto';
 import { activeOpportunityStateWhere } from '../common/opportunities/active-opportunity-scope';
 import { QuotaService } from '../quota/quota.service';
+import { NotificationCoreService } from '../notification-core/notification-core.service';
 
 const opportunityInclude = {
   company: {
@@ -128,6 +129,7 @@ export class OpportunitiesService {
     private pipelineConfig: PipelineConfigService,
     private audit: AuditLogService,
     private quota: QuotaService,
+    private notificationCore: NotificationCoreService,
   ) {}
 
   async findAll(query: FindOpportunitiesDto, user: CurrentUserPayload) {
@@ -519,6 +521,16 @@ export class OpportunitiesService {
       metadata: {
         note: dto.note,
       },
+    });
+
+    await this.notificationCore.publishDomainEvent({
+      organizationId: getCurrentOrganizationId(user),
+      eventName: 'OPPORTUNITY.STAGE_CHANGED',
+      aggregateType: 'OPPORTUNITY',
+      aggregateId: id,
+      actorId: user.userId,
+      idempotencyKey: `OPPORTUNITY.STAGE_CHANGED:${id}:${updated.updatedAt.toISOString()}`,
+      payload: { fromStage: current.stage.code, toStage: target.code },
     });
 
     return updated;

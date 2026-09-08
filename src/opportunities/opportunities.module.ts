@@ -11,9 +11,10 @@ import { OpportunityPaymentsService } from './opportunity-payments.service';
 import { OpportunitiesController } from './opportunities.controller';
 import { OpportunitiesService } from './opportunities.service';
 import { QuotaModule } from '../quota/quota.module';
+import { NotificationCoreModule } from '../notification-core/notification-core.module';
 
 @Module({
-  imports: [PipelineConfigModule, AttachmentsModule, QuotaModule],
+  imports: [PipelineConfigModule, AttachmentsModule, QuotaModule, NotificationCoreModule],
   controllers: [
     OpportunitiesController,
     CompanyOpportunitiesController,

@@ -141,6 +141,16 @@ let NotificationTemplateEngineService = class NotificationTemplateEngineService 
                 },
             };
         }
+        if (event.aggregateType === "OPPORTUNITY") {
+            const opportunity = await db.opportunity.findFirst({
+                where: { id: event.aggregateId, organizationId: event.organizationId },
+                select: { id: true, title: true, priority: true, probability: true, stage: { select: { code: true } } },
+            });
+            if (!opportunity)
+                throw new common_1.NotFoundException("Notification opportunity not found");
+            const payload = event.payload && typeof event.payload === "object" && !Array.isArray(event.payload) ? event.payload : {};
+            return { ...base, opportunity: { id: opportunity.id, title: opportunity.title, priority: opportunity.priority, probability: opportunity.probability, stage: opportunity.stage.code, fromStage: typeof payload.fromStage === "string" ? payload.fromStage : null, toStage: typeof payload.toStage === "string" ? payload.toStage : opportunity.stage.code } };
+        }
         return base;
     }
     sampleContext(eventName) {
@@ -153,6 +163,8 @@ let NotificationTemplateEngineService = class NotificationTemplateEngineService 
             return { ...base, meeting: { id: "preview-meeting", title: "بررسی قرارداد", startAt: "۱۴۰۵/۰۶/۱۵، ۱۰:۰۰", endAt: "۱۴۰۵/۰۶/۱۵، ۱۱:۰۰", location: "اتاق جلسات", agenda: "مرور شرایط قرارداد", company: { id: "preview-company", name: "شرکت نمونه" } } };
         if (eventName.startsWith("TASK."))
             return { ...base, task: { id: "preview-task", title: "پیگیری پیشنهاد", description: "تماس با مشتری", dueAt: "۱۴۰۵/۰۶/۲۰، ۱۲:۰۰", dueDate: "۱۴۰۵/۰۶/۲۰، ۱۲:۰۰", priority: "MEDIUM", opportunity: { title: "فرصت نمونه" }, company: { id: "preview-company", name: "شرکت نمونه" } } };
+        if (eventName.startsWith("OPPORTUNITY."))
+            return { ...base, opportunity: { id: "preview-opportunity", title: "فرصت نمونه", priority: "HIGH", probability: 80, stage: "WON", fromStage: "QUALIFIED", toStage: "WON" } };
         return base;
     }
     extract(...texts) {

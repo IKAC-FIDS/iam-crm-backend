@@ -6,6 +6,7 @@ import {
   IsEnum,
   IsInt,
   IsNotEmpty,
+  IsObject,
   IsOptional,
   IsString,
   Max,
@@ -55,6 +56,10 @@ export class CreateNotificationRuleDto {
   @Max(10000)
   priority?: number
 
+  @IsOptional()
+  @IsObject()
+  conditions?: Record<string, unknown> | null
+
   @IsArray()
   @ArrayNotEmpty()
   @ValidateNested({ each: true })
@@ -86,6 +91,10 @@ export class UpdateNotificationRuleDto {
   @Min(0)
   @Max(10000)
   priority?: number
+
+  @IsOptional()
+  @IsObject()
+  conditions?: Record<string, unknown> | null
 
   @IsOptional()
   @IsArray()

@@ -9,11 +9,15 @@ export const NOTIFICATION_EVENT_CATALOG = {
     REASSIGNED: "TASK.REASSIGNED",
     COMPLETED: "TASK.COMPLETED",
   },
+  OPPORTUNITY: {
+    STAGE_CHANGED: "OPPORTUNITY.STAGE_CHANGED",
+  },
 } as const
 
 export type NotificationEventName =
   | (typeof NOTIFICATION_EVENT_CATALOG.MEETING)[keyof typeof NOTIFICATION_EVENT_CATALOG.MEETING]
   | (typeof NOTIFICATION_EVENT_CATALOG.TASK)[keyof typeof NOTIFICATION_EVENT_CATALOG.TASK]
+  | (typeof NOTIFICATION_EVENT_CATALOG.OPPORTUNITY)[keyof typeof NOTIFICATION_EVENT_CATALOG.OPPORTUNITY]
 
 export const NOTIFICATION_CHANNELS = ["EMAIL", "SMS", "PUSH", "IN_APP"] as const
 export type NotificationChannelCode = (typeof NOTIFICATION_CHANNELS)[number]
@@ -58,6 +62,16 @@ const taskVariables: NotificationTemplateVariable[] = [
   { key: "task.company.name", token: "{{task.company.name}}", label: "نام شرکت کار", type: "string" },
 ]
 
+const opportunityVariables: NotificationTemplateVariable[] = [
+  { key: "opportunity.id", token: "{{opportunity.id}}", label: "شناسه فرصت", type: "string" },
+  { key: "opportunity.title", token: "{{opportunity.title}}", label: "عنوان فرصت", type: "string" },
+  { key: "opportunity.priority", token: "{{opportunity.priority}}", label: "اولویت فرصت", type: "string" },
+  { key: "opportunity.probability", token: "{{opportunity.probability}}", label: "احتمال موفقیت فرصت", type: "string" },
+  { key: "opportunity.stage", token: "{{opportunity.stage}}", label: "مرحله فعلی فرصت", type: "string" },
+  { key: "opportunity.fromStage", token: "{{opportunity.fromStage}}", label: "مرحله قبلی فرصت", type: "string" },
+  { key: "opportunity.toStage", token: "{{opportunity.toStage}}", label: "مرحله جدید فرصت", type: "string" },
+]
+
 export const NOTIFICATION_TEMPLATE_VARIABLES: Record<NotificationEventName, NotificationTemplateVariable[]> = {
   "MEETING.CREATED": [...commonVariables, ...meetingVariables],
   "MEETING.UPDATED": [...commonVariables, ...meetingVariables],
@@ -65,4 +79,5 @@ export const NOTIFICATION_TEMPLATE_VARIABLES: Record<NotificationEventName, Noti
   "TASK.ASSIGNED": [...commonVariables, ...taskVariables],
   "TASK.REASSIGNED": [...commonVariables, ...taskVariables],
   "TASK.COMPLETED": [...commonVariables, ...taskVariables],
+  "OPPORTUNITY.STAGE_CHANGED": [...commonVariables, ...opportunityVariables],
 }

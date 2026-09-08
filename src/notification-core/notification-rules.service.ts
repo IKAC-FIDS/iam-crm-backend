@@ -7,7 +7,7 @@ import {
   NotificationChannel,
   NotificationRecipientType,
   RoleScope,
-  type Prisma,
+  Prisma,
 } from "@prisma/client"
 import type { CurrentUserPayload } from "../common/decorators/current-user.decorator"
 import { tenantScope } from "../common/tenant/tenant-scope.util"
@@ -21,6 +21,8 @@ import {
   NOTIFICATION_CHANNELS,
   NOTIFICATION_EVENT_CATALOG,
 } from "./notification-core.catalog"
+import { NOTIFICATION_CONDITION_CATALOG } from "./policy/notification-condition.catalog"
+import { NotificationPolicyConditionValidator } from "./policy/notification-policy-condition-validator.service"
 
 const ruleInclude = {
   recipientRules: {
@@ -31,12 +33,13 @@ const ruleInclude = {
 const ALLOWED_EVENTS = new Set<string>([
   ...Object.values(NOTIFICATION_EVENT_CATALOG.MEETING),
   ...Object.values(NOTIFICATION_EVENT_CATALOG.TASK),
+  ...Object.values(NOTIFICATION_EVENT_CATALOG.OPPORTUNITY),
 ])
 const ALLOWED_CHANNELS = new Set<string>(NOTIFICATION_CHANNELS)
 
 @Injectable()
 export class NotificationRulesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly conditionValidator: NotificationPolicyConditionValidator) {}
 
   list(user: CurrentUserPayload) {
     const tenant = tenantScope.require(user)
@@ -62,6 +65,7 @@ export class NotificationRulesService {
   async create(dto: CreateNotificationRuleDto, user: CurrentUserPayload) {
     const tenant = tenantScope.require(user)
     this.validateEvent(dto.eventName)
+    const conditions = this.conditionValidator.validate(dto.eventName, dto.conditions)
     await this.validateRecipients(dto.recipientRules, tenant.organizationId)
 
     return this.prisma.withTenantTransaction(tenant, (tx) => tx.notificationRule.create({
@@ -72,6 +76,7 @@ export class NotificationRulesService {
         enabled: dto.enabled ?? true,
         mandatory: dto.mandatory ?? false,
         priority: dto.priority ?? 100,
+        conditions: conditions === null ? Prisma.DbNull : conditions as Prisma.InputJsonValue,
         recipientRules: {
           create: dto.recipientRules.map((recipient) =>
             this.recipientCreateData(recipient),
@@ -88,8 +93,11 @@ export class NotificationRulesService {
     user: CurrentUserPayload,
   ) {
     const tenant = tenantScope.require(user)
-    await this.get(id, user)
+    const current = await this.get(id, user)
     if (dto.eventName) this.validateEvent(dto.eventName)
+    const effectiveEventName = dto.eventName ?? current.eventName
+    const effectiveConditions = dto.conditions !== undefined ? dto.conditions : current.conditions
+    const conditions = this.conditionValidator.validate(effectiveEventName, effectiveConditions)
     if (dto.recipientRules) {
       await this.validateRecipients(dto.recipientRules, tenant.organizationId)
     }
@@ -107,6 +115,7 @@ export class NotificationRulesService {
           ...(dto.enabled !== undefined ? { enabled: dto.enabled } : {}),
           ...(dto.mandatory !== undefined ? { mandatory: dto.mandatory } : {}),
           ...(dto.priority !== undefined ? { priority: dto.priority } : {}),
+          ...(dto.conditions !== undefined || dto.eventName !== undefined ? { conditions: conditions === null ? Prisma.DbNull : conditions as Prisma.InputJsonValue } : {}),
           ...(dto.recipientRules
             ? {
                 recipientRules: {
@@ -134,6 +143,7 @@ export class NotificationRulesService {
   catalog() {
     return {
       events: [...ALLOWED_EVENTS],
+      conditionEvents: Object.values(NOTIFICATION_CONDITION_CATALOG),
       recipientTypes: Object.values(NotificationRecipientType),
       channels: Object.values(NotificationChannel),
     }
