@@ -47,13 +47,14 @@ export class NotificationDeliveryQueueService {
     })
   }
 
-  async retryNow(deliveryId: string, organizationId: string) {
+  async retryNow(deliveryId: string, organizationId: string, requestedByUserId: string) {
     return this.prisma.withTenantTransaction(notificationTenantContext(organizationId), async tx => {
-      const delivery = await tx.notificationDelivery.findFirst({ where: { id: deliveryId, event: { organizationId } }, select: { id: true, status: true } })
-      if (!delivery) throw new BadRequestException("Delivery در سازمان جاری یافت نشد")
-      const terminal = new Set<Status>([Status.SENT, Status.DELIVERED, Status.SKIPPED, Status.PROCESSING])
-      if (terminal.has(delivery.status)) throw new BadRequestException("این ارسال در وضعیت قابل تلاش مجدد نیست")
-      return tx.notificationDelivery.update({ where: { id: delivery.id }, data: { status: Status.RETRYING, attemptCount: 0, nextAttemptAt: new Date(), processingStartedAt: null, failureCode: null, failureMessage: null } })
+      const exists = await tx.notificationDelivery.findFirst({ where: { id: deliveryId, organizationId }, select: { id: true } })
+      if (!exists) throw new BadRequestException("Delivery در سازمان جاری یافت نشد")
+      const now = new Date()
+      const claimed = await tx.notificationDelivery.updateMany({ where: { id: deliveryId, organizationId, status: Status.FAILED }, data: { status: Status.RETRYING, nextAttemptAt: now, processingStartedAt: null, retryRequestedAt: now, retryRequestedById: requestedByUserId } })
+      if (claimed.count !== 1) throw new BadRequestException("فقط ارسال ناموفق و بدون پردازش هم‌زمان قابل تلاش مجدد است")
+      return tx.notificationDelivery.findFirstOrThrow({ where: { id: deliveryId, organizationId } })
     })
   }
 

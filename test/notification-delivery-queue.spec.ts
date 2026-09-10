@@ -31,11 +31,21 @@ describe("Notification delivery durable queue", () => {
   })
 
   it("allows an administrator to start a fresh retry cycle for a failed job", async () => {
-    const update = jest.fn().mockResolvedValue({ status: Status.RETRYING })
-    const tx = { notificationDelivery: { findFirst: jest.fn().mockResolvedValue({ id: "delivery-1", status: Status.FAILED }), update } }
+    const updateMany = jest.fn().mockResolvedValue({ count: 1 })
+    const findFirstOrThrow = jest.fn().mockResolvedValue({ id: "delivery-1", status: Status.RETRYING })
+    const tx = { notificationDelivery: { findFirst: jest.fn().mockResolvedValue({ id: "delivery-1" }), updateMany, findFirstOrThrow } }
     const prisma = { withTenantTransaction: jest.fn(async (_context, callback) => callback(tx)) }
-    await new NotificationDeliveryQueueService(prisma as never).retryNow("delivery-1", "org-1")
-    expect(update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: Status.RETRYING, attemptCount: 0, failureCode: null }) }))
+    await new NotificationDeliveryQueueService(prisma as never).retryNow("delivery-1", "org-1", "admin-1")
+    expect(updateMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ status: Status.FAILED }), data: expect.objectContaining({ status: Status.RETRYING, retryRequestedById: "admin-1" }) }))
+    expect(updateMany.mock.calls[0][0].data).not.toHaveProperty("attemptCount")
+  })
+
+  it("rejects a concurrent or ineligible retry without creating another delivery", async () => {
+    const create = jest.fn()
+    const tx = { notificationDelivery: { findFirst: jest.fn().mockResolvedValue({ id: "delivery-1" }), updateMany: jest.fn().mockResolvedValue({ count: 0 }), findFirstOrThrow: jest.fn(), create } }
+    const prisma = { withTenantTransaction: jest.fn(async (_context, callback) => callback(tx)) }
+    await expect(new NotificationDeliveryQueueService(prisma as never).retryNow("delivery-1", "org-1", "admin-1")).rejects.toThrow("فقط ارسال ناموفق")
+    expect(create).not.toHaveBeenCalled()
   })
 
   it("recovers stale PROCESSING jobs before dispatching due jobs", async () => {

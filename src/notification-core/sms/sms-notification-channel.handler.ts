@@ -36,7 +36,7 @@ export class SmsNotificationChannelHandler implements NotificationChannelHandler
       include: { event: true, template: true, recipientUser: { select: { id: true } } },
     }))
     if (!delivery?.recipientUser || !delivery.template) return this.skip(deliveryId, organizationId, "INCOMPLETE_DELIVERY", "گیرنده یا قالب پیامک موجود نیست")
-    const destination = await this.contacts.resolve(delivery.event.organizationId, delivery.recipientUser.id)
+    const destination = delivery.destination || await this.contacts.resolve(delivery.event.organizationId, delivery.recipientUser.id)
     if (!destination) return this.skip(deliveryId, organizationId, "MISSING_SMS_DESTINATION", "شماره موبایل معتبر برای گیرنده یافت نشد")
     try {
       const rendered = await this.templates.renderStoredTemplate(delivery.event, delivery.recipientUser.id, delivery.template)

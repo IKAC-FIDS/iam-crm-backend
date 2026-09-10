@@ -48,7 +48,7 @@ let SmsNotificationChannelHandler = SmsNotificationChannelHandler_1 = class SmsN
         }));
         if (!delivery?.recipientUser || !delivery.template)
             return this.skip(deliveryId, organizationId, "INCOMPLETE_DELIVERY", "گیرنده یا قالب پیامک موجود نیست");
-        const destination = await this.contacts.resolve(delivery.event.organizationId, delivery.recipientUser.id);
+        const destination = delivery.destination || await this.contacts.resolve(delivery.event.organizationId, delivery.recipientUser.id);
         if (!destination)
             return this.skip(deliveryId, organizationId, "MISSING_SMS_DESTINATION", "شماره موبایل معتبر برای گیرنده یافت نشد");
         try {

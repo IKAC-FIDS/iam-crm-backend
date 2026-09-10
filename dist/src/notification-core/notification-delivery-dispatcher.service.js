@@ -8,6 +8,7 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
+var NotificationDeliveryDispatcher_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.NotificationDeliveryDispatcher = void 0;
 const common_1 = require("@nestjs/common");
@@ -18,14 +19,17 @@ const email_notification_channel_handler_1 = require("./email/email-notification
 const push_notification_channel_handler_1 = require("./push/push-notification-channel.handler");
 const notification_tenant_context_1 = require("./in-app/notification-tenant-context");
 const notification_delivery_queue_service_1 = require("./queue/notification-delivery-queue.service");
-let NotificationDeliveryDispatcher = class NotificationDeliveryDispatcher {
-    constructor(prisma, queue, sms, inApp, email, push) {
+const notification_delivery_audit_service_1 = require("./audit/notification-delivery-audit.service");
+let NotificationDeliveryDispatcher = NotificationDeliveryDispatcher_1 = class NotificationDeliveryDispatcher {
+    constructor(prisma, queue, audit, sms, inApp, email, push) {
         this.prisma = prisma;
         this.queue = queue;
+        this.audit = audit;
+        this.logger = new common_1.Logger(NotificationDeliveryDispatcher_1.name);
         this.handlers = new Map([[sms.channel, sms], [inApp.channel, inApp], [email.channel, email], [push.channel, push]]);
     }
     async dispatch(deliveryId, organizationId) {
-        const delivery = await this.prisma.withTenantTransaction((0, notification_tenant_context_1.notificationTenantContext)(organizationId), tx => tx.notificationDelivery.findFirst({ where: { id: deliveryId, event: { organizationId } }, select: { id: true, channel: true } }));
+        const delivery = await this.prisma.withTenantTransaction((0, notification_tenant_context_1.notificationTenantContext)(organizationId), tx => tx.notificationDelivery.findFirst({ where: { id: deliveryId, organizationId }, select: { id: true, channel: true, status: true, attemptCount: true, retryRequestedById: true, event: { select: { actorId: true, payload: true } } } }));
         if (!delivery)
             throw new common_1.BadRequestException("Delivery در سازمان جاری یافت نشد");
         const handler = this.handlers.get(delivery.channel);
@@ -33,19 +37,30 @@ let NotificationDeliveryDispatcher = class NotificationDeliveryDispatcher {
             throw new common_1.BadRequestException(`کانال ${delivery.channel} هنوز dispatcher ندارد`);
         try {
             const result = await handler.dispatch(delivery.id, organizationId);
+            if (result.reason !== "DELIVERY_NOT_CLAIMABLE")
+                await this.recordAudit(delivery.id, organizationId, delivery, result.status);
             if (result.status === "FAILED")
                 await this.queue.handleFailure(delivery.id, organizationId, result.reason);
             return result;
         }
         catch (error) {
+            await this.recordAudit(delivery.id, organizationId, delivery, "FAILED");
             await this.queue.handleFailure(delivery.id, organizationId, error instanceof Error ? error.message : "DISPATCH_ERROR");
             throw error;
         }
     }
+    async recordAudit(deliveryId, organizationId, delivery, status) {
+        try {
+            await this.audit.record(deliveryId, organizationId, delivery, status);
+        }
+        catch (error) {
+            this.logger.error(`ثبت تاریخچه تلاش اعلان ${deliveryId} ناموفق بود`, error instanceof Error ? error.stack : String(error));
+        }
+    }
 };
 exports.NotificationDeliveryDispatcher = NotificationDeliveryDispatcher;
-exports.NotificationDeliveryDispatcher = NotificationDeliveryDispatcher = __decorate([
+exports.NotificationDeliveryDispatcher = NotificationDeliveryDispatcher = NotificationDeliveryDispatcher_1 = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [prisma_service_1.PrismaService, notification_delivery_queue_service_1.NotificationDeliveryQueueService, sms_notification_channel_handler_1.SmsNotificationChannelHandler, in_app_notification_channel_handler_1.InAppNotificationChannelHandler, email_notification_channel_handler_1.EmailNotificationChannelHandler, push_notification_channel_handler_1.PushNotificationChannelHandler])
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService, notification_delivery_queue_service_1.NotificationDeliveryQueueService, notification_delivery_audit_service_1.NotificationDeliveryAuditService, sms_notification_channel_handler_1.SmsNotificationChannelHandler, in_app_notification_channel_handler_1.InAppNotificationChannelHandler, email_notification_channel_handler_1.EmailNotificationChannelHandler, push_notification_channel_handler_1.PushNotificationChannelHandler])
 ], NotificationDeliveryDispatcher);
 //# sourceMappingURL=notification-delivery-dispatcher.service.js.map

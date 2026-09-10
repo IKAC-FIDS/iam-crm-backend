@@ -22,8 +22,8 @@ export class NotificationAdminController {
   @Post("templates") createTemplate(@Body() dto: CreateNotificationTemplateDto, @CurrentUser() user: CurrentUserPayload) { return this.admin.createTemplate(dto, user) }
   @Patch("templates/:id") updateTemplate(@Param("id") id: string, @Body() dto: UpdateNotificationTemplateDto, @CurrentUser() user: CurrentUserPayload) { return this.admin.updateTemplate(id, dto, user) }
   @Delete("templates/:id") removeTemplate(@Param("id") id: string, @CurrentUser() user: CurrentUserPayload) { return this.admin.removeTemplate(id, user) }
-  @Get("deliveries") deliveries(@Query() query: NotificationDeliveryQueryDto, @CurrentUser() user: CurrentUserPayload) { return this.admin.listDeliveries(query, user) }
-  @Get("deliveries/:id") delivery(@Param("id") id: string, @CurrentUser() user: CurrentUserPayload) { return this.admin.getDelivery(id, user) }
+  @Get("deliveries") @Permissions("notification:view") deliveries(@Query() query: NotificationDeliveryQueryDto, @CurrentUser() user: CurrentUserPayload) { return this.admin.listDeliveries(query, user) }
+  @Get("deliveries/:id") @Permissions("notification:view") delivery(@Param("id") id: string, @CurrentUser() user: CurrentUserPayload) { return this.admin.getDelivery(id, user) }
   @Get("channels/status") channels(@CurrentUser() user: CurrentUserPayload) { return this.admin.channelStatus(user) }
 }
 
@@ -43,11 +43,11 @@ export class NotificationTemplatesController {
 }
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
-@Permissions("notification:manage")
 @Controller("admin/notification-deliveries")
 export class NotificationDeliveriesController {
   constructor(private readonly admin: NotificationAdminService, private readonly queue: NotificationDeliveryQueueService) {}
-  @Get() list(@Query() query: NotificationDeliveryQueryDto, @CurrentUser() user: CurrentUserPayload) { return this.admin.listDeliveries(query, user) }
-  @Get(":id") get(@Param("id") id: string, @CurrentUser() user: CurrentUserPayload) { return this.admin.getDelivery(id, user) }
-  @Post(":id/dispatch") dispatch(@Param("id") id: string, @CurrentUser() user: CurrentUserPayload) { return this.queue.retryNow(id, tenantScope.require(user).organizationId) }
+  @Get() @Permissions("notification:view") list(@Query() query: NotificationDeliveryQueryDto, @CurrentUser() user: CurrentUserPayload) { return this.admin.listDeliveries(query, user) }
+  @Get(":id") @Permissions("notification:view") get(@Param("id") id: string, @CurrentUser() user: CurrentUserPayload) { return this.admin.getDelivery(id, user) }
+  @Post(":id/dispatch") @Permissions("notification:manage") dispatch(@Param("id") id: string, @CurrentUser() user: CurrentUserPayload) { return this.queue.retryNow(id, tenantScope.require(user).organizationId, user.userId) }
+  @Post(":id/retry") @Permissions("notification:manage") retry(@Param("id") id: string, @CurrentUser() user: CurrentUserPayload) { return this.queue.retryNow(id, tenantScope.require(user).organizationId, user.userId) }
 }

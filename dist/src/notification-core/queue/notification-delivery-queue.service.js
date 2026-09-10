@@ -54,15 +54,16 @@ let NotificationDeliveryQueueService = class NotificationDeliveryQueueService {
                 } });
         });
     }
-    async retryNow(deliveryId, organizationId) {
+    async retryNow(deliveryId, organizationId, requestedByUserId) {
         return this.prisma.withTenantTransaction((0, notification_tenant_context_1.notificationTenantContext)(organizationId), async (tx) => {
-            const delivery = await tx.notificationDelivery.findFirst({ where: { id: deliveryId, event: { organizationId } }, select: { id: true, status: true } });
-            if (!delivery)
+            const exists = await tx.notificationDelivery.findFirst({ where: { id: deliveryId, organizationId }, select: { id: true } });
+            if (!exists)
                 throw new common_1.BadRequestException("Delivery در سازمان جاری یافت نشد");
-            const terminal = new Set([client_1.NotificationDeliveryStatus.SENT, client_1.NotificationDeliveryStatus.DELIVERED, client_1.NotificationDeliveryStatus.SKIPPED, client_1.NotificationDeliveryStatus.PROCESSING]);
-            if (terminal.has(delivery.status))
-                throw new common_1.BadRequestException("این ارسال در وضعیت قابل تلاش مجدد نیست");
-            return tx.notificationDelivery.update({ where: { id: delivery.id }, data: { status: client_1.NotificationDeliveryStatus.RETRYING, attemptCount: 0, nextAttemptAt: new Date(), processingStartedAt: null, failureCode: null, failureMessage: null } });
+            const now = new Date();
+            const claimed = await tx.notificationDelivery.updateMany({ where: { id: deliveryId, organizationId, status: client_1.NotificationDeliveryStatus.FAILED }, data: { status: client_1.NotificationDeliveryStatus.RETRYING, nextAttemptAt: now, processingStartedAt: null, retryRequestedAt: now, retryRequestedById: requestedByUserId } });
+            if (claimed.count !== 1)
+                throw new common_1.BadRequestException("فقط ارسال ناموفق و بدون پردازش هم‌زمان قابل تلاش مجدد است");
+            return tx.notificationDelivery.findFirstOrThrow({ where: { id: deliveryId, organizationId } });
         });
     }
     integer(name, fallback, minimum, maximum) {

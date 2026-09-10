@@ -167,15 +167,29 @@ let NotificationAdminService = class NotificationAdminService {
         if (query.dateTo)
             createdAt.lte = this.date(query.dateTo, "dateTo");
         const where = {
-            event: { organizationId, ...(query.eventName ? { eventName: query.eventName } : {}) },
+            organizationId,
+            event: {
+                organizationId,
+                ...(query.eventName ? { eventName: query.eventName } : {}),
+                ...(query.aggregateType ? { aggregateType: query.aggregateType } : {}),
+                ...(query.aggregateId ? { aggregateId: query.aggregateId } : {}),
+            },
             ...(query.channel ? { channel: query.channel } : {}),
             ...(query.status ? { status: query.status } : {}),
             ...(query.recipientUserId ? { recipientUserId: query.recipientUserId } : {}),
+            ...(query.ruleId ? { ruleId: query.ruleId } : {}),
+            ...(query.templateId ? { templateId: query.templateId } : {}),
+            ...(query.triggerType || query.provider ? { attempts: { some: {
+                        ...(query.triggerType ? { triggerType: query.triggerType } : {}),
+                        ...(query.provider ? { provider: { equals: query.provider, mode: "insensitive" } } : {}),
+                    } } } : {}),
             ...(Object.keys(createdAt).length ? { createdAt } : {}),
             ...(query.search?.trim() ? { OR: [
                     { destination: { contains: query.search.trim(), mode: "insensitive" } },
                     { failureMessage: { contains: query.search.trim(), mode: "insensitive" } },
                     { providerMessageId: { contains: query.search.trim(), mode: "insensitive" } },
+                    { event: { is: { eventName: { contains: query.search.trim(), mode: "insensitive" } } } },
+                    { rule: { is: { name: { contains: query.search.trim(), mode: "insensitive" } } } },
                     { recipientUser: { is: { OR: [
                                     { fullName: { contains: query.search.trim(), mode: "insensitive" } },
                                     { email: { contains: query.search.trim(), mode: "insensitive" } },
@@ -183,21 +197,111 @@ let NotificationAdminService = class NotificationAdminService {
                 ] } : {}),
         };
         const [data, total] = await this.prisma.withTenantTransaction(context, (tx) => Promise.all([
-            tx.notificationDelivery.findMany({ where, include: {
-                    event: { select: { eventName: true, occurredAt: true } },
+            tx.notificationDelivery.findMany({ where, select: {
+                    id: true, channel: true, status: true, destination: true, attemptCount: true,
+                    providerMessageId: true, failureCode: true, failureMessage: true,
+                    lastAttemptAt: true, nextAttemptAt: true, processingStartedAt: true,
+                    sentAt: true, deliveredAt: true, createdAt: true, updatedAt: true,
+                    event: { select: { eventName: true, occurredAt: true, aggregateType: true, aggregateId: true, actorId: true, payload: true } },
                     recipientUser: { select: { id: true, fullName: true, email: true } },
-                }, orderBy: { createdAt: "desc" }, skip: (page - 1) * limit, take: limit }),
+                    rule: { select: { id: true, name: true } },
+                    template: { select: { id: true, version: true, locale: true } },
+                    attempts: { orderBy: { attemptNumber: "desc" }, take: 1, select: { triggerType: true, provider: true, triggeredByUser: { select: { id: true, fullName: true } } } },
+                }, orderBy: { [query.sortBy]: query.sortDirection }, skip: (page - 1) * limit, take: limit }),
             tx.notificationDelivery.count({ where }),
         ]));
-        return { data, meta: (0, pagination_util_1.createPaginationMeta)(page, limit, total) };
+        return { data: data.map(item => this.deliverySummary(item)), meta: (0, pagination_util_1.createPaginationMeta)(page, limit, total) };
     }
     async getDelivery(id, user) {
         const context = tenant_scope_util_1.tenantScope.require(user);
         const { organizationId } = context;
-        const item = await this.prisma.withTenantTransaction(context, (tx) => tx.notificationDelivery.findFirst({ where: { id, event: { organizationId } }, include: { event: true, recipientUser: { select: { id: true, fullName: true, email: true } }, rule: { select: { id: true, name: true } }, template: true } }));
+        const item = await this.prisma.withTenantTransaction(context, (tx) => tx.notificationDelivery.findFirst({ where: { id, organizationId }, select: {
+                id: true, channel: true, status: true, destination: true, deduplicationKey: true,
+                attemptCount: true, providerMessageId: true, failureCode: true, failureMessage: true,
+                lastAttemptAt: true, nextAttemptAt: true, processingStartedAt: true,
+                retryRequestedAt: true, sentAt: true, deliveredAt: true, createdAt: true, updatedAt: true,
+                event: { select: { id: true, eventName: true, aggregateType: true, aggregateId: true, actorId: true, idempotencyKey: true, occurredAt: true, payload: true, actor: { select: { id: true, fullName: true } } } },
+                recipientUser: { select: { id: true, fullName: true, email: true } },
+                recipientRule: { select: { id: true, type: true, targetId: true } },
+                retryRequestedBy: { select: { id: true, fullName: true } },
+                rule: { select: { id: true, name: true, mandatory: true } },
+                template: { select: { id: true, eventName: true, channel: true, locale: true, version: true, subject: true } },
+                attempts: { orderBy: { attemptNumber: "asc" }, select: { id: true, attemptNumber: true, triggerType: true, status: true, provider: true, providerMessageId: true, failureCategory: true, failureCode: true, failureReason: true, startedAt: true, finishedAt: true, createdAt: true, triggeredByUser: { select: { id: true, fullName: true } } } },
+            } }));
         if (!item)
             throw new common_1.NotFoundException("Notification delivery not found");
-        return item;
+        const schedule = this.scheduleMetadata(item.event.payload);
+        return {
+            ...item,
+            destination: this.maskDestination(item.destination, item.channel),
+            deduplicationKey: `${item.deduplicationKey.slice(0, 12)}…`,
+            failureMessage: this.sanitizeFailure(item.failureMessage),
+            event: { ...item.event, payload: undefined, schedule },
+            attempts: item.attempts.map(attempt => ({ ...attempt, failureReason: this.sanitizeFailure(attempt.failureReason) })),
+            triggerType: item.attempts[item.attempts.length - 1]?.triggerType ?? this.inferTriggerType(item.event.actorId, item.event.payload),
+            triggeredBy: item.attempts[item.attempts.length - 1]?.triggeredByUser ?? item.event.actor,
+            failureCategory: item.failureCode ? this.failureCategory(item.failureCode) : null,
+            lastFailureAt: [...item.attempts].reverse().find(attempt => attempt.status === "FAILED")?.finishedAt ?? null,
+            deduplication: { enabled: true, key: `${item.deduplicationKey.slice(0, 12)}…` },
+        };
+    }
+    deliverySummary(item) {
+        const latest = item.attempts[0];
+        return { ...item, destination: this.maskDestination(item.destination, item.channel), failureMessage: this.sanitizeFailure(item.failureMessage), triggerType: latest?.triggerType ?? this.inferTriggerType(item.event.actorId, item.event.payload), provider: latest?.provider ?? item.channel, triggeredBy: latest?.triggeredByUser ?? null, event: { ...item.event, payload: undefined } };
+    }
+    inferTriggerType(actorId, payload) {
+        const value = payload && typeof payload === "object" && !Array.isArray(payload) ? payload : {};
+        if (value.schedule)
+            return client_1.NotificationTriggerType.SCHEDULED;
+        return actorId ? client_1.NotificationTriggerType.DOMAIN_EVENT : client_1.NotificationTriggerType.SYSTEM;
+    }
+    scheduleMetadata(payload) {
+        const value = payload && typeof payload === "object" && !Array.isArray(payload) ? payload : {};
+        const schedule = value.schedule && typeof value.schedule === "object" && !Array.isArray(value.schedule) ? value.schedule : null;
+        if (!schedule)
+            return null;
+        const safe = ["scheduledAt", "detectedAt", "offsetMinutes", "sourceField"].reduce((result, key) => {
+            if (["string", "number", "boolean"].includes(typeof schedule[key]))
+                result[key] = schedule[key];
+            return result;
+        }, {});
+        return Object.keys(safe).length ? safe : null;
+    }
+    maskDestination(value, channel) {
+        if (!value)
+            return null;
+        if (channel === client_1.NotificationChannel.EMAIL) {
+            const [name, domain] = value.split("@");
+            return domain ? `${name?.slice(0, 1) || "*"}***@${domain}` : "***";
+        }
+        if (channel === client_1.NotificationChannel.SMS)
+            return value.length > 6 ? `${value.slice(0, 4)}***${value.slice(-3)}` : "***";
+        return value.length > 10 ? `${value.slice(0, 6)}…${value.slice(-4)}` : value;
+    }
+    sanitizeFailure(value) {
+        if (!value)
+            return null;
+        return value.slice(0, 1000).replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/gi, "Bearer [REDACTED]").replace(/(api[-_ ]?key|password|token|secret)\s*[=:]\s*[^\s,;]+/gi, "$1=[REDACTED]").replace(/([?&](?:key|token|secret|signature)=)[^&\s]+/gi, "$1[REDACTED]");
+    }
+    failureCategory(code) {
+        const value = code.toUpperCase();
+        if (value.includes("TIMEOUT"))
+            return "TIMEOUT";
+        if (value.includes("AUTH") || value.includes("401") || value.includes("403"))
+            return "AUTHENTICATION";
+        if (value.includes("RATE") || value.includes("429"))
+            return "RATE_LIMIT";
+        if (value.includes("DESTINATION") || value.includes("RECIPIENT") || value.includes("ENDPOINT"))
+            return "INVALID_DESTINATION";
+        if (value.includes("TEMPLATE"))
+            return "TEMPLATE_ERROR";
+        if (value.includes("CONFIG") || value.includes("NOT_CONFIGURED"))
+            return "CONFIGURATION";
+        if (value.includes("NETWORK") || value.includes("DISPATCH") || /^HTTP_5/.test(value))
+            return "NETWORK";
+        if (value.includes("PROVIDER") || value.startsWith("HTTP_4"))
+            return "PROVIDER_REJECTED";
+        return "UNKNOWN";
     }
     async channelStatus(user) {
         const { organizationId } = tenant_scope_util_1.tenantScope.require(user);

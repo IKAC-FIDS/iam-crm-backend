@@ -505,10 +505,12 @@ model User {
   taskReviewArtifactsAdded          TaskReviewArtifact[]       @relation("TaskReviewArtifactAddedBy")
   platformAuthority                 PlatformAuthority?
 
-  notificationCoreEventActions NotificationEvent[]        @relation("NotificationCoreEventActor")
-  notificationCoreDeliveries   NotificationDelivery[]     @relation("NotificationCoreDeliveryRecipient")
-  notificationCorePreferences  NotificationPreference[]   @relation("NotificationCorePreferences")
-  notificationPushEndpoints    NotificationPushEndpoint[]
+  notificationCoreEventActions  NotificationEvent[]           @relation("NotificationCoreEventActor")
+  notificationCoreDeliveries    NotificationDelivery[]        @relation("NotificationCoreDeliveryRecipient")
+  notificationRetriesRequested  NotificationDelivery[]        @relation("NotificationDeliveryRetryRequestedBy")
+  notificationAttemptsTriggered NotificationDeliveryAttempt[] @relation("NotificationDeliveryAttemptTriggeredBy")
+  notificationCorePreferences   NotificationPreference[]      @relation("NotificationCorePreferences")
+  notificationPushEndpoints     NotificationPushEndpoint[]
 
   @@index([organizationId])
   @@index([teamId])
@@ -604,15 +606,16 @@ model Organization {
   tenders             Tender[]
   tenderReviews       TenderReview[]
 
-  notificationCoreEvents      NotificationEvent[]        @relation("NotificationCoreEvents")
-  notificationCoreRules       NotificationRule[]         @relation("NotificationCoreRules")
-  notificationSchedules       NotificationSchedule[]     @relation("NotificationSchedules")
-  notificationCoreTemplates   NotificationTemplate[]     @relation("NotificationCoreTemplates")
-  notificationCoreDeliveries  NotificationDelivery[]     @relation("NotificationCoreDeliveryOrganization")
-  notificationCorePreferences NotificationPreference[]   @relation("NotificationCorePreferences")
-  notificationSmsSettings     NotificationSmsSettings?
-  notificationPushSettings    NotificationPushSettings?
-  notificationPushEndpoints   NotificationPushEndpoint[]
+  notificationCoreEvents       NotificationEvent[]           @relation("NotificationCoreEvents")
+  notificationCoreRules        NotificationRule[]            @relation("NotificationCoreRules")
+  notificationSchedules        NotificationSchedule[]        @relation("NotificationSchedules")
+  notificationCoreTemplates    NotificationTemplate[]        @relation("NotificationCoreTemplates")
+  notificationCoreDeliveries   NotificationDelivery[]        @relation("NotificationCoreDeliveryOrganization")
+  notificationDeliveryAttempts NotificationDeliveryAttempt[] @relation("NotificationDeliveryAttemptOrganization")
+  notificationCorePreferences  NotificationPreference[]      @relation("NotificationCorePreferences")
+  notificationSmsSettings      NotificationSmsSettings?
+  notificationPushSettings     NotificationPushSettings?
+  notificationPushEndpoints    NotificationPushEndpoint[]
 
   @@index([status])
   @@index([createdAt])
@@ -3082,6 +3085,26 @@ enum NotificationDeliveryStatus {
   SKIPPED
 }
 
+enum NotificationTriggerType {
+  DOMAIN_EVENT
+  SCHEDULED
+  MANUAL_RETRY
+  AUTOMATIC_RETRY
+  SYSTEM
+}
+
+enum NotificationFailureCategory {
+  NETWORK
+  AUTHENTICATION
+  PROVIDER_REJECTED
+  INVALID_DESTINATION
+  TEMPLATE_ERROR
+  RATE_LIMIT
+  TIMEOUT
+  CONFIGURATION
+  UNKNOWN
+}
+
 enum NotificationRecipientType {
   USER
   ROLE
@@ -3205,34 +3228,38 @@ model NotificationTemplate {
 }
 
 model NotificationDelivery {
-  id                  String                     @id @default(uuid())
+  id                  String                        @id @default(uuid())
   organizationId      String
-  organization        Organization               @relation("NotificationCoreDeliveryOrganization", fields: [organizationId], references: [id], onDelete: Cascade)
+  organization        Organization                  @relation("NotificationCoreDeliveryOrganization", fields: [organizationId], references: [id], onDelete: Cascade)
   eventId             String
-  event               NotificationEvent          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  event               NotificationEvent             @relation(fields: [eventId], references: [id], onDelete: Cascade)
   ruleId              String?
-  rule                NotificationRule?          @relation(fields: [ruleId], references: [id], onDelete: SetNull)
+  rule                NotificationRule?             @relation(fields: [ruleId], references: [id], onDelete: SetNull)
   recipientRuleId     String?
-  recipientRule       NotificationRecipientRule? @relation(fields: [recipientRuleId], references: [id], onDelete: SetNull)
+  recipientRule       NotificationRecipientRule?    @relation(fields: [recipientRuleId], references: [id], onDelete: SetNull)
   recipientUserId     String?
-  recipientUser       User?                      @relation("NotificationCoreDeliveryRecipient", fields: [recipientUserId], references: [id], onDelete: SetNull)
+  recipientUser       User?                         @relation("NotificationCoreDeliveryRecipient", fields: [recipientUserId], references: [id], onDelete: SetNull)
   templateId          String?
-  template            NotificationTemplate?      @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  template            NotificationTemplate?         @relation(fields: [templateId], references: [id], onDelete: SetNull)
   channel             NotificationChannel
-  status              NotificationDeliveryStatus @default(PENDING)
+  status              NotificationDeliveryStatus    @default(PENDING)
   destination         String?
   deduplicationKey    String
-  attemptCount        Int                        @default(0)
+  attemptCount        Int                           @default(0)
   providerMessageId   String?
   failureCode         String?
   failureMessage      String?
   lastAttemptAt       DateTime?
   nextAttemptAt       DateTime?
   processingStartedAt DateTime?
+  retryRequestedAt    DateTime?
+  retryRequestedById  String?
+  retryRequestedBy    User?                         @relation("NotificationDeliveryRetryRequestedBy", fields: [retryRequestedById], references: [id], onDelete: SetNull)
   sentAt              DateTime?
   deliveredAt         DateTime?
-  createdAt           DateTime                   @default(now())
-  updatedAt           DateTime                   @updatedAt
+  createdAt           DateTime                      @default(now())
+  updatedAt           DateTime                      @updatedAt
+  attempts            NotificationDeliveryAttempt[]
 
   @@unique([organizationId, deduplicationKey])
   @@index([eventId])
@@ -3242,7 +3269,35 @@ model NotificationDelivery {
   @@index([channel, status, createdAt])
   @@index([status, nextAttemptAt, createdAt])
   @@index([status, processingStartedAt])
+  @@index([retryRequestedById])
   @@map("notification_deliveries")
+}
+
+model NotificationDeliveryAttempt {
+  id                String                       @id @default(uuid())
+  organizationId    String
+  organization      Organization                 @relation("NotificationDeliveryAttemptOrganization", fields: [organizationId], references: [id], onDelete: Cascade)
+  deliveryId        String
+  delivery          NotificationDelivery         @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+  attemptNumber     Int
+  triggerType       NotificationTriggerType
+  triggeredByUserId String?
+  triggeredByUser   User?                        @relation("NotificationDeliveryAttemptTriggeredBy", fields: [triggeredByUserId], references: [id], onDelete: SetNull)
+  status            NotificationDeliveryStatus
+  provider          String?
+  providerMessageId String?
+  failureCategory   NotificationFailureCategory?
+  failureCode       String?
+  failureReason     String?
+  startedAt         DateTime
+  finishedAt        DateTime?
+  createdAt         DateTime                     @default(now())
+
+  @@unique([deliveryId, attemptNumber])
+  @@index([organizationId, createdAt])
+  @@index([organizationId, deliveryId, createdAt])
+  @@index([triggeredByUserId])
+  @@map("notification_delivery_attempts")
 }
 
 model NotificationPreference {

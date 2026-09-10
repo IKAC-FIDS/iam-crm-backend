@@ -37,7 +37,7 @@ export class EmailNotificationChannelHandler implements NotificationChannelHandl
       })
       if (!delivery) throw new NotFoundException("Notification delivery not found")
       if (!claim.count) return { delivery, rendered: null, destination: null, claimable: false }
-      const destination = delivery.recipientUser?.email?.trim().toLowerCase() ?? null
+      const destination = delivery.destination?.trim().toLowerCase() || delivery.recipientUser?.email?.trim().toLowerCase() || null
       if (!delivery.recipientUser?.isActive || !destination || !this.validEmail(destination) || !delivery.template) {
         return { delivery, rendered: null, destination, claimable: true }
       }

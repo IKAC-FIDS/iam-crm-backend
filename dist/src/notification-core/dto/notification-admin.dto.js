@@ -167,9 +167,11 @@ class NotificationDeliveryQueryDto {
     constructor() {
         this.page = 1;
         this.pageSize = 20;
+        this.sortBy = "createdAt";
+        this.sortDirection = "desc";
     }
     static _OPENAPI_METADATA_FACTORY() {
-        return { page: { required: true, type: () => Object, default: 1, minimum: 1 }, pageSize: { required: true, type: () => Object, default: 20, minimum: 1, maximum: 100 }, eventName: { required: false, type: () => String }, channel: { required: false, type: () => Object }, status: { required: false, type: () => Object }, recipientUserId: { required: false, type: () => String }, dateFrom: { required: false, type: () => String }, dateTo: { required: false, type: () => String }, search: { required: false, type: () => String } };
+        return { page: { required: true, type: () => Object, default: 1, minimum: 1 }, pageSize: { required: true, type: () => Object, default: 20, minimum: 1, maximum: 100 }, eventName: { required: false, type: () => String }, channel: { required: false, type: () => Object }, status: { required: false, type: () => Object }, recipientUserId: { required: false, type: () => String }, ruleId: { required: false, type: () => String }, templateId: { required: false, type: () => String }, triggerType: { required: false, type: () => Object }, provider: { required: false, type: () => String }, aggregateType: { required: false, type: () => String }, aggregateId: { required: false, type: () => String }, dateFrom: { required: false, type: () => String }, dateTo: { required: false, type: () => String }, search: { required: false, type: () => String }, sortBy: { required: true, type: () => Object, default: "createdAt", enum: ["createdAt", "sentAt", "deliveredAt", "status", "channel"] }, sortDirection: { required: true, type: () => Object, default: "desc", enum: ["asc", "desc"] } };
     }
 }
 exports.NotificationDeliveryQueryDto = NotificationDeliveryQueryDto;
@@ -210,6 +212,36 @@ __decorate([
 ], NotificationDeliveryQueryDto.prototype, "recipientUserId", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsUUID)(),
+    __metadata("design:type", String)
+], NotificationDeliveryQueryDto.prototype, "ruleId", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsUUID)(),
+    __metadata("design:type", String)
+], NotificationDeliveryQueryDto.prototype, "templateId", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsEnum)(client_1.NotificationTriggerType),
+    __metadata("design:type", String)
+], NotificationDeliveryQueryDto.prototype, "triggerType", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], NotificationDeliveryQueryDto.prototype, "provider", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], NotificationDeliveryQueryDto.prototype, "aggregateType", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], NotificationDeliveryQueryDto.prototype, "aggregateId", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], NotificationDeliveryQueryDto.prototype, "dateFrom", void 0);
@@ -223,4 +255,14 @@ __decorate([
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], NotificationDeliveryQueryDto.prototype, "search", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsIn)(["createdAt", "sentAt", "deliveredAt", "status", "channel"]),
+    __metadata("design:type", String)
+], NotificationDeliveryQueryDto.prototype, "sortBy", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsIn)(["asc", "desc"]),
+    __metadata("design:type", String)
+], NotificationDeliveryQueryDto.prototype, "sortDirection", void 0);
 //# sourceMappingURL=notification-admin.dto.js.map

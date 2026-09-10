@@ -121,6 +121,7 @@ __decorate([
 ], NotificationAdminController.prototype, "removeTemplate", null);
 __decorate([
     (0, common_1.Get)("deliveries"),
+    (0, permissions_decorator_1.Permissions)("notification:view"),
     openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Query)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
@@ -130,7 +131,8 @@ __decorate([
 ], NotificationAdminController.prototype, "deliveries", null);
 __decorate([
     (0, common_1.Get)("deliveries/:id"),
-    openapi.ApiResponse({ status: 200, type: Object }),
+    (0, permissions_decorator_1.Permissions)("notification:view"),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Param)("id")),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
@@ -249,11 +251,13 @@ let NotificationDeliveriesController = class NotificationDeliveriesController {
     }
     list(query, user) { return this.admin.listDeliveries(query, user); }
     get(id, user) { return this.admin.getDelivery(id, user); }
-    dispatch(id, user) { return this.queue.retryNow(id, tenant_scope_util_1.tenantScope.require(user).organizationId); }
+    dispatch(id, user) { return this.queue.retryNow(id, tenant_scope_util_1.tenantScope.require(user).organizationId, user.userId); }
+    retry(id, user) { return this.queue.retryNow(id, tenant_scope_util_1.tenantScope.require(user).organizationId, user.userId); }
 };
 exports.NotificationDeliveriesController = NotificationDeliveriesController;
 __decorate([
     (0, common_1.Get)(),
+    (0, permissions_decorator_1.Permissions)("notification:view"),
     openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Query)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
@@ -263,7 +267,8 @@ __decorate([
 ], NotificationDeliveriesController.prototype, "list", null);
 __decorate([
     (0, common_1.Get)(":id"),
-    openapi.ApiResponse({ status: 200, type: Object }),
+    (0, permissions_decorator_1.Permissions)("notification:view"),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Param)("id")),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
@@ -272,6 +277,7 @@ __decorate([
 ], NotificationDeliveriesController.prototype, "get", null);
 __decorate([
     (0, common_1.Post)(":id/dispatch"),
+    (0, permissions_decorator_1.Permissions)("notification:manage"),
     openapi.ApiResponse({ status: 201 }),
     __param(0, (0, common_1.Param)("id")),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
@@ -279,9 +285,18 @@ __decorate([
     __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", void 0)
 ], NotificationDeliveriesController.prototype, "dispatch", null);
+__decorate([
+    (0, common_1.Post)(":id/retry"),
+    (0, permissions_decorator_1.Permissions)("notification:manage"),
+    openapi.ApiResponse({ status: 201 }),
+    __param(0, (0, common_1.Param)("id")),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", void 0)
+], NotificationDeliveriesController.prototype, "retry", null);
 exports.NotificationDeliveriesController = NotificationDeliveriesController = __decorate([
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, permissions_guard_1.PermissionsGuard),
-    (0, permissions_decorator_1.Permissions)("notification:manage"),
     (0, common_1.Controller)("admin/notification-deliveries"),
     __metadata("design:paramtypes", [notification_admin_service_1.NotificationAdminService, notification_delivery_queue_service_1.NotificationDeliveryQueueService])
 ], NotificationDeliveriesController);
