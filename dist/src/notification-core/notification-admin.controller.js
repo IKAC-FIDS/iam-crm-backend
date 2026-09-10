@@ -22,7 +22,7 @@ const permissions_guard_1 = require("../common/guards/permissions.guard");
 const tenant_scope_util_1 = require("../common/tenant/tenant-scope.util");
 const notification_admin_dto_1 = require("./dto/notification-admin.dto");
 const notification_admin_service_1 = require("./notification-admin.service");
-const notification_delivery_dispatcher_service_1 = require("./notification-delivery-dispatcher.service");
+const notification_delivery_queue_service_1 = require("./queue/notification-delivery-queue.service");
 let NotificationAdminController = class NotificationAdminController {
     constructor(admin) {
         this.admin = admin;
@@ -243,13 +243,13 @@ exports.NotificationTemplatesController = NotificationTemplatesController = __de
     __metadata("design:paramtypes", [notification_admin_service_1.NotificationAdminService])
 ], NotificationTemplatesController);
 let NotificationDeliveriesController = class NotificationDeliveriesController {
-    constructor(admin, dispatcher) {
+    constructor(admin, queue) {
         this.admin = admin;
-        this.dispatcher = dispatcher;
+        this.queue = queue;
     }
     list(query, user) { return this.admin.listDeliveries(query, user); }
     get(id, user) { return this.admin.getDelivery(id, user); }
-    dispatch(id, user) { return this.dispatcher.dispatch(id, tenant_scope_util_1.tenantScope.require(user).organizationId); }
+    dispatch(id, user) { return this.queue.retryNow(id, tenant_scope_util_1.tenantScope.require(user).organizationId); }
 };
 exports.NotificationDeliveriesController = NotificationDeliveriesController;
 __decorate([
@@ -272,7 +272,7 @@ __decorate([
 ], NotificationDeliveriesController.prototype, "get", null);
 __decorate([
     (0, common_1.Post)(":id/dispatch"),
-    openapi.ApiResponse({ status: 201, type: Object }),
+    openapi.ApiResponse({ status: 201 }),
     __param(0, (0, common_1.Param)("id")),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
@@ -283,6 +283,6 @@ exports.NotificationDeliveriesController = NotificationDeliveriesController = __
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, permissions_guard_1.PermissionsGuard),
     (0, permissions_decorator_1.Permissions)("notification:manage"),
     (0, common_1.Controller)("admin/notification-deliveries"),
-    __metadata("design:paramtypes", [notification_admin_service_1.NotificationAdminService, notification_delivery_dispatcher_service_1.NotificationDeliveryDispatcher])
+    __metadata("design:paramtypes", [notification_admin_service_1.NotificationAdminService, notification_delivery_queue_service_1.NotificationDeliveryQueueService])
 ], NotificationDeliveriesController);
 //# sourceMappingURL=notification-admin.controller.js.map

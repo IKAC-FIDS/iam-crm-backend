@@ -25,7 +25,7 @@ export class EmailNotificationChannelHandler implements NotificationChannelHandl
     const prepared = await this.prisma.withTenantTransaction(context, async (tx) => {
       const claim = await tx.notificationDelivery.updateMany({
         where: { ...where, status: { in: [Status.PENDING, Status.RETRYING, Status.FAILED] } },
-        data: { status: Status.PROCESSING, attemptCount: { increment: 1 }, lastAttemptAt: new Date() },
+        data: { status: Status.PROCESSING, attemptCount: { increment: 1 }, lastAttemptAt: new Date(), processingStartedAt: new Date(), nextAttemptAt: null },
       })
       const delivery = await tx.notificationDelivery.findFirst({
         where,
@@ -71,6 +71,7 @@ export class EmailNotificationChannelHandler implements NotificationChannelHandl
           sentAt: now,
           failureCode: null,
           failureMessage: null,
+          processingStartedAt: null,
         },
       }))
       return { deliveryId, status: Status.SENT, sent: true }
@@ -78,7 +79,7 @@ export class EmailNotificationChannelHandler implements NotificationChannelHandl
       const message = error instanceof Error ? error.message.slice(0, 1000) : "ارسال ایمیل ناموفق بود"
       await this.prisma.withTenantTransaction(context, (tx) => tx.notificationDelivery.update({
         where: { id: deliveryId },
-        data: { status: Status.FAILED, destination: prepared.destination, failureCode: "EMAIL_DISPATCH_ERROR", failureMessage: message },
+        data: { status: Status.FAILED, destination: prepared.destination, failureCode: "EMAIL_DISPATCH_ERROR", failureMessage: message, processingStartedAt: null },
       }))
       this.logger.warn(`EMAIL dispatch failed deliveryId=${deliveryId} organizationId=${organizationId}`)
       return { deliveryId, status: Status.FAILED, sent: false, reason: "EMAIL_DISPATCH_ERROR" }
@@ -89,7 +90,7 @@ export class EmailNotificationChannelHandler implements NotificationChannelHandl
     await this.prisma.withTenantTransaction(notificationTenantContext(organizationId), (tx) =>
       tx.notificationDelivery.update({
         where: { id: deliveryId },
-        data: { status: Status.SKIPPED, failureCode: code, failureMessage: message },
+        data: { status: Status.SKIPPED, failureCode: code, failureMessage: message, processingStartedAt: null, nextAttemptAt: null },
       }),
     )
     return { deliveryId, status: Status.SKIPPED, sent: false, reason: code }

@@ -17,9 +17,11 @@ const in_app_notification_channel_handler_1 = require("./in-app/in-app-notificat
 const email_notification_channel_handler_1 = require("./email/email-notification-channel.handler");
 const push_notification_channel_handler_1 = require("./push/push-notification-channel.handler");
 const notification_tenant_context_1 = require("./in-app/notification-tenant-context");
+const notification_delivery_queue_service_1 = require("./queue/notification-delivery-queue.service");
 let NotificationDeliveryDispatcher = class NotificationDeliveryDispatcher {
-    constructor(prisma, sms, inApp, email, push) {
+    constructor(prisma, queue, sms, inApp, email, push) {
         this.prisma = prisma;
+        this.queue = queue;
         this.handlers = new Map([[sms.channel, sms], [inApp.channel, inApp], [email.channel, email], [push.channel, push]]);
     }
     async dispatch(deliveryId, organizationId) {
@@ -29,12 +31,21 @@ let NotificationDeliveryDispatcher = class NotificationDeliveryDispatcher {
         const handler = this.handlers.get(delivery.channel);
         if (!handler)
             throw new common_1.BadRequestException(`کانال ${delivery.channel} هنوز dispatcher ندارد`);
-        return handler.dispatch(delivery.id, organizationId);
+        try {
+            const result = await handler.dispatch(delivery.id, organizationId);
+            if (result.status === "FAILED")
+                await this.queue.handleFailure(delivery.id, organizationId, result.reason);
+            return result;
+        }
+        catch (error) {
+            await this.queue.handleFailure(delivery.id, organizationId, error instanceof Error ? error.message : "DISPATCH_ERROR");
+            throw error;
+        }
     }
 };
 exports.NotificationDeliveryDispatcher = NotificationDeliveryDispatcher;
 exports.NotificationDeliveryDispatcher = NotificationDeliveryDispatcher = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [prisma_service_1.PrismaService, sms_notification_channel_handler_1.SmsNotificationChannelHandler, in_app_notification_channel_handler_1.InAppNotificationChannelHandler, email_notification_channel_handler_1.EmailNotificationChannelHandler, push_notification_channel_handler_1.PushNotificationChannelHandler])
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService, notification_delivery_queue_service_1.NotificationDeliveryQueueService, sms_notification_channel_handler_1.SmsNotificationChannelHandler, in_app_notification_channel_handler_1.InAppNotificationChannelHandler, email_notification_channel_handler_1.EmailNotificationChannelHandler, push_notification_channel_handler_1.PushNotificationChannelHandler])
 ], NotificationDeliveryDispatcher);
 //# sourceMappingURL=notification-delivery-dispatcher.service.js.map

@@ -21,35 +21,27 @@ describe('Notification Core automatic inbox dispatch', () => {
     expect(await engine.evaluateEvent(event)).toMatchObject({ created: 0, duplicate: 3 });
     expect(keys.size).toBe(3);
   });
-  it('evaluates the published event in tenant scope and routes all implemented channels through the shared dispatcher', async () => {
+  it('evaluates the published event in tenant scope and leaves created deliveries for the durable worker', async () => {
     const event = { id: 'event-1', organizationId: 'org-a', eventName: 'TASK.ASSIGNED' };
     const tx = {
       notificationEvent: { create: jest.fn().mockResolvedValue(event) },
-      notificationDelivery: { findMany: jest.fn().mockResolvedValue([{ id: 'delivery-1' }]) },
     };
     const prisma = { withTenantTransaction: jest.fn(async (_context, callback) => callback(tx)) };
     const rules = { evaluateEvent: jest.fn().mockResolvedValue({ created: 3 }) };
-    const dispatcher = { dispatch: jest.fn().mockResolvedValue({ sent: true, status: 'DELIVERED' }) };
-    const core = new NotificationCoreService(prisma as any, rules as any, dispatcher as any);
+    const core = new NotificationCoreService(prisma as any, rules as any);
     await core.publishAndEvaluate({ organizationId: 'org-a', eventName: 'TASK.ASSIGNED', aggregateType: 'TASK', aggregateId: 'task-1' });
     expect(rules.evaluateEvent).toHaveBeenCalledWith(event, tx);
-    expect(tx.notificationDelivery.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ channel: { in: ['IN_APP', 'EMAIL', 'SMS', 'PUSH'] }, event: { organizationId: 'org-a' } }) }));
-    expect(dispatcher.dispatch).toHaveBeenCalledWith('delivery-1', 'org-a');
     expect(prisma.withTenantTransaction).toHaveBeenCalledWith(expect.objectContaining({ organizationId: 'org-a', platformAdmin: false }), expect.any(Function));
   });
-  it('continues dispatching independent channels after one delivery fails', async () => {
+  it('does not wait for providers while publishing a domain event', async () => {
     const event = { id: 'event-1', organizationId: 'org-a', eventName: 'TASK.ASSIGNED' };
     const tx = {
       notificationEvent: { create: jest.fn().mockResolvedValue(event) },
-      notificationDelivery: { findMany: jest.fn().mockResolvedValue([{ id: 'push-delivery' }, { id: 'email-delivery' }]) },
     };
     const prisma = { withTenantTransaction: jest.fn(async (_context, callback) => callback(tx)) };
     const rules = { evaluateEvent: jest.fn().mockResolvedValue({ created: 2 }) };
-    const dispatcher = { dispatch: jest.fn().mockRejectedValueOnce(new Error('push failed')).mockResolvedValueOnce({ sent: true, status: 'SENT' }) };
-    const core = new NotificationCoreService(prisma as any, rules as any, dispatcher as any);
-    await core.publishAndEvaluate({ organizationId: 'org-a', eventName: 'TASK.ASSIGNED', aggregateType: 'TASK', aggregateId: 'task-1' });
-    expect(dispatcher.dispatch).toHaveBeenNthCalledWith(1, 'push-delivery', 'org-a');
-    expect(dispatcher.dispatch).toHaveBeenNthCalledWith(2, 'email-delivery', 'org-a');
+    const core = new NotificationCoreService(prisma as any, rules as any);
+    await expect(core.publishAndEvaluate({ organizationId: 'org-a', eventName: 'TASK.ASSIGNED', aggregateType: 'TASK', aggregateId: 'task-1' })).resolves.toMatchObject({ evaluation: { created: 2 } });
   });
   it('treats a concurrent idempotency conflict as a duplicate and does not evaluate or dispatch twice', async () => {
     const event = { id: 'event-existing', organizationId: 'org-a', eventName: 'MEETING.REMINDER' };
@@ -62,12 +54,10 @@ describe('Notification Core automatic inbox dispatch', () => {
     };
     const prisma = { withTenantTransaction: jest.fn(async (_context, callback) => callback(tx)) };
     const rules = { evaluateEvent: jest.fn() };
-    const dispatcher = { dispatch: jest.fn() };
-    const core = new NotificationCoreService(prisma as any, rules as any, dispatcher as any);
+    const core = new NotificationCoreService(prisma as any, rules as any);
     await expect(core.publishAndEvaluate({ organizationId: 'org-a', eventName: 'MEETING.REMINDER', aggregateType: 'MEETING', aggregateId: 'meeting-1', idempotencyKey: 'same-key' })).resolves.toMatchObject({ duplicate: true, evaluation: null });
     expect(rules.evaluateEvent).not.toHaveBeenCalled();
     expect(tx.notificationDelivery.findMany).not.toHaveBeenCalled();
-    expect(dispatcher.dispatch).not.toHaveBeenCalled();
   });
   it('creates deliveries only for matching conditional rules within the event tenant', async () => {
     const recipient = { id: 'recipient-1', type: 'USER', targetId: 'user-1', channels: ['EMAIL'], enabled: true };

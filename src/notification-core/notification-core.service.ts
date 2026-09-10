@@ -1,7 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common"
 import { Prisma, type NotificationEvent } from "@prisma/client"
 import { PrismaService, type TenantTransactionClient } from "../prisma/prisma.service"
-import { NotificationDeliveryDispatcher } from './notification-delivery-dispatcher.service'
 import { notificationTenantContext } from './in-app/notification-tenant-context'
 import type { PublishNotificationEventInput } from "./notification-core.types"
 import { NotificationRuleEngineService } from "./notification-rule-engine.service"
@@ -12,7 +11,6 @@ export class NotificationCoreService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly ruleEngine: NotificationRuleEngineService,
-    private readonly dispatcher: NotificationDeliveryDispatcher,
   ) {}
 
   async publish(input: PublishNotificationEventInput, db: TenantTransactionClient = this.prisma): Promise<NotificationEvent> {
@@ -41,17 +39,6 @@ export class NotificationCoreService {
     const event = published.event
     if (!published.created) return { event, evaluation: null, duplicate: true }
     const evaluation = await this.prisma.withTenantTransaction(context, tx => this.ruleEngine.evaluateEvent(event, tx))
-    const pending = await this.prisma.withTenantTransaction(context, tx => tx.notificationDelivery.findMany({
-      where: { eventId: event.id, event: { organizationId: input.organizationId }, channel: { in: ['IN_APP', 'EMAIL', 'SMS', 'PUSH'] }, status: { in: ['PENDING', 'RETRYING'] } }, select: { id: true },
-    }))
-    for (const delivery of pending) {
-      try {
-        await this.dispatcher.dispatch(delivery.id, input.organizationId)
-      } catch (error) {
-        const detail = error instanceof Error ? error.stack ?? error.message : String(error)
-        this.logger.error(`Notification delivery failed deliveryId=${delivery.id} organizationId=${input.organizationId}`, detail)
-      }
-    }
     return { event, evaluation, duplicate: false }
   }
 

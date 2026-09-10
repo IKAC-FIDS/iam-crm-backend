@@ -6,11 +6,12 @@ import { InAppNotificationChannelHandler } from './in-app/in-app-notification-ch
 import { EmailNotificationChannelHandler } from './email/email-notification-channel.handler'
 import { PushNotificationChannelHandler } from './push/push-notification-channel.handler'
 import { notificationTenantContext } from './in-app/notification-tenant-context'
+import { NotificationDeliveryQueueService } from './queue/notification-delivery-queue.service'
 
 @Injectable()
 export class NotificationDeliveryDispatcher {
   private readonly handlers: Map<string, NotificationChannelHandler>
-  constructor(private readonly prisma: PrismaService, sms: SmsNotificationChannelHandler, inApp: InAppNotificationChannelHandler, email: EmailNotificationChannelHandler, push: PushNotificationChannelHandler) {
+  constructor(private readonly prisma: PrismaService, private readonly queue: NotificationDeliveryQueueService, sms: SmsNotificationChannelHandler, inApp: InAppNotificationChannelHandler, email: EmailNotificationChannelHandler, push: PushNotificationChannelHandler) {
     this.handlers = new Map<string, NotificationChannelHandler>([[sms.channel, sms], [inApp.channel, inApp], [email.channel, email], [push.channel, push]])
   }
   async dispatch(deliveryId: string, organizationId: string) {
@@ -18,6 +19,13 @@ export class NotificationDeliveryDispatcher {
     if (!delivery) throw new BadRequestException("Delivery در سازمان جاری یافت نشد")
     const handler = this.handlers.get(delivery.channel)
     if (!handler) throw new BadRequestException(`کانال ${delivery.channel} هنوز dispatcher ندارد`)
-    return handler.dispatch(delivery.id, organizationId)
+    try {
+      const result = await handler.dispatch(delivery.id, organizationId)
+      if (result.status === "FAILED") await this.queue.handleFailure(delivery.id, organizationId, result.reason)
+      return result
+    } catch (error) {
+      await this.queue.handleFailure(delivery.id, organizationId, error instanceof Error ? error.message : "DISPATCH_ERROR")
+      throw error
+    }
   }
 }

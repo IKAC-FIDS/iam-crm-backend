@@ -6,7 +6,7 @@ import { PermissionsGuard } from "../common/guards/permissions.guard"
 import { tenantScope } from "../common/tenant/tenant-scope.util"
 import { CreateNotificationTemplateDto, NotificationDeliveryQueryDto, NotificationTemplateQueryDto, PreviewNotificationTemplateDto, UpdateNotificationTemplateDto } from "./dto/notification-admin.dto"
 import { NotificationAdminService } from "./notification-admin.service"
-import { NotificationDeliveryDispatcher } from "./notification-delivery-dispatcher.service"
+import { NotificationDeliveryQueueService } from "./queue/notification-delivery-queue.service"
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @Permissions("notification:manage")
@@ -46,8 +46,8 @@ export class NotificationTemplatesController {
 @Permissions("notification:manage")
 @Controller("admin/notification-deliveries")
 export class NotificationDeliveriesController {
-  constructor(private readonly admin: NotificationAdminService, private readonly dispatcher: NotificationDeliveryDispatcher) {}
+  constructor(private readonly admin: NotificationAdminService, private readonly queue: NotificationDeliveryQueueService) {}
   @Get() list(@Query() query: NotificationDeliveryQueryDto, @CurrentUser() user: CurrentUserPayload) { return this.admin.listDeliveries(query, user) }
   @Get(":id") get(@Param("id") id: string, @CurrentUser() user: CurrentUserPayload) { return this.admin.getDelivery(id, user) }
-  @Post(":id/dispatch") dispatch(@Param("id") id: string, @CurrentUser() user: CurrentUserPayload) { return this.dispatcher.dispatch(id, tenantScope.require(user).organizationId) }
+  @Post(":id/dispatch") dispatch(@Param("id") id: string, @CurrentUser() user: CurrentUserPayload) { return this.queue.retryNow(id, tenantScope.require(user).organizationId) }
 }

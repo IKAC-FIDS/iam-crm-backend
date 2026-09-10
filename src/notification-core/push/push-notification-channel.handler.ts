@@ -18,7 +18,7 @@ export class PushNotificationChannelHandler implements NotificationChannelHandle
     const context = notificationTenantContext(organizationId)
     const where = { id: deliveryId, channel: this.channel, event: { organizationId } }
     const prepared = await this.prisma.withTenantTransaction(context, async tx => {
-      const claim = await tx.notificationDelivery.updateMany({ where: { ...where, status: { in: [Status.PENDING, Status.RETRYING, Status.FAILED] } }, data: { status: Status.PROCESSING, attemptCount: { increment: 1 }, lastAttemptAt: new Date() } })
+      const claim = await tx.notificationDelivery.updateMany({ where: { ...where, status: { in: [Status.PENDING, Status.RETRYING, Status.FAILED] } }, data: { status: Status.PROCESSING, attemptCount: { increment: 1 }, lastAttemptAt: new Date(), processingStartedAt: new Date(), nextAttemptAt: null } })
       const delivery = await tx.notificationDelivery.findFirst({ where, include: { event: true, template: true } })
       if (!delivery) throw new NotFoundException("Notification delivery not found")
       if (!claim.count) return { delivery, rendered: null, endpoints: [], claimable: false }
@@ -50,13 +50,13 @@ export class PushNotificationChannelHandler implements NotificationChannelHandle
     const status = successes.length ? Status.SENT : Status.FAILED
     const failureCode = successes.length ? null : results[0]?.errorCode ?? "PUSH_PROVIDER_FAILED"
     const failureMessage = successes.length ? (successes.length < results.length ? `${successes.length} از ${results.length} مقصد دریافت کردند` : null) : results[0]?.errorMessage ?? "ارسال اعلان پوش ناموفق بود"
-    await this.prisma.withTenantTransaction(context, tx => tx.notificationDelivery.update({ where: { id: deliveryId }, data: { status, destination: `${successes.length}/${results.length} endpoints`, providerMessageId: successes.map(item => item.providerMessageId).filter(Boolean).join(",").slice(0, 1000) || null, sentAt: successes.length ? new Date() : null, failureCode, failureMessage } }))
+    await this.prisma.withTenantTransaction(context, tx => tx.notificationDelivery.update({ where: { id: deliveryId }, data: { status, destination: `${successes.length}/${results.length} endpoints`, providerMessageId: successes.map(item => item.providerMessageId).filter(Boolean).join(",").slice(0, 1000) || null, sentAt: successes.length ? new Date() : null, failureCode, failureMessage, processingStartedAt: null } }))
     this.logger.log(`PUSH processed deliveryId=${deliveryId} organizationId=${organizationId} successful=${successes.length} attempted=${results.length}`)
     return { deliveryId, status, sent: successes.length > 0, reason: failureCode ?? undefined }
   }
 
   private async finish(context: ReturnType<typeof notificationTenantContext>, id: string, status: Status, code: string, message: string) {
-    await this.prisma.withTenantTransaction(context, tx => tx.notificationDelivery.update({ where: { id }, data: { status, failureCode: code, failureMessage: message } }))
+    await this.prisma.withTenantTransaction(context, tx => tx.notificationDelivery.update({ where: { id }, data: { status, failureCode: code, failureMessage: message, processingStartedAt: null, nextAttemptAt: null } }))
     return { deliveryId: id, status, sent: false, reason: code }
   }
 }

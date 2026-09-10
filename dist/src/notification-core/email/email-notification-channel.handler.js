@@ -33,7 +33,7 @@ let EmailNotificationChannelHandler = EmailNotificationChannelHandler_1 = class 
         const prepared = await this.prisma.withTenantTransaction(context, async (tx) => {
             const claim = await tx.notificationDelivery.updateMany({
                 where: { ...where, status: { in: [client_1.NotificationDeliveryStatus.PENDING, client_1.NotificationDeliveryStatus.RETRYING, client_1.NotificationDeliveryStatus.FAILED] } },
-                data: { status: client_1.NotificationDeliveryStatus.PROCESSING, attemptCount: { increment: 1 }, lastAttemptAt: new Date() },
+                data: { status: client_1.NotificationDeliveryStatus.PROCESSING, attemptCount: { increment: 1 }, lastAttemptAt: new Date(), processingStartedAt: new Date(), nextAttemptAt: null },
             });
             const delivery = await tx.notificationDelivery.findFirst({
                 where,
@@ -77,6 +77,7 @@ let EmailNotificationChannelHandler = EmailNotificationChannelHandler_1 = class 
                     sentAt: now,
                     failureCode: null,
                     failureMessage: null,
+                    processingStartedAt: null,
                 },
             }));
             return { deliveryId, status: client_1.NotificationDeliveryStatus.SENT, sent: true };
@@ -85,7 +86,7 @@ let EmailNotificationChannelHandler = EmailNotificationChannelHandler_1 = class 
             const message = error instanceof Error ? error.message.slice(0, 1000) : "ارسال ایمیل ناموفق بود";
             await this.prisma.withTenantTransaction(context, (tx) => tx.notificationDelivery.update({
                 where: { id: deliveryId },
-                data: { status: client_1.NotificationDeliveryStatus.FAILED, destination: prepared.destination, failureCode: "EMAIL_DISPATCH_ERROR", failureMessage: message },
+                data: { status: client_1.NotificationDeliveryStatus.FAILED, destination: prepared.destination, failureCode: "EMAIL_DISPATCH_ERROR", failureMessage: message, processingStartedAt: null },
             }));
             this.logger.warn(`EMAIL dispatch failed deliveryId=${deliveryId} organizationId=${organizationId}`);
             return { deliveryId, status: client_1.NotificationDeliveryStatus.FAILED, sent: false, reason: "EMAIL_DISPATCH_ERROR" };
@@ -94,7 +95,7 @@ let EmailNotificationChannelHandler = EmailNotificationChannelHandler_1 = class 
     async skip(deliveryId, organizationId, code, message) {
         await this.prisma.withTenantTransaction((0, notification_tenant_context_1.notificationTenantContext)(organizationId), (tx) => tx.notificationDelivery.update({
             where: { id: deliveryId },
-            data: { status: client_1.NotificationDeliveryStatus.SKIPPED, failureCode: code, failureMessage: message },
+            data: { status: client_1.NotificationDeliveryStatus.SKIPPED, failureCode: code, failureMessage: message, processingStartedAt: null, nextAttemptAt: null },
         }));
         return { deliveryId, status: client_1.NotificationDeliveryStatus.SKIPPED, sent: false, reason: code };
     }

@@ -13,14 +13,12 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.NotificationCoreService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../prisma/prisma.service");
-const notification_delivery_dispatcher_service_1 = require("./notification-delivery-dispatcher.service");
 const notification_tenant_context_1 = require("./in-app/notification-tenant-context");
 const notification_rule_engine_service_1 = require("./notification-rule-engine.service");
 let NotificationCoreService = NotificationCoreService_1 = class NotificationCoreService {
-    constructor(prisma, ruleEngine, dispatcher) {
+    constructor(prisma, ruleEngine) {
         this.prisma = prisma;
         this.ruleEngine = ruleEngine;
-        this.dispatcher = dispatcher;
         this.logger = new common_1.Logger(NotificationCoreService_1.name);
     }
     async publish(input, db = this.prisma) {
@@ -48,18 +46,6 @@ let NotificationCoreService = NotificationCoreService_1 = class NotificationCore
         if (!published.created)
             return { event, evaluation: null, duplicate: true };
         const evaluation = await this.prisma.withTenantTransaction(context, tx => this.ruleEngine.evaluateEvent(event, tx));
-        const pending = await this.prisma.withTenantTransaction(context, tx => tx.notificationDelivery.findMany({
-            where: { eventId: event.id, event: { organizationId: input.organizationId }, channel: { in: ['IN_APP', 'EMAIL', 'SMS', 'PUSH'] }, status: { in: ['PENDING', 'RETRYING'] } }, select: { id: true },
-        }));
-        for (const delivery of pending) {
-            try {
-                await this.dispatcher.dispatch(delivery.id, input.organizationId);
-            }
-            catch (error) {
-                const detail = error instanceof Error ? error.stack ?? error.message : String(error);
-                this.logger.error(`Notification delivery failed deliveryId=${delivery.id} organizationId=${input.organizationId}`, detail);
-            }
-        }
         return { event, evaluation, duplicate: false };
     }
     async publishDomainEvent(input) {
@@ -77,7 +63,6 @@ exports.NotificationCoreService = NotificationCoreService;
 exports.NotificationCoreService = NotificationCoreService = NotificationCoreService_1 = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
-        notification_rule_engine_service_1.NotificationRuleEngineService,
-        notification_delivery_dispatcher_service_1.NotificationDeliveryDispatcher])
+        notification_rule_engine_service_1.NotificationRuleEngineService])
 ], NotificationCoreService);
 //# sourceMappingURL=notification-core.service.js.map

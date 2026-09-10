@@ -36,14 +36,14 @@ let InAppNotificationChannelHandler = InAppNotificationChannelHandler_1 = class 
         try {
             return await this.prisma.withTenantTransaction(context, async (tx) => {
                 const claim = await tx.notificationDelivery.updateMany({ where: { ...where, status: { in: [client_1.NotificationDeliveryStatus.PENDING, client_1.NotificationDeliveryStatus.RETRYING, client_1.NotificationDeliveryStatus.FAILED] } },
-                    data: { status: client_1.NotificationDeliveryStatus.PROCESSING, attemptCount: { increment: 1 }, lastAttemptAt: new Date() } });
+                    data: { status: client_1.NotificationDeliveryStatus.PROCESSING, attemptCount: { increment: 1 }, lastAttemptAt: new Date(), processingStartedAt: new Date(), nextAttemptAt: null } });
                 const delivery = await tx.notificationDelivery.findFirst({ where, include: { event: true, template: true } });
                 if (!delivery)
                     throw new common_1.NotFoundException('Notification delivery not found');
                 if (!claim.count)
                     return { deliveryId, status: delivery.status, sent: false, reason: 'DELIVERY_NOT_CLAIMABLE' };
                 const skip = async (code) => {
-                    await tx.notificationDelivery.update({ where: { id: deliveryId }, data: { status: client_1.NotificationDeliveryStatus.SKIPPED, failureCode: code, failureMessage: code } });
+                    await tx.notificationDelivery.update({ where: { id: deliveryId }, data: { status: client_1.NotificationDeliveryStatus.SKIPPED, failureCode: code, failureMessage: code, processingStartedAt: null, nextAttemptAt: null } });
                     return { deliveryId, status: client_1.NotificationDeliveryStatus.SKIPPED, sent: false, reason: code };
                 };
                 if (!delivery.recipientUserId)
@@ -74,7 +74,7 @@ let InAppNotificationChannelHandler = InAppNotificationChannelHandler_1 = class 
                 const now = new Date();
                 await tx.notificationDelivery.update({ where: { id: deliveryId }, data: {
                         status: client_1.NotificationDeliveryStatus.DELIVERED, sentAt: now, deliveredAt: now, providerMessageId: notification.id,
-                        destination: recipient.id, failureCode: null, failureMessage: null,
+                        destination: recipient.id, failureCode: null, failureMessage: null, processingStartedAt: null,
                     } });
                 return { deliveryId, status: client_1.NotificationDeliveryStatus.DELIVERED, sent: true };
             }, { timeout: 15000 });
@@ -82,7 +82,7 @@ let InAppNotificationChannelHandler = InAppNotificationChannelHandler_1 = class 
         catch {
             await this.prisma.withTenantTransaction(context, tx => tx.notificationDelivery.updateMany({
                 where: { ...where, status: { in: [client_1.NotificationDeliveryStatus.PENDING, client_1.NotificationDeliveryStatus.RETRYING, client_1.NotificationDeliveryStatus.FAILED] } },
-                data: { status: client_1.NotificationDeliveryStatus.FAILED, failureCode: 'IN_APP_DISPATCH_ERROR', failureMessage: 'ایجاد اعلان داخل سامانه ناموفق بود', attemptCount: { increment: 1 }, lastAttemptAt: new Date() },
+                data: { status: client_1.NotificationDeliveryStatus.FAILED, failureCode: 'IN_APP_DISPATCH_ERROR', failureMessage: 'ایجاد اعلان داخل سامانه ناموفق بود', attemptCount: { increment: 1 }, lastAttemptAt: new Date(), processingStartedAt: null },
             }));
             this.logger.warn(`IN_APP dispatch failed deliveryId=${deliveryId} organizationId=${organizationId}`);
             return { deliveryId, status: client_1.NotificationDeliveryStatus.FAILED, sent: false, reason: 'IN_APP_DISPATCH_ERROR' };
