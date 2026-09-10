@@ -38,6 +38,15 @@ describe("NotificationTemplateEngineService", () => {
     expect(second.body).toBe("سلام مریم")
   })
 
+  it("renders all catalog date variables with the Persian calendar and Tehran time", () => {
+    const { service } = setup()
+    const timestamp = new Date("2026-09-10T08:30:00.000Z")
+    const expected = new Intl.DateTimeFormat("fa-IR-u-ca-persian", { timeZone: "Asia/Tehran", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(timestamp)
+    const result = service.render({ body: "شروع: {{meeting.startAt}} | پایان: {{meeting.endAt}}", context: { meeting: { startAt: timestamp, endAt: timestamp.toISOString() } } })
+    expect(result.body).toBe(`شروع: ${expected} | پایان: ${expected}`)
+    expect(result.body).not.toContain("2026-09-10")
+  })
+
   it("keeps missing placeholders and reports them", () => {
     const { service } = setup()
     expect(service.render({ body: "{{meeting.location}}", context: { meeting: {} } })).toEqual({

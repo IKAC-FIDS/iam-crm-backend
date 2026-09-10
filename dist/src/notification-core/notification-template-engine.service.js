@@ -16,6 +16,10 @@ const notification_core_catalog_1 = require("./notification-core.catalog");
 const PLACEHOLDER = /{{\s*([^{}]+?)\s*}}/g;
 const SAFE_PATH = /^[A-Za-z][A-Za-z0-9]*(?:\.[A-Za-z][A-Za-z0-9]*)*$/;
 const DANGEROUS_SEGMENTS = new Set(["__proto__", "prototype", "constructor"]);
+const DATE_VARIABLE_PATHS = new Set(Object.values(notification_core_catalog_1.NOTIFICATION_TEMPLATE_VARIABLES)
+    .flat()
+    .filter((item) => item.type === "date")
+    .map((item) => item.key));
 let NotificationTemplateEngineService = class NotificationTemplateEngineService {
     constructor(prisma) {
         this.prisma = prisma;
@@ -48,7 +52,7 @@ let NotificationTemplateEngineService = class NotificationTemplateEngineService 
                     missingVariables.add(path);
                     return token;
                 }
-                return value instanceof Date ? value.toISOString() : String(value);
+                return DATE_VARIABLE_PATHS.has(path) ? this.formatPersianDateTime(value) : String(value);
             });
         };
         return {
@@ -185,6 +189,20 @@ let NotificationTemplateEngineService = class NotificationTemplateEngineService 
             current = current[segment];
         }
         return current;
+    }
+    formatPersianDateTime(value) {
+        const parsed = value instanceof Date ? value : typeof value === "string" ? new Date(value) : null;
+        if (!parsed || Number.isNaN(parsed.getTime()))
+            return String(value);
+        return new Intl.DateTimeFormat("fa-IR-u-ca-persian", {
+            timeZone: "Asia/Tehran",
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+            hourCycle: "h23",
+        }).format(parsed);
     }
 };
 exports.NotificationTemplateEngineService = NotificationTemplateEngineService;
