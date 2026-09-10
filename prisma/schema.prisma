@@ -608,6 +608,7 @@ model Organization {
   notificationCoreRules       NotificationRule[]         @relation("NotificationCoreRules")
   notificationSchedules       NotificationSchedule[]     @relation("NotificationSchedules")
   notificationCoreTemplates   NotificationTemplate[]     @relation("NotificationCoreTemplates")
+  notificationCoreDeliveries  NotificationDelivery[]     @relation("NotificationCoreDeliveryOrganization")
   notificationCorePreferences NotificationPreference[]   @relation("NotificationCorePreferences")
   notificationSmsSettings     NotificationSmsSettings?
   notificationPushSettings    NotificationPushSettings?
@@ -3205,6 +3206,8 @@ model NotificationTemplate {
 
 model NotificationDelivery {
   id                  String                     @id @default(uuid())
+  organizationId      String
+  organization        Organization               @relation("NotificationCoreDeliveryOrganization", fields: [organizationId], references: [id], onDelete: Cascade)
   eventId             String
   event               NotificationEvent          @relation(fields: [eventId], references: [id], onDelete: Cascade)
   ruleId              String?
@@ -3218,7 +3221,7 @@ model NotificationDelivery {
   channel             NotificationChannel
   status              NotificationDeliveryStatus @default(PENDING)
   destination         String?
-  deduplicationKey    String                     @unique
+  deduplicationKey    String
   attemptCount        Int                        @default(0)
   providerMessageId   String?
   failureCode         String?
@@ -3231,7 +3234,9 @@ model NotificationDelivery {
   createdAt           DateTime                   @default(now())
   updatedAt           DateTime                   @updatedAt
 
+  @@unique([organizationId, deduplicationKey])
   @@index([eventId])
+  @@index([organizationId, status, createdAt])
   @@index([ruleId])
   @@index([recipientUserId, status, createdAt])
   @@index([channel, status, createdAt])

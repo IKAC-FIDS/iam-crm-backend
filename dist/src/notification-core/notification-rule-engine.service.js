@@ -16,12 +16,14 @@ const prisma_service_1 = require("../prisma/prisma.service");
 const notification_template_engine_service_1 = require("./notification-template-engine.service");
 const notification_policy_context_builder_service_1 = require("./policy/notification-policy-context-builder.service");
 const notification_policy_evaluator_service_1 = require("./policy/notification-policy-evaluator.service");
+const notification_delivery_service_1 = require("./deduplication/notification-delivery.service");
 let NotificationRuleEngineService = class NotificationRuleEngineService {
-    constructor(prisma, templateEngine, contextBuilder, policyEvaluator) {
+    constructor(prisma, templateEngine, contextBuilder, policyEvaluator, deliveries) {
         this.prisma = prisma;
         this.templateEngine = templateEngine;
         this.contextBuilder = contextBuilder;
         this.policyEvaluator = policyEvaluator;
+        this.deliveries = deliveries;
     }
     async evaluateEvent(event, db = this.prisma) {
         const rules = await db.notificationRule.findMany({
@@ -59,29 +61,10 @@ let NotificationRuleEngineService = class NotificationRuleEngineService {
                 }
                 for (const recipientUserId of recipientIds) {
                     for (const channel of recipientRule.channels) {
-                        const deduplicationKey = [
-                            event.id,
-                            rule.id,
-                            recipientRule.id,
-                            recipientUserId,
-                            channel,
-                        ].join(":");
                         try {
                             const rendered = await this.templateEngine.renderDelivery(event, recipientUserId, channel, db);
-                            const inserted = await db.notificationDelivery.createMany({
-                                skipDuplicates: true,
-                                data: {
-                                    eventId: event.id,
-                                    ruleId: rule.id,
-                                    recipientRuleId: recipientRule.id,
-                                    recipientUserId,
-                                    templateId: rendered.template.id,
-                                    channel,
-                                    status: client_1.NotificationDeliveryStatus.PENDING,
-                                    deduplicationKey,
-                                },
-                            });
-                            if (inserted.count)
+                            const result = await this.deliveries.createPendingDelivery({ event, ruleId: rule.id, recipientRuleId: recipientRule.id, recipientUserId, templateId: rendered.template.id, channel }, db);
+                            if (result.status === "CREATED")
                                 created += 1;
                             else
                                 duplicate += 1;
@@ -89,11 +72,6 @@ let NotificationRuleEngineService = class NotificationRuleEngineService {
                         catch (error) {
                             if (error instanceof common_1.NotFoundException) {
                                 unresolved += 1;
-                                continue;
-                            }
-                            if (error instanceof client_1.Prisma.PrismaClientKnownRequestError &&
-                                error.code === "P2002") {
-                                duplicate += 1;
                                 continue;
                             }
                             throw error;
@@ -281,6 +259,7 @@ exports.NotificationRuleEngineService = NotificationRuleEngineService = __decora
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
         notification_template_engine_service_1.NotificationTemplateEngineService,
         notification_policy_context_builder_service_1.NotificationPolicyContextBuilder,
-        notification_policy_evaluator_service_1.NotificationPolicyEvaluatorService])
+        notification_policy_evaluator_service_1.NotificationPolicyEvaluatorService,
+        notification_delivery_service_1.NotificationDeliveryService])
 ], NotificationRuleEngineService);
 //# sourceMappingURL=notification-rule-engine.service.js.map

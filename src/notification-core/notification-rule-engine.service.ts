@@ -1,16 +1,15 @@
 import { Injectable, NotFoundException } from "@nestjs/common"
 import {
-  NotificationDeliveryStatus,
   NotificationRecipientType,
   OrganizationMembershipStatus,
   type NotificationEvent,
   type NotificationRecipientRule,
-  Prisma,
 } from "@prisma/client"
 import { PrismaService, type TenantTransactionClient } from "../prisma/prisma.service"
 import { NotificationTemplateEngineService } from "./notification-template-engine.service"
 import { NotificationPolicyContextBuilder } from "./policy/notification-policy-context-builder.service"
 import { NotificationPolicyEvaluatorService } from "./policy/notification-policy-evaluator.service"
+import { NotificationDeliveryService } from "./deduplication/notification-delivery.service"
 
 @Injectable()
 export class NotificationRuleEngineService {
@@ -19,6 +18,7 @@ export class NotificationRuleEngineService {
     private readonly templateEngine: NotificationTemplateEngineService,
     private readonly contextBuilder: NotificationPolicyContextBuilder,
     private readonly policyEvaluator: NotificationPolicyEvaluatorService,
+    private readonly deliveries: NotificationDeliveryService,
   ) {}
 
   async evaluateEvent(event: NotificationEvent, db: TenantTransactionClient = this.prisma) {
@@ -58,41 +58,14 @@ export class NotificationRuleEngineService {
 
         for (const recipientUserId of recipientIds) {
           for (const channel of recipientRule.channels) {
-            const deduplicationKey = [
-              event.id,
-              rule.id,
-              recipientRule.id,
-              recipientUserId,
-              channel,
-            ].join(":")
-
             try {
               const rendered = await this.templateEngine.renderDelivery(event, recipientUserId, channel, db)
-              const inserted = await db.notificationDelivery.createMany({
-                skipDuplicates: true,
-                data: {
-                  eventId: event.id,
-                  ruleId: rule.id,
-                  recipientRuleId: recipientRule.id,
-                  recipientUserId,
-                  templateId: rendered.template.id,
-                  channel,
-                  status: NotificationDeliveryStatus.PENDING,
-                  deduplicationKey,
-                },
-              })
-              if (inserted.count) created += 1
+              const result = await this.deliveries.createPendingDelivery({ event, ruleId: rule.id, recipientRuleId: recipientRule.id, recipientUserId, templateId: rendered.template.id, channel }, db)
+              if (result.status === "CREATED") created += 1
               else duplicate += 1
             } catch (error) {
               if (error instanceof NotFoundException) {
                 unresolved += 1
-                continue
-              }
-              if (
-                error instanceof Prisma.PrismaClientKnownRequestError &&
-                error.code === "P2002"
-              ) {
-                duplicate += 1
                 continue
               }
               throw error
