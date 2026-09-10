@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from "@nestjs/common"
+import { Injectable, NotFoundException, Optional } from "@nestjs/common"
 import {
   NotificationRecipientType,
   OrganizationMembershipStatus,
@@ -10,6 +10,7 @@ import { NotificationTemplateEngineService } from "./notification-template-engin
 import { NotificationPolicyContextBuilder } from "./policy/notification-policy-context-builder.service"
 import { NotificationPolicyEvaluatorService } from "./policy/notification-policy-evaluator.service"
 import { NotificationDeliveryService } from "./deduplication/notification-delivery.service"
+import { NotificationOrchestrationService } from "./orchestration/notification-orchestration.service"
 
 @Injectable()
 export class NotificationRuleEngineService {
@@ -19,6 +20,7 @@ export class NotificationRuleEngineService {
     private readonly contextBuilder: NotificationPolicyContextBuilder,
     private readonly policyEvaluator: NotificationPolicyEvaluatorService,
     private readonly deliveries: NotificationDeliveryService,
+    @Optional() private readonly orchestration?: NotificationOrchestrationService,
   ) {}
 
   async evaluateEvent(event: NotificationEvent, db: TenantTransactionClient = this.prisma) {
@@ -60,7 +62,8 @@ export class NotificationRuleEngineService {
           for (const channel of recipientRule.channels) {
             try {
               const rendered = await this.templateEngine.renderDelivery(event, recipientUserId, channel, db)
-              const result = await this.deliveries.createPendingDelivery({ event, ruleId: rule.id, recipientRuleId: recipientRule.id, recipientUserId, templateId: rendered.template.id, channel }, db)
+              const decision = this.orchestration ? await this.orchestration.decide(event, rule, recipientUserId, channel, db) : undefined
+              const result = await this.deliveries.createPendingDelivery({ event, ruleId: rule.id, recipientRuleId: recipientRule.id, recipientUserId, templateId: rendered.template.id, channel, priority: rule.deliveryPriority, decision }, db)
               if (result.status === "CREATED") created += 1
               else duplicate += 1
             } catch (error) {
@@ -78,9 +81,9 @@ export class NotificationRuleEngineService {
     return { rules: rules.length, matchedRules, created, duplicate, unresolved }
   }
 
-  private async resolveRecipientIds(
+  async resolveRecipientIds(
     event: NotificationEvent,
-    rule: NotificationRecipientRule,
+    rule: Pick<NotificationRecipientRule, "type" | "targetId">,
     db: TenantTransactionClient,
   ): Promise<string[]> {
     switch (rule.type) {

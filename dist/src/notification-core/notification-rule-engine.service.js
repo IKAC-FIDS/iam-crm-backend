@@ -8,6 +8,9 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.NotificationRuleEngineService = void 0;
 const common_1 = require("@nestjs/common");
@@ -17,13 +20,15 @@ const notification_template_engine_service_1 = require("./notification-template-
 const notification_policy_context_builder_service_1 = require("./policy/notification-policy-context-builder.service");
 const notification_policy_evaluator_service_1 = require("./policy/notification-policy-evaluator.service");
 const notification_delivery_service_1 = require("./deduplication/notification-delivery.service");
+const notification_orchestration_service_1 = require("./orchestration/notification-orchestration.service");
 let NotificationRuleEngineService = class NotificationRuleEngineService {
-    constructor(prisma, templateEngine, contextBuilder, policyEvaluator, deliveries) {
+    constructor(prisma, templateEngine, contextBuilder, policyEvaluator, deliveries, orchestration) {
         this.prisma = prisma;
         this.templateEngine = templateEngine;
         this.contextBuilder = contextBuilder;
         this.policyEvaluator = policyEvaluator;
         this.deliveries = deliveries;
+        this.orchestration = orchestration;
     }
     async evaluateEvent(event, db = this.prisma) {
         const rules = await db.notificationRule.findMany({
@@ -63,7 +68,8 @@ let NotificationRuleEngineService = class NotificationRuleEngineService {
                     for (const channel of recipientRule.channels) {
                         try {
                             const rendered = await this.templateEngine.renderDelivery(event, recipientUserId, channel, db);
-                            const result = await this.deliveries.createPendingDelivery({ event, ruleId: rule.id, recipientRuleId: recipientRule.id, recipientUserId, templateId: rendered.template.id, channel }, db);
+                            const decision = this.orchestration ? await this.orchestration.decide(event, rule, recipientUserId, channel, db) : undefined;
+                            const result = await this.deliveries.createPendingDelivery({ event, ruleId: rule.id, recipientRuleId: recipientRule.id, recipientUserId, templateId: rendered.template.id, channel, priority: rule.deliveryPriority, decision }, db);
                             if (result.status === "CREATED")
                                 created += 1;
                             else
@@ -256,10 +262,12 @@ let NotificationRuleEngineService = class NotificationRuleEngineService {
 exports.NotificationRuleEngineService = NotificationRuleEngineService;
 exports.NotificationRuleEngineService = NotificationRuleEngineService = __decorate([
     (0, common_1.Injectable)(),
+    __param(5, (0, common_1.Optional)()),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
         notification_template_engine_service_1.NotificationTemplateEngineService,
         notification_policy_context_builder_service_1.NotificationPolicyContextBuilder,
         notification_policy_evaluator_service_1.NotificationPolicyEvaluatorService,
-        notification_delivery_service_1.NotificationDeliveryService])
+        notification_delivery_service_1.NotificationDeliveryService,
+        notification_orchestration_service_1.NotificationOrchestrationService])
 ], NotificationRuleEngineService);
 //# sourceMappingURL=notification-rule-engine.service.js.map

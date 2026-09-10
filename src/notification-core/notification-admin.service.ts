@@ -209,6 +209,7 @@ export class NotificationAdminService {
     const [data, total] = await this.prisma.withTenantTransaction(context, (tx) => Promise.all([
       tx.notificationDelivery.findMany({ where, select: {
         id: true, channel: true, status: true, destination: true, attemptCount: true,
+        priority: true, orchestrationReason: true, deferredUntil: true, digestBucketId: true, escalationRunId: true,
         providerMessageId: true, failureCode: true, failureMessage: true,
         lastAttemptAt: true, nextAttemptAt: true, processingStartedAt: true,
         sentAt: true, deliveredAt: true, createdAt: true, updatedAt: true,
@@ -229,6 +230,7 @@ export class NotificationAdminService {
     const item = await this.prisma.withTenantTransaction(context, (tx) =>
       tx.notificationDelivery.findFirst({ where: { id, organizationId }, select: {
         id: true, channel: true, status: true, destination: true, deduplicationKey: true,
+        priority: true, orchestrationReason: true, deferredUntil: true, digestBucketId: true, escalationRunId: true,
         attemptCount: true, providerMessageId: true, failureCode: true, failureMessage: true,
         lastAttemptAt: true, nextAttemptAt: true, processingStartedAt: true,
         retryRequestedAt: true, sentAt: true, deliveredAt: true, createdAt: true, updatedAt: true,

@@ -77,7 +77,7 @@ __decorate([
 ], NotificationRecipientRuleInputDto.prototype, "enabled", void 0);
 class CreateNotificationRuleDto {
     static _OPENAPI_METADATA_FACTORY() {
-        return { name: { required: true, type: () => String }, eventName: { required: true, type: () => String }, enabled: { required: false, type: () => Boolean }, mandatory: { required: false, type: () => Boolean }, priority: { required: false, type: () => Number, minimum: 0, maximum: 10000 }, conditions: { required: false, type: () => Object, nullable: true }, schedule: { required: false, type: () => require("./notification-rule.dto").NotificationScheduleInputDto, nullable: true }, recipientRules: { required: true, type: () => [require("./notification-rule.dto").NotificationRecipientRuleInputDto] } };
+        return { name: { required: true, type: () => String }, eventName: { required: true, type: () => String }, enabled: { required: false, type: () => Boolean }, mandatory: { required: false, type: () => Boolean }, priority: { required: false, type: () => Number, minimum: 0, maximum: 10000 }, deliveryPriority: { required: false, type: () => Object }, digestPolicyId: { required: false, type: () => String, nullable: true }, conditions: { required: false, type: () => Object, nullable: true }, schedule: { required: false, type: () => require("./notification-rule.dto").NotificationScheduleInputDto }, recipientRules: { required: true, type: () => [require("./notification-rule.dto").NotificationRecipientRuleInputDto] } };
     }
 }
 exports.CreateNotificationRuleDto = CreateNotificationRuleDto;
@@ -110,6 +110,16 @@ __decorate([
 ], CreateNotificationRuleDto.prototype, "priority", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsEnum)(client_1.NotificationPriority),
+    __metadata("design:type", String)
+], CreateNotificationRuleDto.prototype, "deliveryPriority", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", Object)
+], CreateNotificationRuleDto.prototype, "digestPolicyId", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsObject)(),
     __metadata("design:type", Object)
 ], CreateNotificationRuleDto.prototype, "conditions", void 0);
@@ -117,7 +127,7 @@ __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.ValidateNested)(),
     (0, class_transformer_1.Type)(() => NotificationScheduleInputDto),
-    __metadata("design:type", Object)
+    __metadata("design:type", NotificationScheduleInputDto)
 ], CreateNotificationRuleDto.prototype, "schedule", void 0);
 __decorate([
     (0, class_validator_1.IsArray)(),
@@ -128,7 +138,7 @@ __decorate([
 ], CreateNotificationRuleDto.prototype, "recipientRules", void 0);
 class UpdateNotificationRuleDto {
     static _OPENAPI_METADATA_FACTORY() {
-        return { name: { required: false, type: () => String }, eventName: { required: false, type: () => String }, enabled: { required: false, type: () => Boolean }, mandatory: { required: false, type: () => Boolean }, priority: { required: false, type: () => Number, minimum: 0, maximum: 10000 }, conditions: { required: false, type: () => Object, nullable: true }, schedule: { required: false, type: () => require("./notification-rule.dto").NotificationScheduleInputDto, nullable: true }, recipientRules: { required: false, type: () => [require("./notification-rule.dto").NotificationRecipientRuleInputDto] } };
+        return { name: { required: false, type: () => String }, eventName: { required: false, type: () => String }, enabled: { required: false, type: () => Boolean }, mandatory: { required: false, type: () => Boolean }, priority: { required: false, type: () => Number, minimum: 0, maximum: 10000 }, deliveryPriority: { required: false, type: () => Object }, digestPolicyId: { required: false, type: () => String, nullable: true }, conditions: { required: false, type: () => Object, nullable: true }, schedule: { required: false, type: () => require("./notification-rule.dto").NotificationScheduleInputDto }, recipientRules: { required: false, type: () => [require("./notification-rule.dto").NotificationRecipientRuleInputDto] } };
     }
 }
 exports.UpdateNotificationRuleDto = UpdateNotificationRuleDto;
@@ -163,6 +173,16 @@ __decorate([
 ], UpdateNotificationRuleDto.prototype, "priority", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsEnum)(client_1.NotificationPriority),
+    __metadata("design:type", String)
+], UpdateNotificationRuleDto.prototype, "deliveryPriority", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", Object)
+], UpdateNotificationRuleDto.prototype, "digestPolicyId", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsObject)(),
     __metadata("design:type", Object)
 ], UpdateNotificationRuleDto.prototype, "conditions", void 0);
@@ -170,7 +190,7 @@ __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.ValidateNested)(),
     (0, class_transformer_1.Type)(() => NotificationScheduleInputDto),
-    __metadata("design:type", Object)
+    __metadata("design:type", NotificationScheduleInputDto)
 ], UpdateNotificationRuleDto.prototype, "schedule", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),

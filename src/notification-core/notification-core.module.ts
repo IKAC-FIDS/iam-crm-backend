@@ -36,11 +36,16 @@ import { NotificationDeliveryWorkerService } from './queue/notification-delivery
 import { NotificationDeduplicationKeyService } from './deduplication/notification-deduplication-key.service'
 import { NotificationDeliveryService } from './deduplication/notification-delivery.service'
 import { NotificationDeliveryAuditService } from './audit/notification-delivery-audit.service'
+import { NotificationPolicyAdminController } from './orchestration/notification-policy-admin.controller'
+import { NotificationPolicyAdminService } from './orchestration/notification-policy-admin.service'
+import { NotificationOrchestrationService } from './orchestration/notification-orchestration.service'
+import { NotificationDigestRendererService } from './orchestration/notification-digest-renderer.service'
+import { NotificationEscalationService } from './orchestration/notification-escalation.service'
 
 @Module({
   imports: [PrismaModule, SsoModule, AuditLogModule, NotificationsModule, EmailModule],
-  controllers: [NotificationRulesController, NotificationAdminController, NotificationTemplatesController, NotificationDeliveriesController, SmsAdminController, PushAdminController, PushSubscriptionController],
-  providers: [NotificationDeliveryAuditService, NotificationDeduplicationKeyService, NotificationDeliveryService, NotificationDeliveryQueueService, NotificationDeliveryWorkerService, NotificationScheduleValidator, NotificationSchedulerService, NotificationPolicyConditionValidator, NotificationPolicyContextBuilder, NotificationPolicyEvaluatorService, PushNotificationChannelHandler, PushProviderRegistry, PushSettingsService, WebPushProvider, EmailNotificationChannelHandler, InAppNotificationChannelHandler, InAppNotificationMetadataMapper, NotificationActionUrlResolver, NotificationCoreService, NotificationRulesService, NotificationRuleEngineService, NotificationAdminService, NotificationTemplateEngineService, GenericHttpSmsProvider, SmsProviderRegistry, SmsRecipientResolver, SmsSettingsService, SmsNotificationChannelHandler, NotificationDeliveryDispatcher],
+  controllers: [NotificationRulesController, NotificationAdminController, NotificationTemplatesController, NotificationDeliveriesController, SmsAdminController, PushAdminController, PushSubscriptionController, NotificationPolicyAdminController],
+  providers: [NotificationPolicyAdminService, NotificationOrchestrationService, NotificationDigestRendererService, NotificationEscalationService, NotificationDeliveryAuditService, NotificationDeduplicationKeyService, NotificationDeliveryService, NotificationDeliveryQueueService, NotificationDeliveryWorkerService, NotificationScheduleValidator, NotificationSchedulerService, NotificationPolicyConditionValidator, NotificationPolicyContextBuilder, NotificationPolicyEvaluatorService, PushNotificationChannelHandler, PushProviderRegistry, PushSettingsService, WebPushProvider, EmailNotificationChannelHandler, InAppNotificationChannelHandler, InAppNotificationMetadataMapper, NotificationActionUrlResolver, NotificationCoreService, NotificationRulesService, NotificationRuleEngineService, NotificationAdminService, NotificationTemplateEngineService, GenericHttpSmsProvider, SmsProviderRegistry, SmsRecipientResolver, SmsSettingsService, SmsNotificationChannelHandler, NotificationDeliveryDispatcher],
   exports: [NotificationCoreService, NotificationRulesService, NotificationRuleEngineService, NotificationTemplateEngineService, NotificationDeliveryDispatcher],
 })
 export class NotificationCoreModule {}

@@ -17,11 +17,13 @@ const email_service_1 = require("../../email/email.service");
 const prisma_service_1 = require("../../prisma/prisma.service");
 const notification_template_engine_service_1 = require("../notification-template-engine.service");
 const notification_tenant_context_1 = require("../in-app/notification-tenant-context");
+const notification_digest_renderer_service_1 = require("../orchestration/notification-digest-renderer.service");
 let EmailNotificationChannelHandler = EmailNotificationChannelHandler_1 = class EmailNotificationChannelHandler {
-    constructor(prisma, templates, email) {
+    constructor(prisma, templates, email, digests) {
         this.prisma = prisma;
         this.templates = templates;
         this.email = email;
+        this.digests = digests;
         this.channel = client_1.NotificationChannel.EMAIL;
         this.logger = new common_1.Logger(EmailNotificationChannelHandler_1.name);
     }
@@ -47,11 +49,15 @@ let EmailNotificationChannelHandler = EmailNotificationChannelHandler_1 = class 
                 throw new common_1.NotFoundException("Notification delivery not found");
             if (!claim.count)
                 return { delivery, rendered: null, destination: null, claimable: false };
+            if (delivery.digestBucketId)
+                await tx.notificationDigestBucket.update({ where: { id: delivery.digestBucketId }, data: { status: "PROCESSING" } });
             const destination = delivery.destination?.trim().toLowerCase() || delivery.recipientUser?.email?.trim().toLowerCase() || null;
             if (!delivery.recipientUser?.isActive || !destination || !this.validEmail(destination) || !delivery.template) {
                 return { delivery, rendered: null, destination, claimable: true };
             }
-            const rendered = await this.templates.renderStoredTemplate(delivery.event, delivery.recipientUser.id, delivery.template, tx);
+            const rendered = delivery.digestBucketId
+                ? await this.digests.render(delivery.digestBucketId, delivery.recipientUser.id, tx)
+                : await this.templates.renderStoredTemplate(delivery.event, delivery.recipientUser.id, delivery.template, tx);
             return { delivery, rendered, destination, claimable: true };
         });
         if (!prepared.claimable) {
@@ -80,6 +86,8 @@ let EmailNotificationChannelHandler = EmailNotificationChannelHandler_1 = class 
                     processingStartedAt: null,
                 },
             }));
+            if (prepared.delivery.digestBucketId)
+                await this.prisma.withTenantTransaction(context, tx => tx.notificationDigestBucket.update({ where: { id: prepared.delivery.digestBucketId }, data: { status: "SENT" } }));
             return { deliveryId, status: client_1.NotificationDeliveryStatus.SENT, sent: true };
         }
         catch (error) {
@@ -88,6 +96,8 @@ let EmailNotificationChannelHandler = EmailNotificationChannelHandler_1 = class 
                 where: { id: deliveryId },
                 data: { status: client_1.NotificationDeliveryStatus.FAILED, destination: prepared.destination, failureCode: "EMAIL_DISPATCH_ERROR", failureMessage: message, processingStartedAt: null },
             }));
+            if (prepared.delivery.digestBucketId)
+                await this.prisma.withTenantTransaction(context, tx => tx.notificationDigestBucket.update({ where: { id: prepared.delivery.digestBucketId }, data: { status: "FAILED" } }));
             this.logger.warn(`EMAIL dispatch failed deliveryId=${deliveryId} organizationId=${organizationId}`);
             return { deliveryId, status: client_1.NotificationDeliveryStatus.FAILED, sent: false, reason: "EMAIL_DISPATCH_ERROR" };
         }
@@ -108,6 +118,7 @@ exports.EmailNotificationChannelHandler = EmailNotificationChannelHandler = Emai
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
         notification_template_engine_service_1.NotificationTemplateEngineService,
-        email_service_1.EmailService])
+        email_service_1.EmailService,
+        notification_digest_renderer_service_1.NotificationDigestRendererService])
 ], EmailNotificationChannelHandler);
 //# sourceMappingURL=email-notification-channel.handler.js.map

@@ -71,6 +71,7 @@ export class NotificationRulesService {
     const conditions = this.conditionValidator.validate(dto.eventName, dto.conditions)
     const schedule = this.scheduleValidator.validate(dto.eventName, dto.schedule)
     await this.validateRecipients(dto.recipientRules, tenant.organizationId)
+    await this.validateDigestPolicy(dto.digestPolicyId, tenant.organizationId)
 
     return this.prisma.withTenantTransaction(tenant, (tx) => tx.notificationRule.create({
       data: {
@@ -80,6 +81,8 @@ export class NotificationRulesService {
         enabled: dto.enabled ?? true,
         mandatory: dto.mandatory ?? false,
         priority: dto.priority ?? 100,
+        deliveryPriority: dto.deliveryPriority,
+        digestPolicyId: dto.digestPolicyId ?? null,
         conditions: conditions === null ? Prisma.DbNull : conditions as Prisma.InputJsonValue,
         ...(schedule ? { schedule: { create: { organizationId: tenant.organizationId, ...schedule } } } : {}),
         recipientRules: {
@@ -108,6 +111,7 @@ export class NotificationRulesService {
     if (dto.recipientRules) {
       await this.validateRecipients(dto.recipientRules, tenant.organizationId)
     }
+    if (dto.digestPolicyId !== undefined) await this.validateDigestPolicy(dto.digestPolicyId, tenant.organizationId)
 
     return this.prisma.withTenantTransaction(tenant, async (tx) => {
       if (dto.recipientRules) {
@@ -129,6 +133,8 @@ export class NotificationRulesService {
           ...(dto.enabled !== undefined ? { enabled: dto.enabled } : {}),
           ...(dto.mandatory !== undefined ? { mandatory: dto.mandatory } : {}),
           ...(dto.priority !== undefined ? { priority: dto.priority } : {}),
+          ...(dto.deliveryPriority !== undefined ? { deliveryPriority: dto.deliveryPriority } : {}),
+          ...(dto.digestPolicyId !== undefined ? { digestPolicyId: dto.digestPolicyId || null } : {}),
           ...(dto.conditions !== undefined || dto.eventName !== undefined ? { conditions: conditions === null ? Prisma.DbNull : conditions as Prisma.InputJsonValue } : {}),
           ...(dto.recipientRules
             ? {
@@ -225,6 +231,12 @@ export class NotificationRulesService {
     if (!ALLOWED_EVENTS.has(eventName)) {
       throw new BadRequestException(`Unsupported notification event: ${eventName}`)
     }
+  }
+
+  private async validateDigestPolicy(id: string | null | undefined, organizationId: string) {
+    if (!id) return
+    const policy = await this.prisma.notificationDigestPolicy.findFirst({ where: { id, organizationId, enabled: true }, select: { id: true } })
+    if (!policy) throw new BadRequestException("Digest policy is unavailable in the current organization")
   }
 
   private recipientCreateData(recipient: NotificationRecipientRuleInputDto) {

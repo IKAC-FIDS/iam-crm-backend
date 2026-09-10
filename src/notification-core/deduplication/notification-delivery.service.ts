@@ -2,6 +2,7 @@ import { Injectable, Logger } from "@nestjs/common"
 import { NotificationDeliveryStatus, Prisma, type NotificationChannel, type NotificationDelivery, type NotificationEvent } from "@prisma/client"
 import type { TenantTransactionClient } from "../../prisma/prisma.service"
 import { NotificationDeduplicationKeyService } from "./notification-deduplication-key.service"
+import type { OrchestrationDecision } from "../orchestration/notification-orchestration.service"
 
 export type CreatePendingDeliveryInput = {
   event: NotificationEvent
@@ -10,6 +11,9 @@ export type CreatePendingDeliveryInput = {
   recipientUserId: string
   templateId?: string | null
   channel: NotificationChannel
+  priority?: import("@prisma/client").NotificationPriority
+  decision?: OrchestrationDecision
+  escalationRunId?: string | null
 }
 
 export type DeliveryCreationResult =
@@ -32,13 +36,19 @@ export class NotificationDeliveryService {
       recipientUserId: input.recipientUserId,
       templateId: input.templateId ?? null,
       channel: input.channel,
-      status: NotificationDeliveryStatus.PENDING,
+      status: input.decision?.status ?? NotificationDeliveryStatus.PENDING,
+      priority: input.priority,
+      orchestrationReason: input.decision?.disposition ?? "DIRECT",
+      nextAttemptAt: input.decision?.nextAttemptAt ?? null,
+      deferredUntil: input.decision?.deferredUntil ?? null,
+      escalationRunId: input.escalationRunId ?? null,
       deduplicationKey,
     }
     try {
       const inserted = await db.notificationDelivery.createMany({ data, skipDuplicates: true })
       const delivery = await db.notificationDelivery.findUniqueOrThrow({ where: { organizationId_deduplicationKey: { organizationId: input.event.organizationId, deduplicationKey } } })
       if (inserted.count === 1) {
+        if (input.decision?.digest) await this.attachDigest(input, delivery.id, db)
         this.log("delivery.created", input, delivery.id)
         return { status: "CREATED", delivery }
       }
@@ -52,6 +62,22 @@ export class NotificationDeliveryService {
       }
       throw error
     }
+  }
+
+  private async attachDigest(input: CreatePendingDeliveryInput, deliveryId: string, db: TenantTransactionClient) {
+    const digest = input.decision?.digest
+    if (!digest) return
+    const bucket = await db.notificationDigestBucket.upsert({
+      where: { organizationId_policyId_recipientUserId_channel_windowStart: { organizationId: input.event.organizationId, policyId: digest.policyId, recipientUserId: input.recipientUserId, channel: input.channel, windowStart: digest.windowStart } },
+      create: { organizationId: input.event.organizationId, policyId: digest.policyId, recipientUserId: input.recipientUserId, channel: input.channel, windowStart: digest.windowStart, scheduledFor: digest.scheduledFor, carrierDeliveryId: deliveryId },
+      update: { scheduledFor: digest.scheduledFor },
+      select: { id: true, carrierDeliveryId: true },
+    })
+    await db.notificationDigestItem.createMany({ data: [{ bucketId: bucket.id, deliveryId, eventId: input.event.id }], skipDuplicates: true })
+    await db.notificationDelivery.update({ where: { id: deliveryId }, data: {
+      digestBucketId: bucket.id,
+      ...(bucket.carrierDeliveryId === deliveryId ? {} : { status: NotificationDeliveryStatus.SKIPPED, nextAttemptAt: null, deferredUntil: digest.scheduledFor, orchestrationReason: "DIGEST_ITEM" }),
+    } })
   }
 
   private log(event: string, input: CreatePendingDeliveryInput, deliveryId: string) {

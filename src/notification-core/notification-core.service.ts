@@ -1,9 +1,10 @@
-import { Injectable, Logger } from "@nestjs/common"
+import { Injectable, Logger, Optional } from "@nestjs/common"
 import { Prisma, type NotificationEvent } from "@prisma/client"
 import { PrismaService, type TenantTransactionClient } from "../prisma/prisma.service"
 import { notificationTenantContext } from './in-app/notification-tenant-context'
 import type { PublishNotificationEventInput } from "./notification-core.types"
 import { NotificationRuleEngineService } from "./notification-rule-engine.service"
+import { NotificationEscalationService } from "./orchestration/notification-escalation.service"
 
 @Injectable()
 export class NotificationCoreService {
@@ -11,6 +12,7 @@ export class NotificationCoreService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly ruleEngine: NotificationRuleEngineService,
+    @Optional() private readonly escalations?: NotificationEscalationService,
   ) {}
 
   async publish(input: PublishNotificationEventInput, db: TenantTransactionClient = this.prisma): Promise<NotificationEvent> {
@@ -38,7 +40,11 @@ export class NotificationCoreService {
     const published = await this.prisma.withTenantTransaction(context, tx => this.publishOnce(input, tx))
     const event = published.event
     if (!published.created) return { event, evaluation: null, duplicate: true }
-    const evaluation = await this.prisma.withTenantTransaction(context, tx => this.ruleEngine.evaluateEvent(event, tx))
+    const evaluation = await this.prisma.withTenantTransaction(context, async tx => {
+      const result = await this.ruleEngine.evaluateEvent(event, tx)
+      if (this.escalations) await this.escalations.register(event, tx)
+      return result
+    })
     return { event, evaluation, duplicate: false }
   }
 

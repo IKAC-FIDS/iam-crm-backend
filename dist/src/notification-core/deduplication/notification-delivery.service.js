@@ -30,13 +30,20 @@ let NotificationDeliveryService = NotificationDeliveryService_1 = class Notifica
             recipientUserId: input.recipientUserId,
             templateId: input.templateId ?? null,
             channel: input.channel,
-            status: client_1.NotificationDeliveryStatus.PENDING,
+            status: input.decision?.status ?? client_1.NotificationDeliveryStatus.PENDING,
+            priority: input.priority,
+            orchestrationReason: input.decision?.disposition ?? "DIRECT",
+            nextAttemptAt: input.decision?.nextAttemptAt ?? null,
+            deferredUntil: input.decision?.deferredUntil ?? null,
+            escalationRunId: input.escalationRunId ?? null,
             deduplicationKey,
         };
         try {
             const inserted = await db.notificationDelivery.createMany({ data, skipDuplicates: true });
             const delivery = await db.notificationDelivery.findUniqueOrThrow({ where: { organizationId_deduplicationKey: { organizationId: input.event.organizationId, deduplicationKey } } });
             if (inserted.count === 1) {
+                if (input.decision?.digest)
+                    await this.attachDigest(input, delivery.id, db);
                 this.log("delivery.created", input, delivery.id);
                 return { status: "CREATED", delivery };
             }
@@ -51,6 +58,22 @@ let NotificationDeliveryService = NotificationDeliveryService_1 = class Notifica
             }
             throw error;
         }
+    }
+    async attachDigest(input, deliveryId, db) {
+        const digest = input.decision?.digest;
+        if (!digest)
+            return;
+        const bucket = await db.notificationDigestBucket.upsert({
+            where: { organizationId_policyId_recipientUserId_channel_windowStart: { organizationId: input.event.organizationId, policyId: digest.policyId, recipientUserId: input.recipientUserId, channel: input.channel, windowStart: digest.windowStart } },
+            create: { organizationId: input.event.organizationId, policyId: digest.policyId, recipientUserId: input.recipientUserId, channel: input.channel, windowStart: digest.windowStart, scheduledFor: digest.scheduledFor, carrierDeliveryId: deliveryId },
+            update: { scheduledFor: digest.scheduledFor },
+            select: { id: true, carrierDeliveryId: true },
+        });
+        await db.notificationDigestItem.createMany({ data: [{ bucketId: bucket.id, deliveryId, eventId: input.event.id }], skipDuplicates: true });
+        await db.notificationDelivery.update({ where: { id: deliveryId }, data: {
+                digestBucketId: bucket.id,
+                ...(bucket.carrierDeliveryId === deliveryId ? {} : { status: client_1.NotificationDeliveryStatus.SKIPPED, nextAttemptAt: null, deferredUntil: digest.scheduledFor, orchestrationReason: "DIGEST_ITEM" }),
+            } });
     }
     log(event, input, deliveryId) {
         this.logger.log(JSON.stringify({ event, organizationId: input.event.organizationId, eventName: input.event.eventName, recipientUserId: input.recipientUserId, channel: input.channel, deliveryId }));

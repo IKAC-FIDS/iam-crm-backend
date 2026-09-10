@@ -345,6 +345,7 @@ enum NotificationPriority {
   NORMAL
   HIGH
   URGENT
+  CRITICAL
 }
 
 enum NotificationEntityType {
@@ -606,16 +607,21 @@ model Organization {
   tenders             Tender[]
   tenderReviews       TenderReview[]
 
-  notificationCoreEvents       NotificationEvent[]           @relation("NotificationCoreEvents")
-  notificationCoreRules        NotificationRule[]            @relation("NotificationCoreRules")
-  notificationSchedules        NotificationSchedule[]        @relation("NotificationSchedules")
-  notificationCoreTemplates    NotificationTemplate[]        @relation("NotificationCoreTemplates")
-  notificationCoreDeliveries   NotificationDelivery[]        @relation("NotificationCoreDeliveryOrganization")
-  notificationDeliveryAttempts NotificationDeliveryAttempt[] @relation("NotificationDeliveryAttemptOrganization")
-  notificationCorePreferences  NotificationPreference[]      @relation("NotificationCorePreferences")
+  notificationCoreEvents       NotificationEvent[]            @relation("NotificationCoreEvents")
+  notificationCoreRules        NotificationRule[]             @relation("NotificationCoreRules")
+  notificationSchedules        NotificationSchedule[]         @relation("NotificationSchedules")
+  notificationCoreTemplates    NotificationTemplate[]         @relation("NotificationCoreTemplates")
+  notificationCoreDeliveries   NotificationDelivery[]         @relation("NotificationCoreDeliveryOrganization")
+  notificationDeliveryAttempts NotificationDeliveryAttempt[]  @relation("NotificationDeliveryAttemptOrganization")
+  notificationCorePreferences  NotificationPreference[]       @relation("NotificationCorePreferences")
   notificationSmsSettings      NotificationSmsSettings?
   notificationPushSettings     NotificationPushSettings?
   notificationPushEndpoints    NotificationPushEndpoint[]
+  notificationQuietHours       NotificationQuietHoursPolicy?
+  notificationDigestPolicies   NotificationDigestPolicy[]
+  notificationDigestBuckets    NotificationDigestBucket[]
+  notificationEscalations      NotificationEscalationPolicy[]
+  notificationEscalationRuns   NotificationEscalationRun[]
 
   @@index([status])
   @@index([createdAt])
@@ -3127,6 +3133,30 @@ enum NotificationScheduleTriggerMode {
   AFTER
 }
 
+enum NotificationQuietHoursMode {
+  SUPPRESS
+  DEFER
+}
+
+enum NotificationDigestFrequency {
+  DAILY
+}
+
+enum NotificationDigestBucketStatus {
+  OPEN
+  PROCESSING
+  SENT
+  FAILED
+}
+
+enum NotificationEscalationRunStatus {
+  PENDING
+  PROCESSING
+  SENT
+  CANCELLED_RESOLVED
+  FAILED
+}
+
 model NotificationEvent {
   id             String                 @id @default(uuid())
   organizationId String
@@ -3150,22 +3180,26 @@ model NotificationEvent {
 }
 
 model NotificationRule {
-  id             String                      @id @default(uuid())
-  organizationId String
-  organization   Organization                @relation("NotificationCoreRules", fields: [organizationId], references: [id], onDelete: Cascade)
-  name           String
-  eventName      String
-  enabled        Boolean                     @default(true)
-  mandatory      Boolean                     @default(false)
-  priority       Int                         @default(100)
-  conditions     Json?
-  createdAt      DateTime                    @default(now())
-  updatedAt      DateTime                    @updatedAt
-  recipientRules NotificationRecipientRule[]
-  deliveries     NotificationDelivery[]
-  schedule       NotificationSchedule?
+  id               String                      @id @default(uuid())
+  organizationId   String
+  organization     Organization                @relation("NotificationCoreRules", fields: [organizationId], references: [id], onDelete: Cascade)
+  name             String
+  eventName        String
+  enabled          Boolean                     @default(true)
+  mandatory        Boolean                     @default(false)
+  priority         Int                         @default(100)
+  deliveryPriority NotificationPriority        @default(NORMAL)
+  digestPolicyId   String?
+  digestPolicy     NotificationDigestPolicy?   @relation(fields: [digestPolicyId], references: [id], onDelete: SetNull)
+  conditions       Json?
+  createdAt        DateTime                    @default(now())
+  updatedAt        DateTime                    @updatedAt
+  recipientRules   NotificationRecipientRule[]
+  deliveries       NotificationDelivery[]
+  schedule         NotificationSchedule?
 
   @@index([organizationId, eventName, enabled])
+  @@index([digestPolicyId])
   @@map("notification_rules")
 }
 
@@ -3243,6 +3277,13 @@ model NotificationDelivery {
   template            NotificationTemplate?         @relation(fields: [templateId], references: [id], onDelete: SetNull)
   channel             NotificationChannel
   status              NotificationDeliveryStatus    @default(PENDING)
+  priority            NotificationPriority          @default(NORMAL)
+  orchestrationReason String?
+  deferredUntil       DateTime?
+  digestBucketId      String?
+  digestBucket        NotificationDigestBucket?     @relation(fields: [digestBucketId], references: [id], onDelete: SetNull)
+  escalationRunId     String?
+  escalationRun       NotificationEscalationRun?    @relation(fields: [escalationRunId], references: [id], onDelete: SetNull)
   destination         String?
   deduplicationKey    String
   attemptCount        Int                           @default(0)
@@ -3270,6 +3311,9 @@ model NotificationDelivery {
   @@index([status, nextAttemptAt, createdAt])
   @@index([status, processingStartedAt])
   @@index([retryRequestedById])
+  @@index([organizationId, deferredUntil])
+  @@index([digestBucketId])
+  @@index([escalationRunId])
   @@map("notification_deliveries")
 }
 
@@ -3378,4 +3422,141 @@ model NotificationPushEndpoint {
   @@index([organizationId])
   @@index([organizationId, userId, provider, active])
   @@map("notification_push_endpoints")
+}
+
+model NotificationQuietHoursPolicy {
+  id             String                     @id @default(uuid())
+  organizationId String                     @unique
+  organization   Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  enabled        Boolean                    @default(false)
+  startTime      String                     @default("22:00")
+  endTime        String                     @default("07:00")
+  timezone       String                     @default("Asia/Tehran")
+  channels       NotificationChannel[]
+  allowCritical  Boolean                    @default(true)
+  mode           NotificationQuietHoursMode @default(DEFER)
+  createdAt      DateTime                   @default(now())
+  updatedAt      DateTime                   @updatedAt
+
+  @@index([organizationId, enabled])
+  @@map("notification_quiet_hours_policies")
+}
+
+model NotificationDigestPolicy {
+  id              String                      @id @default(uuid())
+  organizationId  String
+  organization    Organization                @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name            String
+  enabled         Boolean                     @default(true)
+  frequency       NotificationDigestFrequency @default(DAILY)
+  sendTime        String
+  timezone        String                      @default("Asia/Tehran")
+  subjectTemplate String                      @default("خلاصه اعلان‌های روزانه")
+  introText       String                      @default("خلاصه اعلان‌های شما:")
+  eventNames      String[]
+  channels        NotificationChannel[]
+  createdAt       DateTime                    @default(now())
+  updatedAt       DateTime                    @updatedAt
+  rules           NotificationRule[]
+  buckets         NotificationDigestBucket[]
+
+  @@index([organizationId, enabled])
+  @@map("notification_digest_policies")
+}
+
+model NotificationDigestBucket {
+  id                String                         @id @default(uuid())
+  organizationId    String
+  organization      Organization                   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  policyId          String
+  policy            NotificationDigestPolicy       @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  recipientUserId   String
+  channel           NotificationChannel
+  windowStart       DateTime
+  scheduledFor      DateTime
+  status            NotificationDigestBucketStatus @default(OPEN)
+  carrierDeliveryId String?                        @unique
+  createdAt         DateTime                       @default(now())
+  updatedAt         DateTime                       @updatedAt
+  items             NotificationDigestItem[]
+  deliveries        NotificationDelivery[]
+
+  @@unique([organizationId, policyId, recipientUserId, channel, windowStart])
+  @@index([organizationId, status, scheduledFor])
+  @@map("notification_digest_buckets")
+}
+
+model NotificationDigestItem {
+  id         String                   @id @default(uuid())
+  bucketId   String
+  bucket     NotificationDigestBucket @relation(fields: [bucketId], references: [id], onDelete: Cascade)
+  deliveryId String                   @unique
+  eventId    String
+  createdAt  DateTime                 @default(now())
+
+  @@index([bucketId, createdAt])
+  @@map("notification_digest_items")
+}
+
+model NotificationEscalationPolicy {
+  id             String                       @id @default(uuid())
+  organizationId String
+  organization   Organization                 @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  enabled        Boolean                      @default(true)
+  eventName      String
+  aggregateType  String                       @default("TASK")
+  conditions     Json?
+  createdAt      DateTime                     @default(now())
+  updatedAt      DateTime                     @updatedAt
+  steps          NotificationEscalationStep[]
+  runs           NotificationEscalationRun[]
+
+  @@index([organizationId, eventName, enabled])
+  @@map("notification_escalation_policies")
+}
+
+model NotificationEscalationStep {
+  id            String                       @id @default(uuid())
+  policyId      String
+  policy        NotificationEscalationPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  stepOrder     Int
+  delayMinutes  Int
+  recipientType NotificationRecipientType
+  targetId      String?
+  channels      NotificationChannel[]
+  priority      NotificationPriority         @default(HIGH)
+  mandatory     Boolean                      @default(true)
+  createdAt     DateTime                     @default(now())
+  updatedAt     DateTime                     @updatedAt
+  runs          NotificationEscalationRun[]
+
+  @@unique([policyId, stepOrder])
+  @@index([policyId, delayMinutes])
+  @@map("notification_escalation_steps")
+}
+
+model NotificationEscalationRun {
+  id             String                          @id @default(uuid())
+  organizationId String
+  organization   Organization                    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  policyId       String
+  policy         NotificationEscalationPolicy    @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  stepId         String
+  step           NotificationEscalationStep      @relation(fields: [stepId], references: [id], onDelete: Cascade)
+  sourceEventId  String
+  aggregateType  String
+  aggregateId    String
+  sourceDueAt    DateTime?
+  scheduledFor   DateTime
+  status         NotificationEscalationRunStatus @default(PENDING)
+  resolvedAt     DateTime?
+  createdAt      DateTime                        @default(now())
+  updatedAt      DateTime                        @updatedAt
+  deliveries     NotificationDelivery[]
+
+  @@unique([organizationId, sourceEventId, stepId])
+  @@index([organizationId, status, scheduledFor])
+  @@index([aggregateType, aggregateId])
+  @@map("notification_escalation_runs")
 }

@@ -8,6 +8,9 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
 var NotificationCoreService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.NotificationCoreService = void 0;
@@ -15,10 +18,12 @@ const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../prisma/prisma.service");
 const notification_tenant_context_1 = require("./in-app/notification-tenant-context");
 const notification_rule_engine_service_1 = require("./notification-rule-engine.service");
+const notification_escalation_service_1 = require("./orchestration/notification-escalation.service");
 let NotificationCoreService = NotificationCoreService_1 = class NotificationCoreService {
-    constructor(prisma, ruleEngine) {
+    constructor(prisma, ruleEngine, escalations) {
         this.prisma = prisma;
         this.ruleEngine = ruleEngine;
+        this.escalations = escalations;
         this.logger = new common_1.Logger(NotificationCoreService_1.name);
     }
     async publish(input, db = this.prisma) {
@@ -45,7 +50,12 @@ let NotificationCoreService = NotificationCoreService_1 = class NotificationCore
         const event = published.event;
         if (!published.created)
             return { event, evaluation: null, duplicate: true };
-        const evaluation = await this.prisma.withTenantTransaction(context, tx => this.ruleEngine.evaluateEvent(event, tx));
+        const evaluation = await this.prisma.withTenantTransaction(context, async (tx) => {
+            const result = await this.ruleEngine.evaluateEvent(event, tx);
+            if (this.escalations)
+                await this.escalations.register(event, tx);
+            return result;
+        });
         return { event, evaluation, duplicate: false };
     }
     async publishDomainEvent(input) {
@@ -62,7 +72,9 @@ let NotificationCoreService = NotificationCoreService_1 = class NotificationCore
 exports.NotificationCoreService = NotificationCoreService;
 exports.NotificationCoreService = NotificationCoreService = NotificationCoreService_1 = __decorate([
     (0, common_1.Injectable)(),
+    __param(2, (0, common_1.Optional)()),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
-        notification_rule_engine_service_1.NotificationRuleEngineService])
+        notification_rule_engine_service_1.NotificationRuleEngineService,
+        notification_escalation_service_1.NotificationEscalationService])
 ], NotificationCoreService);
 //# sourceMappingURL=notification-core.service.js.map

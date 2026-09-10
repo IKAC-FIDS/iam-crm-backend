@@ -61,6 +61,7 @@ let NotificationRulesService = class NotificationRulesService {
         const conditions = this.conditionValidator.validate(dto.eventName, dto.conditions);
         const schedule = this.scheduleValidator.validate(dto.eventName, dto.schedule);
         await this.validateRecipients(dto.recipientRules, tenant.organizationId);
+        await this.validateDigestPolicy(dto.digestPolicyId, tenant.organizationId);
         return this.prisma.withTenantTransaction(tenant, (tx) => tx.notificationRule.create({
             data: {
                 organizationId: tenant.organizationId,
@@ -69,6 +70,8 @@ let NotificationRulesService = class NotificationRulesService {
                 enabled: dto.enabled ?? true,
                 mandatory: dto.mandatory ?? false,
                 priority: dto.priority ?? 100,
+                deliveryPriority: dto.deliveryPriority,
+                digestPolicyId: dto.digestPolicyId ?? null,
                 conditions: conditions === null ? client_1.Prisma.DbNull : conditions,
                 ...(schedule ? { schedule: { create: { organizationId: tenant.organizationId, ...schedule } } } : {}),
                 recipientRules: {
@@ -91,6 +94,8 @@ let NotificationRulesService = class NotificationRulesService {
         if (dto.recipientRules) {
             await this.validateRecipients(dto.recipientRules, tenant.organizationId);
         }
+        if (dto.digestPolicyId !== undefined)
+            await this.validateDigestPolicy(dto.digestPolicyId, tenant.organizationId);
         return this.prisma.withTenantTransaction(tenant, async (tx) => {
             if (dto.recipientRules) {
                 await tx.notificationRecipientRule.deleteMany({ where: { ruleId: id } });
@@ -111,6 +116,8 @@ let NotificationRulesService = class NotificationRulesService {
                     ...(dto.enabled !== undefined ? { enabled: dto.enabled } : {}),
                     ...(dto.mandatory !== undefined ? { mandatory: dto.mandatory } : {}),
                     ...(dto.priority !== undefined ? { priority: dto.priority } : {}),
+                    ...(dto.deliveryPriority !== undefined ? { deliveryPriority: dto.deliveryPriority } : {}),
+                    ...(dto.digestPolicyId !== undefined ? { digestPolicyId: dto.digestPolicyId || null } : {}),
                     ...(dto.conditions !== undefined || dto.eventName !== undefined ? { conditions: conditions === null ? client_1.Prisma.DbNull : conditions } : {}),
                     ...(dto.recipientRules
                         ? {
@@ -198,6 +205,13 @@ let NotificationRulesService = class NotificationRulesService {
         if (!ALLOWED_EVENTS.has(eventName)) {
             throw new common_1.BadRequestException(`Unsupported notification event: ${eventName}`);
         }
+    }
+    async validateDigestPolicy(id, organizationId) {
+        if (!id)
+            return;
+        const policy = await this.prisma.notificationDigestPolicy.findFirst({ where: { id, organizationId, enabled: true }, select: { id: true } });
+        if (!policy)
+            throw new common_1.BadRequestException("Digest policy is unavailable in the current organization");
     }
     recipientCreateData(recipient) {
         return {

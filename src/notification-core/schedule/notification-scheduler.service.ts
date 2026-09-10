@@ -1,10 +1,11 @@
-import { Injectable, Logger } from "@nestjs/common"
+import { Injectable, Logger, Optional } from "@nestjs/common"
 import { Interval } from "@nestjs/schedule"
 import { MeetingStatus, OrganizationStatus, TaskStatus, type NotificationSchedule } from "@prisma/client"
 import { PrismaService } from "../../prisma/prisma.service"
 import { NotificationCoreService } from "../notification-core.service"
 import { notificationTenantContext } from "../in-app/notification-tenant-context"
 import type { NotificationEventName } from "../notification-core.catalog"
+import { NotificationEscalationService } from "../orchestration/notification-escalation.service"
 
 const MINUTE = 60_000
 const BATCH_SIZE = 500
@@ -29,7 +30,7 @@ export class NotificationSchedulerService {
   private running = false
   private lastRunAt = 0
 
-  constructor(private readonly prisma: PrismaService, private readonly core: NotificationCoreService) {}
+  constructor(private readonly prisma: PrismaService, private readonly core: NotificationCoreService, @Optional() private readonly escalations?: NotificationEscalationService) {}
 
   @Interval(60_000)
   async tick() {
@@ -67,6 +68,7 @@ export class NotificationSchedulerService {
         await this.prisma.withTenantTransaction(context, tx => tx.notificationSchedule.updateMany({ where: { id: schedule.id, organizationId }, data: { lastEvaluatedAt: now } }))
       } catch (error) { metrics.errors += 1; this.safeError("SCHEDULE", schedule.id, organizationId, schedule.rule.eventName, error) }
     }
+    if (this.escalations) await this.escalations.processOrganization(organizationId, now)
     return metrics
   }
 

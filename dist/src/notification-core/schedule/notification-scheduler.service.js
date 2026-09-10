@@ -8,6 +8,9 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
 var NotificationSchedulerService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.NotificationSchedulerService = void 0;
@@ -20,6 +23,7 @@ const client_1 = require("@prisma/client");
 const prisma_service_1 = require("../../prisma/prisma.service");
 const notification_core_service_1 = require("../notification-core.service");
 const notification_tenant_context_1 = require("../in-app/notification-tenant-context");
+const notification_escalation_service_1 = require("../orchestration/notification-escalation.service");
 const MINUTE = 60_000;
 const BATCH_SIZE = 500;
 const OVERDUE_LOOKBACK_MINUTES = 525600;
@@ -34,9 +38,10 @@ function scheduledOccurrenceKey(eventName, aggregateId, sourceAt, offsetMinutes)
     return `${eventName}:${aggregateId}:${sourceAt.toISOString()}:OFFSET:${offsetMinutes}`;
 }
 let NotificationSchedulerService = NotificationSchedulerService_1 = class NotificationSchedulerService {
-    constructor(prisma, core) {
+    constructor(prisma, core, escalations) {
         this.prisma = prisma;
         this.core = core;
+        this.escalations = escalations;
         this.logger = new common_1.Logger(NotificationSchedulerService_1.name);
         this.running = false;
         this.lastRunAt = 0;
@@ -90,6 +95,8 @@ let NotificationSchedulerService = NotificationSchedulerService_1 = class Notifi
                 this.safeError("SCHEDULE", schedule.id, organizationId, schedule.rule.eventName, error);
             }
         }
+        if (this.escalations)
+            await this.escalations.processOrganization(organizationId, now);
         return metrics;
     }
     async scanMeetings(organizationId, schedule, eventName, now, metrics) {
@@ -155,6 +162,7 @@ __decorate([
 ], NotificationSchedulerService.prototype, "tick", null);
 exports.NotificationSchedulerService = NotificationSchedulerService = NotificationSchedulerService_1 = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [prisma_service_1.PrismaService, notification_core_service_1.NotificationCoreService])
+    __param(2, (0, common_1.Optional)()),
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService, notification_core_service_1.NotificationCoreService, notification_escalation_service_1.NotificationEscalationService])
 ], NotificationSchedulerService);
 //# sourceMappingURL=notification-scheduler.service.js.map
