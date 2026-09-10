@@ -51,6 +51,24 @@ describe('Notification Core automatic inbox dispatch', () => {
     expect(dispatcher.dispatch).toHaveBeenNthCalledWith(1, 'push-delivery', 'org-a');
     expect(dispatcher.dispatch).toHaveBeenNthCalledWith(2, 'email-delivery', 'org-a');
   });
+  it('treats a concurrent idempotency conflict as a duplicate and does not evaluate or dispatch twice', async () => {
+    const event = { id: 'event-existing', organizationId: 'org-a', eventName: 'MEETING.REMINDER' };
+    const tx = {
+      notificationEvent: {
+        createMany: jest.fn().mockResolvedValue({ count: 0 }),
+        findFirstOrThrow: jest.fn().mockResolvedValue(event),
+      },
+      notificationDelivery: { findMany: jest.fn() },
+    };
+    const prisma = { withTenantTransaction: jest.fn(async (_context, callback) => callback(tx)) };
+    const rules = { evaluateEvent: jest.fn() };
+    const dispatcher = { dispatch: jest.fn() };
+    const core = new NotificationCoreService(prisma as any, rules as any, dispatcher as any);
+    await expect(core.publishAndEvaluate({ organizationId: 'org-a', eventName: 'MEETING.REMINDER', aggregateType: 'MEETING', aggregateId: 'meeting-1', idempotencyKey: 'same-key' })).resolves.toMatchObject({ duplicate: true, evaluation: null });
+    expect(rules.evaluateEvent).not.toHaveBeenCalled();
+    expect(tx.notificationDelivery.findMany).not.toHaveBeenCalled();
+    expect(dispatcher.dispatch).not.toHaveBeenCalled();
+  });
   it('creates deliveries only for matching conditional rules within the event tenant', async () => {
     const recipient = { id: 'recipient-1', type: 'USER', targetId: 'user-1', channels: ['EMAIL'], enabled: true };
     const db = {
@@ -68,5 +86,22 @@ describe('Notification Core automatic inbox dispatch', () => {
     expect(db.notificationRule.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { organizationId: 'org-a', eventName: 'TASK.ASSIGNED', enabled: true } }));
     expect(result).toMatchObject({ rules: 2, matchedRules: 1, created: 1 });
     expect(db.notificationDelivery.createMany).toHaveBeenCalledTimes(1);
+  });
+  it('evaluates only scheduled rules for the occurrence offset while allowing multiple rules at that offset', async () => {
+    const recipient = { id: 'recipient-1', type: 'USER', targetId: 'user-1', channels: ['EMAIL'], enabled: true };
+    const db = {
+      notificationRule: { findMany: jest.fn().mockResolvedValue([
+        { id: 'day-email', schedule: { offsetMinutes: -1440, sourceField: 'meeting.startAt', triggerMode: 'BEFORE' }, recipientRules: [recipient] },
+        { id: 'day-in-app', schedule: { offsetMinutes: -1440, sourceField: 'meeting.startAt', triggerMode: 'BEFORE' }, recipientRules: [{ ...recipient, id: 'recipient-2', channels: ['IN_APP'] }] },
+        { id: 'hour-sms', schedule: { offsetMinutes: -60, sourceField: 'meeting.startAt', triggerMode: 'BEFORE' }, recipientRules: [{ ...recipient, id: 'recipient-3', channels: ['SMS'] }] },
+      ]) },
+      user: { findMany: jest.fn().mockResolvedValue([{ id: 'user-1' }]) },
+      notificationDelivery: { createMany: jest.fn().mockResolvedValue({ count: 1 }) },
+    };
+    const templates = { renderDelivery: jest.fn().mockResolvedValue({ template: { id: 'template-1' } }) };
+    const engine = new NotificationRuleEngineService(db as any, templates as any, {} as any, { hasConditions: jest.fn().mockReturnValue(false) } as any);
+    const event = { id: 'event-1', organizationId: 'org-a', eventName: 'MEETING.REMINDER', aggregateType: 'MEETING', aggregateId: 'meeting-1', payload: { schedule: { offsetMinutes: -1440 } } } as any;
+    expect(await engine.evaluateEvent(event)).toMatchObject({ rules: 3, matchedRules: 2, created: 2 });
+    expect(db.notificationDelivery.createMany).toHaveBeenCalledTimes(2);
   });
 });

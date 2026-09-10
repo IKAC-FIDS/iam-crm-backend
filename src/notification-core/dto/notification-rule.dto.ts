@@ -13,7 +13,32 @@ import {
   Min,
   ValidateNested,
 } from "class-validator"
-import { NotificationChannel, NotificationRecipientType } from "@prisma/client"
+import { NotificationChannel, NotificationRecipientType, NotificationScheduleTriggerMode, NotificationScheduleType } from "@prisma/client"
+
+export class NotificationScheduleInputDto {
+  @IsOptional()
+  @IsBoolean()
+  enabled?: boolean
+
+  @IsEnum(NotificationScheduleType)
+  type!: NotificationScheduleType
+
+  @IsString()
+  @IsNotEmpty()
+  sourceField!: string
+
+  @IsEnum(NotificationScheduleTriggerMode)
+  triggerMode!: NotificationScheduleTriggerMode
+
+  @IsInt()
+  offsetMinutes!: number
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(525600)
+  gracePeriodMinutes?: number
+}
 
 export class NotificationRecipientRuleInputDto {
   @IsEnum(NotificationRecipientType)
@@ -60,6 +85,11 @@ export class CreateNotificationRuleDto {
   @IsObject()
   conditions?: Record<string, unknown> | null
 
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => NotificationScheduleInputDto)
+  schedule?: NotificationScheduleInputDto | null
+
   @IsArray()
   @ArrayNotEmpty()
   @ValidateNested({ each: true })
@@ -95,6 +125,11 @@ export class UpdateNotificationRuleDto {
   @IsOptional()
   @IsObject()
   conditions?: Record<string, unknown> | null
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => NotificationScheduleInputDto)
+  schedule?: NotificationScheduleInputDto | null
 
   @IsOptional()
   @IsArray()

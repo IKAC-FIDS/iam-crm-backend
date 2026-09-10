@@ -16,23 +16,30 @@ export class NotificationCoreService {
   ) {}
 
   async publish(input: PublishNotificationEventInput, db: TenantTransactionClient = this.prisma): Promise<NotificationEvent> {
+    return (await this.publishOnce(input, db)).event
+  }
+
+  private async publishOnce(input: PublishNotificationEventInput, db: TenantTransactionClient): Promise<{ event: NotificationEvent; created: boolean }> {
     const data = {
       organizationId: input.organizationId, eventName: input.eventName,
       aggregateType: input.aggregateType, aggregateId: input.aggregateId,
       actorId: input.actorId ?? null, payload: (input.payload ?? {}) as Prisma.InputJsonValue,
       idempotencyKey: input.idempotencyKey ?? null, occurredAt: input.occurredAt ?? new Date(),
     }
-    if (!input.idempotencyKey) return db.notificationEvent.create({ data })
+    if (!input.idempotencyKey) return { event: await db.notificationEvent.create({ data }), created: true }
     // ON CONFLICT avoids aborting the surrounding PostgreSQL transaction on a replay/race.
-    await db.notificationEvent.createMany({ data, skipDuplicates: true })
-    return db.notificationEvent.findFirstOrThrow({ where: {
+    const inserted = await db.notificationEvent.createMany({ data, skipDuplicates: true })
+    const event = await db.notificationEvent.findFirstOrThrow({ where: {
       organizationId: input.organizationId, idempotencyKey: input.idempotencyKey,
     } })
+    return { event, created: inserted.count === 1 }
   }
 
   async publishAndEvaluate(input: PublishNotificationEventInput) {
     const context = notificationTenantContext(input.organizationId, input.actorId ?? undefined)
-    const event = await this.prisma.withTenantTransaction(context, tx => this.publish(input, tx))
+    const published = await this.prisma.withTenantTransaction(context, tx => this.publishOnce(input, tx))
+    const event = published.event
+    if (!published.created) return { event, evaluation: null, duplicate: true }
     const evaluation = await this.prisma.withTenantTransaction(context, tx => this.ruleEngine.evaluateEvent(event, tx))
     const pending = await this.prisma.withTenantTransaction(context, tx => tx.notificationDelivery.findMany({
       where: { eventId: event.id, event: { organizationId: input.organizationId }, channel: { in: ['IN_APP', 'EMAIL', 'SMS', 'PUSH'] }, status: { in: ['PENDING', 'RETRYING'] } }, select: { id: true },
@@ -45,7 +52,7 @@ export class NotificationCoreService {
         this.logger.error(`Notification delivery failed deliveryId=${delivery.id} organizationId=${input.organizationId}`, detail)
       }
     }
-    return { event, evaluation }
+    return { event, evaluation, duplicate: false }
   }
 
   /** A notification failure must not turn a committed domain action into an apparent failure. */

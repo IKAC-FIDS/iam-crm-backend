@@ -110,17 +110,19 @@ export class NotificationTemplateEngineService {
       event.actorId ? db.user.findFirst({ where: { id: event.actorId, organizationMemberships: { some: { organizationId: event.organizationId, status: 'ACTIVE' } } }, select: { id: true, fullName: true } }) : null,
     ])
     if (!user) throw new NotFoundException("Notification recipient not found")
-    const base: TemplateContext = { user, actor, organization: { id: organization.id, name: organization.name } }
+    const payload = event.payload && typeof event.payload === "object" && !Array.isArray(event.payload) ? event.payload as Record<string, unknown> : {}
+    const base: TemplateContext = { user, actor, organization: { id: organization.id, name: organization.name }, schedule: payload.schedule ?? null }
     if (event.aggregateType === "MEETING") {
       const meeting = await db.meeting.findFirst({
         where: { id: event.aggregateId, organizationId: event.organizationId },
-        select: { id: true, title: true, startAt: true, endAt: true, location: true, agenda: true, company: { select: { id: true, legalName: true, brandName: true } } },
+        select: { id: true, title: true, startAt: true, endAt: true, location: true, agenda: true, type: { select: { code: true } }, company: { select: { id: true, legalName: true, brandName: true } } },
       })
       if (!meeting) throw new NotFoundException("Notification meeting not found")
       return {
         ...base,
         meeting: {
           ...meeting,
+          type: meeting.type?.code ?? null,
           company: meeting.company
             ? { id: meeting.company.id, name: meeting.company.brandName || meeting.company.legalName }
             : null,
@@ -130,7 +132,7 @@ export class NotificationTemplateEngineService {
     if (event.aggregateType === "TASK") {
       const task = await db.task.findFirst({
         where: { id: event.aggregateId, organizationId: event.organizationId },
-        select: { id: true, title: true, description: true, dueAt: true, priority: true, opportunity: { select: { title: true } }, company: { select: { id: true, legalName: true, brandName: true } } },
+        select: { id: true, title: true, description: true, dueAt: true, priority: true, assignedTo: { select: { fullName: true } }, opportunity: { select: { title: true } }, company: { select: { id: true, legalName: true, brandName: true } } },
       })
       if (!task) throw new NotFoundException("Notification task not found")
       return {
@@ -150,7 +152,6 @@ export class NotificationTemplateEngineService {
         select: { id: true, title: true, priority: true, probability: true, stage: { select: { code: true } } },
       })
       if (!opportunity) throw new NotFoundException("Notification opportunity not found")
-      const payload = event.payload && typeof event.payload === "object" && !Array.isArray(event.payload) ? event.payload as Record<string, unknown> : {}
       return { ...base, opportunity: { id: opportunity.id, title: opportunity.title, priority: opportunity.priority, probability: opportunity.probability, stage: opportunity.stage.code, fromStage: typeof payload.fromStage === "string" ? payload.fromStage : null, toStage: typeof payload.toStage === "string" ? payload.toStage : opportunity.stage.code } }
     }
     return base
@@ -162,8 +163,9 @@ export class NotificationTemplateEngineService {
       actor: { id: "preview-actor", fullName: "مدیر سامانه" },
       organization: { id: "preview-organization", name: "سازمان نمونه" },
     }
-    if (eventName.startsWith("MEETING.")) return { ...base, meeting: { id: "preview-meeting", title: "بررسی قرارداد", startAt: "۱۴۰۵/۰۶/۱۵، ۱۰:۰۰", endAt: "۱۴۰۵/۰۶/۱۵، ۱۱:۰۰", location: "اتاق جلسات", agenda: "مرور شرایط قرارداد", company: { id: "preview-company", name: "شرکت نمونه" } } }
-    if (eventName.startsWith("TASK.")) return { ...base, task: { id: "preview-task", title: "پیگیری پیشنهاد", description: "تماس با مشتری", dueAt: "۱۴۰۵/۰۶/۲۰، ۱۲:۰۰", dueDate: "۱۴۰۵/۰۶/۲۰، ۱۲:۰۰", priority: "MEDIUM", opportunity: { title: "فرصت نمونه" }, company: { id: "preview-company", name: "شرکت نمونه" } } }
+    const schedule = { offsetMinutes: -1440, scheduledAt: "2026-09-11T09:00:00.000Z", detectedAt: "2026-09-11T09:03:00.000Z" }
+    if (eventName.startsWith("MEETING.")) return { ...base, schedule, meeting: { id: "preview-meeting", title: "بررسی قرارداد", type: "SALES_MEETING", startAt: "۱۴۰۵/۰۶/۱۵، ۱۰:۰۰", endAt: "۱۴۰۵/۰۶/۱۵، ۱۱:۰۰", location: "اتاق جلسات", agenda: "مرور شرایط قرارداد", company: { id: "preview-company", name: "شرکت نمونه" } } }
+    if (eventName.startsWith("TASK.")) return { ...base, schedule, task: { id: "preview-task", title: "پیگیری پیشنهاد", description: "تماس با مشتری", dueAt: "۱۴۰۵/۰۶/۲۰، ۱۲:۰۰", dueDate: "۱۴۰۵/۰۶/۲۰، ۱۲:۰۰", priority: "MEDIUM", assignee: { fullName: "علی رضایی" }, opportunity: { title: "فرصت نمونه" }, company: { id: "preview-company", name: "شرکت نمونه" } } }
     if (eventName.startsWith("OPPORTUNITY.")) return { ...base, opportunity: { id: "preview-opportunity", title: "فرصت نمونه", priority: "HIGH", probability: 80, stage: "WON", fromStage: "QUALIFIED", toStage: "WON" } }
     return base
   }

@@ -29,6 +29,7 @@ export class NotificationRuleEngineService {
         enabled: true,
       },
       include: {
+        schedule: true,
         recipientRules: {
           where: { enabled: true },
           orderBy: { createdAt: "asc" },
@@ -45,6 +46,7 @@ export class NotificationRuleEngineService {
     const policyContext = needsPolicyContext ? await this.contextBuilder.build(event, db) : null
 
     for (const rule of rules) {
+      if (!this.scheduleMatches(rule.schedule, event)) continue
       if (policyContext && !this.policyEvaluator.evaluate(rule.conditions, policyContext).matches) continue
       matchedRules += 1
       for (const recipientRule of rule.recipientRules) {
@@ -301,5 +303,12 @@ export class NotificationRuleEngineService {
 
   private unique(values: string[]) {
     return [...new Set(values)]
+  }
+
+  private scheduleMatches(schedule: { offsetMinutes: number; sourceField: string; triggerMode: string } | null, event: NotificationEvent) {
+    const payload = event.payload && typeof event.payload === "object" && !Array.isArray(event.payload) ? event.payload as Record<string, unknown> : {}
+    const metadata = payload.schedule && typeof payload.schedule === "object" && !Array.isArray(payload.schedule) ? payload.schedule as Record<string, unknown> : null
+    if (!metadata) return schedule == null
+    return Boolean(schedule) && schedule?.offsetMinutes === metadata.offsetMinutes
   }
 }

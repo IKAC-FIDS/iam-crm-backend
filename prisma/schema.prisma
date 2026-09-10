@@ -606,6 +606,7 @@ model Organization {
 
   notificationCoreEvents      NotificationEvent[]        @relation("NotificationCoreEvents")
   notificationCoreRules       NotificationRule[]         @relation("NotificationCoreRules")
+  notificationSchedules       NotificationSchedule[]     @relation("NotificationSchedules")
   notificationCoreTemplates   NotificationTemplate[]     @relation("NotificationCoreTemplates")
   notificationCorePreferences NotificationPreference[]   @relation("NotificationCorePreferences")
   notificationSmsSettings     NotificationSmsSettings?
@@ -3090,6 +3091,18 @@ enum NotificationRecipientType {
   MANAGER
 }
 
+enum NotificationScheduleType {
+  RELATIVE
+  OVERDUE
+}
+
+enum NotificationScheduleTriggerMode {
+  BEFORE
+  AT
+  AT_OR_AFTER
+  AFTER
+}
+
 model NotificationEvent {
   id             String                 @id @default(uuid())
   organizationId String
@@ -3126,9 +3139,31 @@ model NotificationRule {
   updatedAt      DateTime                    @updatedAt
   recipientRules NotificationRecipientRule[]
   deliveries     NotificationDelivery[]
+  schedule       NotificationSchedule?
 
   @@index([organizationId, eventName, enabled])
   @@map("notification_rules")
+}
+
+model NotificationSchedule {
+  id                 String                          @id @default(uuid())
+  organizationId     String
+  organization       Organization                    @relation("NotificationSchedules", fields: [organizationId], references: [id], onDelete: Cascade)
+  ruleId             String                          @unique
+  rule               NotificationRule                @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  enabled            Boolean                         @default(true)
+  scheduleType       NotificationScheduleType
+  sourceField        String
+  offsetMinutes      Int                             @default(0)
+  triggerMode        NotificationScheduleTriggerMode
+  gracePeriodMinutes Int                             @default(60)
+  lastEvaluatedAt    DateTime?
+  createdAt          DateTime                        @default(now())
+  updatedAt          DateTime                        @updatedAt
+
+  @@index([organizationId, enabled])
+  @@index([organizationId, scheduleType, enabled])
+  @@map("notification_schedules")
 }
 
 model NotificationRecipientRule {

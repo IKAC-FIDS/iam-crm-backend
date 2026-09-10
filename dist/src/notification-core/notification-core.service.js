@@ -24,6 +24,9 @@ let NotificationCoreService = NotificationCoreService_1 = class NotificationCore
         this.logger = new common_1.Logger(NotificationCoreService_1.name);
     }
     async publish(input, db = this.prisma) {
+        return (await this.publishOnce(input, db)).event;
+    }
+    async publishOnce(input, db) {
         const data = {
             organizationId: input.organizationId, eventName: input.eventName,
             aggregateType: input.aggregateType, aggregateId: input.aggregateId,
@@ -31,15 +34,19 @@ let NotificationCoreService = NotificationCoreService_1 = class NotificationCore
             idempotencyKey: input.idempotencyKey ?? null, occurredAt: input.occurredAt ?? new Date(),
         };
         if (!input.idempotencyKey)
-            return db.notificationEvent.create({ data });
-        await db.notificationEvent.createMany({ data, skipDuplicates: true });
-        return db.notificationEvent.findFirstOrThrow({ where: {
+            return { event: await db.notificationEvent.create({ data }), created: true };
+        const inserted = await db.notificationEvent.createMany({ data, skipDuplicates: true });
+        const event = await db.notificationEvent.findFirstOrThrow({ where: {
                 organizationId: input.organizationId, idempotencyKey: input.idempotencyKey,
             } });
+        return { event, created: inserted.count === 1 };
     }
     async publishAndEvaluate(input) {
         const context = (0, notification_tenant_context_1.notificationTenantContext)(input.organizationId, input.actorId ?? undefined);
-        const event = await this.prisma.withTenantTransaction(context, tx => this.publish(input, tx));
+        const published = await this.prisma.withTenantTransaction(context, tx => this.publishOnce(input, tx));
+        const event = published.event;
+        if (!published.created)
+            return { event, evaluation: null, duplicate: true };
         const evaluation = await this.prisma.withTenantTransaction(context, tx => this.ruleEngine.evaluateEvent(event, tx));
         const pending = await this.prisma.withTenantTransaction(context, tx => tx.notificationDelivery.findMany({
             where: { eventId: event.id, event: { organizationId: input.organizationId }, channel: { in: ['IN_APP', 'EMAIL', 'SMS', 'PUSH'] }, status: { in: ['PENDING', 'RETRYING'] } }, select: { id: true },
@@ -53,7 +60,7 @@ let NotificationCoreService = NotificationCoreService_1 = class NotificationCore
                 this.logger.error(`Notification delivery failed deliveryId=${delivery.id} organizationId=${input.organizationId}`, detail);
             }
         }
-        return { event, evaluation };
+        return { event, evaluation, duplicate: false };
     }
     async publishDomainEvent(input) {
         try {

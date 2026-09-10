@@ -31,6 +31,7 @@ let NotificationRuleEngineService = class NotificationRuleEngineService {
                 enabled: true,
             },
             include: {
+                schedule: true,
                 recipientRules: {
                     where: { enabled: true },
                     orderBy: { createdAt: "asc" },
@@ -45,6 +46,8 @@ let NotificationRuleEngineService = class NotificationRuleEngineService {
         const needsPolicyContext = rules.some(rule => this.policyEvaluator.hasConditions(rule.conditions));
         const policyContext = needsPolicyContext ? await this.contextBuilder.build(event, db) : null;
         for (const rule of rules) {
+            if (!this.scheduleMatches(rule.schedule, event))
+                continue;
             if (policyContext && !this.policyEvaluator.evaluate(rule.conditions, policyContext).matches)
                 continue;
             matchedRules += 1;
@@ -263,6 +266,13 @@ let NotificationRuleEngineService = class NotificationRuleEngineService {
     }
     unique(values) {
         return [...new Set(values)];
+    }
+    scheduleMatches(schedule, event) {
+        const payload = event.payload && typeof event.payload === "object" && !Array.isArray(event.payload) ? event.payload : {};
+        const metadata = payload.schedule && typeof payload.schedule === "object" && !Array.isArray(payload.schedule) ? payload.schedule : null;
+        if (!metadata)
+            return schedule == null;
+        return Boolean(schedule) && schedule?.offsetMinutes === metadata.offsetMinutes;
     }
 };
 exports.NotificationRuleEngineService = NotificationRuleEngineService;

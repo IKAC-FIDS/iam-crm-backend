@@ -12,9 +12,10 @@ export type NotificationPolicyContext = {
   event: { name: string }
   actor: { id: string | null; roleId: string | null; teamId: string | null }
   organization: { id: string }
-  task: null | { id: string; title: string; priority: string; status: string; assigneeId: string | null; teamId: string | null; creatorId: string | null }
-  meeting: null | { id: string; title: string; type: string | null; status: string; organizerId: string }
+  task: null | { id: string; title: string; priority: string; status: string; dueAt?: string | null; assigneeId: string | null; teamId: string | null; creatorId: string | null }
+  meeting: null | { id: string; title: string; type: string | null; status: string; startAt?: string; organizerId: string }
   opportunity: null | { id: string; title: string | null; priority: string | null; probability: number | null; stage: string | null; fromStage: string | null; toStage: string | null; ownerId: string | null }
+  schedule?: null | { offsetMinutes: number; scheduledAt: string; detectedAt: string | null }
 }
 
 export type NotificationConditionFieldType = "string" | "number" | "boolean" | "enum" | "userId" | "teamId"

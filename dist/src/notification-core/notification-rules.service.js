@@ -17,7 +17,10 @@ const prisma_service_1 = require("../prisma/prisma.service");
 const notification_core_catalog_1 = require("./notification-core.catalog");
 const notification_condition_catalog_1 = require("./policy/notification-condition.catalog");
 const notification_policy_condition_validator_service_1 = require("./policy/notification-policy-condition-validator.service");
+const notification_schedule_catalog_1 = require("./schedule/notification-schedule.catalog");
+const notification_schedule_validator_service_1 = require("./schedule/notification-schedule-validator.service");
 const ruleInclude = {
+    schedule: true,
     recipientRules: {
         orderBy: { createdAt: "asc" },
     },
@@ -29,9 +32,10 @@ const ALLOWED_EVENTS = new Set([
 ]);
 const ALLOWED_CHANNELS = new Set(notification_core_catalog_1.NOTIFICATION_CHANNELS);
 let NotificationRulesService = class NotificationRulesService {
-    constructor(prisma, conditionValidator) {
+    constructor(prisma, conditionValidator, scheduleValidator) {
         this.prisma = prisma;
         this.conditionValidator = conditionValidator;
+        this.scheduleValidator = scheduleValidator;
     }
     list(user) {
         const tenant = tenant_scope_util_1.tenantScope.require(user);
@@ -55,6 +59,7 @@ let NotificationRulesService = class NotificationRulesService {
         const tenant = tenant_scope_util_1.tenantScope.require(user);
         this.validateEvent(dto.eventName);
         const conditions = this.conditionValidator.validate(dto.eventName, dto.conditions);
+        const schedule = this.scheduleValidator.validate(dto.eventName, dto.schedule);
         await this.validateRecipients(dto.recipientRules, tenant.organizationId);
         return this.prisma.withTenantTransaction(tenant, (tx) => tx.notificationRule.create({
             data: {
@@ -65,6 +70,7 @@ let NotificationRulesService = class NotificationRulesService {
                 mandatory: dto.mandatory ?? false,
                 priority: dto.priority ?? 100,
                 conditions: conditions === null ? client_1.Prisma.DbNull : conditions,
+                ...(schedule ? { schedule: { create: { organizationId: tenant.organizationId, ...schedule } } } : {}),
                 recipientRules: {
                     create: dto.recipientRules.map((recipient) => this.recipientCreateData(recipient)),
                 },
@@ -80,12 +86,22 @@ let NotificationRulesService = class NotificationRulesService {
         const effectiveEventName = dto.eventName ?? current.eventName;
         const effectiveConditions = dto.conditions !== undefined ? dto.conditions : current.conditions;
         const conditions = this.conditionValidator.validate(effectiveEventName, effectiveConditions);
+        const effectiveSchedule = dto.schedule !== undefined ? dto.schedule : current.schedule ? { enabled: current.schedule.enabled, type: current.schedule.scheduleType, sourceField: current.schedule.sourceField, triggerMode: current.schedule.triggerMode, offsetMinutes: current.schedule.offsetMinutes, gracePeriodMinutes: current.schedule.gracePeriodMinutes } : null;
+        const schedule = this.scheduleValidator.validate(effectiveEventName, effectiveSchedule);
         if (dto.recipientRules) {
             await this.validateRecipients(dto.recipientRules, tenant.organizationId);
         }
         return this.prisma.withTenantTransaction(tenant, async (tx) => {
             if (dto.recipientRules) {
                 await tx.notificationRecipientRule.deleteMany({ where: { ruleId: id } });
+            }
+            if (dto.schedule !== undefined || dto.eventName !== undefined) {
+                if (schedule) {
+                    await tx.notificationSchedule.upsert({ where: { ruleId: id }, create: { ruleId: id, organizationId: tenant.organizationId, ...schedule }, update: schedule });
+                }
+                else {
+                    await tx.notificationSchedule.deleteMany({ where: { ruleId: id, organizationId: tenant.organizationId } });
+                }
             }
             return tx.notificationRule.update({
                 where: { id },
@@ -119,6 +135,10 @@ let NotificationRulesService = class NotificationRulesService {
         return {
             events: [...ALLOWED_EVENTS],
             conditionEvents: Object.values(notification_condition_catalog_1.NOTIFICATION_CONDITION_CATALOG),
+            scheduleEvents: Object.values(notification_schedule_catalog_1.NOTIFICATION_SCHEDULE_CATALOG).map((item) => ({
+                eventName: item.eventName, label: item.label, supportsSchedule: true,
+                scheduleOptions: { type: item.scheduleType, sourceField: item.sourceField, triggerModes: item.triggerModes, suggestedOffsetsMinutes: item.suggestedOffsetsMinutes, defaultGracePeriodMinutes: item.defaultGracePeriodMinutes },
+            })),
             recipientTypes: Object.values(client_1.NotificationRecipientType),
             channels: Object.values(client_1.NotificationChannel),
         };
@@ -247,6 +267,6 @@ let NotificationRulesService = class NotificationRulesService {
 exports.NotificationRulesService = NotificationRulesService;
 exports.NotificationRulesService = NotificationRulesService = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [prisma_service_1.PrismaService, notification_policy_condition_validator_service_1.NotificationPolicyConditionValidator])
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService, notification_policy_condition_validator_service_1.NotificationPolicyConditionValidator, notification_schedule_validator_service_1.NotificationScheduleValidator])
 ], NotificationRulesService);
 //# sourceMappingURL=notification-rules.service.js.map

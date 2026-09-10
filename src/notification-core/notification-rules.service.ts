@@ -23,8 +23,11 @@ import {
 } from "./notification-core.catalog"
 import { NOTIFICATION_CONDITION_CATALOG } from "./policy/notification-condition.catalog"
 import { NotificationPolicyConditionValidator } from "./policy/notification-policy-condition-validator.service"
+import { NOTIFICATION_SCHEDULE_CATALOG } from "./schedule/notification-schedule.catalog"
+import { NotificationScheduleValidator } from "./schedule/notification-schedule-validator.service"
 
 const ruleInclude = {
+  schedule: true,
   recipientRules: {
     orderBy: { createdAt: "asc" as const },
   },
@@ -39,7 +42,7 @@ const ALLOWED_CHANNELS = new Set<string>(NOTIFICATION_CHANNELS)
 
 @Injectable()
 export class NotificationRulesService {
-  constructor(private readonly prisma: PrismaService, private readonly conditionValidator: NotificationPolicyConditionValidator) {}
+  constructor(private readonly prisma: PrismaService, private readonly conditionValidator: NotificationPolicyConditionValidator, private readonly scheduleValidator: NotificationScheduleValidator) {}
 
   list(user: CurrentUserPayload) {
     const tenant = tenantScope.require(user)
@@ -66,6 +69,7 @@ export class NotificationRulesService {
     const tenant = tenantScope.require(user)
     this.validateEvent(dto.eventName)
     const conditions = this.conditionValidator.validate(dto.eventName, dto.conditions)
+    const schedule = this.scheduleValidator.validate(dto.eventName, dto.schedule)
     await this.validateRecipients(dto.recipientRules, tenant.organizationId)
 
     return this.prisma.withTenantTransaction(tenant, (tx) => tx.notificationRule.create({
@@ -77,6 +81,7 @@ export class NotificationRulesService {
         mandatory: dto.mandatory ?? false,
         priority: dto.priority ?? 100,
         conditions: conditions === null ? Prisma.DbNull : conditions as Prisma.InputJsonValue,
+        ...(schedule ? { schedule: { create: { organizationId: tenant.organizationId, ...schedule } } } : {}),
         recipientRules: {
           create: dto.recipientRules.map((recipient) =>
             this.recipientCreateData(recipient),
@@ -98,6 +103,8 @@ export class NotificationRulesService {
     const effectiveEventName = dto.eventName ?? current.eventName
     const effectiveConditions = dto.conditions !== undefined ? dto.conditions : current.conditions
     const conditions = this.conditionValidator.validate(effectiveEventName, effectiveConditions)
+    const effectiveSchedule = dto.schedule !== undefined ? dto.schedule : current.schedule ? { enabled: current.schedule.enabled, type: current.schedule.scheduleType, sourceField: current.schedule.sourceField, triggerMode: current.schedule.triggerMode, offsetMinutes: current.schedule.offsetMinutes, gracePeriodMinutes: current.schedule.gracePeriodMinutes } : null
+    const schedule = this.scheduleValidator.validate(effectiveEventName, effectiveSchedule)
     if (dto.recipientRules) {
       await this.validateRecipients(dto.recipientRules, tenant.organizationId)
     }
@@ -105,6 +112,13 @@ export class NotificationRulesService {
     return this.prisma.withTenantTransaction(tenant, async (tx) => {
       if (dto.recipientRules) {
         await tx.notificationRecipientRule.deleteMany({ where: { ruleId: id } })
+      }
+      if (dto.schedule !== undefined || dto.eventName !== undefined) {
+        if (schedule) {
+          await tx.notificationSchedule.upsert({ where: { ruleId: id }, create: { ruleId: id, organizationId: tenant.organizationId, ...schedule }, update: schedule })
+        } else {
+          await tx.notificationSchedule.deleteMany({ where: { ruleId: id, organizationId: tenant.organizationId } })
+        }
       }
 
       return tx.notificationRule.update({
@@ -144,6 +158,10 @@ export class NotificationRulesService {
     return {
       events: [...ALLOWED_EVENTS],
       conditionEvents: Object.values(NOTIFICATION_CONDITION_CATALOG),
+      scheduleEvents: Object.values(NOTIFICATION_SCHEDULE_CATALOG).map((item) => ({
+        eventName: item.eventName, label: item.label, supportsSchedule: true,
+        scheduleOptions: { type: item.scheduleType, sourceField: item.sourceField, triggerModes: item.triggerModes, suggestedOffsetsMinutes: item.suggestedOffsetsMinutes, defaultGracePeriodMinutes: item.defaultGracePeriodMinutes },
+      })),
       recipientTypes: Object.values(NotificationRecipientType),
       channels: Object.values(NotificationChannel),
     }

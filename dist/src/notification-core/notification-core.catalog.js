@@ -6,11 +6,14 @@ exports.NOTIFICATION_EVENT_CATALOG = {
         CREATED: "MEETING.CREATED",
         UPDATED: "MEETING.UPDATED",
         CANCELLED: "MEETING.CANCELLED",
+        REMINDER: "MEETING.REMINDER",
     },
     TASK: {
         ASSIGNED: "TASK.ASSIGNED",
         REASSIGNED: "TASK.REASSIGNED",
         COMPLETED: "TASK.COMPLETED",
+        DUE_SOON: "TASK.DUE_SOON",
+        OVERDUE: "TASK.OVERDUE",
     },
     OPPORTUNITY: {
         STAGE_CHANGED: "OPPORTUNITY.STAGE_CHANGED",
@@ -33,6 +36,7 @@ const meetingVariables = [
     { key: "meeting.endAt", token: "{{meeting.endAt}}", label: "زمان پایان جلسه", type: "date" },
     { key: "meeting.location", token: "{{meeting.location}}", label: "مکان جلسه", type: "string" },
     { key: "meeting.agenda", token: "{{meeting.agenda}}", label: "دستور جلسه", type: "string" },
+    { key: "meeting.type", token: "{{meeting.type}}", label: "نوع جلسه", type: "string" },
     { key: "meeting.company.id", token: "{{meeting.company.id}}", label: "شناسه شرکت جلسه", type: "string" },
     { key: "meeting.company.name", token: "{{meeting.company.name}}", label: "نام شرکت جلسه", type: "string" },
 ];
@@ -44,8 +48,13 @@ const taskVariables = [
     { key: "task.title", token: "{{task.title}}", label: "عنوان کار", type: "string" },
     { key: "task.description", token: "{{task.description}}", label: "شرح کار", type: "string" },
     { key: "task.dueAt", token: "{{task.dueAt}}", label: "مهلت کار", type: "date" },
+    { key: "task.assignee.fullName", token: "{{task.assignee.fullName}}", label: "نام مسئول کار", type: "string" },
     { key: "task.company.id", token: "{{task.company.id}}", label: "شناسه شرکت کار", type: "string" },
     { key: "task.company.name", token: "{{task.company.name}}", label: "نام شرکت کار", type: "string" },
+];
+const scheduleVariables = [
+    { key: "schedule.offsetMinutes", token: "{{schedule.offsetMinutes}}", label: "فاصله زمانی اعلان (دقیقه)", type: "string" },
+    { key: "schedule.scheduledAt", token: "{{schedule.scheduledAt}}", label: "زمان برنامه‌ریزی اعلان", type: "date" },
 ];
 const opportunityVariables = [
     { key: "opportunity.id", token: "{{opportunity.id}}", label: "شناسه فرصت", type: "string" },
@@ -60,9 +69,12 @@ exports.NOTIFICATION_TEMPLATE_VARIABLES = {
     "MEETING.CREATED": [...commonVariables, ...meetingVariables],
     "MEETING.UPDATED": [...commonVariables, ...meetingVariables],
     "MEETING.CANCELLED": [...commonVariables, ...meetingVariables],
+    "MEETING.REMINDER": [...commonVariables, ...meetingVariables, ...scheduleVariables],
     "TASK.ASSIGNED": [...commonVariables, ...taskVariables],
     "TASK.REASSIGNED": [...commonVariables, ...taskVariables],
     "TASK.COMPLETED": [...commonVariables, ...taskVariables],
+    "TASK.DUE_SOON": [...commonVariables, ...taskVariables, ...scheduleVariables],
+    "TASK.OVERDUE": [...commonVariables, ...taskVariables, ...scheduleVariables],
     "OPPORTUNITY.STAGE_CHANGED": [...commonVariables, ...opportunityVariables],
 };
 //# sourceMappingURL=notification-core.catalog.js.map

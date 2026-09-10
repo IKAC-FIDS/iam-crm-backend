@@ -29,11 +29,13 @@ import { WebPushProvider } from './push/web-push.provider'
 import { NotificationPolicyConditionValidator } from './policy/notification-policy-condition-validator.service'
 import { NotificationPolicyContextBuilder } from './policy/notification-policy-context-builder.service'
 import { NotificationPolicyEvaluatorService } from './policy/notification-policy-evaluator.service'
+import { NotificationScheduleValidator } from './schedule/notification-schedule-validator.service'
+import { NotificationSchedulerService } from './schedule/notification-scheduler.service'
 
 @Module({
   imports: [PrismaModule, SsoModule, AuditLogModule, NotificationsModule, EmailModule],
   controllers: [NotificationRulesController, NotificationAdminController, NotificationTemplatesController, NotificationDeliveriesController, SmsAdminController, PushAdminController, PushSubscriptionController],
-  providers: [NotificationPolicyConditionValidator, NotificationPolicyContextBuilder, NotificationPolicyEvaluatorService, PushNotificationChannelHandler, PushProviderRegistry, PushSettingsService, WebPushProvider, EmailNotificationChannelHandler, InAppNotificationChannelHandler, InAppNotificationMetadataMapper, NotificationActionUrlResolver, NotificationCoreService, NotificationRulesService, NotificationRuleEngineService, NotificationAdminService, NotificationTemplateEngineService, GenericHttpSmsProvider, SmsProviderRegistry, SmsRecipientResolver, SmsSettingsService, SmsNotificationChannelHandler, NotificationDeliveryDispatcher],
+  providers: [NotificationScheduleValidator, NotificationSchedulerService, NotificationPolicyConditionValidator, NotificationPolicyContextBuilder, NotificationPolicyEvaluatorService, PushNotificationChannelHandler, PushProviderRegistry, PushSettingsService, WebPushProvider, EmailNotificationChannelHandler, InAppNotificationChannelHandler, InAppNotificationMetadataMapper, NotificationActionUrlResolver, NotificationCoreService, NotificationRulesService, NotificationRuleEngineService, NotificationAdminService, NotificationTemplateEngineService, GenericHttpSmsProvider, SmsProviderRegistry, SmsRecipientResolver, SmsSettingsService, SmsNotificationChannelHandler, NotificationDeliveryDispatcher],
   exports: [NotificationCoreService, NotificationRulesService, NotificationRuleEngineService, NotificationTemplateEngineService, NotificationDeliveryDispatcher],
 })
 export class NotificationCoreModule {}
