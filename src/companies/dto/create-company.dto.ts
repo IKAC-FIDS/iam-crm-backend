@@ -56,6 +56,11 @@ export class CreateCompanyDto {
   headOfficeCity?: string;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  headOfficeAddress?: string | null;
+
+  @IsOptional()
   @Transform(transformCompanyPhone)
   @IsString()
   @Matches(COMPANY_PHONE_PATTERN, {
