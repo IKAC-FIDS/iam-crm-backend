@@ -36,6 +36,7 @@ import { getCurrentOrganizationId, tenantScope } from '../common/tenant/tenant-s
 import { userTeamScopeWhere } from '../common/tenant/team-scope.util';
 import { parseApiDate, parseApiDateRange } from '../common/dates/api-date.util';
 import { SubmitTaskReviewDto, TaskReviewDecisionDto } from './dto/task-review.dto';
+import { CompanyAccessService } from '../companies/company-access.service';
 
 const taskInclude = {
   company: {
@@ -202,6 +203,7 @@ export class TasksService {
     private readonly audit: AuditLogService,
     private readonly notifications: NotificationsService,
     private readonly notificationCore: NotificationCoreService,
+    private readonly companyAccess: CompanyAccessService,
   ) {}
 
   async findAll(query: FindTasksDto, user: CurrentUserPayload) {
@@ -264,7 +266,7 @@ export class TasksService {
     let data: Array<{ id: string; label: string; secondary?: string }>;
     let total: number;
     if (query.type === 'COMPANY') {
-      const where: Prisma.CompanyWhereInput = { AND: [{ organizationId, archivedAt: null }, this.companyScopeWhere(user), ...(search ? [{ OR: [{ legalName: { contains: search, mode: 'insensitive' as const } }, { brandName: { contains: search, mode: 'insensitive' as const } }] }] : [])] };
+      const where: Prisma.CompanyWhereInput = { AND: [{ organizationId, archivedAt: null }, ...(search ? [{ OR: [{ legalName: { contains: search, mode: 'insensitive' as const } }, { brandName: { contains: search, mode: 'insensitive' as const } }] }] : [])] };
       const [rows, count] = await Promise.all([this.prisma.company.findMany({ where, select: { id: true, legalName: true, brandName: true }, orderBy: { legalName: 'asc' }, ...paging }), this.prisma.company.count({ where })]);
       data = rows.map((row) => ({ id: row.id, label: row.brandName || row.legalName, secondary: row.brandName ? row.legalName : undefined })); total = count;
     } else if (query.type === 'OPPORTUNITY') {
@@ -1316,24 +1318,7 @@ export class TasksService {
     companyId: string,
     user: CurrentUserPayload,
   ): Promise<ScopedCompany> {
-    const company = await this.prisma.company.findFirst({
-      where: {
-        AND: [
-          {
-            id: companyId,
-            archivedAt: null,
-            organizationId: getCurrentOrganizationId(user),
-          },
-          this.companyScopeWhere(user),
-        ],
-      },
-    });
-
-    if (!company) {
-      throw new NotFoundException('Company not found');
-    }
-
-    return company;
+    return this.companyAccess.assertCompanyReadable(companyId, user);
   }
 
   private async assertOpportunityAccess(

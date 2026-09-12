@@ -19,6 +19,7 @@ const prisma_service_1 = require("../prisma/prisma.service");
 const tenant_scope_util_1 = require("../common/tenant/tenant-scope.util");
 const team_scope_util_1 = require("../common/tenant/team-scope.util");
 const api_date_util_1 = require("../common/dates/api-date.util");
+const company_access_service_1 = require("../companies/company-access.service");
 const taskInclude = {
     company: {
         select: {
@@ -115,11 +116,12 @@ const taskInclude = {
     _count: { select: { subtasks: true, reviewRounds: true } },
 };
 let TasksService = class TasksService {
-    constructor(prisma, audit, notifications, notificationCore) {
+    constructor(prisma, audit, notifications, notificationCore, companyAccess) {
         this.prisma = prisma;
         this.audit = audit;
         this.notifications = notifications;
         this.notificationCore = notificationCore;
+        this.companyAccess = companyAccess;
     }
     async findAll(query, user) {
         const page = query.page ?? 1;
@@ -173,7 +175,7 @@ let TasksService = class TasksService {
         let data;
         let total;
         if (query.type === 'COMPANY') {
-            const where = { AND: [{ organizationId, archivedAt: null }, this.companyScopeWhere(user), ...(search ? [{ OR: [{ legalName: { contains: search, mode: 'insensitive' } }, { brandName: { contains: search, mode: 'insensitive' } }] }] : [])] };
+            const where = { AND: [{ organizationId, archivedAt: null }, ...(search ? [{ OR: [{ legalName: { contains: search, mode: 'insensitive' } }, { brandName: { contains: search, mode: 'insensitive' } }] }] : [])] };
             const [rows, count] = await Promise.all([this.prisma.company.findMany({ where, select: { id: true, legalName: true, brandName: true }, orderBy: { legalName: 'asc' }, ...paging }), this.prisma.company.count({ where })]);
             data = rows.map((row) => ({ id: row.id, label: row.brandName || row.legalName, secondary: row.brandName ? row.legalName : undefined }));
             total = count;
@@ -1109,22 +1111,7 @@ let TasksService = class TasksService {
         }
     }
     async assertCompanyAccess(companyId, user) {
-        const company = await this.prisma.company.findFirst({
-            where: {
-                AND: [
-                    {
-                        id: companyId,
-                        archivedAt: null,
-                        organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
-                    },
-                    this.companyScopeWhere(user),
-                ],
-            },
-        });
-        if (!company) {
-            throw new common_1.NotFoundException('Company not found');
-        }
-        return company;
+        return this.companyAccess.assertCompanyReadable(companyId, user);
     }
     async assertOpportunityAccess(opportunityId, user) {
         const opportunity = await this.prisma.opportunity.findFirst({
@@ -1560,6 +1547,7 @@ exports.TasksService = TasksService = __decorate([
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
         audit_log_service_1.AuditLogService,
         notifications_service_1.NotificationsService,
-        notification_core_service_1.NotificationCoreService])
+        notification_core_service_1.NotificationCoreService,
+        company_access_service_1.CompanyAccessService])
 ], TasksService);
 //# sourceMappingURL=tasks.service.js.map

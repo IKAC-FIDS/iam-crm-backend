@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Priority, TaskAssignmentScope, TaskStatus, UserRole } from '@prisma/client';
 import { TasksService } from '../src/tasks/tasks.service';
 import type { CurrentUserPayload } from '../src/common/decorators/current-user.decorator';
@@ -33,6 +33,8 @@ function createPrismaService() {
     },
     company: {
       findFirst: jest.fn(),
+      findMany: jest.fn().mockResolvedValue([]),
+      count: jest.fn().mockResolvedValue(0),
     },
     opportunity: {
       findFirst: jest.fn(),
@@ -60,12 +62,18 @@ function createPrismaService() {
   };
 }
 
-function createService(prisma: ReturnType<typeof createPrismaService>) {
+function createService(
+  prisma: ReturnType<typeof createPrismaService>,
+  companyAccess = {
+    assertCompanyReadable: jest.fn().mockImplementation(async (companyId: string) => ({ id: companyId })),
+  },
+) {
   return new TasksService(
     prisma as any,
     { record: jest.fn() } as any,
     { notifyUser: jest.fn() } as any,
     { publishDomainEvent: jest.fn() } as any,
+    companyAccess as any,
   );
 }
 
@@ -101,6 +109,49 @@ function task(overrides: Record<string, unknown> = {}) {
 }
 
 describe('TasksService relation resolution', () => {
+  it('lists active companies from the current organization without an accidental owner filter', async () => {
+    const prisma = createPrismaService();
+    const rep = actor(UserRole.REP, ['task:create']);
+
+    await createService(prisma).findEntityOptions({ type: 'COMPANY' } as any, rep);
+
+    expect(prisma.company.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { AND: [{ organizationId, archivedAt: null }] },
+    }));
+  });
+
+  it('allows a REP to link a readable company in the same organization', async () => {
+    const prisma = createPrismaService();
+    const rep = actor(UserRole.REP, ['task:create', 'task:assign']);
+    const companyAccess = { assertCompanyReadable: jest.fn().mockResolvedValue({ id: 'company-1' }) };
+    prisma.user.findFirst.mockResolvedValue({ id: 'user-2', isActive: true, role: UserRole.REP, teamId: null });
+    prisma.task.create.mockResolvedValue(task({ companyId: 'company-1', assignedToId: 'user-2', assignmentScope: TaskAssignmentScope.ORGANIZATION }));
+
+    await expect(createService(prisma, companyAccess).create({
+      title: 'Organization follow-up', companyId: 'company-1',
+      assignmentScope: TaskAssignmentScope.ORGANIZATION, assignedToId: 'user-2',
+    }, rep)).resolves.toBeDefined();
+
+    expect(companyAccess.assertCompanyReadable).toHaveBeenCalledWith('company-1', rep);
+  });
+
+  it('preserves not-found semantics when company access rejects another tenant or an unavailable company', async () => {
+    const prisma = createPrismaService();
+    const companyAccess = { assertCompanyReadable: jest.fn().mockRejectedValue(new NotFoundException('Company not found')) };
+    await expect(createService(prisma, companyAccess).create({
+      title: 'Cross-tenant task', companyId: 'company-outside-tenant',
+    }, actor(UserRole.REP, ['task:create']))).rejects.toThrow('Company not found');
+    expect(prisma.task.create).not.toHaveBeenCalled();
+  });
+
+  it('keeps the previously successful admin company-link flow working', async () => {
+    const prisma = createPrismaService();
+    prisma.task.create.mockResolvedValue(task({ companyId: 'company-1' }));
+    await expect(createService(prisma).create({
+      title: 'Admin follow-up', companyId: 'company-1',
+    }, user)).resolves.toBeDefined();
+  });
+
   it('derives companyId from opportunityId during task creation', async () => {
     const prisma = createPrismaService();
     prisma.opportunity.findFirst.mockResolvedValue({
@@ -220,7 +271,6 @@ describe('TasksService relation resolution', () => {
     );
   });
 });
-
 describe('TasksService work-management rules', () => {
   it('keeps SELF assignment consistent with the acting user', async () => {
     const prisma = createPrismaService();
@@ -264,7 +314,7 @@ describe('TasksService work-management rules', () => {
     const audit = { record: jest.fn() };
     const notifications = { notifyUser: jest.fn() };
     const core = { publishDomainEvent: jest.fn() };
-    const service = new TasksService(prisma as any, audit as any, notifications as any, core as any);
+    const service = new TasksService(prisma as any, audit as any, notifications as any, core as any, { assertCompanyReadable: jest.fn() } as any);
 
     await service.reassign('task-1', { assignmentScope: TaskAssignmentScope.ORGANIZATION, assigneeId: 'user-2', reason: 'Capacity' }, user);
 
@@ -415,7 +465,7 @@ describe('TasksService permission-driven assignment', () => {
     prisma.user.findFirst.mockResolvedValue({ id: 'user-2', isActive: true, role: UserRole.REP, teamId: null });
     prisma.task.update.mockResolvedValue(task({ assignedToId: 'user-2', assignmentScope: TaskAssignmentScope.ORGANIZATION }));
     const audit = { record: jest.fn() };
-    const service = new TasksService(prisma as any, audit as any, { notifyUser: jest.fn() } as any, { publishDomainEvent: jest.fn() } as any);
+    const service = new TasksService(prisma as any, audit as any, { notifyUser: jest.fn() } as any, { publishDomainEvent: jest.fn() } as any, { assertCompanyReadable: jest.fn() } as any);
     await service.reassign('task-1', { assignmentScope: TaskAssignmentScope.ORGANIZATION, assigneeId: 'user-2' }, actor(UserRole.REP, ['task:reassign']));
     expect(audit.record).toHaveBeenCalledWith(expect.objectContaining({ action: 'task.reassigned' }));
   });

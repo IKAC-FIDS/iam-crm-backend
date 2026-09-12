@@ -102,7 +102,7 @@ describe('overdueOnly task filtering', () => {
     };
     return {
       prisma,
-      service: new TasksService(prisma as any, {} as any, {} as any, { publishDomainEvent: jest.fn() } as any),
+      service: new TasksService(prisma as any, {} as any, {} as any, { publishDomainEvent: jest.fn() } as any, { assertCompanyReadable: jest.fn() } as any),
     };
   }
   it('uses a database predicate for open tasks and exact count pagination', async () => {
