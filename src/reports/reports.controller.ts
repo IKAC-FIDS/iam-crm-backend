@@ -198,6 +198,14 @@ export class ReportsController {
     return this.reportsService.getActivityReport(filters, user);
   }
 
+  @Get("user-performance")
+  getUserPerformance(
+    @Query() filters: ReportFiltersDto,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.reportsService.getUserPerformance(filters, user);
+  }
+
   @Get("pipeline/by-owner")
   getPipelineByOwner(
     @Query() filters: ReportFiltersDto,

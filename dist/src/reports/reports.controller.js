@@ -107,6 +107,9 @@ let ReportsController = class ReportsController {
     getActivityReport(filters, user) {
         return this.reportsService.getActivityReport(filters, user);
     }
+    getUserPerformance(filters, user) {
+        return this.reportsService.getUserPerformance(filters, user);
+    }
     getPipelineByOwner(filters, user) {
         return this.reportsService.getPipelineByOwner(filters, user);
     }
@@ -271,6 +274,15 @@ __decorate([
     __metadata("design:paramtypes", [report_filters_dto_1.ReportFiltersDto, Object]),
     __metadata("design:returntype", void 0)
 ], ReportsController.prototype, "getActivityReport", null);
+__decorate([
+    (0, common_1.Get)("user-performance"),
+    openapi.ApiResponse({ status: 200 }),
+    __param(0, (0, common_1.Query)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [report_filters_dto_1.ReportFiltersDto, Object]),
+    __metadata("design:returntype", void 0)
+], ReportsController.prototype, "getUserPerformance", null);
 __decorate([
     (0, common_1.Get)("pipeline/by-owner"),
     openapi.ApiResponse({ status: 200 }),
