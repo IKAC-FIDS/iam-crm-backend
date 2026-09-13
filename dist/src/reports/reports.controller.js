@@ -276,7 +276,7 @@ __decorate([
 ], ReportsController.prototype, "getActivityReport", null);
 __decorate([
     (0, common_1.Get)("user-performance"),
-    openapi.ApiResponse({ status: 200 }),
+    openapi.ApiResponse({ status: 200, type: Object }),
     __param(0, (0, common_1.Query)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),

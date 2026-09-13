@@ -365,15 +365,21 @@ let ReportsService = class ReportsService {
     async getUserPerformance(filters, user) {
         const organizationId = (0, tenant_scope_util_1.getCurrentOrganizationId)(user);
         const { range, startDate, endDate } = this.dateRange(filters);
-        const requestedUserIds = filters.userIds?.length
-            ? [...new Set(filters.userIds)]
-            : undefined;
+        const requestedUserIds = filters.userIds?.length ? [...new Set(filters.userIds)] : undefined;
         const users = await this.prisma.user.findMany({
             where: {
                 organizationId,
+                isActive: true,
                 ...(requestedUserIds ? { id: { in: requestedUserIds } } : {}),
+                ...(filters.teams?.length ? { teamRef: { id: { in: filters.teams } } } : {}),
             },
-            select: { id: true, fullName: true, email: true },
+            select: {
+                id: true,
+                fullName: true,
+                email: true,
+                teamId: true,
+                teamRef: { select: { id: true, code: true, name: true } },
+            },
             orderBy: { fullName: 'asc' },
         });
         const userIds = users.map((item) => item.id);
@@ -382,17 +388,18 @@ let ReportsService = class ReportsService {
         }
         const actorFilter = userIds.length ? { in: userIds } : { in: ['__none__'] };
         const dated = range ? { createdAt: range } : {};
-        const [activityTypes, activityCounts, companyAudits, opportunityAudits, tasksCreated, assignedTasks] = await Promise.all([
+        const [activityTypes, activityCounts, companyAudits, opportunityAudits, createdTasks, assignedTasks] = await Promise.all([
             this.prisma.lookupOption.findMany({
                 where: { group: 'activity-types', isActive: true },
                 select: { code: true, label: true, sortOrder: true },
                 orderBy: [{ sortOrder: 'asc' }, { label: 'asc' }],
             }),
             this.prisma.activity.groupBy({
-                by: ['type'],
+                by: ['userId', 'type'],
                 where: {
                     userId: actorFilter,
                     user: { organizationId },
+                    type: { not: activity_type_1.ActivityType.STAGE_CHANGE },
                     ...(range ? { occurredAt: range } : {}),
                 },
                 _count: { id: true },
@@ -404,7 +411,7 @@ let ReportsService = class ReportsService {
                     action: 'company.created',
                     ...dated,
                 },
-                select: { entityId: true },
+                select: { actorId: true, entityId: true },
             }),
             this.prisma.auditLog.findMany({
                 where: {
@@ -413,17 +420,19 @@ let ReportsService = class ReportsService {
                     action: 'opportunity.created',
                     ...dated,
                 },
-                select: { entityId: true },
+                select: { actorId: true, entityId: true },
             }),
-            this.prisma.task.count({
+            this.prisma.task.groupBy({
+                by: ['createdById'],
                 where: {
                     organizationId,
                     createdById: actorFilter,
                     ...(range ? { createdAt: range } : {}),
                 },
+                _count: { id: true },
             }),
             this.prisma.task.groupBy({
-                by: ['status'],
+                by: ['assignedToId', 'status'],
                 where: {
                     organizationId,
                     assignedToId: actorFilter,
@@ -441,22 +450,29 @@ let ReportsService = class ReportsService {
             ? await this.prisma.opportunity.findMany({
                 where: { organizationId, id: { in: opportunityIds } },
                 select: {
+                    id: true,
                     estimatedValue: true,
                     stage: { select: { isTerminal: true, terminalType: true } },
                 },
             })
             : [];
-        const activityCountMap = new Map(activityCounts.map((item) => [item.type, item._count.id]));
+        const activeTypeCodes = new Set(activityTypes.map((item) => item.code));
+        const manualActivityCounts = activityCounts.filter((item) => activeTypeCodes.has(item.type));
+        const activityTotalFor = (userId, code) => manualActivityCounts
+            .filter((item) => item.userId === userId && (!code || item.type === code))
+            .reduce((sum, item) => sum + item._count.id, 0);
+        const typeTotals = new Map(activityTypes.map((type) => [
+            type.code,
+            manualActivityCounts
+                .filter((item) => item.type === type.code)
+                .reduce((sum, item) => sum + item._count.id, 0),
+        ]));
         const activityBreakdown = activityTypes.map((item) => ({
             code: item.code,
             label: item.label,
-            count: activityCountMap.get(item.code) ?? 0,
+            count: typeTotals.get(item.code) ?? 0,
         }));
-        const uncataloguedCount = activityCounts
-            .filter((item) => !activityTypes.some((type) => type.code === item.type))
-            .reduce((sum, item) => sum + item._count.id, 0);
-        const completedAssigned = assignedTasks
-            .filter((item) => item.status === 'DONE')
+        const completedAssigned = assignedTasks.filter((item) => item.status === 'DONE')
             .reduce((sum, item) => sum + item._count.id, 0);
         const assignedTotal = assignedTasks.reduce((sum, item) => sum + item._count.id, 0);
         const classify = (opportunity) => opportunity.stage.terminalType === 'WON'
@@ -464,10 +480,58 @@ let ReportsService = class ReportsService {
             : opportunity.stage.terminalType === 'LOST'
                 ? 'lost'
                 : 'active';
-        const values = (kind) => opportunities
-            .filter((item) => classify(item) === kind)
-            .reduce((sum, item) => sum + Number(item.estimatedValue ?? 0), 0);
         const financialVisible = (0, financial_visibility_1.canViewFinancials)(user);
+        const opportunityActorById = new Map(opportunityAudits
+            .filter((item) => Boolean(item.actorId && item.entityId))
+            .map((item) => [item.entityId, item.actorId]));
+        const opportunitiesFor = (userId) => opportunities.filter((item) => opportunityActorById.get(item.id) === userId);
+        const opportunitySummary = (items) => {
+            const valueFor = (kind) => items
+                .filter((item) => classify(item) === kind)
+                .reduce((sum, item) => sum + Number(item.estimatedValue ?? 0), 0);
+            return {
+                total: items.length,
+                active: items.filter((item) => classify(item) === 'active').length,
+                won: items.filter((item) => classify(item) === 'won').length,
+                lost: items.filter((item) => classify(item) === 'lost').length,
+                totalValue: financialVisible ? items.reduce((sum, item) => sum + Number(item.estimatedValue ?? 0), 0) : null,
+                activeValue: financialVisible ? valueFor('active') : null,
+                wonValue: financialVisible ? valueFor('won') : null,
+                lostValue: financialVisible ? valueFor('lost') : null,
+            };
+        };
+        const members = users.map((member) => {
+            const memberAssigned = assignedTasks.filter((item) => item.assignedToId === member.id);
+            const assignedTotalForMember = memberAssigned.reduce((sum, item) => sum + item._count.id, 0);
+            const completedForMember = memberAssigned
+                .filter((item) => item.status === 'DONE')
+                .reduce((sum, item) => sum + item._count.id, 0);
+            const breakdown = activityTypes.map((type) => {
+                const count = activityTotalFor(member.id, type.code);
+                const total = typeTotals.get(type.code) ?? 0;
+                return { code: type.code, label: type.label, count, percentage: this.percent(count, total) };
+            });
+            return {
+                user: member,
+                activity: {
+                    total: activityTotalFor(member.id),
+                    breakdown,
+                },
+                companiesCreated: new Set(companyAudits
+                    .filter((item) => item.actorId === member.id)
+                    .map((item) => item.entityId)
+                    .filter(Boolean)).size,
+                tasksCreated: createdTasks
+                    .filter((item) => item.createdById === member.id)
+                    .reduce((sum, item) => sum + item._count.id, 0),
+                tasksAssigned: {
+                    total: assignedTotalForMember,
+                    completed: completedForMember,
+                    incomplete: assignedTotalForMember - completedForMember,
+                },
+                opportunities: opportunitySummary(opportunitiesFor(member.id)),
+            };
+        });
         return {
             period: {
                 startDate: startDate?.toISOString() ?? null,
@@ -480,30 +544,20 @@ let ReportsService = class ReportsService {
                 },
             },
             users,
+            members,
             activity: {
-                total: activityCounts.reduce((sum, item) => sum + item._count.id, 0),
+                total: manualActivityCounts.reduce((sum, item) => sum + item._count.id, 0),
                 breakdown: activityBreakdown,
-                uncataloguedCount,
+                uncataloguedCount: 0,
             },
             companiesCreated: new Set(companyAudits.map((item) => item.entityId).filter(Boolean)).size,
-            tasksCreated,
+            tasksCreated: createdTasks.reduce((sum, item) => sum + item._count.id, 0),
             tasksAssigned: {
                 total: assignedTotal,
                 completed: completedAssigned,
                 incomplete: assignedTotal - completedAssigned,
             },
-            opportunities: {
-                total: opportunities.length,
-                active: opportunities.filter((item) => classify(item) === 'active').length,
-                won: opportunities.filter((item) => classify(item) === 'won').length,
-                lost: opportunities.filter((item) => classify(item) === 'lost').length,
-                totalValue: financialVisible
-                    ? opportunities.reduce((sum, item) => sum + Number(item.estimatedValue ?? 0), 0)
-                    : null,
-                activeValue: financialVisible ? values('active') : null,
-                wonValue: financialVisible ? values('won') : null,
-                lostValue: financialVisible ? values('lost') : null,
-            },
+            opportunities: opportunitySummary(opportunities),
             financialVisible,
         };
     }
@@ -520,6 +574,7 @@ let ReportsService = class ReportsService {
                 },
             },
             users,
+            members: [],
             activity: { total: 0, breakdown: [], uncataloguedCount: 0 },
             companiesCreated: 0,
             tasksCreated: 0,

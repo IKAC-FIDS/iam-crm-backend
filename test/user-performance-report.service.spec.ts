@@ -23,7 +23,7 @@ function prismaMock() {
   return {
     user: {
       findMany: jest.fn().mockResolvedValue([
-        { id: selectedUserId, fullName: 'کاربر نمونه', email: 'user@example.com' },
+        { id: selectedUserId, fullName: 'کاربر نمونه', email: 'user@example.com', teamId: null, teamRef: null },
       ]),
     },
     lookupOption: {
@@ -34,29 +34,31 @@ function prismaMock() {
     },
     activity: {
       groupBy: jest.fn().mockResolvedValue([
-        { type: 'CALL', _count: { id: 3 } },
+        { userId: selectedUserId, type: 'CALL', _count: { id: 3 } },
+        { userId: selectedUserId, type: 'STAGE_CHANGE', _count: { id: 67 } },
       ]),
     },
     auditLog: {
       findMany: jest
         .fn()
-        .mockResolvedValueOnce([{ entityId: 'company-1' }])
+        .mockResolvedValueOnce([{ actorId: selectedUserId, entityId: 'company-1' }])
         .mockResolvedValueOnce([
-          { entityId: 'opportunity-1' },
-          { entityId: 'opportunity-2' },
+          { actorId: selectedUserId, entityId: 'opportunity-1' },
+          { actorId: selectedUserId, entityId: 'opportunity-2' },
         ]),
     },
     task: {
-      count: jest.fn().mockResolvedValue(4),
-      groupBy: jest.fn().mockResolvedValue([
-        { status: 'DONE', _count: { id: 2 } },
-        { status: 'TODO', _count: { id: 3 } },
-      ]),
+      groupBy: jest.fn()
+        .mockResolvedValueOnce([{ createdById: selectedUserId, _count: { id: 4 } }])
+        .mockResolvedValueOnce([
+          { assignedToId: selectedUserId, status: 'DONE', _count: { id: 2 } },
+          { assignedToId: selectedUserId, status: 'TODO', _count: { id: 3 } },
+        ]),
     },
     opportunity: {
       findMany: jest.fn().mockResolvedValue([
-        { estimatedValue: 100, stage: { isTerminal: false, terminalType: null } },
-        { estimatedValue: 250, stage: { isTerminal: true, terminalType: 'WON' } },
+        { id: 'opportunity-1', estimatedValue: 100, stage: { isTerminal: false, terminalType: null } },
+        { id: 'opportunity-2', estimatedValue: 250, stage: { isTerminal: true, terminalType: 'WON' } },
       ]),
     },
   };
@@ -85,6 +87,9 @@ describe('ReportsService user performance', () => {
     expect(result.companiesCreated).toBe(1);
     expect(result.tasksCreated).toBe(4);
     expect(result.tasksAssigned).toEqual({ total: 5, completed: 2, incomplete: 3 });
+    expect(result.members[0].activity.breakdown[0]).toEqual({
+      code: 'CALL', label: 'تماس تلفنی', count: 3, percentage: 100,
+    });
     expect(result.opportunities).toEqual({
       total: 2,
       active: 1,
@@ -99,6 +104,7 @@ describe('ReportsService user performance', () => {
       expect.objectContaining({
         where: expect.objectContaining({
           userId: { in: [selectedUserId] },
+          type: { not: 'STAGE_CHANGE' },
           occurredAt: {
             gte: new Date('2026-09-01T00:00:00.000Z'),
             lt: new Date('2026-10-01T00:00:00.000Z'),
