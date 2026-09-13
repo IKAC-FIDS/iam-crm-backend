@@ -453,7 +453,7 @@ export class ReportsService {
 
     const actorFilter = userIds.length ? { in: userIds } : { in: ['__none__'] };
     const dated = range ? { createdAt: range } : {};
-    const [activityTypes, activityCounts, companyAudits, opportunityAudits, createdTasks, assignedTasks] =
+    const [activityTypes, activityCounts, companyAudits, opportunityAudits, createdTasks, assignedTasks, meetings] =
       await Promise.all([
         this.prisma.lookupOption.findMany({
           where: { group: 'activity-types', isActive: true },
@@ -503,6 +503,15 @@ export class ReportsService {
             organizationId,
             assignedToId: actorFilter,
             ...(range ? { createdAt: range } : {}),
+          },
+          _count: { id: true },
+        }),
+        this.prisma.meeting.groupBy({
+          by: ['organizerId'],
+          where: {
+            organizationId,
+            organizerId: actorFilter,
+            ...(range ? { startAt: range } : {}),
           },
           _count: { id: true },
         }),
@@ -578,6 +587,9 @@ export class ReportsService {
         lostValue: financialVisible ? valueFor('lost') : null,
       };
     };
+    const meetingsFor = (userId: string) => meetings
+      .filter((item) => item.organizerId === userId)
+      .reduce((sum, item) => sum + item._count.id, 0);
     const members = users.map((member) => {
       const memberAssigned = assignedTasks.filter((item) => item.assignedToId === member.id);
       const assignedTotalForMember = memberAssigned.reduce((sum, item) => sum + item._count.id, 0);
@@ -599,6 +611,7 @@ export class ReportsService {
           .filter((item) => item.actorId === member.id)
           .map((item) => item.entityId)
           .filter(Boolean)).size,
+        meetings: meetingsFor(member.id),
         tasksCreated: createdTasks
           .filter((item) => item.createdById === member.id)
           .reduce((sum, item) => sum + item._count.id, 0),
@@ -618,6 +631,7 @@ export class ReportsService {
         dateBasis: {
           activities: 'occurredAt',
           companies: 'audit.createdAt',
+          meetings: 'startAt',
           tasks: 'createdAt',
           opportunities: 'audit.createdAt',
         },
@@ -632,6 +646,7 @@ export class ReportsService {
       companiesCreated: new Set(
         companyAudits.map((item) => item.entityId).filter(Boolean),
       ).size,
+      meetings: meetings.reduce((sum, item) => sum + item._count.id, 0),
       tasksCreated: createdTasks.reduce((sum, item) => sum + item._count.id, 0),
       tasksAssigned: {
         total: assignedTotal,
@@ -656,6 +671,7 @@ export class ReportsService {
         dateBasis: {
           activities: 'occurredAt',
           companies: 'audit.createdAt',
+          meetings: 'startAt',
           tasks: 'createdAt',
           opportunities: 'audit.createdAt',
         },
@@ -664,6 +680,7 @@ export class ReportsService {
       members: [],
       activity: { total: 0, breakdown: [], uncataloguedCount: 0 },
       companiesCreated: 0,
+      meetings: 0,
       tasksCreated: 0,
       tasksAssigned: { total: 0, completed: 0, incomplete: 0 },
       opportunities: {

@@ -55,6 +55,11 @@ function prismaMock() {
           { assignedToId: selectedUserId, status: 'TODO', _count: { id: 3 } },
         ]),
     },
+    meeting: {
+      groupBy: jest.fn().mockResolvedValue([
+        { organizerId: selectedUserId, _count: { id: 2 } },
+      ]),
+    },
     opportunity: {
       findMany: jest.fn().mockResolvedValue([
         { id: 'opportunity-1', estimatedValue: 100, stage: { isTerminal: false, terminalType: null } },
@@ -85,6 +90,8 @@ describe('ReportsService user performance', () => {
       uncataloguedCount: 0,
     });
     expect(result.companiesCreated).toBe(1);
+    expect(result.meetings).toBe(2);
+    expect(result.members[0].meetings).toBe(2);
     expect(result.tasksCreated).toBe(4);
     expect(result.tasksAssigned).toEqual({ total: 5, completed: 2, incomplete: 3 });
     expect(result.members[0].activity.breakdown[0]).toEqual({
@@ -112,6 +119,18 @@ describe('ReportsService user performance', () => {
         }),
       }),
     );
+    expect(prisma.meeting.groupBy).toHaveBeenCalledWith({
+      by: ['organizerId'],
+      where: {
+        organizationId,
+        organizerId: { in: [selectedUserId] },
+        startAt: {
+          gte: new Date('2026-09-01T00:00:00.000Z'),
+          lt: new Date('2026-10-01T00:00:00.000Z'),
+        },
+      },
+      _count: { id: true },
+    });
   });
 
   it('redacts opportunity values without financial permission', async () => {
