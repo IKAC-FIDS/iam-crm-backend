@@ -32,7 +32,8 @@ export class UpdateOpportunityDto {
   source?: string;
 
   @IsOptional()
-  @IsUUID()
+  @IsString()
+  @IsNotEmpty()
   sourceOptionId?: string;
 
   @IsOptional()

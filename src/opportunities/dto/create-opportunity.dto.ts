@@ -41,7 +41,8 @@ export class CreateOpportunityDto {
   source?: string;
 
   @IsOptional()
-  @IsUUID()
+  @IsString()
+  @IsNotEmpty()
   sourceOptionId?: string;
 
   @IsOptional()
