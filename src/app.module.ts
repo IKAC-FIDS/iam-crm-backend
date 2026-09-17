@@ -49,6 +49,7 @@ import { ArtifactsModule } from './artifacts/artifacts.module';
 import { EmailModule } from './email/email.module';
 import { NotificationCoreModule } from './notification-core/notification-core.module';
 import { ConversationsModule } from './conversations/conversations.module';
+import { AccountWorkspaceModule } from './account-workspace/account-workspace.module';
 
 @Module({
   imports: [
@@ -114,6 +115,7 @@ import { ConversationsModule } from './conversations/conversations.module';
     ArtifactsModule,
     EmailModule,
     ConversationsModule,
+    AccountWorkspaceModule,
   ],
   providers: [
     {
