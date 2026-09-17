@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ConversationEntityType } from '@prisma/client';
 import { ConversationAccessService } from '../src/conversations/conversation-access.service';
+import { NotificationRulesService } from '../src/notification-core/notification-rules.service';
 
 describe('Conversation architecture', () => {
   const companies = { assertCompanyReadable: jest.fn() };
@@ -35,5 +36,15 @@ describe('Conversation architecture', () => {
     expect(sql.match(/FORCE ROW LEVEL SECURITY/g)).toHaveLength(3);
     expect(sql).toContain("current_setting('app.current_organization_id', true)");
     expect(sql).not.toContain('SECURITY DEFINER');
+  });
+
+  it('exposes every conversation event to the notification rule editor', () => {
+    const rules = new NotificationRulesService({} as never, {} as never, {} as never);
+    expect(rules.catalog().events).toEqual(expect.arrayContaining([
+      'CONVERSATION.MESSAGE_CREATED',
+      'CONVERSATION.QUESTION_CREATED',
+      'CONVERSATION.REPLY_CREATED',
+      'CONVERSATION.RESOLVED',
+    ]));
   });
 });
