@@ -110,7 +110,20 @@ let NotificationTemplateEngineService = class NotificationTemplateEngineService 
         if (!user)
             throw new common_1.NotFoundException("Notification recipient not found");
         const payload = event.payload && typeof event.payload === "object" && !Array.isArray(event.payload) ? event.payload : {};
-        const base = { user, actor, organization: { id: organization.id, name: organization.name }, schedule: payload.schedule ?? null };
+        const base = {
+            user,
+            actor,
+            organization: { id: organization.id, name: organization.name },
+            schedule: payload.schedule ?? null,
+            conversation: event.eventName.startsWith("CONVERSATION.") ? {
+                threadId: payload.threadId,
+                messageId: payload.messageId,
+                entityType: payload.entityType,
+                entityId: payload.entityId,
+                entityLabel: payload.entityLabel,
+                messageType: payload.messageType,
+            } : null,
+        };
         if (event.aggregateType === "MEETING") {
             const meeting = await db.meeting.findFirst({
                 where: { id: event.aggregateId, organizationId: event.organizationId },
@@ -171,6 +184,8 @@ let NotificationTemplateEngineService = class NotificationTemplateEngineService 
             return { ...base, schedule, task: { id: "preview-task", title: "پیگیری پیشنهاد", description: "تماس با مشتری", dueAt: "۱۴۰۵/۰۶/۲۰، ۱۲:۰۰", dueDate: "۱۴۰۵/۰۶/۲۰، ۱۲:۰۰", priority: "MEDIUM", assignee: { fullName: "علی رضایی" }, opportunity: { title: "فرصت نمونه" }, company: { id: "preview-company", name: "شرکت نمونه" } } };
         if (eventName.startsWith("OPPORTUNITY."))
             return { ...base, opportunity: { id: "preview-opportunity", title: "فرصت نمونه", priority: "HIGH", probability: 80, stage: "WON", fromStage: "QUALIFIED", toStage: "WON" } };
+        if (eventName.startsWith("CONVERSATION."))
+            return { ...base, conversation: { threadId: "preview-thread", messageId: "preview-message", entityType: "TASK", entityId: "preview-task", entityLabel: "پیگیری پیشنهاد", messageType: "QUESTION" } };
         return base;
     }
     extract(...texts) {

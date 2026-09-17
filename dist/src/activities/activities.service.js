@@ -305,6 +305,13 @@ let ActivitiesService = class ActivitiesService {
         }
         return activity;
     }
+    async assertReadable(activityId, user) {
+        const activity = await this.findActivityForMutation(activityId, user);
+        if (!this.canViewOrganizationActivities(user) && activity.userId !== user.userId) {
+            throw new common_1.NotFoundException('Activity not found');
+        }
+        return activity;
+    }
     async findByCompany(companyId, pagination, user) {
         if (!companyId)
             throw new common_1.BadRequestException('شناسه شرکت الزامی است');

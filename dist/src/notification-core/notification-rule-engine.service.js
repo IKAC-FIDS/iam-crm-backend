@@ -59,7 +59,7 @@ let NotificationRuleEngineService = class NotificationRuleEngineService {
                 continue;
             matchedRules += 1;
             for (const recipientRule of rule.recipientRules) {
-                const recipientIds = await this.resolveRecipientIds(event, recipientRule, db);
+                const recipientIds = (await this.resolveRecipientIds(event, recipientRule, db)).filter(id => id !== event.actorId);
                 if (!recipientIds.length) {
                     unresolved += recipientRule.channels.length;
                     continue;
@@ -155,6 +155,9 @@ let NotificationRuleEngineService = class NotificationRuleEngineService {
         return this.unique(users.map((item) => item.id));
     }
     async aggregateAssignees(event, db) {
+        const payloadRecipients = await this.payloadIds(event, "assigneeUserIds", db);
+        if (payloadRecipients.length)
+            return payloadRecipients;
         if (event.aggregateType === "MEETING") {
             const rows = await db.meetingAssignee.findMany({
                 where: {

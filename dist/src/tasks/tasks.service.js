@@ -157,6 +157,9 @@ let TasksService = class TasksService {
         const task = await this.getTaskInScope(id, user);
         return task;
     }
+    async assertReadable(id, user) {
+        return this.getTaskInScope(id, user);
+    }
     async findTeamOptions(query, user) {
         const page = query.page ?? 1, limit = query.limit ?? 25, search = query.search?.trim();
         const where = {

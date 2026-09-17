@@ -18,6 +18,12 @@ exports.NOTIFICATION_EVENT_CATALOG = {
     OPPORTUNITY: {
         STAGE_CHANGED: "OPPORTUNITY.STAGE_CHANGED",
     },
+    CONVERSATION: {
+        MESSAGE_CREATED: "CONVERSATION.MESSAGE_CREATED",
+        QUESTION_CREATED: "CONVERSATION.QUESTION_CREATED",
+        REPLY_CREATED: "CONVERSATION.REPLY_CREATED",
+        RESOLVED: "CONVERSATION.RESOLVED",
+    },
 };
 exports.NOTIFICATION_CHANNELS = ["EMAIL", "SMS", "PUSH", "IN_APP"];
 const commonVariables = [
@@ -65,6 +71,14 @@ const opportunityVariables = [
     { key: "opportunity.fromStage", token: "{{opportunity.fromStage}}", label: "مرحله قبلی فرصت", type: "string" },
     { key: "opportunity.toStage", token: "{{opportunity.toStage}}", label: "مرحله جدید فرصت", type: "string" },
 ];
+const conversationVariables = [
+    { key: "conversation.threadId", token: "{{conversation.threadId}}", label: "شناسه گفتگو", type: "string" },
+    { key: "conversation.messageId", token: "{{conversation.messageId}}", label: "شناسه پیام", type: "string" },
+    { key: "conversation.entityType", token: "{{conversation.entityType}}", label: "نوع موجودیت", type: "string" },
+    { key: "conversation.entityId", token: "{{conversation.entityId}}", label: "شناسه موجودیت", type: "string" },
+    { key: "conversation.entityLabel", token: "{{conversation.entityLabel}}", label: "عنوان موجودیت", type: "string" },
+    { key: "conversation.messageType", token: "{{conversation.messageType}}", label: "نوع پیام", type: "string" },
+];
 exports.NOTIFICATION_TEMPLATE_VARIABLES = {
     "MEETING.CREATED": [...commonVariables, ...meetingVariables],
     "MEETING.UPDATED": [...commonVariables, ...meetingVariables],
@@ -76,5 +90,9 @@ exports.NOTIFICATION_TEMPLATE_VARIABLES = {
     "TASK.DUE_SOON": [...commonVariables, ...taskVariables, ...scheduleVariables],
     "TASK.OVERDUE": [...commonVariables, ...taskVariables, ...scheduleVariables],
     "OPPORTUNITY.STAGE_CHANGED": [...commonVariables, ...opportunityVariables],
+    "CONVERSATION.MESSAGE_CREATED": [...commonVariables, ...conversationVariables],
+    "CONVERSATION.QUESTION_CREATED": [...commonVariables, ...conversationVariables],
+    "CONVERSATION.REPLY_CREATED": [...commonVariables, ...conversationVariables],
+    "CONVERSATION.RESOLVED": [...commonVariables, ...conversationVariables],
 };
 //# sourceMappingURL=notification-core.catalog.js.map

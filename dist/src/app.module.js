@@ -57,6 +57,8 @@ const technical_center_module_1 = require("./technical-center/technical-center.m
 const artifacts_module_1 = require("./artifacts/artifacts.module");
 const email_module_1 = require("./email/email.module");
 const notification_core_module_1 = require("./notification-core/notification-core.module");
+const conversations_module_1 = require("./conversations/conversations.module");
+const account_workspace_module_1 = require("./account-workspace/account-workspace.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -124,6 +126,8 @@ exports.AppModule = AppModule = __decorate([
             technical_center_module_1.TechnicalCenterModule,
             artifacts_module_1.ArtifactsModule,
             email_module_1.EmailModule,
+            conversations_module_1.ConversationsModule,
+            account_workspace_module_1.AccountWorkspaceModule,
         ],
         providers: [
             {

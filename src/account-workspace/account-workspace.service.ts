@@ -208,7 +208,6 @@ export class AccountWorkspaceService {
         }),
         tx.lookupOption.findMany({
           where: {
-            organizationId: tenant.organizationId,
             group: "activity-types",
             isActive: true,
           },

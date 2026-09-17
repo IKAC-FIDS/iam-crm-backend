@@ -9,11 +9,20 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.InAppNotificationMetadataMapper = exports.NotificationActionUrlResolver = void 0;
 const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
-const routes = { TASK: 'tasks', MEETING: 'meetings', OPPORTUNITY: 'opportunities' };
+const routes = { TASK: 'tasks', MEETING: 'meetings', OPPORTUNITY: 'opportunities', COMPANY: 'companies' };
 let NotificationActionUrlResolver = class NotificationActionUrlResolver {
     resolve(event) {
+        if (event.eventName.startsWith('CONVERSATION.') && event.payload && typeof event.payload === 'object' && !Array.isArray(event.payload)) {
+            const actionUrl = event.payload.actionUrl;
+            if (typeof actionUrl === 'string' && /^\/[a-z0-9/_?=&%-]+(?:#conversation)?$/i.test(actionUrl))
+                return actionUrl;
+        }
         const route = routes[event.aggregateType];
-        if (!route || !event.eventName.startsWith(`${event.aggregateType}.`) || !/^[a-zA-Z0-9_-]+$/.test(event.aggregateId))
+        if (!route || !/^[a-zA-Z0-9_-]+$/.test(event.aggregateId))
+            return null;
+        if (event.eventName.startsWith('CONVERSATION.'))
+            return `/${route}/${event.aggregateId}#conversation`;
+        if (!event.eventName.startsWith(`${event.aggregateType}.`))
             return null;
         return `/${route}/${event.aggregateId}`;
     }
