@@ -296,6 +296,14 @@ export class ActivitiesService {
     return activity;
   }
 
+  async assertReadable(activityId: string, user: CurrentUserPayload) {
+    const activity = await this.findActivityForMutation(activityId, user);
+    if (!this.canViewOrganizationActivities(user) && activity.userId !== user.userId) {
+      throw new NotFoundException('Activity not found');
+    }
+    return activity;
+  }
+
   async findByCompany(companyId: string, pagination: PaginationDto, user: CurrentUserPayload): Promise<PaginatedResponse<any>> {
     if (!companyId) throw new BadRequestException('شناسه شرکت الزامی است');
     await this.assertCompanyReadable(companyId, user);

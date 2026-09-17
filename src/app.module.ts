@@ -48,6 +48,7 @@ import { TechnicalCenterModule } from './technical-center/technical-center.modul
 import { ArtifactsModule } from './artifacts/artifacts.module';
 import { EmailModule } from './email/email.module';
 import { NotificationCoreModule } from './notification-core/notification-core.module';
+import { ConversationsModule } from './conversations/conversations.module';
 
 @Module({
   imports: [
@@ -112,6 +113,7 @@ import { NotificationCoreModule } from './notification-core/notification-core.mo
     TechnicalCenterModule,
     ArtifactsModule,
     EmailModule,
+    ConversationsModule,
   ],
   providers: [
     {

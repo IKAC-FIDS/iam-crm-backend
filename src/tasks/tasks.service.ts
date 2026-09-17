@@ -247,6 +247,10 @@ export class TasksService {
     return task;
   }
 
+  async assertReadable(id: string, user: CurrentUserPayload) {
+    return this.getTaskInScope(id, user);
+  }
+
   async findTeamOptions(query: FindTaskOptionsDto, user: CurrentUserPayload) {
     const page = query.page ?? 1, limit = query.limit ?? 25, search = query.search?.trim();
     const where: Prisma.TeamWhereInput = {

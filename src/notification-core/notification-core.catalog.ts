@@ -15,12 +15,19 @@ export const NOTIFICATION_EVENT_CATALOG = {
   OPPORTUNITY: {
     STAGE_CHANGED: "OPPORTUNITY.STAGE_CHANGED",
   },
+  CONVERSATION: {
+    MESSAGE_CREATED: "CONVERSATION.MESSAGE_CREATED",
+    QUESTION_CREATED: "CONVERSATION.QUESTION_CREATED",
+    REPLY_CREATED: "CONVERSATION.REPLY_CREATED",
+    RESOLVED: "CONVERSATION.RESOLVED",
+  },
 } as const
 
 export type NotificationEventName =
   | (typeof NOTIFICATION_EVENT_CATALOG.MEETING)[keyof typeof NOTIFICATION_EVENT_CATALOG.MEETING]
   | (typeof NOTIFICATION_EVENT_CATALOG.TASK)[keyof typeof NOTIFICATION_EVENT_CATALOG.TASK]
   | (typeof NOTIFICATION_EVENT_CATALOG.OPPORTUNITY)[keyof typeof NOTIFICATION_EVENT_CATALOG.OPPORTUNITY]
+  | (typeof NOTIFICATION_EVENT_CATALOG.CONVERSATION)[keyof typeof NOTIFICATION_EVENT_CATALOG.CONVERSATION]
 
 export const NOTIFICATION_CHANNELS = ["EMAIL", "SMS", "PUSH", "IN_APP"] as const
 export type NotificationChannelCode = (typeof NOTIFICATION_CHANNELS)[number]
@@ -82,6 +89,15 @@ const opportunityVariables: NotificationTemplateVariable[] = [
   { key: "opportunity.toStage", token: "{{opportunity.toStage}}", label: "مرحله جدید فرصت", type: "string" },
 ]
 
+const conversationVariables: NotificationTemplateVariable[] = [
+  { key: "conversation.threadId", token: "{{conversation.threadId}}", label: "شناسه گفتگو", type: "string" },
+  { key: "conversation.messageId", token: "{{conversation.messageId}}", label: "شناسه پیام", type: "string" },
+  { key: "conversation.entityType", token: "{{conversation.entityType}}", label: "نوع موجودیت", type: "string" },
+  { key: "conversation.entityId", token: "{{conversation.entityId}}", label: "شناسه موجودیت", type: "string" },
+  { key: "conversation.entityLabel", token: "{{conversation.entityLabel}}", label: "عنوان موجودیت", type: "string" },
+  { key: "conversation.messageType", token: "{{conversation.messageType}}", label: "نوع پیام", type: "string" },
+]
+
 export const NOTIFICATION_TEMPLATE_VARIABLES: Record<NotificationEventName, NotificationTemplateVariable[]> = {
   "MEETING.CREATED": [...commonVariables, ...meetingVariables],
   "MEETING.UPDATED": [...commonVariables, ...meetingVariables],
@@ -93,4 +109,8 @@ export const NOTIFICATION_TEMPLATE_VARIABLES: Record<NotificationEventName, Noti
   "TASK.DUE_SOON": [...commonVariables, ...taskVariables, ...scheduleVariables],
   "TASK.OVERDUE": [...commonVariables, ...taskVariables, ...scheduleVariables],
   "OPPORTUNITY.STAGE_CHANGED": [...commonVariables, ...opportunityVariables],
+  "CONVERSATION.MESSAGE_CREATED": [...commonVariables, ...conversationVariables],
+  "CONVERSATION.QUESTION_CREATED": [...commonVariables, ...conversationVariables],
+  "CONVERSATION.REPLY_CREATED": [...commonVariables, ...conversationVariables],
+  "CONVERSATION.RESOLVED": [...commonVariables, ...conversationVariables],
 }

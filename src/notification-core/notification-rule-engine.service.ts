@@ -52,7 +52,7 @@ export class NotificationRuleEngineService {
       if (policyContext && !this.policyEvaluator.evaluate(rule.conditions, policyContext).matches) continue
       matchedRules += 1
       for (const recipientRule of rule.recipientRules) {
-        const recipientIds = await this.resolveRecipientIds(event, recipientRule, db)
+        const recipientIds = (await this.resolveRecipientIds(event, recipientRule, db)).filter(id => id !== event.actorId)
         if (!recipientIds.length) {
           unresolved += recipientRule.channels.length
           continue
@@ -160,6 +160,8 @@ export class NotificationRuleEngineService {
   }
 
   private async aggregateAssignees(event: NotificationEvent, db: TenantTransactionClient) {
+    const payloadRecipients = await this.payloadIds(event, "assigneeUserIds", db)
+    if (payloadRecipients.length) return payloadRecipients
     if (event.aggregateType === "MEETING") {
       const rows = await db.meetingAssignee.findMany({
         where: {

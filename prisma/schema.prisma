@@ -407,6 +407,23 @@ enum OrganizationDomainVerificationMethod {
   DNS_TXT
 }
 
+enum ConversationEntityType {
+  COMPANY
+  TASK
+  ACTIVITY
+}
+
+enum ConversationMessageType {
+  COMMENT
+  QUESTION
+  ANSWER
+}
+
+enum ConversationThreadStatus {
+  OPEN
+  RESOLVED
+}
+
 // ============================================================
 // Users & Auth
 // ============================================================
@@ -512,6 +529,10 @@ model User {
   notificationAttemptsTriggered NotificationDeliveryAttempt[] @relation("NotificationDeliveryAttemptTriggeredBy")
   notificationCorePreferences   NotificationPreference[]      @relation("NotificationCorePreferences")
   notificationPushEndpoints     NotificationPushEndpoint[]
+  conversationThreadsCreated    ConversationThread[]          @relation("ConversationThreadCreatedBy")
+  conversationMessagesAuthored  ConversationMessage[]         @relation("ConversationMessageAuthor")
+  conversationMessagesDeleted   ConversationMessage[]         @relation("ConversationMessageDeletedBy")
+  conversationParticipants      ConversationParticipant[]
 
   @@index([organizationId])
   @@index([teamId])
@@ -573,39 +594,41 @@ model Organization {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users               User[]
-  teams               Team[]
-  companies           Company[]
-  opportunities       Opportunity[]
-  tasks               Task[]
-  notifications       Notification[]
-  fileAttachments     FileAttachment[]
-  artifactLinks       ArtifactLink[]
-  taskReviewRounds    TaskReviewRound[]
-  auditLogs           AuditLog[]
-  meetings            Meeting[]
-  memberships         OrganizationMembership[]
-  ssoProviders        SsoProvider[]
-  ssoRoutes           SsoProviderRoute[]
-  ssoAuthTransactions SsoAuthTransaction[]
-  tenantSettings      OrganizationSettings?
-  branding            OrganizationBranding?
-  domains             OrganizationDomain[]
-  tenantRoles         Role[]                      @relation("TenantRoles")
-  subscriptions       Subscription[]
-  entitlements        OrganizationEntitlement[]
-  quotaOverrides      OrganizationQuotaOverride[]
-  usageCounters       UsageCounter[]
-  usageSnapshots      UsageSnapshot[]
-  quotaThresholds     QuotaThresholdEvent[]
-  usageReservations   UsageReservation[]
-  usageEvents         UsageEvent[]
-  technicalReleases   TechnicalRelease[]
-  knowledgeArticles   KnowledgeBaseArticle[]
-  technicalDocuments  TechnicalDocument[]
-  technicalResources  TechnicalResource[]
-  tenders             Tender[]
-  tenderReviews       TenderReview[]
+  users                User[]
+  teams                Team[]
+  companies            Company[]
+  opportunities        Opportunity[]
+  tasks                Task[]
+  notifications        Notification[]
+  fileAttachments      FileAttachment[]
+  artifactLinks        ArtifactLink[]
+  taskReviewRounds     TaskReviewRound[]
+  auditLogs            AuditLog[]
+  meetings             Meeting[]
+  conversationThreads  ConversationThread[]
+  conversationMessages ConversationMessage[]
+  memberships          OrganizationMembership[]
+  ssoProviders         SsoProvider[]
+  ssoRoutes            SsoProviderRoute[]
+  ssoAuthTransactions  SsoAuthTransaction[]
+  tenantSettings       OrganizationSettings?
+  branding             OrganizationBranding?
+  domains              OrganizationDomain[]
+  tenantRoles          Role[]                      @relation("TenantRoles")
+  subscriptions        Subscription[]
+  entitlements         OrganizationEntitlement[]
+  quotaOverrides       OrganizationQuotaOverride[]
+  usageCounters        UsageCounter[]
+  usageSnapshots       UsageSnapshot[]
+  quotaThresholds      QuotaThresholdEvent[]
+  usageReservations    UsageReservation[]
+  usageEvents          UsageEvent[]
+  technicalReleases    TechnicalRelease[]
+  knowledgeArticles    KnowledgeBaseArticle[]
+  technicalDocuments   TechnicalDocument[]
+  technicalResources   TechnicalResource[]
+  tenders              Tender[]
+  tenderReviews        TenderReview[]
 
   notificationCoreEvents       NotificationEvent[]            @relation("NotificationCoreEvents")
   notificationCoreRules        NotificationRule[]             @relation("NotificationCoreRules")
@@ -1695,6 +1718,65 @@ model Task {
   @@index([organizationId])
   @@index([organizationId, assignedToId, status, dueAt])
   @@map("tasks")
+}
+
+model ConversationThread {
+  id             String                    @id @default(uuid())
+  organizationId String
+  organization   Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  entityType     ConversationEntityType
+  entityId       String
+  status         ConversationThreadStatus  @default(OPEN)
+  createdById    String
+  createdBy      User                      @relation("ConversationThreadCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
+  messages       ConversationMessage[]
+  participants   ConversationParticipant[]
+
+  @@unique([organizationId, entityType, entityId])
+  @@index([organizationId, status, updatedAt])
+  @@index([createdById])
+  @@map("conversation_threads")
+}
+
+model ConversationMessage {
+  id              String                  @id @default(uuid())
+  organizationId  String
+  organization    Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  threadId        String
+  thread          ConversationThread      @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  authorId        String
+  author          User                    @relation("ConversationMessageAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+  parentMessageId String?
+  parentMessage   ConversationMessage?    @relation("ConversationMessageReplies", fields: [parentMessageId], references: [id], onDelete: Restrict)
+  replies         ConversationMessage[]   @relation("ConversationMessageReplies")
+  type            ConversationMessageType @default(COMMENT)
+  body            String
+  editedAt        DateTime?
+  deletedAt       DateTime?
+  deletedById     String?
+  deletedBy       User?                   @relation("ConversationMessageDeletedBy", fields: [deletedById], references: [id], onDelete: SetNull)
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+
+  @@index([organizationId, threadId, createdAt])
+  @@index([parentMessageId])
+  @@index([authorId])
+  @@map("conversation_messages")
+}
+
+model ConversationParticipant {
+  threadId   String
+  thread     ConversationThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastReadAt DateTime?
+  createdAt  DateTime           @default(now())
+
+  @@id([threadId, userId])
+  @@index([userId, lastReadAt])
+  @@map("conversation_participants")
 }
 
 model TaskReviewRound {
