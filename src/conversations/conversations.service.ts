@@ -69,11 +69,11 @@ export class ConversationsService {
       });
       const participantIds = [...new Set([user.userId, ...entity.responsibleUserIds, parent?.authorId].filter((id): id is string => Boolean(id)))];
       await Promise.all(participantIds.map((userId) => tx.conversationParticipant.upsert({ where: { threadId_userId: { threadId: thread.id, userId } }, create: { threadId: thread.id, userId, ...(userId === user.userId ? { lastReadAt: new Date() } : {}) }, update: userId === user.userId ? { lastReadAt: new Date() } : {} })));
-      return { thread, message, parentAuthorId: parent?.authorId ?? null };
+      return { thread, message, participantIds };
     });
     await this.audit.record({ actorId: user.userId, organizationId, entityType: 'conversation-message', entityId: created.message.id, action: 'conversation.message_created', metadata: { threadId: created.thread.id, entityType, entityId, messageType: created.message.type } });
-    const recipientIds = (created.parentAuthorId ? [created.parentAuthorId] : entity.responsibleUserIds).filter((id) => id !== user.userId);
-    const eventName = created.parentAuthorId ? 'CONVERSATION.REPLY_CREATED' : dto.type === ConversationMessageType.QUESTION ? 'CONVERSATION.QUESTION_CREATED' : 'CONVERSATION.MESSAGE_CREATED';
+    const recipientIds = created.participantIds.filter((id) => id !== user.userId);
+    const eventName = created.message.parentMessageId ? 'CONVERSATION.REPLY_CREATED' : dto.type === ConversationMessageType.QUESTION ? 'CONVERSATION.QUESTION_CREATED' : 'CONVERSATION.MESSAGE_CREATED';
     await this.notifications.publishDomainEvent({
       organizationId, eventName, aggregateType: entityType, aggregateId: entityId, actorId: user.userId,
       idempotencyKey: `conversation:${created.message.id}:created`,
@@ -120,7 +120,11 @@ export class ConversationsService {
     if (thread.createdById !== user.userId && !this.canModerate(user)) throw new ForbiddenException('اجازه تغییر وضعیت گفتگو را ندارید.');
     const updated = await this.prisma.withTenantTransaction(tenantScope.require(user), (tx) => tx.conversationThread.update({ where: { id: threadId }, data: { status: dto.status } }));
     await this.audit.record({ actorId: user.userId, organizationId: thread.organizationId, entityType: 'conversation-thread', entityId: threadId, action: `conversation.${dto.status.toLowerCase()}` });
-    if (dto.status === 'RESOLVED') await this.notifications.publishDomainEvent({ organizationId: thread.organizationId, eventName: 'CONVERSATION.RESOLVED', aggregateType: thread.entityType, aggregateId: thread.entityId, actorId: user.userId, idempotencyKey: `conversation:${threadId}:resolved:${updated.updatedAt.toISOString()}`, payload: { threadId, entityType: thread.entityType, entityId: thread.entityId, entityLabel: entity.label, assigneeUserIds: entity.responsibleUserIds.filter((id) => id !== user.userId), actionUrl: entity.actionUrl } });
+    if (dto.status === 'RESOLVED') {
+      const participantIds = await this.prisma.withTenantTransaction(tenantScope.require(user), (tx) => tx.conversationParticipant.findMany({ where: { threadId }, select: { userId: true } }));
+      const recipientIds = [...new Set([...participantIds.map((item) => item.userId), ...entity.responsibleUserIds])].filter((id) => id !== user.userId);
+      await this.notifications.publishDomainEvent({ organizationId: thread.organizationId, eventName: 'CONVERSATION.RESOLVED', aggregateType: thread.entityType, aggregateId: thread.entityId, actorId: user.userId, idempotencyKey: `conversation:${threadId}:resolved:${updated.updatedAt.toISOString()}`, payload: { threadId, entityType: thread.entityType, entityId: thread.entityId, entityLabel: entity.label, assigneeUserIds: recipientIds, actionUrl: entity.actionUrl } });
+    }
     return { id: updated.id, status: updated.status, updatedAt: updated.updatedAt };
   }
 
