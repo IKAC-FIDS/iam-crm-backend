@@ -6,3 +6,11 @@
 /node_modules/
 /backups/
 *.dump
+
+.env
+.env.*
+!.env.example
+
+.env.docker
+.env.docker.*
+!.env.docker.example
