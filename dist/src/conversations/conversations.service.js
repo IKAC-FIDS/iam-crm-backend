@@ -28,6 +28,29 @@ let ConversationsService = class ConversationsService {
         this.notifications = notifications;
         this.audit = audit;
     }
+    async findMentionOptions(query, user) {
+        const organizationId = (0, tenant_scope_util_1.getCurrentOrganizationId)(user);
+        const search = query.search?.trim();
+        const data = await this.prisma.withTenantTransaction(tenant_scope_util_1.tenantScope.require(user), (tx) => tx.user.findMany({
+            where: {
+                organizationId,
+                isActive: true,
+                id: { not: user.userId },
+                ...(search
+                    ? {
+                        OR: [
+                            { fullName: { contains: search, mode: 'insensitive' } },
+                            { email: { contains: search, mode: 'insensitive' } },
+                        ],
+                    }
+                    : {}),
+            },
+            select: { id: true, fullName: true, email: true },
+            orderBy: [{ fullName: 'asc' }, { email: 'asc' }],
+            take: 25,
+        }));
+        return { data };
+    }
     async find(entityType, entityId, query, user) {
         this.assertEntityType(entityType);
         await this.access.assertReadable(entityType, entityId, user);
@@ -72,21 +95,32 @@ let ConversationsService = class ConversationsService {
                 if (!parent || parent.parentMessageId)
                     throw new common_1.BadRequestException('پیام مرجع نامعتبر است.');
             }
+            const requestedMentionIds = [...new Set(dto.mentionedUserIds ?? [])].filter((id) => id !== user.userId);
+            const mentionableUsers = requestedMentionIds.length
+                ? await tx.user.findMany({
+                    where: { id: { in: requestedMentionIds }, organizationId, isActive: true },
+                    select: { id: true },
+                })
+                : [];
+            if (mentionableUsers.length !== requestedMentionIds.length) {
+                throw new common_1.BadRequestException('یک یا چند کاربر منشن‌شده معتبر یا فعال نیستند.');
+            }
+            const mentionedUserIds = mentionableUsers.map((item) => item.id);
             const message = await tx.conversationMessage.create({
                 data: { organizationId, threadId: thread.id, authorId: user.userId, body, type: dto.parentMessageId ? client_1.ConversationMessageType.ANSWER : dto.type, parentMessageId: parent?.id },
                 include: messageInclude,
             });
-            const participantIds = [...new Set([user.userId, ...entity.responsibleUserIds, parent?.authorId].filter((id) => Boolean(id)))];
+            const participantIds = [...new Set([user.userId, ...entity.responsibleUserIds, parent?.authorId, ...mentionedUserIds].filter((id) => Boolean(id)))];
             await Promise.all(participantIds.map((userId) => tx.conversationParticipant.upsert({ where: { threadId_userId: { threadId: thread.id, userId } }, create: { threadId: thread.id, userId, ...(userId === user.userId ? { lastReadAt: new Date() } : {}) }, update: userId === user.userId ? { lastReadAt: new Date() } : {} })));
-            return { thread, message, participantIds };
+            return { thread, message, participantIds, mentionedUserIds };
         });
-        await this.audit.record({ actorId: user.userId, organizationId, entityType: 'conversation-message', entityId: created.message.id, action: 'conversation.message_created', metadata: { threadId: created.thread.id, entityType, entityId, messageType: created.message.type } });
+        await this.audit.record({ actorId: user.userId, organizationId, entityType: 'conversation-message', entityId: created.message.id, action: 'conversation.message_created', metadata: { threadId: created.thread.id, entityType, entityId, messageType: created.message.type, mentionedUserIds: created.mentionedUserIds } });
         const recipientIds = created.participantIds.filter((id) => id !== user.userId);
         const eventName = created.message.parentMessageId ? 'CONVERSATION.REPLY_CREATED' : dto.type === client_1.ConversationMessageType.QUESTION ? 'CONVERSATION.QUESTION_CREATED' : 'CONVERSATION.MESSAGE_CREATED';
         await this.notifications.publishDomainEvent({
             organizationId, eventName, aggregateType: entityType, aggregateId: entityId, actorId: user.userId,
             idempotencyKey: `conversation:${created.message.id}:created`,
-            payload: { threadId: created.thread.id, messageId: created.message.id, entityType, entityId, messageType: created.message.type, parentMessageId: created.message.parentMessageId, assigneeUserIds: recipientIds, ownerUserId: recipientIds[0], creatorUserId: recipientIds[0], actionUrl: entity.actionUrl, entityLabel: entity.label },
+            payload: { threadId: created.thread.id, messageId: created.message.id, entityType, entityId, messageType: created.message.type, parentMessageId: created.message.parentMessageId, mentionedUserIds: created.mentionedUserIds, assigneeUserIds: recipientIds, ownerUserId: recipientIds[0], creatorUserId: recipientIds[0], actionUrl: entity.actionUrl, entityLabel: entity.label },
         });
         return this.presentMessage(created.message);
     }

@@ -9,7 +9,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.UpdateConversationStatusDto = exports.UpdateConversationMessageDto = exports.CreateConversationMessageDto = exports.FindConversationDto = void 0;
+exports.UpdateConversationStatusDto = exports.UpdateConversationMessageDto = exports.CreateConversationMessageDto = exports.FindConversationMentionOptionsDto = exports.FindConversationDto = void 0;
 const openapi = require("@nestjs/swagger");
 const client_1 = require("@prisma/client");
 const class_validator_1 = require("class-validator");
@@ -20,12 +20,24 @@ class FindConversationDto extends pagination_dto_1.PaginationDto {
     }
 }
 exports.FindConversationDto = FindConversationDto;
+class FindConversationMentionOptionsDto {
+    static _OPENAPI_METADATA_FACTORY() {
+        return { search: { required: false, type: () => String, maxLength: 100 } };
+    }
+}
+exports.FindConversationMentionOptionsDto = FindConversationMentionOptionsDto;
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.MaxLength)(100),
+    __metadata("design:type", String)
+], FindConversationMentionOptionsDto.prototype, "search", void 0);
 class CreateConversationMessageDto {
     constructor() {
         this.type = client_1.ConversationMessageType.COMMENT;
     }
     static _OPENAPI_METADATA_FACTORY() {
-        return { body: { required: true, type: () => String, minLength: 1, maxLength: 4000 }, type: { required: true, type: () => Object, default: client_1.ConversationMessageType.COMMENT }, parentMessageId: { required: false, type: () => String } };
+        return { body: { required: true, type: () => String, minLength: 1, maxLength: 4000 }, type: { required: true, type: () => Object, default: client_1.ConversationMessageType.COMMENT }, parentMessageId: { required: false, type: () => String }, mentionedUserIds: { required: false, type: () => [String] } };
     }
 }
 exports.CreateConversationMessageDto = CreateConversationMessageDto;
@@ -44,6 +56,14 @@ __decorate([
     (0, class_validator_1.IsUUID)(),
     __metadata("design:type", String)
 ], CreateConversationMessageDto.prototype, "parentMessageId", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.ArrayUnique)(),
+    (0, class_validator_1.ArrayMaxSize)(20),
+    (0, class_validator_1.IsUUID)('4', { each: true }),
+    __metadata("design:type", Array)
+], CreateConversationMessageDto.prototype, "mentionedUserIds", void 0);
 class UpdateConversationMessageDto {
     static _OPENAPI_METADATA_FACTORY() {
         return { body: { required: true, type: () => String, minLength: 1, maxLength: 4000 } };

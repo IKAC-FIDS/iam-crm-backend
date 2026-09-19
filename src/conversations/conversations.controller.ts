@@ -3,13 +3,18 @@ import { ConversationEntityType } from '@prisma/client';
 import { CurrentUser, CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
-import { CreateConversationMessageDto, FindConversationDto, UpdateConversationMessageDto, UpdateConversationStatusDto } from './dto/conversation.dto';
+import { CreateConversationMessageDto, FindConversationDto, FindConversationMentionOptionsDto, UpdateConversationMessageDto, UpdateConversationStatusDto } from './dto/conversation.dto';
 import { ConversationsService } from './conversations.service';
 
 @Controller('conversations')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class ConversationsController {
   constructor(private readonly conversations: ConversationsService) {}
+
+  @Get('mention-options')
+  mentionOptions(@Query() query: FindConversationMentionOptionsDto, @CurrentUser() user: CurrentUserPayload) {
+    return this.conversations.findMentionOptions(query, user);
+  }
 
   @Get(':entityType/:entityId')
   find(@Param('entityType') entityType: ConversationEntityType, @Param('entityId') entityId: string, @Query() query: FindConversationDto, @CurrentUser() user: CurrentUserPayload) {

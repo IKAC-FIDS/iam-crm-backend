@@ -1,7 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ConversationEntityType } from '@prisma/client';
+import { validate } from 'class-validator';
 import { ConversationAccessService } from '../src/conversations/conversation-access.service';
+import { CreateConversationMessageDto } from '../src/conversations/dto/conversation.dto';
 import { NotificationRulesService } from '../src/notification-core/notification-rules.service';
 
 describe('Conversation architecture', () => {
@@ -46,5 +48,27 @@ describe('Conversation architecture', () => {
       'CONVERSATION.REPLY_CREATED',
       'CONVERSATION.RESOLVED',
     ]));
+  });
+
+  it('accepts unique UUID mentions and rejects duplicate recipients', async () => {
+    const valid = Object.assign(new CreateConversationMessageDto(), {
+      body: 'لطفاً بررسی کنید',
+      type: 'COMMENT',
+      mentionedUserIds: [
+        '05eb8df2-d20b-4d86-8dbf-9747af0eaa7f',
+        'ef9f3a15-8fcb-45a4-b2fd-76e6c1ca7359',
+      ],
+    });
+    expect(await validate(valid)).toHaveLength(0);
+
+    valid.mentionedUserIds = [
+      '05eb8df2-d20b-4d86-8dbf-9747af0eaa7f',
+      '05eb8df2-d20b-4d86-8dbf-9747af0eaa7f',
+    ];
+    expect(await validate(valid)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ property: 'mentionedUserIds' }),
+      ]),
+    );
   });
 });

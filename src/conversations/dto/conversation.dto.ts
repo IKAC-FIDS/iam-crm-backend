@@ -1,8 +1,15 @@
 import { ConversationMessageType, ConversationThreadStatus } from '@prisma/client';
-import { IsEnum, IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
+import { ArrayMaxSize, ArrayUnique, IsArray, IsEnum, IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 
 export class FindConversationDto extends PaginationDto {}
+
+export class FindConversationMentionOptionsDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  search?: string;
+}
 
 export class CreateConversationMessageDto {
   @IsString()
@@ -16,6 +23,13 @@ export class CreateConversationMessageDto {
   @IsOptional()
   @IsUUID()
   parentMessageId?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @ArrayMaxSize(20)
+  @IsUUID('4', { each: true })
+  mentionedUserIds?: string[];
 }
 
 export class UpdateConversationMessageDto {

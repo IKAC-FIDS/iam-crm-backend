@@ -6,7 +6,7 @@ import { getCurrentOrganizationId, tenantScope } from '../common/tenant/tenant-s
 import { NotificationCoreService } from '../notification-core/notification-core.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConversationAccessService } from './conversation-access.service';
-import { CreateConversationMessageDto, FindConversationDto, UpdateConversationMessageDto, UpdateConversationStatusDto } from './dto/conversation.dto';
+import { CreateConversationMessageDto, FindConversationDto, FindConversationMentionOptionsDto, UpdateConversationMessageDto, UpdateConversationStatusDto } from './dto/conversation.dto';
 
 const messageInclude = {
   author: { select: { id: true, fullName: true, avatarObjectKey: true } },
@@ -21,6 +21,32 @@ export class ConversationsService {
     private readonly notifications: NotificationCoreService,
     private readonly audit: AuditLogService,
   ) {}
+
+  async findMentionOptions(query: FindConversationMentionOptionsDto, user: CurrentUserPayload) {
+    const organizationId = getCurrentOrganizationId(user);
+    const search = query.search?.trim();
+    const data = await this.prisma.withTenantTransaction(tenantScope.require(user), (tx) =>
+      tx.user.findMany({
+        where: {
+          organizationId,
+          isActive: true,
+          id: { not: user.userId },
+          ...(search
+            ? {
+                OR: [
+                  { fullName: { contains: search, mode: 'insensitive' as const } },
+                  { email: { contains: search, mode: 'insensitive' as const } },
+                ],
+              }
+            : {}),
+        },
+        select: { id: true, fullName: true, email: true },
+        orderBy: [{ fullName: 'asc' }, { email: 'asc' }],
+        take: 25,
+      }),
+    );
+    return { data };
+  }
 
   async find(entityType: ConversationEntityType, entityId: string, query: FindConversationDto, user: CurrentUserPayload) {
     this.assertEntityType(entityType);
@@ -63,21 +89,32 @@ export class ConversationsService {
         parent = await tx.conversationMessage.findFirst({ where: { id: dto.parentMessageId, threadId: thread.id, organizationId, deletedAt: null }, select: { id: true, authorId: true, parentMessageId: true } });
         if (!parent || parent.parentMessageId) throw new BadRequestException('پیام مرجع نامعتبر است.');
       }
+      const requestedMentionIds = [...new Set(dto.mentionedUserIds ?? [])].filter((id) => id !== user.userId);
+      const mentionableUsers = requestedMentionIds.length
+        ? await tx.user.findMany({
+            where: { id: { in: requestedMentionIds }, organizationId, isActive: true },
+            select: { id: true },
+          })
+        : [];
+      if (mentionableUsers.length !== requestedMentionIds.length) {
+        throw new BadRequestException('یک یا چند کاربر منشن‌شده معتبر یا فعال نیستند.');
+      }
+      const mentionedUserIds = mentionableUsers.map((item) => item.id);
       const message = await tx.conversationMessage.create({
         data: { organizationId, threadId: thread.id, authorId: user.userId, body, type: dto.parentMessageId ? ConversationMessageType.ANSWER : dto.type, parentMessageId: parent?.id },
         include: messageInclude,
       });
-      const participantIds = [...new Set([user.userId, ...entity.responsibleUserIds, parent?.authorId].filter((id): id is string => Boolean(id)))];
+      const participantIds = [...new Set([user.userId, ...entity.responsibleUserIds, parent?.authorId, ...mentionedUserIds].filter((id): id is string => Boolean(id)))];
       await Promise.all(participantIds.map((userId) => tx.conversationParticipant.upsert({ where: { threadId_userId: { threadId: thread.id, userId } }, create: { threadId: thread.id, userId, ...(userId === user.userId ? { lastReadAt: new Date() } : {}) }, update: userId === user.userId ? { lastReadAt: new Date() } : {} })));
-      return { thread, message, participantIds };
+      return { thread, message, participantIds, mentionedUserIds };
     });
-    await this.audit.record({ actorId: user.userId, organizationId, entityType: 'conversation-message', entityId: created.message.id, action: 'conversation.message_created', metadata: { threadId: created.thread.id, entityType, entityId, messageType: created.message.type } });
+    await this.audit.record({ actorId: user.userId, organizationId, entityType: 'conversation-message', entityId: created.message.id, action: 'conversation.message_created', metadata: { threadId: created.thread.id, entityType, entityId, messageType: created.message.type, mentionedUserIds: created.mentionedUserIds } });
     const recipientIds = created.participantIds.filter((id) => id !== user.userId);
     const eventName = created.message.parentMessageId ? 'CONVERSATION.REPLY_CREATED' : dto.type === ConversationMessageType.QUESTION ? 'CONVERSATION.QUESTION_CREATED' : 'CONVERSATION.MESSAGE_CREATED';
     await this.notifications.publishDomainEvent({
       organizationId, eventName, aggregateType: entityType, aggregateId: entityId, actorId: user.userId,
       idempotencyKey: `conversation:${created.message.id}:created`,
-      payload: { threadId: created.thread.id, messageId: created.message.id, entityType, entityId, messageType: created.message.type, parentMessageId: created.message.parentMessageId, assigneeUserIds: recipientIds, ownerUserId: recipientIds[0], creatorUserId: recipientIds[0], actionUrl: entity.actionUrl, entityLabel: entity.label },
+      payload: { threadId: created.thread.id, messageId: created.message.id, entityType, entityId, messageType: created.message.type, parentMessageId: created.message.parentMessageId, mentionedUserIds: created.mentionedUserIds, assigneeUserIds: recipientIds, ownerUserId: recipientIds[0], creatorUserId: recipientIds[0], actionUrl: entity.actionUrl, entityLabel: entity.label },
     });
     return this.presentMessage(created.message);
   }

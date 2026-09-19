@@ -25,6 +25,9 @@ let ConversationsController = class ConversationsController {
     constructor(conversations) {
         this.conversations = conversations;
     }
+    mentionOptions(query, user) {
+        return this.conversations.findMentionOptions(query, user);
+    }
     find(entityType, entityId, query, user) {
         return this.conversations.find(entityType, entityId, query, user);
     }
@@ -45,6 +48,15 @@ let ConversationsController = class ConversationsController {
     }
 };
 exports.ConversationsController = ConversationsController;
+__decorate([
+    (0, common_1.Get)('mention-options'),
+    openapi.ApiResponse({ status: 200 }),
+    __param(0, (0, common_1.Query)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [conversation_dto_1.FindConversationMentionOptionsDto, Object]),
+    __metadata("design:returntype", void 0)
+], ConversationsController.prototype, "mentionOptions", null);
 __decorate([
     (0, common_1.Get)(':entityType/:entityId'),
     openapi.ApiResponse({ status: 200, type: Object }),
