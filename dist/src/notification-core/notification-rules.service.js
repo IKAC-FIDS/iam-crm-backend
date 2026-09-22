@@ -30,6 +30,9 @@ const ALLOWED_EVENTS = new Set([
     ...Object.values(notification_core_catalog_1.NOTIFICATION_EVENT_CATALOG.TASK),
     ...Object.values(notification_core_catalog_1.NOTIFICATION_EVENT_CATALOG.OPPORTUNITY),
     ...Object.values(notification_core_catalog_1.NOTIFICATION_EVENT_CATALOG.CONVERSATION),
+    ...Object.values(notification_core_catalog_1.NOTIFICATION_EVENT_CATALOG.TIMESHEET),
+    ...Object.values(notification_core_catalog_1.NOTIFICATION_EVENT_CATALOG.OVERTIME),
+    ...Object.values(notification_core_catalog_1.NOTIFICATION_EVENT_CATALOG.LEAVE),
 ]);
 const ALLOWED_CHANNELS = new Set(notification_core_catalog_1.NOTIFICATION_CHANNELS);
 let NotificationRulesService = class NotificationRulesService {

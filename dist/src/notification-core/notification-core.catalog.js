@@ -24,6 +24,21 @@ exports.NOTIFICATION_EVENT_CATALOG = {
         REPLY_CREATED: "CONVERSATION.REPLY_CREATED",
         RESOLVED: "CONVERSATION.RESOLVED",
     },
+    TIMESHEET: {
+        SUBMITTED: "TIMESHEET.SUBMITTED",
+        APPROVED: "TIMESHEET.APPROVED",
+        REJECTED: "TIMESHEET.REJECTED",
+    },
+    OVERTIME: {
+        SUBMITTED: "OVERTIME.SUBMITTED",
+        APPROVED: "OVERTIME.APPROVED",
+        REJECTED: "OVERTIME.REJECTED",
+    },
+    LEAVE: {
+        REQUESTED: "LEAVE.REQUESTED",
+        APPROVED: "LEAVE.APPROVED",
+        REJECTED: "LEAVE.REJECTED",
+    },
 };
 exports.NOTIFICATION_CHANNELS = ["EMAIL", "SMS", "PUSH", "IN_APP"];
 const commonVariables = [
@@ -94,5 +109,14 @@ exports.NOTIFICATION_TEMPLATE_VARIABLES = {
     "CONVERSATION.QUESTION_CREATED": [...commonVariables, ...conversationVariables],
     "CONVERSATION.REPLY_CREATED": [...commonVariables, ...conversationVariables],
     "CONVERSATION.RESOLVED": [...commonVariables, ...conversationVariables],
+    "TIMESHEET.SUBMITTED": [...commonVariables],
+    "TIMESHEET.APPROVED": [...commonVariables],
+    "TIMESHEET.REJECTED": [...commonVariables],
+    "OVERTIME.SUBMITTED": [...commonVariables],
+    "OVERTIME.APPROVED": [...commonVariables],
+    "OVERTIME.REJECTED": [...commonVariables],
+    "LEAVE.REQUESTED": [...commonVariables],
+    "LEAVE.APPROVED": [...commonVariables],
+    "LEAVE.REJECTED": [...commonVariables],
 };
 //# sourceMappingURL=notification-core.catalog.js.map

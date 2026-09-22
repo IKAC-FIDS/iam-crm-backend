@@ -33,6 +33,7 @@ import { HealthModule } from './health/health.module';
 import { ProductCatalogModule } from './product-catalog/product-catalog.module';
 import { AttachmentsModule } from './attachments/attachments.module';
 import { TasksModule } from './tasks/tasks.module';
+import { TimesheetsModule } from './timesheets/timesheets.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { OrganizationsModule } from './organizations/organizations.module';
 import { TeamsModule } from './teams/teams.module';
@@ -102,6 +103,7 @@ import { AccountWorkspaceModule } from './account-workspace/account-workspace.mo
     ProductCatalogModule,
     AttachmentsModule,
     TasksModule,
+    TimesheetsModule,
     NotificationsModule,
     OrganizationsModule,
     TeamsModule,

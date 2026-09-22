@@ -27,6 +27,9 @@ const scheduleFields: NotificationConditionFieldDefinition[] = [
   { field: "schedule.offsetMinutes", label: "فاصله اعلان تا موعد (دقیقه)", type: "number", operators: numeric, control: "number" },
   { field: "schedule.scheduledAt", label: "زمان برنامه‌ریزی اعلان", type: "string", operators: equality, control: "text" },
 ]
+const approvalFields: NotificationConditionFieldDefinition[] = [
+  { field: "actor.id", label: "انجام‌دهنده رویداد", type: "userId", operators: equality, control: "text" },
+]
 
 export const NOTIFICATION_CONDITION_CATALOG: Record<string, NotificationConditionEventDefinition> = {
   "TASK.ASSIGNED": { eventName: "TASK.ASSIGNED", label: "ارجاع کار", conditionFields: taskFields },
@@ -39,6 +42,15 @@ export const NOTIFICATION_CONDITION_CATALOG: Record<string, NotificationConditio
   "MEETING.CANCELLED": { eventName: "MEETING.CANCELLED", label: "لغو جلسه", conditionFields: meetingFields },
   "MEETING.REMINDER": { eventName: "MEETING.REMINDER", label: "یادآوری جلسه", conditionFields: [...meetingFields, ...scheduleFields] },
   "OPPORTUNITY.STAGE_CHANGED": { eventName: "OPPORTUNITY.STAGE_CHANGED", label: "تغییر مرحله فرصت", conditionFields: opportunityFields },
+  "TIMESHEET.SUBMITTED": { eventName: "TIMESHEET.SUBMITTED", label: "ارسال کارکرد", conditionFields: approvalFields },
+  "TIMESHEET.APPROVED": { eventName: "TIMESHEET.APPROVED", label: "تأیید کارکرد", conditionFields: approvalFields },
+  "TIMESHEET.REJECTED": { eventName: "TIMESHEET.REJECTED", label: "رد کارکرد", conditionFields: approvalFields },
+  "OVERTIME.SUBMITTED": { eventName: "OVERTIME.SUBMITTED", label: "ارسال اضافه‌کاری", conditionFields: approvalFields },
+  "OVERTIME.APPROVED": { eventName: "OVERTIME.APPROVED", label: "تأیید اضافه‌کاری", conditionFields: approvalFields },
+  "OVERTIME.REJECTED": { eventName: "OVERTIME.REJECTED", label: "رد اضافه‌کاری", conditionFields: approvalFields },
+  "LEAVE.REQUESTED": { eventName: "LEAVE.REQUESTED", label: "درخواست مرخصی", conditionFields: approvalFields },
+  "LEAVE.APPROVED": { eventName: "LEAVE.APPROVED", label: "تأیید مرخصی", conditionFields: approvalFields },
+  "LEAVE.REJECTED": { eventName: "LEAVE.REJECTED", label: "رد مرخصی", conditionFields: approvalFields },
 }
 
 export function conditionDefinition(eventName: string) { return NOTIFICATION_CONDITION_CATALOG[eventName] }

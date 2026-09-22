@@ -21,6 +21,21 @@ export const NOTIFICATION_EVENT_CATALOG = {
     REPLY_CREATED: "CONVERSATION.REPLY_CREATED",
     RESOLVED: "CONVERSATION.RESOLVED",
   },
+  TIMESHEET: {
+    SUBMITTED: "TIMESHEET.SUBMITTED",
+    APPROVED: "TIMESHEET.APPROVED",
+    REJECTED: "TIMESHEET.REJECTED",
+  },
+  OVERTIME: {
+    SUBMITTED: "OVERTIME.SUBMITTED",
+    APPROVED: "OVERTIME.APPROVED",
+    REJECTED: "OVERTIME.REJECTED",
+  },
+  LEAVE: {
+    REQUESTED: "LEAVE.REQUESTED",
+    APPROVED: "LEAVE.APPROVED",
+    REJECTED: "LEAVE.REJECTED",
+  },
 } as const
 
 export type NotificationEventName =
@@ -28,6 +43,9 @@ export type NotificationEventName =
   | (typeof NOTIFICATION_EVENT_CATALOG.TASK)[keyof typeof NOTIFICATION_EVENT_CATALOG.TASK]
   | (typeof NOTIFICATION_EVENT_CATALOG.OPPORTUNITY)[keyof typeof NOTIFICATION_EVENT_CATALOG.OPPORTUNITY]
   | (typeof NOTIFICATION_EVENT_CATALOG.CONVERSATION)[keyof typeof NOTIFICATION_EVENT_CATALOG.CONVERSATION]
+  | (typeof NOTIFICATION_EVENT_CATALOG.TIMESHEET)[keyof typeof NOTIFICATION_EVENT_CATALOG.TIMESHEET]
+  | (typeof NOTIFICATION_EVENT_CATALOG.OVERTIME)[keyof typeof NOTIFICATION_EVENT_CATALOG.OVERTIME]
+  | (typeof NOTIFICATION_EVENT_CATALOG.LEAVE)[keyof typeof NOTIFICATION_EVENT_CATALOG.LEAVE]
 
 export const NOTIFICATION_CHANNELS = ["EMAIL", "SMS", "PUSH", "IN_APP"] as const
 export type NotificationChannelCode = (typeof NOTIFICATION_CHANNELS)[number]
@@ -113,4 +131,13 @@ export const NOTIFICATION_TEMPLATE_VARIABLES: Record<NotificationEventName, Noti
   "CONVERSATION.QUESTION_CREATED": [...commonVariables, ...conversationVariables],
   "CONVERSATION.REPLY_CREATED": [...commonVariables, ...conversationVariables],
   "CONVERSATION.RESOLVED": [...commonVariables, ...conversationVariables],
+  "TIMESHEET.SUBMITTED": [...commonVariables],
+  "TIMESHEET.APPROVED": [...commonVariables],
+  "TIMESHEET.REJECTED": [...commonVariables],
+  "OVERTIME.SUBMITTED": [...commonVariables],
+  "OVERTIME.APPROVED": [...commonVariables],
+  "OVERTIME.REJECTED": [...commonVariables],
+  "LEAVE.REQUESTED": [...commonVariables],
+  "LEAVE.APPROVED": [...commonVariables],
+  "LEAVE.REJECTED": [...commonVariables],
 }

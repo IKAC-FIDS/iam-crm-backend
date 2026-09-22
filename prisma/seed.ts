@@ -948,6 +948,17 @@ async function main() {
     { action: 'notification:manage', description: 'مدیریت اعلان‌های شخصی' },
     { action: 'notification:send', description: 'ارسال اعلان داخلی' },
 
+    { action: 'timesheet:view', description: 'مشاهده کارکرد شخصی' },
+    { action: 'timesheet:manage', description: 'مدیریت کارکرد شخصی' },
+    { action: 'timesheet:approve', description: 'تأیید کارکرد تیم' },
+    { action: 'timesheet:view-organization', description: 'مشاهده کارکرد سازمان' },
+    { action: 'timesheet:approve-organization', description: 'تأیید کارکرد سازمان' },
+    { action: 'leave:view', description: 'مشاهده مرخصی شخصی' },
+    { action: 'leave:manage', description: 'مدیریت مرخصی شخصی' },
+    { action: 'leave:approve', description: 'تأیید مرخصی تیم' },
+    { action: 'leave:view-organization', description: 'مشاهده مرخصی سازمان' },
+    { action: 'leave:approve-organization', description: 'تأیید مرخصی سازمان' },
+
     { action: 'technical-release:view', description: 'مشاهده انتشارهای فنی' },
     { action: 'technical-release:manage', description: 'مدیریت انتشارهای فنی' },
     { action: 'technical-release:publish', description: 'انتشار و پایان چرخه انتشار فنی' },
@@ -979,6 +990,8 @@ async function main() {
   const allActions = permissions.map((permission) => permission.action);
 
   const managerActions = [
+    'timesheet:view', 'timesheet:manage', 'timesheet:approve',
+    'leave:view', 'leave:manage', 'leave:approve',
     'company:view',
     'company:create',
     'company:update',
@@ -1084,6 +1097,8 @@ async function main() {
   ];
 
   const repActions = [
+    'timesheet:view', 'timesheet:manage',
+    'leave:view', 'leave:manage',
     'company:view',
     'company:create',
     'company:update',

@@ -42,6 +42,7 @@ const health_module_1 = require("./health/health.module");
 const product_catalog_module_1 = require("./product-catalog/product-catalog.module");
 const attachments_module_1 = require("./attachments/attachments.module");
 const tasks_module_1 = require("./tasks/tasks.module");
+const timesheets_module_1 = require("./timesheets/timesheets.module");
 const notifications_module_1 = require("./notifications/notifications.module");
 const organizations_module_1 = require("./organizations/organizations.module");
 const teams_module_1 = require("./teams/teams.module");
@@ -114,6 +115,7 @@ exports.AppModule = AppModule = __decorate([
             product_catalog_module_1.ProductCatalogModule,
             attachments_module_1.AttachmentsModule,
             tasks_module_1.TasksModule,
+            timesheets_module_1.TimesheetsModule,
             notifications_module_1.NotificationsModule,
             organizations_module_1.OrganizationsModule,
             teams_module_1.TeamsModule,
