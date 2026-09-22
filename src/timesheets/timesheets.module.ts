@@ -1,4 +1,7 @@
 import { Module } from "@nestjs/common";
+import { ReportExportService } from '../common/export/report-export.service';
+import { TimesheetReportingService } from './timesheet-reporting.service';
+import { TimesheetReportingController } from './timesheet-reporting.controller';
 import { CompanyAccessModule } from "../companies/company-access.module";
 import { NotificationCoreModule } from "../notification-core/notification-core.module";
 import { TasksModule } from "../tasks/tasks.module";
@@ -17,11 +20,14 @@ import { WorkScheduleResolverService } from "./work-schedule-resolver.service";
 @Module({
   imports: [TasksModule, CompanyAccessModule, NotificationCoreModule],
   controllers: [
+    TimesheetReportingController,
     TimesheetsController,
     LeaveRequestsController,
     TimesheetAdminController,
   ],
   providers: [
+    ReportExportService,
+    TimesheetReportingService,
     WorkScheduleResolverService,
     TimesheetTimeCalculationService,
     TimesheetConflictService,

@@ -948,6 +948,8 @@ async function main() {
     { action: 'notification:manage', description: 'مدیریت اعلان‌های شخصی' },
     { action: 'notification:send', description: 'ارسال اعلان داخلی' },
 
+    { action: 'timesheet:report', description: 'گزارش کارکرد در محدوده مجاز' },
+    { action: 'timesheet:export', description: 'خروجی کارکرد در محدوده مجاز' },
     { action: 'timesheet:view', description: 'مشاهده کارکرد شخصی' },
     { action: 'timesheet:manage', description: 'مدیریت کارکرد شخصی' },
     { action: 'timesheet:approve', description: 'تأیید کارکرد تیم' },

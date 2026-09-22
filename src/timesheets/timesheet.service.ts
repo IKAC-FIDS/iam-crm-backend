@@ -344,6 +344,7 @@ export class TimesheetService {
           orderBy: { workDate: query.sort ?? "desc" },
           skip: (page - 1) * limit,
           take: limit,
+          include: { task: { select: { id: true, title: true } }, company: { select: { id: true, legalName: true } }, reviewedByMembership: { select: { user: { select: { fullName: true } } } }, approvalHistory: { orderBy: { createdAt: 'asc' }, take: 100, include: { actorMembership: { select: { user: { select: { fullName: true } } } } } } },
         }),
         db.timesheetEntry.count({ where }),
       ]);

@@ -431,6 +431,7 @@ export class LeaveRequestService {
           orderBy: { startDate: query.sort ?? "desc" },
           skip: (page - 1) * limit,
           take: limit,
+          include: { reviewedByMembership: { select: { user: { select: { fullName: true } } } }, approvalHistory: { orderBy: { createdAt: 'asc' }, take: 100, include: { actorMembership: { select: { user: { select: { fullName: true } } } } } } },
         }),
         db.leaveRequest.count({ where }),
       ]);

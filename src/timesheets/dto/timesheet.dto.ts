@@ -1,6 +1,9 @@
 import { Type } from "class-transformer";
 import {
   IsEnum,
+  IsBoolean,
+  IsIn,
+  Matches,
   IsInt,
   IsOptional,
   IsString,
@@ -35,7 +38,7 @@ export class CreateTimesheetDto {
   @Min(0)
   @Max(1439)
   endMinute?: number;
-  @IsOptional() spansMidnight?: boolean;
+  @IsOptional() @IsBoolean() spansMidnight?: boolean;
   @ValidateIf((o) => o.startMinute == null && o.endMinute == null)
   @Type(() => Number)
   @IsInt()
@@ -56,7 +59,7 @@ export class FindMyTimesheetsDto extends PaginationDto {
   @IsOptional() @IsApiDateString() endDate?: string;
   @IsOptional() @IsEnum(TimeEntryType) type?: TimeEntryType;
   @IsOptional() @IsEnum(TimeEntryStatus) status?: TimeEntryStatus;
-  @IsOptional() sort?: "asc" | "desc" = "desc";
+  @IsOptional() @IsIn(['asc', 'desc']) sort?: "asc" | "desc" = "desc";
 }
 
 export class FindAdminTimesheetsDto extends FindMyTimesheetsDto {
@@ -91,7 +94,7 @@ export class FindMyLeaveRequestsDto extends PaginationDto {
   @IsOptional() @IsApiDateString() endDate?: string;
   @IsOptional() @IsEnum(LeaveType) type?: LeaveType;
   @IsOptional() @IsEnum(LeaveStatus) status?: LeaveStatus;
-  @IsOptional() sort?: "asc" | "desc" = "desc";
+  @IsOptional() @IsIn(['asc', 'desc']) sort?: "asc" | "desc" = "desc";
 }
 
 export class FindAdminLeaveRequestsDto extends FindMyLeaveRequestsDto {
@@ -100,5 +103,5 @@ export class FindAdminLeaveRequestsDto extends FindMyLeaveRequestsDto {
 }
 
 export class RejectDecisionDto {
-  @IsString() @MaxLength(2000) reason!: string;
+  @IsString() @Matches(/\S/) @MaxLength(2000) reason!: string;
 }
