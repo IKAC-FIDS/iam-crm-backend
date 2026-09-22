@@ -293,6 +293,54 @@ enum TaskAssignmentScope {
   ORGANIZATION
 }
 
+enum TimeEntryType {
+  REGULAR
+  OVERTIME
+}
+
+enum TimeEntryStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum LeaveType {
+  ANNUAL
+  SICK
+  UNPAID
+  OTHER
+}
+
+enum LeaveUnit {
+  FULL_DAY
+  HALF_DAY
+  HOURLY
+}
+
+enum LeaveStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum WorkScheduleScope {
+  ORGANIZATION
+  TEAM
+  USER
+}
+
+enum TimesheetApprovalAction {
+  SUBMITTED
+  APPROVED
+  REJECTED
+  CANCELLED
+  RESUBMITTED
+}
+
 enum MeetingStatus {
   SCHEDULED
   COMPLETED
@@ -533,7 +581,10 @@ model User {
   conversationMessagesAuthored  ConversationMessage[]         @relation("ConversationMessageAuthor")
   conversationMessagesDeleted   ConversationMessage[]         @relation("ConversationMessageDeletedBy")
   conversationParticipants      ConversationParticipant[]
+  timesheetEntries              TimesheetEntry[]
+  leaveRequests                 LeaveRequest[]
 
+  @@unique([id, organizationId])
   @@index([organizationId])
   @@index([teamId])
   @@index([roleId])
@@ -561,7 +612,11 @@ model Team {
   organizationMemberships OrganizationMembership[]
   technicalTenders        Tender[]
   tasks                   Task[]
+  timesheetEntries        TimesheetEntry[]
+  leaveRequests           LeaveRequest[]
+  workSchedules           WorkSchedule[]
 
+  @@unique([id, organizationId])
   @@unique([organizationId, code])
   @@index([managerId])
   @@index([isActive])
@@ -645,6 +700,10 @@ model Organization {
   notificationDigestBuckets    NotificationDigestBucket[]
   notificationEscalations      NotificationEscalationPolicy[]
   notificationEscalationRuns   NotificationEscalationRun[]
+  timesheetEntries             TimesheetEntry[]
+  leaveRequests                LeaveRequest[]
+  workSchedules                WorkSchedule[]
+  timesheetApprovalHistories   TimesheetApprovalHistory[]
 
   @@index([status])
   @@index([createdAt])
@@ -1007,10 +1066,12 @@ model Company {
   meetings                Meeting[]
   technicalDocuments      TechnicalDocument[]
   tenders                 Tender[]
+  timesheetEntries        TimesheetEntry[]
 
   organizationId String       @default("00000000-0000-4000-8000-000000000001")
   organization   Organization @relation(fields: [organizationId], references: [id])
 
+  @@unique([id, organizationId])
   @@index([ownerId])
   @@index([industryId])
   @@index([sourceId])
@@ -1692,7 +1753,9 @@ model Task {
   organizationId    String              @default("00000000-0000-4000-8000-000000000001")
   organization      Organization        @relation(fields: [organizationId], references: [id])
   TenderRequirement TenderRequirement[]
+  timesheetEntries  TimesheetEntry[]
 
+  @@unique([id, organizationId])
   @@index([status])
   @@index([priority])
   @@index([dueAt])
@@ -1718,6 +1781,178 @@ model Task {
   @@index([organizationId])
   @@index([organizationId, assignedToId, status, dueAt])
   @@map("tasks")
+}
+
+// ============================================================
+// Technical timesheet and leave management
+// ============================================================
+
+model TimesheetEntry {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  userId       String
+  user         User                   @relation(fields: [userId], references: [id], onDelete: Restrict)
+  membershipId String
+  membership   OrganizationMembership @relation("TimesheetEmployeeMembership", fields: [membershipId, organizationId, userId], references: [id, organizationId, userId], onDelete: Restrict)
+
+  // Snapshot fields preserve reporting history when the employee changes teams
+  // or a team is renamed/deactivated. teamId is retained when the team exists.
+  teamId           String?
+  team             Team?   @relation(fields: [teamId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  teamCodeSnapshot String?
+  teamNameSnapshot String?
+
+  // The whole entry belongs to its starting local workDate. Cross-midnight
+  // sessions are represented by spansMidnight instead of being split.
+  workDate      DateTime @db.Date
+  startMinute   Int?
+  endMinute     Int?
+  spansMidnight Boolean  @default(false)
+
+  // Net worked time is authoritative; breakMinutes is excluded from it.
+  // Exact DST-aware derivation from a time range belongs in the domain service.
+  durationMinutes Int
+  breakMinutes    Int             @default(0)
+  type            TimeEntryType
+  description     String?
+  status          TimeEntryStatus @default(DRAFT)
+
+  taskId String?
+  task   Task?   @relation(fields: [taskId, organizationId], references: [id, organizationId], onDelete: Restrict)
+
+  companyId String?
+  company   Company? @relation(fields: [companyId, organizationId], references: [id, organizationId], onDelete: Restrict)
+
+  submittedAt            DateTime?
+  reviewedByMembershipId String?
+  reviewedByMembership   OrganizationMembership? @relation("TimesheetReviewerMembership", fields: [reviewedByMembershipId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  reviewedAt             DateTime?
+  rejectionReason        String?
+
+  approvalHistory TimesheetApprovalHistory[]
+  createdAt       DateTime                   @default(now())
+  updatedAt       DateTime                   @updatedAt
+
+  @@unique([id, organizationId])
+  @@index([organizationId, userId, workDate])
+  @@index([organizationId, teamId, workDate])
+  @@index([organizationId, status, type, workDate])
+  @@index([organizationId, taskId])
+  @@index([organizationId, companyId])
+  @@map("timesheet_entries")
+}
+
+model LeaveRequest {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  userId       String
+  user         User                   @relation(fields: [userId], references: [id], onDelete: Restrict)
+  membershipId String
+  membership   OrganizationMembership @relation("LeaveEmployeeMembership", fields: [membershipId, organizationId, userId], references: [id, organizationId, userId], onDelete: Restrict)
+
+  teamId           String?
+  team             Team?   @relation(fields: [teamId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  teamCodeSnapshot String?
+  teamNameSnapshot String?
+
+  type        LeaveType
+  unit        LeaveUnit
+  startDate   DateTime  @db.Date
+  endDate     DateTime  @db.Date
+  startMinute Int?
+  endMinute   Int?
+
+  // Filled from the effective WorkSchedule before submission. Drafts may be
+  // incomplete; non-draft requests must have a positive requested duration.
+  requestedMinutes Int?
+  reason           String?
+  status           LeaveStatus @default(DRAFT)
+
+  submittedAt            DateTime?
+  reviewedByMembershipId String?
+  reviewedByMembership   OrganizationMembership? @relation("LeaveReviewerMembership", fields: [reviewedByMembershipId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  reviewedAt             DateTime?
+  rejectionReason        String?
+
+  approvalHistory TimesheetApprovalHistory[]
+  createdAt       DateTime                   @default(now())
+  updatedAt       DateTime                   @updatedAt
+
+  @@unique([id, organizationId])
+  @@index([organizationId, userId, startDate, endDate])
+  @@index([organizationId, teamId, startDate, endDate])
+  @@index([organizationId, status, startDate])
+  @@map("leave_requests")
+}
+
+model WorkSchedule {
+  id             String            @id @default(uuid())
+  organizationId String
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  scope          WorkScheduleScope
+
+  teamId String?
+  team   Team?   @relation(fields: [teamId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  userId       String?
+  membershipId String?
+  membership   OrganizationMembership? @relation("WorkScheduleUserMembership", fields: [membershipId, organizationId, userId], references: [id, organizationId, userId], onDelete: Cascade)
+
+  // Null means inherit OrganizationSettings.timezone.
+  timezoneOverride String?
+  effectiveFrom    DateTime          @db.Date
+  effectiveTo      DateTime?         @db.Date
+  days             WorkScheduleDay[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([id, organizationId])
+  @@index([organizationId, scope, effectiveFrom, effectiveTo])
+  @@index([organizationId, teamId, effectiveFrom])
+  @@index([organizationId, membershipId, effectiveFrom])
+  @@map("work_schedules")
+}
+
+model WorkScheduleDay {
+  id             String       @id @default(uuid())
+  organizationId String
+  scheduleId     String
+  schedule       WorkSchedule @relation(fields: [scheduleId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  weekday        Int
+  regularMinutes Int
+
+  @@unique([scheduleId, weekday])
+  @@index([organizationId, scheduleId])
+  @@map("work_schedule_days")
+}
+
+model TimesheetApprovalHistory {
+  id             String                  @id @default(uuid())
+  organizationId String
+  organization   Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  action         TimesheetApprovalAction
+
+  timesheetEntryId String?
+  timesheetEntry   TimesheetEntry? @relation(fields: [timesheetEntryId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  leaveRequestId   String?
+  leaveRequest     LeaveRequest?   @relation(fields: [leaveRequestId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  actorMembershipId String
+  actorMembership   OrganizationMembership @relation("TimesheetApprovalActorMembership", fields: [actorMembershipId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  fromStatus        String?
+  toStatus          String
+  reason            String?
+  createdAt         DateTime               @default(now())
+
+  @@index([organizationId, timesheetEntryId, createdAt])
+  @@index([organizationId, leaveRequestId, createdAt])
+  @@index([organizationId, actorMembershipId, createdAt])
+  @@map("timesheet_approval_histories")
 }
 
 model ConversationThread {
@@ -2363,7 +2598,16 @@ model OrganizationMembership {
   createdAt      DateTime                     @default(now())
   updatedAt      DateTime                     @updatedAt
 
+  timesheetEntries         TimesheetEntry[]           @relation("TimesheetEmployeeMembership")
+  leaveRequests            LeaveRequest[]             @relation("LeaveEmployeeMembership")
+  workSchedules            WorkSchedule[]             @relation("WorkScheduleUserMembership")
+  reviewedTimesheetEntries TimesheetEntry[]           @relation("TimesheetReviewerMembership")
+  reviewedLeaveRequests    LeaveRequest[]             @relation("LeaveReviewerMembership")
+  approvalHistoryActions   TimesheetApprovalHistory[] @relation("TimesheetApprovalActorMembership")
+
   @@unique([userId, organizationId])
+  @@unique([id, organizationId])
+  @@unique([id, organizationId, userId])
   @@index([userId])
   @@index([organizationId])
   @@index([organizationId, status])
