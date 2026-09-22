@@ -85,7 +85,7 @@ export class TimesheetConflictService {
           overlapping.id,
         );
     }
-    const leave = await db.leaveRequest.findFirst({
+    const leaves = await db.leaveRequest.findMany({
       where: {
         organizationId: candidate.organizationId,
         userId: candidate.userId,
@@ -94,16 +94,17 @@ export class TimesheetConflictService {
         endDate: { gte: this.date(candidate.workDate) },
       },
     });
-    if (
-      leave &&
-      (candidate.startMinute == null ||
+    const conflictingLeave = leaves.find(
+      (leave) =>
+        candidate.startMinute == null ||
         leave.unit !== LeaveUnit.HOURLY ||
-        this.leaveOverlapsWork(leave, candidate, timezone))
-    )
+        this.leaveOverlapsWork(leave, candidate, timezone),
+    );
+    if (conflictingLeave)
       this.conflict(
         "WORK_LEAVE_CONFLICT",
         "Work conflicts with pending or approved leave",
-        leave.id,
+        conflictingLeave.id,
       );
   }
 
@@ -114,7 +115,7 @@ export class TimesheetConflictService {
   ) {
     const dates = this.days(candidate.startDate, candidate.endDate);
     await this.lockDates(db, candidate.organizationId, candidate.userId, dates);
-    const other = await db.leaveRequest.findFirst({
+    const otherLeaves = await db.leaveRequest.findMany({
       where: {
         organizationId: candidate.organizationId,
         userId: candidate.userId,
@@ -124,18 +125,19 @@ export class TimesheetConflictService {
         endDate: { gte: this.date(candidate.startDate) },
       },
     });
-    if (
-      other &&
-      (candidate.unit !== LeaveUnit.HOURLY ||
+    const conflictingLeave = otherLeaves.find(
+      (other) =>
+        candidate.unit !== LeaveUnit.HOURLY ||
         other.unit !== LeaveUnit.HOURLY ||
-        this.hourlyLeavesOverlap(candidate, other, timezone))
-    )
+        this.hourlyLeavesOverlap(candidate, other, timezone),
+    );
+    if (conflictingLeave)
       this.conflict(
         "OVERLAPPING_LEAVE",
         "Leave overlaps another pending or approved request",
-        other.id,
+        conflictingLeave.id,
       );
-    const work = await db.timesheetEntry.findFirst({
+    const workEntries = await db.timesheetEntry.findMany({
       where: {
         organizationId: candidate.organizationId,
         userId: candidate.userId,
@@ -146,20 +148,21 @@ export class TimesheetConflictService {
         },
       },
     });
-    if (
-      work &&
-      (candidate.unit !== LeaveUnit.HOURLY ||
+    const conflictingWork = workEntries.find(
+      (work) =>
+        candidate.unit !== LeaveUnit.HOURLY ||
         work.startMinute == null ||
         this.leaveOverlapsWork(
           candidate,
           { ...work, workDate: work.workDate.toISOString().slice(0, 10) },
           timezone,
-        ))
-    )
+        ),
+    );
+    if (conflictingWork)
       this.conflict(
         "LEAVE_WORK_CONFLICT",
         "Leave conflicts with recorded work",
-        work.id,
+        conflictingWork.id,
       );
   }
 
