@@ -13,7 +13,12 @@ describe('organization work schedule', () => {
     const db = { workSchedule: { findFirst: jest.fn().mockResolvedValue(null), create: jest.fn().mockResolvedValue({ id: 's' }) } };
     const prisma = { withTenantTransaction: jest.fn().mockImplementation((_tenant, action) => action(db)) }, audit = { record: jest.fn() };
     await new WorkScheduleManagementService(prisma as any, audit as any).create(dto, actor);
-    expect(db.workSchedule.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ scope: 'ORGANIZATION', organizationId: 'org', days: { create: dto.days.map(day => ({ ...day, organizationId: 'org' })) } }) }));
+    expect(db.workSchedule.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ scope: 'ORGANIZATION', organizationId: 'org', days: { create: dto.days } }) }));
+    // Nested relation keys are supplied by Prisma, not accepted as child input.
+    for (const day of db.workSchedule.create.mock.calls[0][0].data.days.create) {
+      expect(day).not.toHaveProperty('organizationId');
+      expect(day).not.toHaveProperty('scheduleId');
+    }
     expect(audit.record).toHaveBeenCalledWith(expect.objectContaining({ organizationId: 'org', entityId: 's' }), db);
   });
   it('rejects overlapping programs without altering previous schedules', async () => {

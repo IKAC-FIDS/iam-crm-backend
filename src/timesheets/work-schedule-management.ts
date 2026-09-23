@@ -58,7 +58,8 @@ export class WorkScheduleManagementService {
         }, select: { id: true } });
         if (overlap) throw new ConflictException({ code: 'WORK_SCHEDULE_OVERLAP', message: 'بازه اعتبار با برنامه کاری موجود هم‌پوشانی دارد.' });
         const row = await db.workSchedule.create({ data: { organizationId: tenant.organizationId, scope: 'ORGANIZATION', ...dates,
-          days: { create: dto.days.map(day => ({ organizationId: tenant.organizationId, weekday: day.weekday, regularMinutes: day.regularMinutes })) },
+          // Prisma inherits both composite relation keys from the parent schedule.
+          days: { create: dto.days.map(day => ({ weekday: day.weekday, regularMinutes: day.regularMinutes } satisfies Prisma.WorkScheduleDayCreateWithoutScheduleInput)) },
         }, include: { days: true } });
         await this.audit.record({ actorId: tenant.userId, actorMembershipId: tenant.membershipId, organizationId: tenant.organizationId,
           entityType: 'work-schedule', entityId: row.id, action: 'work-schedule.created', after: row }, db);
