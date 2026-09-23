@@ -13,13 +13,22 @@ describe('organization work schedule', () => {
     const db = { workSchedule: { findFirst: jest.fn().mockResolvedValue(null), create: jest.fn().mockResolvedValue({ id: 's' }) } };
     const prisma = { withTenantTransaction: jest.fn().mockImplementation((_tenant, action) => action(db)) }, audit = { record: jest.fn() };
     await new WorkScheduleManagementService(prisma as any, audit as any).create(dto, actor);
-    expect(db.workSchedule.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ scope: 'ORGANIZATION', organizationId: 'org', days: { create: dto.days } }) }));
+    expect(db.workSchedule.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ scope: 'ORGANIZATION', organizationId: 'org', days: { create: dto.days.filter(day => day.regularMinutes > 0) } }) }));
     // Nested relation keys are supplied by Prisma, not accepted as child input.
     for (const day of db.workSchedule.create.mock.calls[0][0].data.days.create) {
       expect(day).not.toHaveProperty('organizationId');
       expect(day).not.toHaveProperty('scheduleId');
     }
     expect(audit.record).toHaveBeenCalledWith(expect.objectContaining({ organizationId: 'org', entityId: 's' }), db);
+  });
+  it.each([ [4, 5], [0, 1, 2, 3, 4, 5, 6] ])('omits zero-minute days for holidays %j', async (...holidays: number[]) => {
+    const input = { ...dto, days: dto.days.map(day => ({ ...day, regularMinutes: holidays.includes(day.weekday) ? 0 : 480 })) };
+    const db = { workSchedule: { findFirst: jest.fn().mockResolvedValue(null), create: jest.fn().mockResolvedValue({ id: 's' }) } };
+    const prisma = { withTenantTransaction: jest.fn().mockImplementation((_tenant, action) => action(db)) };
+    await new WorkScheduleManagementService(prisma as any, { record: jest.fn() } as any).create(input, actor);
+    expect(db.workSchedule.create.mock.calls[0][0].data.days.create).toEqual(
+      input.days.filter(day => !holidays.includes(day.weekday)),
+    );
   });
   it('rejects overlapping programs without altering previous schedules', async () => {
     const db = { workSchedule: { findFirst: jest.fn().mockResolvedValue({ id: 'existing' }), create: jest.fn() } };
