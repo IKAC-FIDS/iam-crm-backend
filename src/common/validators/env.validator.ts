@@ -1,6 +1,7 @@
 import * as Joi from 'joi';
 
 export const envValidationSchema = Joi.object({
+  OPENAPI_RUNTIME_ENABLED: Joi.boolean().default(false),
   // ---------- اجباری ----------
   DATABASE_URL: Joi.string()
     .required()
