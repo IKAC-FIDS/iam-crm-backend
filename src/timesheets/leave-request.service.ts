@@ -268,7 +268,7 @@ export class LeaveRequestService {
       if (!schedule.scheduleId)
         throw new BadRequestException({
           code: "MISSING_WORK_SCHEDULE",
-          message: `No work schedule applies on ${date}`,
+          message: `برای تاریخ ${date} برنامه کاری معتبری تعریف نشده است. از مدیر سازمان بخواهید در بخش «برنامه کاری سازمان» برنامه‌ای با تاریخ اعتبار مناسب ثبت کند.`,
         });
       if (dto.unit === LeaveUnit.FULL_DAY)
         requestedMinutes += schedule.expectedRegularMinutes;
