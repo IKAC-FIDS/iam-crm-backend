@@ -36,7 +36,8 @@ const activityCenterSelect = {
       id: true,
       legalName: true,
       brandName: true,
-      owner: { select: { id: true, fullName: true, email: true, team: true, teamId: true } },
+      logoObjectKey: true,
+      owner: { select: { id: true, fullName: true, email: true, team: true, teamId: true, avatarObjectKey: true } },
     },
   },
   task: {
@@ -48,7 +49,7 @@ const activityCenterSelect = {
       parentTask: { select: { id: true, title: true } },
     },
   },
-  user: { select: { id: true, fullName: true, email: true } },
+  user: { select: { id: true, fullName: true, email: true, team: true, avatarObjectKey: true } },
 } satisfies Prisma.ActivitySelect;
 
 @Injectable()
