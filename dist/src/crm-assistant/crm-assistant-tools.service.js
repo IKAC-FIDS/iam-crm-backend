@@ -94,11 +94,12 @@ let CrmAssistantToolsService = class CrmAssistantToolsService {
                 inputSchema: {
                     type: 'object', additionalProperties: false,
                     properties: {
-                        userId: { type: 'string', description: 'شناسه UUID کارشناس از search_report_users' },
+                        userId: { type: ['string', 'null'], description: 'شناسه UUID کارشناس، اگر قبلاً مشخص شده است' },
+                        userName: { type: ['string', 'null'], description: 'نام یا بخشی از نام کارشناس؛ فقط میان کاربران مجاز جست‌وجو می‌شود' },
                         startDate: { type: ['string', 'null'], description: 'تاریخ شروع YYYY-MM-DD؛ در صورت null سی روز اخیر' },
                         endDate: { type: ['string', 'null'], description: 'تاریخ پایان YYYY-MM-DD؛ در صورت null امروز' },
                     },
-                    required: ['userId', 'startDate', 'endDate'],
+                    required: ['userId', 'userName', 'startDate', 'endDate'],
                 },
             },
         ];
@@ -228,10 +229,24 @@ let CrmAssistantToolsService = class CrmAssistantToolsService {
     }
     async salesRepPerformance(value, user) {
         const input = value && typeof value === 'object' ? value : {};
-        const userId = typeof input.userId === 'string' ? input.userId.trim() : '';
-        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId)) {
-            throw new common_1.BadRequestException('شناسه کارشناس برای گزارش معتبر نیست');
+        const requestedId = typeof input.userId === 'string' ? input.userId.trim() : '';
+        const requestedName = typeof input.userName === 'string' ? input.userName.trim() : '';
+        const options = await this.reports.getFilterOptions(user);
+        const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        let candidates = requestedId && uuid.test(requestedId) ? options.users.filter((item) => item.id === requestedId) : [];
+        if (!candidates.length && requestedName) {
+            const needle = this.normalizePersonName(requestedName);
+            const exact = options.users.filter((item) => this.normalizePersonName(item.fullName) === needle);
+            candidates = exact.length ? exact : options.users.filter((item) => this.normalizePersonName(item.fullName).includes(needle));
         }
+        if (candidates.length !== 1) {
+            return {
+                needsSelection: true,
+                message: candidates.length ? 'چند کارشناس با این نام پیدا شد؛ یکی باید انتخاب شود.' : 'کارشناس موردنظر در محدوده مجاز پیدا نشد.',
+                candidates: candidates.slice(0, 10).map((item) => ({ id: item.id, fullName: item.fullName, teamName: item.teamName, role: item.role })),
+            };
+        }
+        const userId = candidates[0].id;
         const today = new Date();
         const defaultStart = new Date(today.getTime() - 30 * 86_400_000);
         const startDate = this.reportDate(input.startDate, defaultStart);
@@ -264,6 +279,15 @@ let CrmAssistantToolsService = class CrmAssistantToolsService {
                 activityBasis: 'فعالیت بر اساس occurredAt', meetingBasis: 'جلسه بر اساس startAt', taskBasis: 'کار بر اساس createdAt/completedAt',
             },
         };
+    }
+    normalizePersonName(value) {
+        return value
+            .normalize('NFKC')
+            .replace(/[يى]/g, 'ی')
+            .replace(/ك/g, 'ک')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .toLocaleLowerCase('fa');
     }
     reportDate(value, fallback) {
         if (value == null || value === '')
