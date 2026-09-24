@@ -38,6 +38,7 @@ const opportunityInclude = {
       legalName: true,
       brandName: true,
       industry: true,
+      logoObjectKey: true,
     },
   },
   owner: {
@@ -46,6 +47,7 @@ const opportunityInclude = {
       fullName: true,
       email: true,
       team: true,
+      avatarObjectKey: true,
     },
   },
   stage: {
