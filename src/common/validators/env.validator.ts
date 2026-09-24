@@ -237,4 +237,8 @@ export const envValidationSchema = Joi.object({
   WEBAUTHN_RP_ID: Joi.string().default('localhost'),
 
   WEBAUTHN_ORIGIN: Joi.string().uri().default('http://localhost:5173'),
+
+  OPENAI_API_KEY: Joi.string().allow('').optional(),
+  OPENAI_MODEL: Joi.string().default('gpt-5.4'),
+  OPENAI_BASE_URL: Joi.string().uri().default('https://api.openai.com/v1'),
 });

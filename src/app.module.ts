@@ -51,6 +51,7 @@ import { EmailModule } from './email/email.module';
 import { NotificationCoreModule } from './notification-core/notification-core.module';
 import { ConversationsModule } from './conversations/conversations.module';
 import { AccountWorkspaceModule } from './account-workspace/account-workspace.module';
+import { CrmAssistantModule } from './crm-assistant/crm-assistant.module';
 
 @Module({
   imports: [
@@ -118,6 +119,7 @@ import { AccountWorkspaceModule } from './account-workspace/account-workspace.mo
     EmailModule,
     ConversationsModule,
     AccountWorkspaceModule,
+    CrmAssistantModule,
   ],
   providers: [
     {

@@ -1,0 +1,153 @@
+"use strict";
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __metadata = (this && this.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.CrmAssistantToolsService = void 0;
+const common_1 = require("@nestjs/common");
+const companies_service_1 = require("../companies/companies.service");
+const meetings_service_1 = require("../meetings/meetings.service");
+const opportunities_service_1 = require("../opportunities/opportunities.service");
+const tasks_service_1 = require("../tasks/tasks.service");
+const listSchema = (searchDescription) => ({
+    type: 'object',
+    properties: {
+        search: { type: ['string', 'null'], description: searchDescription },
+        limit: { type: ['integer', 'null'], minimum: 1, maximum: 20, description: 'حداکثر تعداد نتیجه؛ حداکثر ۲۰' },
+    },
+    required: ['search', 'limit'],
+    additionalProperties: false,
+});
+let CrmAssistantToolsService = class CrmAssistantToolsService {
+    constructor(companies, opportunities, tasks, meetings) {
+        this.companies = companies;
+        this.opportunities = opportunities;
+        this.tasks = tasks;
+        this.meetings = meetings;
+        this.definitions = [
+            {
+                name: 'search_companies',
+                description: 'جست‌وجوی شرکت‌های قابل مشاهده برای کاربر جاری در سازمان فعال.',
+                permission: 'company:view',
+                inputSchema: listSchema('نام، برند، شناسه یا شماره تماس شرکت؛ برای فهرست اخیر null'),
+            },
+            {
+                name: 'search_opportunities',
+                description: 'جست‌وجوی فرصت‌های فروش قابل مشاهده همراه با مرحله، شرکت، مالک و ارزش.',
+                permission: 'opportunity:view',
+                inputSchema: listSchema('عنوان یا شرکت فرصت؛ برای فهرست اخیر null'),
+            },
+            {
+                name: 'search_tasks',
+                description: 'جست‌وجوی کارهای قابل مشاهده همراه با وضعیت، اولویت، سررسید و مسئول.',
+                permission: 'task:view',
+                inputSchema: listSchema('عنوان یا توضیحات کار؛ برای فهرست جاری null'),
+            },
+            {
+                name: 'search_meetings',
+                description: 'جست‌وجوی جلسات قابل مشاهده همراه با زمان، وضعیت، شرکت و برگزارکننده.',
+                permission: 'meeting:view',
+                inputSchema: listSchema('عنوان جلسه؛ برای فهرست اخیر null'),
+            },
+        ];
+    }
+    listFor(user) {
+        return this.definitions.filter((tool) => this.hasPermission(user, tool.permission));
+    }
+    async call(name, rawArguments, user) {
+        const definition = this.definitions.find((tool) => tool.name === name);
+        if (!definition || !this.hasPermission(user, definition.permission)) {
+            throw new common_1.ForbiddenException('این ابزار برای کاربر جاری قابل دسترس نیست');
+        }
+        const args = this.normalizeArguments(rawArguments);
+        const query = { page: 1, limit: args.limit, ...(args.search ? { search: args.search } : {}) };
+        switch (name) {
+            case 'search_companies': {
+                const result = await this.companies.findAll(user, query, { search: args.search });
+                return this.compactPage(result, (item) => ({
+                    id: item.id,
+                    name: item.brandName || item.legalName,
+                    legalName: item.legalName,
+                    status: item.status,
+                    priority: item.priority,
+                    industry: item.industryOption?.name ?? item.industry,
+                    owner: item.owner?.fullName ?? null,
+                    updatedAt: item.updatedAt,
+                }));
+            }
+            case 'search_opportunities': {
+                const result = await this.opportunities.findAll(query, user);
+                return this.compactPage(result, (item) => ({
+                    id: item.id,
+                    title: item.title,
+                    company: item.company?.brandName || item.company?.legalName,
+                    stage: item.stage?.label ?? null,
+                    priority: item.priority,
+                    estimatedValue: item.estimatedValue,
+                    expectedCloseDate: item.expectedCloseDate,
+                    owner: item.owner?.fullName ?? null,
+                    updatedAt: item.updatedAt,
+                }));
+            }
+            case 'search_tasks': {
+                const result = await this.tasks.findAll(query, user);
+                return this.compactPage(result, (item) => ({
+                    id: item.id,
+                    title: item.title,
+                    status: item.status,
+                    priority: item.priority,
+                    dueAt: item.dueAt,
+                    company: item.company?.brandName || item.company?.legalName || null,
+                    opportunity: item.opportunity?.title ?? null,
+                    assignee: item.assignedTo?.fullName ?? null,
+                    updatedAt: item.updatedAt,
+                }));
+            }
+            case 'search_meetings': {
+                const result = await this.meetings.findAll(query, user);
+                return this.compactPage(result, (item) => ({
+                    id: item.id,
+                    title: item.title,
+                    status: item.status,
+                    mode: item.mode,
+                    startAt: item.startAt,
+                    endAt: item.endAt,
+                    company: item.company?.brandName || item.company?.legalName || null,
+                    organizer: item.organizer?.fullName ?? null,
+                }));
+            }
+            default:
+                throw new common_1.ForbiddenException('ابزار ناشناخته است');
+        }
+    }
+    hasPermission(user, permission) {
+        const permissions = user.tenantContext?.permissions;
+        if (permissions)
+            return permissions.includes(permission);
+        return user.role === 'ADMIN' || user.role === 'BOARDS';
+    }
+    normalizeArguments(value) {
+        const input = value && typeof value === 'object' ? value : {};
+        const search = typeof input.search === 'string' ? input.search.trim().slice(0, 200) : undefined;
+        const requestedLimit = typeof input.limit === 'number' ? Math.trunc(input.limit) : 10;
+        return { search: search || undefined, limit: Math.min(20, Math.max(1, requestedLimit)) };
+    }
+    compactPage(result, mapper) {
+        return { data: result.data.map(mapper), meta: result.meta };
+    }
+};
+exports.CrmAssistantToolsService = CrmAssistantToolsService;
+exports.CrmAssistantToolsService = CrmAssistantToolsService = __decorate([
+    (0, common_1.Injectable)(),
+    __metadata("design:paramtypes", [companies_service_1.CompaniesService,
+        opportunities_service_1.OpportunitiesService,
+        tasks_service_1.TasksService,
+        meetings_service_1.MeetingsService])
+], CrmAssistantToolsService);
+//# sourceMappingURL=crm-assistant-tools.service.js.map

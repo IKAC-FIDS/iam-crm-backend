@@ -60,6 +60,7 @@ const email_module_1 = require("./email/email.module");
 const notification_core_module_1 = require("./notification-core/notification-core.module");
 const conversations_module_1 = require("./conversations/conversations.module");
 const account_workspace_module_1 = require("./account-workspace/account-workspace.module");
+const crm_assistant_module_1 = require("./crm-assistant/crm-assistant.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -130,6 +131,7 @@ exports.AppModule = AppModule = __decorate([
             email_module_1.EmailModule,
             conversations_module_1.ConversationsModule,
             account_workspace_module_1.AccountWorkspaceModule,
+            crm_assistant_module_1.CrmAssistantModule,
         ],
         providers: [
             {
