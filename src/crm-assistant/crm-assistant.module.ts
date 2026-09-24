@@ -7,10 +7,11 @@ import { CrmAssistantController } from './crm-assistant.controller';
 import { CrmAssistantService } from './crm-assistant.service';
 import { CrmAssistantToolsService } from './crm-assistant-tools.service';
 import { CrmMcpController } from './crm-mcp.controller';
+import { CrmAssistantActionsService } from './crm-assistant-actions.service';
 
 @Module({
   imports: [CompaniesModule, OpportunitiesModule, TasksModule, MeetingsModule],
   controllers: [CrmAssistantController, CrmMcpController],
-  providers: [CrmAssistantService, CrmAssistantToolsService],
+  providers: [CrmAssistantService, CrmAssistantToolsService, CrmAssistantActionsService],
 })
 export class CrmAssistantModule {}

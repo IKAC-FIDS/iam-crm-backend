@@ -15,9 +15,9 @@ COPY package*.json ./
 RUN npm config get registry
 RUN npm config get replace-registry-host
 RUN npm ci \
-    || (npm config set registry https://registry.npmjs.org/ \
-        && npm config set replace-registry-host never \
-        && npm ci)
+    || NPM_CONFIG_REGISTRY=https://registry.npmjs.org/ \
+       NPM_CONFIG_REPLACE_REGISTRY_HOST=never \
+       npm ci
 
 COPY prisma ./prisma
 RUN npx prisma generate
@@ -42,9 +42,9 @@ RUN apt-get update \
 
 COPY package*.json ./
 RUN npm ci --omit=dev \
-    || (npm config set registry https://registry.npmjs.org/ \
-        && npm config set replace-registry-host never \
-        && npm ci --omit=dev)
+    || NPM_CONFIG_REGISTRY=https://registry.npmjs.org/ \
+       NPM_CONFIG_REPLACE_REGISTRY_HOST=never \
+       npm ci --omit=dev
 
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma

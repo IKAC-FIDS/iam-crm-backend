@@ -16,6 +16,7 @@ const crm_assistant_controller_1 = require("./crm-assistant.controller");
 const crm_assistant_service_1 = require("./crm-assistant.service");
 const crm_assistant_tools_service_1 = require("./crm-assistant-tools.service");
 const crm_mcp_controller_1 = require("./crm-mcp.controller");
+const crm_assistant_actions_service_1 = require("./crm-assistant-actions.service");
 let CrmAssistantModule = class CrmAssistantModule {
 };
 exports.CrmAssistantModule = CrmAssistantModule;
@@ -23,7 +24,7 @@ exports.CrmAssistantModule = CrmAssistantModule = __decorate([
     (0, common_1.Module)({
         imports: [companies_module_1.CompaniesModule, opportunities_module_1.OpportunitiesModule, tasks_module_1.TasksModule, meetings_module_1.MeetingsModule],
         controllers: [crm_assistant_controller_1.CrmAssistantController, crm_mcp_controller_1.CrmMcpController],
-        providers: [crm_assistant_service_1.CrmAssistantService, crm_assistant_tools_service_1.CrmAssistantToolsService],
+        providers: [crm_assistant_service_1.CrmAssistantService, crm_assistant_tools_service_1.CrmAssistantToolsService, crm_assistant_actions_service_1.CrmAssistantActionsService],
     })
 ], CrmAssistantModule);
 //# sourceMappingURL=crm-assistant.module.js.map
