@@ -19,6 +19,7 @@ exports.PeopleModule = PeopleModule = __decorate([
     (0, common_1.Module)({
         providers: [people_service_1.PeopleService, person_histories_service_1.PersonHistoriesService],
         controllers: [people_controller_1.PeopleController, person_histories_controller_1.PersonHistoriesController],
+        exports: [people_service_1.PeopleService],
     })
 ], PeopleModule);
 //# sourceMappingURL=people.module.js.map

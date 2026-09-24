@@ -17,12 +17,17 @@ const user = {
     const companies = { create: globals_1.jest.fn() };
     const opportunities = { create: globals_1.jest.fn() };
     const tasks = { create: globals_1.jest.fn() };
+    const people = { create: globals_1.jest.fn() };
+    const activities = { create: globals_1.jest.fn() };
+    const meetings = { create: globals_1.jest.fn() };
+    const timesheets = { create: globals_1.jest.fn() };
+    const leaveRequests = { create: globals_1.jest.fn() };
     const audit = { recordTenantEvent: globals_1.jest.fn() };
     const config = { get: globals_1.jest.fn((key) => key === 'ASSISTANT_ACTION_SECRET' ? 'test-secret-with-enough-entropy' : undefined) };
     let service;
     (0, globals_1.beforeEach)(() => {
         globals_1.jest.clearAllMocks();
-        service = new crm_assistant_actions_service_1.CrmAssistantActionsService(config, companies, opportunities, tasks, audit);
+        service = new crm_assistant_actions_service_1.CrmAssistantActionsService(config, companies, opportunities, tasks, people, activities, meetings, timesheets, leaveRequests, audit);
     });
     (0, globals_1.it)('only exposes action tools covered by effective permissions', () => {
         (0, globals_1.expect)(service.listFor({ ...user, tenantContext: { ...user.tenantContext, permissions: ['task:create'] } }).map((item) => item.name))

@@ -14,13 +14,13 @@ export class CrmAssistantController {
   constructor(private readonly assistant: CrmAssistantService, private readonly actions: CrmAssistantActionsService) {}
 
   @Post('ask')
-  @AnyPermission('company:view', 'opportunity:view', 'task:view', 'meeting:view')
+  @AnyPermission('company:view', 'opportunity:view', 'task:view', 'meeting:view', 'people:directory:view', 'activity:view', 'timesheet:view', 'leave:view')
   ask(@Body() dto: AskCrmAssistantDto, @CurrentUser() user: CurrentUserPayload) {
     return this.assistant.ask(dto, user);
   }
 
   @Post('actions/confirm')
-  @AnyPermission('company:create', 'opportunity:create', 'task:create')
+  @AnyPermission('company:create', 'opportunity:create', 'task:create', 'person:create', 'activity:create', 'meeting:create', 'timesheet:manage', 'leave:manage')
   confirm(@Body() dto: ConfirmCrmAssistantActionDto, @CurrentUser() user: CurrentUserPayload) {
     return this.actions.confirm(dto.token, user);
   }

@@ -7,5 +7,6 @@ import { PersonHistoriesService } from './person-histories.service';
 @Module({
   providers: [PeopleService, PersonHistoriesService],
   controllers: [PeopleController, PersonHistoriesController],
+  exports: [PeopleService],
 })
 export class PeopleModule {}

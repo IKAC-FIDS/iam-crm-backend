@@ -17,13 +17,21 @@ describe('CrmAssistantActionsService', () => {
   const companies = { create: jest.fn<(...args: any[]) => Promise<any>>() };
   const opportunities = { create: jest.fn<(...args: any[]) => Promise<any>>() };
   const tasks = { create: jest.fn<(...args: any[]) => Promise<any>>() };
+  const people = { create: jest.fn<(...args: any[]) => Promise<any>>() };
+  const activities = { create: jest.fn<(...args: any[]) => Promise<any>>() };
+  const meetings = { create: jest.fn<(...args: any[]) => Promise<any>>() };
+  const timesheets = { create: jest.fn<(...args: any[]) => Promise<any>>() };
+  const leaveRequests = { create: jest.fn<(...args: any[]) => Promise<any>>() };
   const audit = { recordTenantEvent: jest.fn<(...args: any[]) => Promise<any>>() };
   const config = { get: jest.fn((key: string) => key === 'ASSISTANT_ACTION_SECRET' ? 'test-secret-with-enough-entropy' : undefined) };
   let service: CrmAssistantActionsService;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new CrmAssistantActionsService(config as any, companies as any, opportunities as any, tasks as any, audit as any);
+    service = new CrmAssistantActionsService(
+      config as any, companies as any, opportunities as any, tasks as any, people as any,
+      activities as any, meetings as any, timesheets as any, leaveRequests as any, audit as any,
+    );
   });
 
   it('only exposes action tools covered by effective permissions', () => {

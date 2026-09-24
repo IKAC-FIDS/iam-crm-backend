@@ -42,6 +42,8 @@ import { WorkScheduleResolverService } from "./work-schedule-resolver.service";
     WorkScheduleResolverService,
     TimesheetTimeCalculationService,
     TimesheetConflictService,
+    TimesheetService,
+    LeaveRequestService,
   ],
 })
 export class TimesheetsModule {}

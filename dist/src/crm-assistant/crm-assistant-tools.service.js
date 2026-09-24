@@ -15,6 +15,10 @@ const companies_service_1 = require("../companies/companies.service");
 const meetings_service_1 = require("../meetings/meetings.service");
 const opportunities_service_1 = require("../opportunities/opportunities.service");
 const tasks_service_1 = require("../tasks/tasks.service");
+const people_service_1 = require("../people/people.service");
+const activities_service_1 = require("../activities/activities.service");
+const timesheet_service_1 = require("../timesheets/timesheet.service");
+const leave_request_service_1 = require("../timesheets/leave-request.service");
 const listSchema = (searchDescription) => ({
     type: 'object',
     properties: {
@@ -25,11 +29,15 @@ const listSchema = (searchDescription) => ({
     additionalProperties: false,
 });
 let CrmAssistantToolsService = class CrmAssistantToolsService {
-    constructor(companies, opportunities, tasks, meetings) {
+    constructor(companies, opportunities, tasks, meetings, people, activities, timesheets, leaveRequests) {
         this.companies = companies;
         this.opportunities = opportunities;
         this.tasks = tasks;
         this.meetings = meetings;
+        this.people = people;
+        this.activities = activities;
+        this.timesheets = timesheets;
+        this.leaveRequests = leaveRequests;
         this.definitions = [
             {
                 name: 'search_companies',
@@ -54,6 +62,22 @@ let CrmAssistantToolsService = class CrmAssistantToolsService {
                 description: 'جست‌وجوی جلسات قابل مشاهده همراه با زمان، وضعیت، شرکت و برگزارکننده.',
                 permission: 'meeting:view',
                 inputSchema: listSchema('عنوان جلسه؛ برای فهرست اخیر null'),
+            },
+            {
+                name: 'search_people', description: 'جست‌وجوی مخاطبان قابل مشاهده در دفترچه سازمان.',
+                permission: 'people:directory:view', inputSchema: listSchema('نام، عنوان یا مشخصات مخاطب؛ برای فهرست اخیر null'),
+            },
+            {
+                name: 'search_activities', description: 'جست‌وجوی فعالیت‌های قابل مشاهده و اقدامات بعدی.',
+                permission: 'activity:view', inputSchema: listSchema('نوع، یادداشت یا نتیجه فعالیت؛ برای فهرست اخیر null'),
+            },
+            {
+                name: 'list_my_timesheets', description: 'نمایش آخرین کارکردهای شخصی کاربر جاری؛ هویت کاربر از نشست گرفته می‌شود.',
+                permission: 'timesheet:view', inputSchema: listSchema('برای این ابزار search نادیده گرفته می‌شود'),
+            },
+            {
+                name: 'list_my_leave_requests', description: 'نمایش آخرین درخواست‌های مرخصی شخصی کاربر جاری.',
+                permission: 'leave:view', inputSchema: listSchema('برای این ابزار search نادیده گرفته می‌شود'),
             },
         ];
     }
@@ -122,6 +146,36 @@ let CrmAssistantToolsService = class CrmAssistantToolsService {
                     organizer: item.organizer?.fullName ?? null,
                 }));
             }
+            case 'search_people': {
+                const result = await this.people.findDirectory(query, user);
+                return this.compactPage(result, (item) => ({
+                    id: item.id, name: item.fullName, title: item.jobTitle ?? item.title ?? null,
+                    company: item.company?.brandName || item.company?.legalName || null,
+                    email: item.email ?? null, phone: item.phone ?? null,
+                }));
+            }
+            case 'search_activities': {
+                const result = await this.activities.findAll(query, user);
+                return this.compactPage(result, (item) => ({
+                    id: item.id, type: item.type, notes: item.notes ?? null, outcome: item.outcome ?? null,
+                    occurredAt: item.occurredAt, nextActionDate: item.nextActionDate ?? null,
+                    company: item.company?.brandName || item.company?.legalName || null,
+                }));
+            }
+            case 'list_my_timesheets': {
+                const result = await this.timesheets.findMine({ page: 1, limit: args.limit }, user);
+                return this.compactPage(result, (item) => ({
+                    id: item.id, workDate: item.workDate, type: item.type, status: item.status,
+                    durationMinutes: item.durationMinutes, description: item.description ?? null,
+                }));
+            }
+            case 'list_my_leave_requests': {
+                const result = await this.leaveRequests.findMine({ page: 1, limit: args.limit }, user);
+                return this.compactPage(result, (item) => ({
+                    id: item.id, type: item.type, unit: item.unit, status: item.status,
+                    startDate: item.startDate, endDate: item.endDate, requestedMinutes: item.requestedMinutes,
+                }));
+            }
             default:
                 throw new common_1.ForbiddenException('ابزار ناشناخته است');
         }
@@ -148,6 +202,10 @@ exports.CrmAssistantToolsService = CrmAssistantToolsService = __decorate([
     __metadata("design:paramtypes", [companies_service_1.CompaniesService,
         opportunities_service_1.OpportunitiesService,
         tasks_service_1.TasksService,
-        meetings_service_1.MeetingsService])
+        meetings_service_1.MeetingsService,
+        people_service_1.PeopleService,
+        activities_service_1.ActivitiesService,
+        timesheet_service_1.TimesheetService,
+        leave_request_service_1.LeaveRequestService])
 ], CrmAssistantToolsService);
 //# sourceMappingURL=crm-assistant-tools.service.js.map

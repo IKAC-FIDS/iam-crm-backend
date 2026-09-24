@@ -50,6 +50,8 @@ exports.TimesheetsModule = TimesheetsModule = __decorate([
             work_schedule_resolver_service_1.WorkScheduleResolverService,
             timesheet_time_calculation_service_1.TimesheetTimeCalculationService,
             timesheet_conflict_service_1.TimesheetConflictService,
+            timesheet_service_1.TimesheetService,
+            leave_request_service_1.LeaveRequestService,
         ],
     })
 ], TimesheetsModule);

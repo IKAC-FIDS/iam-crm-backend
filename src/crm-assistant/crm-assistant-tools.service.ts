@@ -4,6 +4,10 @@ import { CompaniesService } from '../companies/companies.service';
 import { MeetingsService } from '../meetings/meetings.service';
 import { OpportunitiesService } from '../opportunities/opportunities.service';
 import { TasksService } from '../tasks/tasks.service';
+import { PeopleService } from '../people/people.service';
+import { ActivitiesService } from '../activities/activities.service';
+import { TimesheetService } from '../timesheets/timesheet.service';
+import { LeaveRequestService } from '../timesheets/leave-request.service';
 
 type JsonSchema = Record<string, unknown>;
 
@@ -51,6 +55,22 @@ export class CrmAssistantToolsService {
       permission: 'meeting:view',
       inputSchema: listSchema('عنوان جلسه؛ برای فهرست اخیر null'),
     },
+    {
+      name: 'search_people', description: 'جست‌وجوی مخاطبان قابل مشاهده در دفترچه سازمان.',
+      permission: 'people:directory:view', inputSchema: listSchema('نام، عنوان یا مشخصات مخاطب؛ برای فهرست اخیر null'),
+    },
+    {
+      name: 'search_activities', description: 'جست‌وجوی فعالیت‌های قابل مشاهده و اقدامات بعدی.',
+      permission: 'activity:view', inputSchema: listSchema('نوع، یادداشت یا نتیجه فعالیت؛ برای فهرست اخیر null'),
+    },
+    {
+      name: 'list_my_timesheets', description: 'نمایش آخرین کارکردهای شخصی کاربر جاری؛ هویت کاربر از نشست گرفته می‌شود.',
+      permission: 'timesheet:view', inputSchema: listSchema('برای این ابزار search نادیده گرفته می‌شود'),
+    },
+    {
+      name: 'list_my_leave_requests', description: 'نمایش آخرین درخواست‌های مرخصی شخصی کاربر جاری.',
+      permission: 'leave:view', inputSchema: listSchema('برای این ابزار search نادیده گرفته می‌شود'),
+    },
   ];
 
   constructor(
@@ -58,6 +78,10 @@ export class CrmAssistantToolsService {
     private readonly opportunities: OpportunitiesService,
     private readonly tasks: TasksService,
     private readonly meetings: MeetingsService,
+    private readonly people: PeopleService,
+    private readonly activities: ActivitiesService,
+    private readonly timesheets: TimesheetService,
+    private readonly leaveRequests: LeaveRequestService,
   ) {}
 
   listFor(user: CurrentUserPayload) {
@@ -126,6 +150,36 @@ export class CrmAssistantToolsService {
           endAt: item.endAt,
           company: item.company?.brandName || item.company?.legalName || null,
           organizer: item.organizer?.fullName ?? null,
+        }));
+      }
+      case 'search_people': {
+        const result = await this.people.findDirectory(query, user);
+        return this.compactPage(result, (item) => ({
+          id: item.id, name: item.fullName, title: item.jobTitle ?? item.title ?? null,
+          company: item.company?.brandName || item.company?.legalName || null,
+          email: item.email ?? null, phone: item.phone ?? null,
+        }));
+      }
+      case 'search_activities': {
+        const result = await this.activities.findAll(query, user);
+        return this.compactPage(result, (item) => ({
+          id: item.id, type: item.type, notes: item.notes ?? null, outcome: item.outcome ?? null,
+          occurredAt: item.occurredAt, nextActionDate: item.nextActionDate ?? null,
+          company: item.company?.brandName || item.company?.legalName || null,
+        }));
+      }
+      case 'list_my_timesheets': {
+        const result = await this.timesheets.findMine({ page: 1, limit: args.limit }, user);
+        return this.compactPage(result, (item) => ({
+          id: item.id, workDate: item.workDate, type: item.type, status: item.status,
+          durationMinutes: item.durationMinutes, description: item.description ?? null,
+        }));
+      }
+      case 'list_my_leave_requests': {
+        const result = await this.leaveRequests.findMine({ page: 1, limit: args.limit }, user);
+        return this.compactPage(result, (item) => ({
+          id: item.id, type: item.type, unit: item.unit, status: item.status,
+          startDate: item.startDate, endDate: item.endDate, requestedMinutes: item.requestedMinutes,
         }));
       }
       default:

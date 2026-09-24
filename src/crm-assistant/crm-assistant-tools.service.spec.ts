@@ -8,11 +8,19 @@ describe('CrmAssistantToolsService', () => {
   const opportunities = { findAll: jest.fn<(...args: any[]) => Promise<any>>() };
   const tasks = { findAll: jest.fn<(...args: any[]) => Promise<any>>() };
   const meetings = { findAll: jest.fn<(...args: any[]) => Promise<any>>() };
+  const people = { findDirectory: jest.fn<(...args: any[]) => Promise<any>>() };
+  const activities = { findAll: jest.fn<(...args: any[]) => Promise<any>>() };
+  const timesheets = { findMine: jest.fn<(...args: any[]) => Promise<any>>() };
+  const leaveRequests = { findMine: jest.fn<(...args: any[]) => Promise<any>>() };
   const service = new CrmAssistantToolsService(
     companies as never,
     opportunities as never,
     tasks as never,
     meetings as never,
+    people as never,
+    activities as never,
+    timesheets as never,
+    leaveRequests as never,
   );
   const user = {
     userId: 'user-1',

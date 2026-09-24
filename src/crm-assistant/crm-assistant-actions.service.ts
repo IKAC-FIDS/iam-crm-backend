@@ -18,9 +18,21 @@ import { OpportunitiesService } from '../opportunities/opportunities.service';
 import { CreateOpportunityDto } from '../opportunities/dto/create-opportunity.dto';
 import { TasksService } from '../tasks/tasks.service';
 import { CreateTaskDto } from '../tasks/dto/create-task.dto';
+import { PeopleService } from '../people/people.service';
+import { CreatePersonDto } from '../people/dto/create-person.dto';
+import { ActivitiesService } from '../activities/activities.service';
+import { CreateActivityDto } from '../activities/dto/create-activity.dto';
+import { MeetingsService } from '../meetings/meetings.service';
+import { CreateMeetingDto } from '../meetings/dto/create-meeting.dto';
+import { TimesheetService } from '../timesheets/timesheet.service';
+import { LeaveRequestService } from '../timesheets/leave-request.service';
+import { CreateLeaveRequestDto, CreateTimesheetDto } from '../timesheets/dto/timesheet.dto';
 import type { CrmAssistantToolDefinition } from './crm-assistant-tools.service';
 
-type ActionType = 'company.create' | 'opportunity.create' | 'task.create';
+type ActionType =
+  | 'company.create' | 'opportunity.create' | 'task.create'
+  | 'person.create' | 'activity.create' | 'meeting.create'
+  | 'timesheet.create' | 'leave.create';
 type TokenState = 'executing' | 'executed';
 
 interface ActionTokenPayload {
@@ -42,6 +54,7 @@ interface ActionDefinition extends CrmAssistantToolDefinition {
 
 const priorities = ['LOW', 'MEDIUM', 'HIGH', 'STRATEGIC'];
 const nullableString = (description: string) => ({ type: ['string', 'null'], description });
+const nullableUuid = (description: string) => ({ type: ['string', 'null'], description });
 
 @Injectable()
 export class CrmAssistantActionsService {
@@ -91,6 +104,78 @@ export class CrmAssistantActionsService {
         required: ['title', 'description', 'priority', 'dueAt', 'companyId', 'opportunityId', 'assignedToId'],
       },
     },
+    {
+      name: 'propose_create_person', action: 'person.create', title: 'ایجاد مخاطب', permission: 'person:create',
+      description: 'پیش‌نویس ایجاد مخاطب در یک شرکت موجود را آماده می‌کند؛ companyId باید از داده واقعی CRM باشد.',
+      inputSchema: {
+        type: 'object', additionalProperties: false,
+        properties: {
+          companyId: { type: 'string', description: 'شناسه شرکت موجود' }, fullName: { type: 'string', description: 'نام کامل مخاطب' },
+          jobTitle: nullableString('عنوان شغلی'), department: nullableString('واحد سازمانی'), email: nullableString('ایمیل'),
+          phone: nullableString('تلفن'), linkedinUrl: nullableString('نشانی لینکدین'),
+          isPrimaryContact: { type: ['boolean', 'null'], description: 'آیا مخاطب اصلی شرکت است؟' },
+        },
+        required: ['companyId', 'fullName', 'jobTitle', 'department', 'email', 'phone', 'linkedinUrl', 'isPrimaryContact'],
+      },
+    },
+    {
+      name: 'propose_create_activity', action: 'activity.create', title: 'ثبت فعالیت', permission: 'activity:create',
+      description: 'پیش‌نویس ثبت یک فعالیت واقعی برای شرکت، کار یا فرصت را آماده می‌کند.',
+      inputSchema: {
+        type: 'object', additionalProperties: false,
+        properties: {
+          targetType: { type: ['string', 'null'], enum: ['COMPANY', 'TASK', null] }, companyId: nullableUuid('شناسه شرکت'),
+          taskId: nullableUuid('شناسه کار'), personId: nullableUuid('شناسه مخاطب'), opportunityId: nullableUuid('شناسه فرصت'),
+          type: { type: 'string', description: 'کد یا عنوان نوع فعالیت پشتیبانی‌شده در سیستم' }, notes: nullableString('یادداشت'),
+          outcome: nullableString('نتیجه'), occurredAt: nullableString('تاریخ/زمان وقوع طبق قرارداد API'), nextActionDate: nullableString('تاریخ اقدام بعدی'),
+        },
+        required: ['targetType', 'companyId', 'taskId', 'personId', 'opportunityId', 'type', 'notes', 'outcome', 'occurredAt', 'nextActionDate'],
+      },
+    },
+    {
+      name: 'propose_create_meeting', action: 'meeting.create', title: 'برنامه‌ریزی جلسه', permission: 'meeting:create',
+      description: 'پیش‌نویس جلسه برای یک شرکت موجود را آماده می‌کند.',
+      inputSchema: {
+        type: 'object', additionalProperties: false,
+        properties: {
+          companyId: { type: 'string' }, opportunityId: nullableUuid('شناسه فرصت مرتبط'), title: { type: 'string' },
+          agenda: nullableString('دستور جلسه'), description: nullableString('شرح'),
+          mode: { type: 'string', enum: ['IN_PERSON', 'ONLINE', 'HYBRID'] }, location: nullableString('محل جلسه'),
+          meetingUrl: nullableString('لینک کامل جلسه آنلاین'), startAt: { type: 'string' }, endAt: { type: 'string' }, reminderAt: nullableString('زمان یادآوری'),
+          assigneeUserIds: { type: ['array', 'null'], items: { type: 'string' } }, attendeePersonIds: { type: ['array', 'null'], items: { type: 'string' } },
+        },
+        required: ['companyId', 'opportunityId', 'title', 'agenda', 'description', 'mode', 'location', 'meetingUrl', 'startAt', 'endAt', 'reminderAt', 'assigneeUserIds', 'attendeePersonIds'],
+      },
+    },
+    {
+      name: 'propose_create_timesheet', action: 'timesheet.create', title: 'ثبت کارکرد', permission: 'timesheet:manage',
+      description: 'پیش‌نویس کارکرد شخصی کاربر جاری را آماده می‌کند. مدت‌ها بر حسب دقیقه هستند.',
+      inputSchema: {
+        type: 'object', additionalProperties: false,
+        properties: {
+          workDate: { type: 'string', description: 'تاریخ YYYY-MM-DD' }, type: { type: 'string', enum: ['REGULAR', 'OVERTIME'] },
+          startMinute: { type: ['integer', 'null'], minimum: 0, maximum: 1439 }, endMinute: { type: ['integer', 'null'], minimum: 0, maximum: 1439 },
+          spansMidnight: { type: ['boolean', 'null'] }, durationMinutes: { type: ['integer', 'null'], minimum: 1, maximum: 2880 },
+          breakMinutes: { type: ['integer', 'null'], minimum: 0, maximum: 1440 }, description: nullableString('شرح'),
+          taskId: nullableUuid('کار مرتبط'), companyId: nullableUuid('شرکت مرتبط'),
+        },
+        required: ['workDate', 'type', 'startMinute', 'endMinute', 'spansMidnight', 'durationMinutes', 'breakMinutes', 'description', 'taskId', 'companyId'],
+      },
+    },
+    {
+      name: 'propose_create_leave', action: 'leave.create', title: 'ثبت درخواست مرخصی', permission: 'leave:manage',
+      description: 'پیش‌نویس درخواست مرخصی شخصی کاربر جاری را آماده می‌کند؛ برنامه کاری معتبر همچنان الزامی است.',
+      inputSchema: {
+        type: 'object', additionalProperties: false,
+        properties: {
+          type: { type: 'string', enum: ['ANNUAL', 'SICK', 'UNPAID', 'OTHER'] },
+          unit: { type: 'string', enum: ['FULL_DAY', 'HALF_DAY', 'HOURLY'] }, startDate: { type: 'string' }, endDate: { type: 'string' },
+          startMinute: { type: ['integer', 'null'], minimum: 0, maximum: 1439 }, endMinute: { type: ['integer', 'null'], minimum: 1, maximum: 1440 },
+          reason: nullableString('دلیل مرخصی'),
+        },
+        required: ['type', 'unit', 'startDate', 'endDate', 'startMinute', 'endMinute', 'reason'],
+      },
+    },
   ];
 
   constructor(
@@ -98,6 +183,11 @@ export class CrmAssistantActionsService {
     private readonly companies: CompaniesService,
     private readonly opportunities: OpportunitiesService,
     private readonly tasks: TasksService,
+    private readonly people: PeopleService,
+    private readonly activities: ActivitiesService,
+    private readonly meetings: MeetingsService,
+    private readonly timesheets: TimesheetService,
+    private readonly leaveRequests: LeaveRequestService,
     private readonly audit: AuditLogService,
   ) {}
 
@@ -139,9 +229,24 @@ export class CrmAssistantActionsService {
       } else if (payload.action === 'opportunity.create') {
         const created = await this.opportunities.create(dto as CreateOpportunityDto, user);
         entity = { id: created.id, label: created.title, href: `/opportunities/${created.id}` };
-      } else {
+      } else if (payload.action === 'task.create') {
         const created = await this.tasks.create(dto as CreateTaskDto, user);
         entity = { id: created.id, label: created.title, href: `/tasks/${created.id}` };
+      } else if (payload.action === 'person.create') {
+        const created = await this.people.create(dto as CreatePersonDto, user);
+        entity = { id: created.id, label: created.fullName, href: `/people/${created.id}` };
+      } else if (payload.action === 'activity.create') {
+        const created = await this.activities.create(dto as CreateActivityDto, user);
+        entity = { id: created.id, label: created.type, href: '/activities' };
+      } else if (payload.action === 'meeting.create') {
+        const created = await this.meetings.create(dto as CreateMeetingDto, user);
+        entity = { id: created.id, label: created.title, href: `/meetings/${created.id}` };
+      } else if (payload.action === 'timesheet.create') {
+        const created = await this.timesheets.create(dto as CreateTimesheetDto, user);
+        entity = { id: created.id, label: 'کارکرد ثبت‌شده', href: '/account/timesheets' };
+      } else {
+        const created = await this.leaveRequests.create(dto as CreateLeaveRequestDto, user);
+        entity = { id: created.id, label: 'درخواست مرخصی', href: '/account/leave-requests' };
       }
       this.tokenStates.set(payload.nonce, { state: 'executed', expiresAt: payload.exp });
       await this.audit.recordTenantEvent({
@@ -157,11 +262,14 @@ export class CrmAssistantActionsService {
   }
 
   private async validateAction(action: ActionType, args: Record<string, unknown>) {
-    const dto = action === 'company.create'
-      ? plainToInstance(CreateCompanyDto, args)
-      : action === 'opportunity.create'
-        ? plainToInstance(CreateOpportunityDto, args)
-        : plainToInstance(CreateTaskDto, args);
+    const dto = action === 'company.create' ? plainToInstance(CreateCompanyDto, args)
+      : action === 'opportunity.create' ? plainToInstance(CreateOpportunityDto, args)
+      : action === 'task.create' ? plainToInstance(CreateTaskDto, args)
+      : action === 'person.create' ? plainToInstance(CreatePersonDto, args)
+      : action === 'activity.create' ? plainToInstance(CreateActivityDto, args)
+      : action === 'meeting.create' ? plainToInstance(CreateMeetingDto, args)
+      : action === 'timesheet.create' ? plainToInstance(CreateTimesheetDto, args)
+      : plainToInstance(CreateLeaveRequestDto, args);
     const errors = await validate(dto, { whitelist: true, forbidNonWhitelisted: true, stopAtFirstError: false });
     if (errors.length) {
       const messages = errors.flatMap((error) => Object.values(error.constraints ?? {}));
@@ -183,6 +291,10 @@ export class CrmAssistantActionsService {
       legalName: 'نام حقوقی', brandName: 'نام تجاری', companyId: 'شناسه شرکت', title: 'عنوان', description: 'شرح',
       priority: 'اولویت', website: 'وب‌سایت', headOfficeCity: 'شهر', centralPhone: 'تلفن', estimatedValue: 'ارزش تخمینی',
       expectedCloseDate: 'تاریخ بستن', dueAt: 'سررسید', ownerId: 'مالک', assignedToId: 'مسئول', stageId: 'مرحله', opportunityId: 'فرصت مرتبط',
+      fullName: 'نام مخاطب', jobTitle: 'عنوان شغلی', department: 'واحد', email: 'ایمیل', phone: 'تلفن', type: 'نوع', notes: 'یادداشت',
+      outcome: 'نتیجه', occurredAt: 'زمان وقوع', nextActionDate: 'اقدام بعدی', agenda: 'دستور جلسه', mode: 'شیوه جلسه',
+      location: 'محل', meetingUrl: 'لینک جلسه', startAt: 'شروع', endAt: 'پایان', workDate: 'تاریخ کارکرد',
+      durationMinutes: 'مدت به دقیقه', breakMinutes: 'استراحت به دقیقه', unit: 'واحد مرخصی', startDate: 'شروع مرخصی', endDate: 'پایان مرخصی', reason: 'دلیل',
     };
     return Object.entries(args).filter(([, value]) => value !== undefined).map(([key, value]) => ({ label: labels[key] ?? key, value: String(value) }));
   }
@@ -222,7 +334,19 @@ export class CrmAssistantActionsService {
     return user.role === 'ADMIN';
   }
 
-  private permissionFor(action: ActionType) { return action === 'company.create' ? 'company:create' : action === 'opportunity.create' ? 'opportunity:create' : 'task:create'; }
-  private titleFor(action: ActionType) { return action === 'company.create' ? 'ایجاد شرکت' : action === 'opportunity.create' ? 'ایجاد فرصت فروش' : 'ایجاد کار'; }
+  private permissionFor(action: ActionType) {
+    return ({
+      'company.create': 'company:create', 'opportunity.create': 'opportunity:create', 'task.create': 'task:create',
+      'person.create': 'person:create', 'activity.create': 'activity:create', 'meeting.create': 'meeting:create',
+      'timesheet.create': 'timesheet:manage', 'leave.create': 'leave:manage',
+    } as const)[action];
+  }
+  private titleFor(action: ActionType) {
+    return ({
+      'company.create': 'ایجاد شرکت', 'opportunity.create': 'ایجاد فرصت فروش', 'task.create': 'ایجاد کار',
+      'person.create': 'ایجاد مخاطب', 'activity.create': 'ثبت فعالیت', 'meeting.create': 'برنامه‌ریزی جلسه',
+      'timesheet.create': 'ثبت کارکرد', 'leave.create': 'ثبت درخواست مرخصی',
+    } as const)[action];
+  }
   private cleanupStates() { const now = Date.now(); for (const [nonce, value] of this.tokenStates) if (value.expiresAt <= now) this.tokenStates.delete(nonce); }
 }

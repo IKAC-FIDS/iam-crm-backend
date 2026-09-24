@@ -8,7 +8,11 @@ const crm_assistant_tools_service_1 = require("./crm-assistant-tools.service");
     const opportunities = { findAll: globals_1.jest.fn() };
     const tasks = { findAll: globals_1.jest.fn() };
     const meetings = { findAll: globals_1.jest.fn() };
-    const service = new crm_assistant_tools_service_1.CrmAssistantToolsService(companies, opportunities, tasks, meetings);
+    const people = { findDirectory: globals_1.jest.fn() };
+    const activities = { findAll: globals_1.jest.fn() };
+    const timesheets = { findMine: globals_1.jest.fn() };
+    const leaveRequests = { findMine: globals_1.jest.fn() };
+    const service = new crm_assistant_tools_service_1.CrmAssistantToolsService(companies, opportunities, tasks, meetings, people, activities, timesheets, leaveRequests);
     const user = {
         userId: 'user-1',
         email: 'user@example.com',

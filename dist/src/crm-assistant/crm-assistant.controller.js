@@ -38,7 +38,7 @@ let CrmAssistantController = class CrmAssistantController {
 exports.CrmAssistantController = CrmAssistantController;
 __decorate([
     (0, common_1.Post)('ask'),
-    (0, permissions_decorator_1.AnyPermission)('company:view', 'opportunity:view', 'task:view', 'meeting:view'),
+    (0, permissions_decorator_1.AnyPermission)('company:view', 'opportunity:view', 'task:view', 'meeting:view', 'people:directory:view', 'activity:view', 'timesheet:view', 'leave:view'),
     openapi.ApiResponse({ status: 201 }),
     __param(0, (0, common_1.Body)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
@@ -48,7 +48,7 @@ __decorate([
 ], CrmAssistantController.prototype, "ask", null);
 __decorate([
     (0, common_1.Post)('actions/confirm'),
-    (0, permissions_decorator_1.AnyPermission)('company:create', 'opportunity:create', 'task:create'),
+    (0, permissions_decorator_1.AnyPermission)('company:create', 'opportunity:create', 'task:create', 'person:create', 'activity:create', 'meeting:create', 'timesheet:manage', 'leave:manage'),
     openapi.ApiResponse({ status: 201 }),
     __param(0, (0, common_1.Body)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
