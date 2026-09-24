@@ -8,6 +8,7 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TimesheetsModule = void 0;
 const common_1 = require("@nestjs/common");
+const work_schedule_management_1 = require("./work-schedule-management");
 const report_export_service_1 = require("../common/export/report-export.service");
 const timesheet_reporting_service_1 = require("./timesheet-reporting.service");
 const timesheet_reporting_controller_1 = require("./timesheet-reporting.controller");
@@ -28,12 +29,14 @@ exports.TimesheetsModule = TimesheetsModule = __decorate([
     (0, common_1.Module)({
         imports: [tasks_module_1.TasksModule, company_access_module_1.CompanyAccessModule, notification_core_module_1.NotificationCoreModule],
         controllers: [
+            work_schedule_management_1.WorkScheduleManagementController,
             timesheet_reporting_controller_1.TimesheetReportingController,
             timesheets_controller_1.TimesheetsController,
             timesheets_controller_1.LeaveRequestsController,
             timesheets_controller_1.TimesheetAdminController,
         ],
         providers: [
+            work_schedule_management_1.WorkScheduleManagementService,
             report_export_service_1.ReportExportService,
             timesheet_reporting_service_1.TimesheetReportingService,
             work_schedule_resolver_service_1.WorkScheduleResolverService,

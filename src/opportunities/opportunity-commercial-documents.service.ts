@@ -14,6 +14,7 @@ import {
 import { AuditLogService } from '../audit-log/audit-log.service';
 import { AttachmentsService } from '../attachments/attachments.service';
 import { CurrentUserPayload } from '../common/decorators/current-user.decorator';
+import { getCurrentOrganizationId } from '../common/tenant/tenant-scope.util';
 import { userTeamScopeWhere } from '../common/tenant/team-scope.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { ChangeCommercialDocumentStatusDto } from './dto/change-commercial-document-status.dto';
@@ -519,12 +520,14 @@ export class OpportunityCommercialDocumentsService {
   private async getOpportunityForView(
     opportunityId: string,
     user: CurrentUserPayload,
+    enforceOwnershipScope = false,
   ) {
     const opportunity = await this.prisma.opportunity.findFirst({
       where: {
         AND: [
           { id: opportunityId },
-          this.opportunityScopeWhere(user),
+          { organizationId: getCurrentOrganizationId(user) },
+          ...(enforceOwnershipScope ? [this.opportunityScopeWhere(user)] : []),
         ],
       },
     });
@@ -544,7 +547,11 @@ export class OpportunityCommercialDocumentsService {
       throw new ForbiddenException('Opportunity is read-only for this role');
     }
 
-    const opportunity = await this.getOpportunityForView(opportunityId, user);
+    const opportunity = await this.getOpportunityForView(
+      opportunityId,
+      user,
+      true,
+    );
 
     if (opportunity.archivedAt) {
       throw new BadRequestException('Archived opportunities cannot be changed');

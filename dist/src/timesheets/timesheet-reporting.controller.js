@@ -20,11 +20,14 @@ const permissions_decorator_1 = require("../common/decorators/permissions.decora
 const jwt_auth_guard_1 = require("../common/guards/jwt-auth.guard");
 const permissions_guard_1 = require("../common/guards/permissions.guard");
 const timesheet_report_dto_1 = require("./dto/timesheet-report.dto");
+const timesheet_approval_service_1 = require("./timesheet-approval.service");
 const timesheet_reporting_service_1 = require("./timesheet-reporting.service");
 let TimesheetReportingController = class TimesheetReportingController {
-    constructor(reports) {
+    constructor(reports, approvals) {
         this.reports = reports;
+        this.approvals = approvals;
     }
+    options(query, user) { return this.approvals.filterOptions(query.domain, user); }
     report(query, user) { return this.reports.report(query, user); }
     personal(query, user) { return this.reports.personal(query, user); }
     async export(query, user, response) {
@@ -38,6 +41,16 @@ let TimesheetReportingController = class TimesheetReportingController {
     }
 };
 exports.TimesheetReportingController = TimesheetReportingController;
+__decorate([
+    (0, common_1.Get)('admin/timesheets/filter-options'),
+    (0, permissions_decorator_1.AnyPermission)('timesheet:approve', 'timesheet:approve-organization', 'timesheet:view-organization', 'timesheet:report', 'leave:approve', 'leave:approve-organization', 'leave:view-organization'),
+    openapi.ApiResponse({ status: 200 }),
+    __param(0, (0, common_1.Query)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [timesheet_report_dto_1.TimesheetOptionsDto, Object]),
+    __metadata("design:returntype", void 0)
+], TimesheetReportingController.prototype, "options", null);
 __decorate([
     (0, common_1.Get)('admin/timesheets/reports'),
     (0, permissions_decorator_1.Permissions)('timesheet:report'),
@@ -72,6 +85,6 @@ __decorate([
 exports.TimesheetReportingController = TimesheetReportingController = __decorate([
     (0, common_1.Controller)(),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, permissions_guard_1.PermissionsGuard),
-    __metadata("design:paramtypes", [timesheet_reporting_service_1.TimesheetReportingService])
+    __metadata("design:paramtypes", [timesheet_reporting_service_1.TimesheetReportingService, timesheet_approval_service_1.TimesheetApprovalService])
 ], TimesheetReportingController);
 //# sourceMappingURL=timesheet-reporting.controller.js.map

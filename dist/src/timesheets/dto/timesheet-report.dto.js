@@ -9,7 +9,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.TimesheetReportDto = exports.PersonalTimesheetReportDto = void 0;
+exports.TimesheetReportDto = exports.TimesheetOptionsDto = exports.PersonalTimesheetReportDto = void 0;
 const openapi = require("@nestjs/swagger");
 const class_validator_1 = require("class-validator");
 const client_1 = require("@prisma/client");
@@ -28,6 +28,19 @@ __decorate([
     (0, class_validator_1.Matches)(/^\d{4}-\d{2}-\d{2}$/),
     __metadata("design:type", String)
 ], PersonalTimesheetReportDto.prototype, "dateTo", void 0);
+class TimesheetOptionsDto {
+    constructor() {
+        this.domain = 'timesheet';
+    }
+    static _OPENAPI_METADATA_FACTORY() {
+        return { domain: { required: true, type: () => Object, default: "timesheet", enum: ['timesheet', 'leave'] } };
+    }
+}
+exports.TimesheetOptionsDto = TimesheetOptionsDto;
+__decorate([
+    (0, class_validator_1.IsIn)(['timesheet', 'leave']),
+    __metadata("design:type", String)
+], TimesheetOptionsDto.prototype, "domain", void 0);
 class TimesheetReportDto extends PersonalTimesheetReportDto {
     static _OPENAPI_METADATA_FACTORY() {
         return { employeeId: { required: false, type: () => String }, teamId: { required: false, type: () => String }, entryType: { required: false, type: () => Object }, status: { required: false, type: () => String, enum: ['DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED', 'CANCELLED'] }, taskId: { required: false, type: () => String }, companyId: { required: false, type: () => String } };

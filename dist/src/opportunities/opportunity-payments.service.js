@@ -13,6 +13,7 @@ exports.OpportunityPaymentsService = void 0;
 const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
 const audit_log_service_1 = require("../audit-log/audit-log.service");
+const tenant_scope_util_1 = require("../common/tenant/tenant-scope.util");
 const team_scope_util_1 = require("../common/tenant/team-scope.util");
 const prisma_service_1 = require("../prisma/prisma.service");
 const api_date_util_1 = require("../common/dates/api-date.util");
@@ -305,12 +306,13 @@ let OpportunityPaymentsService = class OpportunityPaymentsService {
         }
         return decimal;
     }
-    async getOpportunityForView(opportunityId, user) {
+    async getOpportunityForView(opportunityId, user, enforceOwnershipScope = false) {
         const opportunity = await this.prisma.opportunity.findFirst({
             where: {
                 AND: [
                     { id: opportunityId },
-                    this.opportunityScopeWhere(user),
+                    { organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user) },
+                    ...(enforceOwnershipScope ? [this.opportunityScopeWhere(user)] : []),
                 ],
             },
         });
@@ -323,7 +325,7 @@ let OpportunityPaymentsService = class OpportunityPaymentsService {
         if (user.role === client_1.UserRole.BOARDS) {
             throw new common_1.ForbiddenException('Opportunity is read-only for this role');
         }
-        const opportunity = await this.getOpportunityForView(opportunityId, user);
+        const opportunity = await this.getOpportunityForView(opportunityId, user, true);
         if (opportunity.archivedAt) {
             throw new common_1.BadRequestException('Archived opportunities cannot be changed');
         }

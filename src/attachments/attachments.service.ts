@@ -517,7 +517,7 @@ export class AttachmentsService {
           AND: [
             { id: entityId },
             { organizationId: getCurrentOrganizationId(user) },
-            this.opportunityScopeWhere(user),
+            ...(mutation ? [this.opportunityScopeWhere(user)] : []),
           ],
         },
       });

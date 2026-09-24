@@ -11,6 +11,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TimesheetReportingService = void 0;
 const common_1 = require("@nestjs/common");
+const client_1 = require("@prisma/client");
 const tenant_scope_util_1 = require("../common/tenant/tenant-scope.util");
 const prisma_service_1 = require("../prisma/prisma.service");
 const report_export_service_1 = require("../common/export/report-export.service");
@@ -99,14 +100,14 @@ let TimesheetReportingService = class TimesheetReportingService {
                 throw new common_1.BadRequestException('Export limit exceeded; narrow the period');
             const review = { select: { user: { select: { fullName: true } } } };
             const [work, leave] = await Promise.all([
-                db.timesheetEntry.findMany({ where: scope.work, take: timesheet_reporting_policy_1.EXPORT_MAX_ROWS, orderBy: [{ workDate: 'asc' }, { id: 'asc' }], include: { user: { select: { fullName: true } }, task: { select: { title: true } }, company: { select: { name: true } }, reviewedByMembership: review } }),
+                db.timesheetEntry.findMany({ where: scope.work, take: timesheet_reporting_policy_1.EXPORT_MAX_ROWS, orderBy: [{ workDate: 'asc' }, { id: 'asc' }], include: { user: { select: { fullName: true } }, task: { select: { title: true } }, company: { select: { legalName: true } }, reviewedByMembership: review } }),
                 db.leaveRequest.findMany({ where: scope.leave, take: timesheet_reporting_policy_1.EXPORT_MAX_ROWS, orderBy: [{ startDate: 'asc' }, { id: 'asc' }], include: { user: { select: { fullName: true } }, reviewedByMembership: review } }),
             ]);
             const duration = (minutes) => minutes == null ? 'Unavailable' : `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, '0')}`;
             const stamp = (date) => date?.toISOString() ?? '';
             const detail = work.map(row => ({ Date: stamp(row.workDate).slice(0, 10), Employee: row.user.fullName, 'Historical Team': row.teamNameSnapshot,
                 'Work Type': row.type, 'Start Time': row.startMinute == null ? '' : duration(row.startMinute), 'End Time': row.endMinute == null ? '' : duration(row.endMinute),
-                Overnight: row.spansMidnight, 'Break Minutes': row.breakMinutes, 'Duration (H:MM)': duration(row.durationMinutes), Task: row.task?.title, Company: row.company?.name,
+                Overnight: row.spansMidnight, 'Break Minutes': row.breakMinutes, 'Duration (H:MM)': duration(row.durationMinutes), Task: row.task?.title, Company: row.company?.legalName,
                 Description: row.description, Status: row.status, 'Submitted At (UTC)': stamp(row.submittedAt), Reviewer: row.reviewedByMembership?.user.fullName,
                 'Decision Date (UTC)': stamp(row.reviewedAt), 'Rejection Reason': row.rejectionReason }));
             return this.exporter.create('xlsx', `timesheets-${query.dateFrom}-${query.dateTo}`, [
@@ -120,7 +121,7 @@ let TimesheetReportingService = class TimesheetReportingService {
                         'Crosses reporting boundary': row.startDate < scope.from || row.endDate > scope.to, Status: row.status, Reason: row.reason,
                         Reviewer: row.reviewedByMembership?.user.fullName, 'Decision Date (UTC)': stamp(row.reviewedAt), 'Rejection Reason': row.rejectionReason })) },
             ], timesheet_reporting_policy_1.EXPORT_MAX_ROWS);
-        });
+        }, { isolationLevel: client_1.Prisma.TransactionIsolationLevel.RepeatableRead, timeout: 30000 });
     }
 };
 exports.TimesheetReportingService = TimesheetReportingService;

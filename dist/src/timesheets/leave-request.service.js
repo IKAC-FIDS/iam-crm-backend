@@ -206,7 +206,7 @@ let LeaveRequestService = class LeaveRequestService {
             if (!schedule.scheduleId)
                 throw new common_1.BadRequestException({
                     code: "MISSING_WORK_SCHEDULE",
-                    message: `No work schedule applies on ${date}`,
+                    message: `برای تاریخ ${date} برنامه کاری معتبری تعریف نشده است. از مدیر سازمان بخواهید در بخش «برنامه کاری سازمان» برنامه‌ای با تاریخ اعتبار مناسب ثبت کند.`,
                 });
             if (dto.unit === client_1.LeaveUnit.FULL_DAY)
                 requestedMinutes += schedule.expectedRegularMinutes;
@@ -349,6 +349,7 @@ let LeaveRequestService = class LeaveRequestService {
                     orderBy: { startDate: query.sort ?? "desc" },
                     skip: (page - 1) * limit,
                     take: limit,
+                    include: { reviewedByMembership: { select: { user: { select: { fullName: true } } } }, approvalHistory: { orderBy: { createdAt: 'asc' }, take: 100, include: { actorMembership: { select: { user: { select: { fullName: true } } } } } } },
                 }),
                 db.leaveRequest.count({ where }),
             ]);

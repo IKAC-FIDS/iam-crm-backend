@@ -51,6 +51,7 @@ __decorate([
 ], CreateTimesheetDto.prototype, "endMinute", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsBoolean)(),
     __metadata("design:type", Boolean)
 ], CreateTimesheetDto.prototype, "spansMidnight", void 0);
 __decorate([
@@ -97,7 +98,7 @@ class FindMyTimesheetsDto extends pagination_dto_1.PaginationDto {
         this.sort = "desc";
     }
     static _OPENAPI_METADATA_FACTORY() {
-        return { startDate: { required: false, type: () => String }, endDate: { required: false, type: () => String }, type: { required: false, type: () => Object }, status: { required: false, type: () => Object }, sort: { required: false, type: () => Object, default: "desc" } };
+        return { startDate: { required: false, type: () => String }, endDate: { required: false, type: () => String }, type: { required: false, type: () => Object }, status: { required: false, type: () => Object }, sort: { required: false, type: () => Object, default: "desc", enum: ['asc', 'desc'] } };
     }
 }
 exports.FindMyTimesheetsDto = FindMyTimesheetsDto;
@@ -123,6 +124,7 @@ __decorate([
 ], FindMyTimesheetsDto.prototype, "status", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsIn)(['asc', 'desc']),
     __metadata("design:type", String)
 ], FindMyTimesheetsDto.prototype, "sort", void 0);
 class FindAdminTimesheetsDto extends FindMyTimesheetsDto {
@@ -197,7 +199,7 @@ class FindMyLeaveRequestsDto extends pagination_dto_1.PaginationDto {
         this.sort = "desc";
     }
     static _OPENAPI_METADATA_FACTORY() {
-        return { startDate: { required: false, type: () => String }, endDate: { required: false, type: () => String }, type: { required: false, type: () => Object }, status: { required: false, type: () => Object }, sort: { required: false, type: () => Object, default: "desc" } };
+        return { startDate: { required: false, type: () => String }, endDate: { required: false, type: () => String }, type: { required: false, type: () => Object }, status: { required: false, type: () => Object }, sort: { required: false, type: () => Object, default: "desc", enum: ['asc', 'desc'] } };
     }
 }
 exports.FindMyLeaveRequestsDto = FindMyLeaveRequestsDto;
@@ -223,6 +225,7 @@ __decorate([
 ], FindMyLeaveRequestsDto.prototype, "status", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsIn)(['asc', 'desc']),
     __metadata("design:type", String)
 ], FindMyLeaveRequestsDto.prototype, "sort", void 0);
 class FindAdminLeaveRequestsDto extends FindMyLeaveRequestsDto {
@@ -243,12 +246,13 @@ __decorate([
 ], FindAdminLeaveRequestsDto.prototype, "teamId", void 0);
 class RejectDecisionDto {
     static _OPENAPI_METADATA_FACTORY() {
-        return { reason: { required: true, type: () => String, maxLength: 2000 } };
+        return { reason: { required: true, type: () => String, maxLength: 2000, pattern: "/\\S/" } };
     }
 }
 exports.RejectDecisionDto = RejectDecisionDto;
 __decorate([
     (0, class_validator_1.IsString)(),
+    (0, class_validator_1.Matches)(/\S/),
     (0, class_validator_1.MaxLength)(2000),
     __metadata("design:type", String)
 ], RejectDecisionDto.prototype, "reason", void 0);

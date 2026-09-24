@@ -7,6 +7,7 @@ import {
 import { Prisma, SalesChannel, UserRole } from "@prisma/client";
 import { AuditLogService } from "../audit-log/audit-log.service";
 import { CurrentUserPayload } from "../common/decorators/current-user.decorator";
+import { getCurrentOrganizationId } from "../common/tenant/tenant-scope.util";
 import { userTeamScopeWhere } from "../common/tenant/team-scope.util";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateOpportunityLineItemDto } from "./dto/create-opportunity-line-item.dto";
@@ -351,10 +352,15 @@ export class OpportunityLineItemsService {
   private async getOpportunityForView(
     opportunityId: string,
     user: CurrentUserPayload,
+    enforceOwnershipScope = false,
   ) {
     const opportunity = await this.prisma.opportunity.findFirst({
       where: {
-        AND: [{ id: opportunityId }, this.opportunityScopeWhere(user)],
+        AND: [
+          { id: opportunityId },
+          { organizationId: getCurrentOrganizationId(user) },
+          ...(enforceOwnershipScope ? [this.opportunityScopeWhere(user)] : []),
+        ],
       },
       include: {
         company: {
@@ -385,7 +391,11 @@ export class OpportunityLineItemsService {
       throw new ForbiddenException("Opportunity is read-only for this role");
     }
 
-    const opportunity = await this.getOpportunityForView(opportunityId, user);
+    const opportunity = await this.getOpportunityForView(
+      opportunityId,
+      user,
+      true,
+    );
 
     if (opportunity.archivedAt) {
       throw new BadRequestException("Archived opportunities cannot be changed");

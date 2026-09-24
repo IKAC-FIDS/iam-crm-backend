@@ -36,6 +36,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.envValidationSchema = void 0;
 const Joi = __importStar(require("joi"));
 exports.envValidationSchema = Joi.object({
+    OPENAPI_RUNTIME_ENABLED: Joi.boolean().default(false),
     DATABASE_URL: Joi.string()
         .required()
         .uri({ scheme: ['postgresql', 'postgres'] })

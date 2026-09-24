@@ -388,7 +388,7 @@ let AttachmentsService = AttachmentsService_1 = class AttachmentsService {
                     AND: [
                         { id: entityId },
                         { organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user) },
-                        this.opportunityScopeWhere(user),
+                        ...(mutation ? [this.opportunityScopeWhere(user)] : []),
                     ],
                 },
             });

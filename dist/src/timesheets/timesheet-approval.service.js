@@ -28,6 +28,19 @@ let TimesheetApprovalService = class TimesheetApprovalService {
     listLeave(query, user) {
         return this.list("leave", query, user);
     }
+    filterOptions(domain, user) {
+        const tenant = tenant_scope_util_1.tenantScope.require(user);
+        if (!['approve', 'approve-organization', 'view-organization', ...(domain === 'timesheet' ? ['report'] : [])].some(action => tenant.permissions.includes(`${domain}:${action}`)))
+            throw new common_1.ForbiddenException('Missing domain permission');
+        return this.prisma.withTenantTransaction(tenant, async (db) => {
+            const ids = await this.managedTeamIds(db, user, domain);
+            const teams = await db.team.findMany({ where: { organizationId: tenant.organizationId, ...(ids ? { id: { in: ids } } : {}) }, select: { id: true, name: true }, take: 1000, orderBy: { name: 'asc' } });
+            const members = await db.organizationMembership.findMany({ where: { organizationId: tenant.organizationId,
+                    ...(ids ? { OR: [{ teamId: { in: ids } }, ...(domain === 'timesheet' ? [{ timesheetEntries: { some: { organizationId: tenant.organizationId, teamId: { in: ids } } } }] : [])] } : {}) },
+                select: { user: { select: { id: true, fullName: true } } }, take: 1000 });
+            return { teams, employees: members.map(member => member.user), limited: teams.length === 1000 || members.length === 1000 };
+        });
+    }
     approveTimesheet(id, user) {
         return this.decideTimesheet(id, true, undefined, user);
     }
@@ -282,6 +295,9 @@ let TimesheetApprovalService = class TimesheetApprovalService {
                     where,
                     include: {
                         user: { select: { id: true, fullName: true, email: true } },
+                        reviewedByMembership: { select: { user: { select: { fullName: true } } } },
+                        approvalHistory: { orderBy: { createdAt: 'asc' }, take: 100, include: { actorMembership: { select: { user: { select: { fullName: true } } } } } },
+                        ...(kind === 'timesheet' ? { task: { select: { id: true, title: true } }, company: { select: { id: true, legalName: true } } } : {}),
                     },
                     orderBy: kind === "timesheet"
                         ? { workDate: query.sort ?? "desc" }
