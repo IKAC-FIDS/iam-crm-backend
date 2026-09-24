@@ -24,8 +24,8 @@ let CrmAssistantService = CrmAssistantService_1 = class CrmAssistantService {
         this.logger = new common_1.Logger(CrmAssistantService_1.name);
     }
     async ask(dto, user) {
-        const apiKey = this.config.get('OPENAI_API_KEY')?.trim();
-        if (!apiKey) {
+        const provider = this.resolveProvider();
+        if (!provider) {
             throw new common_1.ServiceUnavailableException('دستیار هوشمند هنوز پیکربندی نشده است');
         }
         const toolDefinitions = this.tools.listFor(user);
@@ -34,7 +34,7 @@ let CrmAssistantService = CrmAssistantService_1 = class CrmAssistantService {
             { role: 'user', content: dto.message.trim() },
         ];
         const usedTools = [];
-        let response = await this.createResponse(apiKey, input, toolDefinitions);
+        let response = await this.createResponse(provider, input, toolDefinitions);
         for (let round = 0; round < 4; round += 1) {
             const calls = (response.output ?? []).filter((item) => item.type === 'function_call');
             if (!calls.length)
@@ -52,7 +52,7 @@ let CrmAssistantService = CrmAssistantService_1 = class CrmAssistantService {
                     output: JSON.stringify(result),
                 });
             }
-            response = await this.createResponse(apiKey, input, toolDefinitions);
+            response = await this.createResponse(provider, input, toolDefinitions);
         }
         const answer = response.output_text?.trim() || this.extractText(response.output) || 'پاسخی تولید نشد.';
         await this.audit.recordTenantEvent({
@@ -61,18 +61,21 @@ let CrmAssistantService = CrmAssistantService_1 = class CrmAssistantService {
             organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
             entityType: 'crm-assistant',
             action: 'crm-assistant.question_answered',
-            metadata: { questionLength: dto.message.length, tools: [...new Set(usedTools)] },
+            metadata: {
+                questionLength: dto.message.length,
+                tools: [...new Set(usedTools)],
+                modelProvider: provider.provider,
+                model: provider.model,
+            },
         });
         return { answer, toolsUsed: [...new Set(usedTools)] };
     }
-    async createResponse(apiKey, input, definitions) {
-        const baseUrl = this.config.get('OPENAI_BASE_URL', 'https://api.openai.com/v1').replace(/\/$/, '');
-        const model = this.config.get('OPENAI_MODEL', 'gpt-5.4');
-        const response = await fetch(`${baseUrl}/responses`, {
+    async createResponse(provider, input, definitions) {
+        const response = await fetch(`${provider.baseUrl}/responses`, {
             method: 'POST',
-            headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+            headers: { Authorization: `Bearer ${provider.apiKey}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                model,
+                model: provider.model,
                 instructions: [
                     'شما دستیار تحلیلی CRM هستید. فقط بر اساس خروجی ابزارها پاسخ دهید.',
                     'هرگز وجود داده‌ای را حدس نزنید. اگر داده کافی نیست، صریح بگویید.',
@@ -94,10 +97,43 @@ let CrmAssistantService = CrmAssistantService_1 = class CrmAssistantService {
         });
         if (!response.ok) {
             await response.text();
-            this.logger.warn(`OpenAI Responses API returned status ${response.status}`);
+            this.logger.warn(`${provider.provider} Responses API returned status ${response.status}`);
             throw new common_1.BadGatewayException('سرویس مدل هوشمند در دسترس نیست؛ کمی بعد دوباره تلاش کنید');
         }
         return response.json();
+    }
+    resolveProvider() {
+        const genericKey = this.config.get('LLM_API_KEY')?.trim();
+        const groqKey = this.config.get('GROQ_API_KEY')?.trim();
+        const openAiKey = this.config.get('OPENAI_API_KEY')?.trim();
+        if (genericKey) {
+            return {
+                apiKey: genericKey,
+                baseUrl: this.cleanBaseUrl(this.config.get('LLM_BASE_URL', 'https://api.groq.com/openai/v1')),
+                model: this.config.get('LLM_MODEL', 'openai/gpt-oss-120b'),
+                provider: 'generic',
+            };
+        }
+        if (groqKey) {
+            return {
+                apiKey: groqKey,
+                baseUrl: this.cleanBaseUrl(this.config.get('GROQ_BASE_URL', 'https://api.groq.com/openai/v1')),
+                model: this.config.get('GROQ_MODEL', 'openai/gpt-oss-120b'),
+                provider: 'groq',
+            };
+        }
+        if (openAiKey) {
+            return {
+                apiKey: openAiKey,
+                baseUrl: this.cleanBaseUrl(this.config.get('OPENAI_BASE_URL', 'https://api.openai.com/v1')),
+                model: this.config.get('OPENAI_MODEL', 'gpt-5.4'),
+                provider: 'openai',
+            };
+        }
+        return null;
+    }
+    cleanBaseUrl(value) {
+        return value.replace(/\/$/, '');
     }
     parseArguments(value) {
         if (!value)

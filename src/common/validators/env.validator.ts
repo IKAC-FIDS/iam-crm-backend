@@ -238,7 +238,13 @@ export const envValidationSchema = Joi.object({
 
   WEBAUTHN_ORIGIN: Joi.string().uri().default('http://localhost:5173'),
 
+  LLM_API_KEY: Joi.string().allow('').optional(),
+  LLM_MODEL: Joi.string().default('openai/gpt-oss-120b'),
+  LLM_BASE_URL: Joi.string().uri().default('https://api.groq.com/openai/v1'),
+  GROQ_API_KEY: Joi.string().allow('').optional(),
+  GROQ_MODEL: Joi.string().default('openai/gpt-oss-120b'),
+  GROQ_BASE_URL: Joi.string().uri().default('https://api.groq.com/openai/v1'),
   OPENAI_API_KEY: Joi.string().allow('').optional(),
-  OPENAI_MODEL: Joi.string().default('gpt-5.4'),
-  OPENAI_BASE_URL: Joi.string().uri().default('https://api.openai.com/v1'),
+  OPENAI_MODEL: Joi.string().optional(),
+  OPENAI_BASE_URL: Joi.string().uri().optional(),
 });
