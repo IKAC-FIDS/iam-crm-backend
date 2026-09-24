@@ -89,11 +89,13 @@ let PeopleService = class PeopleService {
                             id: true,
                             legalName: true,
                             brandName: true,
+                            logoObjectKey: true,
                             owner: {
                                 select: {
                                     id: true,
                                     fullName: true,
                                     email: true,
+                                    avatarObjectKey: true,
                                     team: true,
                                     teamId: true,
                                     teamRef: { select: { code: true, name: true } },
