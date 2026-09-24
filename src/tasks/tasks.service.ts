@@ -45,6 +45,7 @@ const taskInclude = {
       legalName: true,
       brandName: true,
       ownerId: true,
+      logoObjectKey: true,
     },
   },
   person: {
@@ -92,6 +93,7 @@ const taskInclude = {
       email: true,
       role: true,
       team: true,
+      avatarObjectKey: true,
     },
   },
   createdBy: {
