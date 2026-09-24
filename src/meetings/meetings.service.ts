@@ -16,13 +16,13 @@ import { NotificationCoreService } from '../notification-core/notification-core.
 
 const meetingInclude = {
   type: { select: { id: true, code: true, label: true, description: true, sortOrder: true, isActive: true } },
-  company: { select: { id: true, legalName: true, brandName: true } },
+  company: { select: { id: true, legalName: true, brandName: true, logoObjectKey: true } },
   opportunity: { select: { id: true, title: true, companyId: true } },
-  organizer: { select: { id: true, fullName: true, email: true } },
-  createdBy: { select: { id: true, fullName: true, email: true } },
-  completedBy: { select: { id: true, fullName: true, email: true } },
-  cancelledBy: { select: { id: true, fullName: true, email: true } },
-  assignees: { include: { user: { select: { id: true, fullName: true, email: true, role: true, teamId: true } } } },
+  organizer: { select: { id: true, fullName: true, email: true, avatarObjectKey: true } },
+  createdBy: { select: { id: true, fullName: true, email: true, avatarObjectKey: true } },
+  completedBy: { select: { id: true, fullName: true, email: true, avatarObjectKey: true } },
+  cancelledBy: { select: { id: true, fullName: true, email: true, avatarObjectKey: true } },
+  assignees: { include: { user: { select: { id: true, fullName: true, email: true, role: true, teamId: true, avatarObjectKey: true } } } },
   attendees: { include: { person: { select: { id: true, fullName: true, title: true, companyId: true } } } },
 } satisfies Prisma.MeetingInclude;
 

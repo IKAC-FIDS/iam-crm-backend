@@ -15,6 +15,30 @@ function setup() {
 }
 
 describe('MeetingsService', () => {
+  it('selects company logos and user avatars for meeting cards', async () => {
+    const prisma = {
+      meeting: {
+        findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
+      },
+    };
+    const service = new MeetingsService(prisma as any, {} as any, {} as any, {} as any);
+
+    await service.findAll({ page: 1, limit: 20 }, user);
+
+    expect(prisma.meeting.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      include: expect.objectContaining({
+        company: { select: expect.objectContaining({ logoObjectKey: true }) },
+        organizer: { select: expect.objectContaining({ avatarObjectKey: true }) },
+        assignees: {
+          include: {
+            user: { select: expect.objectContaining({ avatarObjectKey: true }) },
+          },
+        },
+      }),
+    }));
+  });
+
   it('creates an organization-scoped company meeting transactionally', async () => {
     const { prisma, service } = setup(); await service.create(base, user);
     expect(prisma.$transaction).toHaveBeenCalled(); expect(prisma.meeting.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ organizationId, companyId: base.companyId, organizerId: user.userId }) }));
