@@ -20,12 +20,13 @@ const crm_assistant_actions_service_1 = require("./crm-assistant-actions.service
 const activities_module_1 = require("../activities/activities.module");
 const people_module_1 = require("../people/people.module");
 const timesheets_module_1 = require("../timesheets/timesheets.module");
+const reports_module_1 = require("../reports/reports.module");
 let CrmAssistantModule = class CrmAssistantModule {
 };
 exports.CrmAssistantModule = CrmAssistantModule;
 exports.CrmAssistantModule = CrmAssistantModule = __decorate([
     (0, common_1.Module)({
-        imports: [companies_module_1.CompaniesModule, opportunities_module_1.OpportunitiesModule, tasks_module_1.TasksModule, meetings_module_1.MeetingsModule, activities_module_1.ActivitiesModule, people_module_1.PeopleModule, timesheets_module_1.TimesheetsModule],
+        imports: [companies_module_1.CompaniesModule, opportunities_module_1.OpportunitiesModule, tasks_module_1.TasksModule, meetings_module_1.MeetingsModule, activities_module_1.ActivitiesModule, people_module_1.PeopleModule, timesheets_module_1.TimesheetsModule, reports_module_1.ReportsModule],
         controllers: [crm_assistant_controller_1.CrmAssistantController, crm_mcp_controller_1.CrmMcpController],
         providers: [crm_assistant_service_1.CrmAssistantService, crm_assistant_tools_service_1.CrmAssistantToolsService, crm_assistant_actions_service_1.CrmAssistantActionsService],
     })

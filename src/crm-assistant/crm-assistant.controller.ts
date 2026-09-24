@@ -14,7 +14,7 @@ export class CrmAssistantController {
   constructor(private readonly assistant: CrmAssistantService, private readonly actions: CrmAssistantActionsService) {}
 
   @Post('ask')
-  @AnyPermission('company:view', 'opportunity:view', 'task:view', 'meeting:view', 'people:directory:view', 'activity:view', 'timesheet:view', 'leave:view')
+  @AnyPermission('company:view', 'opportunity:view', 'task:view', 'meeting:view', 'people:directory:view', 'activity:view', 'timesheet:view', 'leave:view', 'report:view')
   ask(@Body() dto: AskCrmAssistantDto, @CurrentUser() user: CurrentUserPayload) {
     return this.assistant.ask(dto, user);
   }

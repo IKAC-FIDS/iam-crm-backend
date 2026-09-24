@@ -12,7 +12,9 @@ const crm_assistant_tools_service_1 = require("./crm-assistant-tools.service");
     const activities = { findAll: globals_1.jest.fn() };
     const timesheets = { findMine: globals_1.jest.fn() };
     const leaveRequests = { findMine: globals_1.jest.fn() };
-    const service = new crm_assistant_tools_service_1.CrmAssistantToolsService(companies, opportunities, tasks, meetings, people, activities, timesheets, leaveRequests);
+    const reports = { getFilterOptions: globals_1.jest.fn(), getUserPerformance: globals_1.jest.fn(), getPipelineByOwner: globals_1.jest.fn() };
+    const advancedReports = { taskPerformance: globals_1.jest.fn(), meetingPerformance: globals_1.jest.fn() };
+    const service = new crm_assistant_tools_service_1.CrmAssistantToolsService(companies, opportunities, tasks, meetings, people, activities, timesheets, leaveRequests, reports, advancedReports);
     const user = {
         userId: 'user-1',
         email: 'user@example.com',

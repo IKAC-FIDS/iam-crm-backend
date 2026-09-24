@@ -11,9 +11,10 @@ import { CrmAssistantActionsService } from './crm-assistant-actions.service';
 import { ActivitiesModule } from '../activities/activities.module';
 import { PeopleModule } from '../people/people.module';
 import { TimesheetsModule } from '../timesheets/timesheets.module';
+import { ReportsModule } from '../reports/reports.module';
 
 @Module({
-  imports: [CompaniesModule, OpportunitiesModule, TasksModule, MeetingsModule, ActivitiesModule, PeopleModule, TimesheetsModule],
+  imports: [CompaniesModule, OpportunitiesModule, TasksModule, MeetingsModule, ActivitiesModule, PeopleModule, TimesheetsModule, ReportsModule],
   controllers: [CrmAssistantController, CrmMcpController],
   providers: [CrmAssistantService, CrmAssistantToolsService, CrmAssistantActionsService],
 })

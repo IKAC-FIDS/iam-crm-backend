@@ -12,6 +12,8 @@ describe('CrmAssistantToolsService', () => {
   const activities = { findAll: jest.fn<(...args: any[]) => Promise<any>>() };
   const timesheets = { findMine: jest.fn<(...args: any[]) => Promise<any>>() };
   const leaveRequests = { findMine: jest.fn<(...args: any[]) => Promise<any>>() };
+  const reports = { getFilterOptions: jest.fn<(...args: any[]) => Promise<any>>(), getUserPerformance: jest.fn<(...args: any[]) => Promise<any>>(), getPipelineByOwner: jest.fn<(...args: any[]) => Promise<any>>() };
+  const advancedReports = { taskPerformance: jest.fn<(...args: any[]) => Promise<any>>(), meetingPerformance: jest.fn<(...args: any[]) => Promise<any>>() };
   const service = new CrmAssistantToolsService(
     companies as never,
     opportunities as never,
@@ -21,6 +23,8 @@ describe('CrmAssistantToolsService', () => {
     activities as never,
     timesheets as never,
     leaveRequests as never,
+    reports as never,
+    advancedReports as never,
   );
   const user = {
     userId: 'user-1',
@@ -52,5 +56,23 @@ describe('CrmAssistantToolsService', () => {
       { search: 'نمونه' },
     );
     expect(result).toMatchObject({ data: [{ id: 'c1', name: 'شرکت نمونه' }], meta: { total: 1 } });
+  });
+
+  it('builds a scoped sales-rep performance report from authoritative report services', async () => {
+    const reportUser = { ...user, tenantContext: { permissions: ['report:view'] } } as unknown as CurrentUserPayload;
+    const userId = '11111111-1111-4111-8111-111111111111';
+    reports.getUserPerformance.mockResolvedValue({
+      period: { startDate: '2026-09-01', endDate: '2026-09-24' }, financialVisible: false,
+      members: [{ user: { id: userId, fullName: 'کارشناس نمونه' }, activity: { total: 5, breakdown: [] }, companiesCreated: 2, meetings: 3, tasksCreated: 4, tasksAssigned: { total: 4, completed: 3, incomplete: 1 }, opportunities: { total: 2, active: 1, won: 1, lost: 0 } }],
+    });
+    reports.getPipelineByOwner.mockResolvedValue([{ ownerId: userId, conversionRate: 50 }]);
+    advancedReports.taskPerformance.mockResolvedValue({ periodFlow: { completedCount: 3 }, current: { overdueCount: 1 }, byAssignee: [{ userId, onTimeCompletionRate: 67 }] });
+    advancedReports.meetingPerformance.mockResolvedValue({ summary: { completedCount: 2 }, byOrganizer: [{ organizerId: userId, executionRate: 67 }] });
+
+    const result = await service.call('get_sales_rep_performance', { userId, startDate: '2026-09-01', endDate: '2026-09-24' }, reportUser) as any;
+    expect(result.employee.fullName).toBe('کارشناس نمونه');
+    expect(result.sales.pipeline.conversionRate).toBe(50);
+    expect(result.tasks.employee.onTimeCompletionRate).toBe(67);
+    expect(reports.getUserPerformance).toHaveBeenCalledWith(expect.objectContaining({ userIds: [userId], ownerIds: [userId] }), reportUser);
   });
 });

@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import type { CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { CompaniesService } from '../companies/companies.service';
 import { MeetingsService } from '../meetings/meetings.service';
@@ -8,6 +8,8 @@ import { PeopleService } from '../people/people.service';
 import { ActivitiesService } from '../activities/activities.service';
 import { TimesheetService } from '../timesheets/timesheet.service';
 import { LeaveRequestService } from '../timesheets/leave-request.service';
+import { ReportsService } from '../reports/reports.service';
+import { AdvancedReportsService } from '../reports/advanced-reports.service';
 
 type JsonSchema = Record<string, unknown>;
 
@@ -71,6 +73,24 @@ export class CrmAssistantToolsService {
       name: 'list_my_leave_requests', description: 'نمایش آخرین درخواست‌های مرخصی شخصی کاربر جاری.',
       permission: 'leave:view', inputSchema: listSchema('برای این ابزار search نادیده گرفته می‌شود'),
     },
+    {
+      name: 'search_report_users', description: 'یافتن کارشناس یا کاربر سازمانی مجاز برای گزارش عملکرد و دریافت شناسه واقعی او.',
+      permission: 'report:view', inputSchema: listSchema('نام، ایمیل یا نام تیم کارشناس'),
+    },
+    {
+      name: 'get_sales_rep_performance',
+      description: 'گزارش تجمیعی و عددی عملکرد یک کارشناس شامل فرصت‌ها، نرخ تبدیل، فعالیت‌ها، جلسات و کارهای او. ابتدا شناسه را با search_report_users پیدا کن.',
+      permission: 'report:view',
+      inputSchema: {
+        type: 'object', additionalProperties: false,
+        properties: {
+          userId: { type: 'string', description: 'شناسه UUID کارشناس از search_report_users' },
+          startDate: { type: ['string', 'null'], description: 'تاریخ شروع YYYY-MM-DD؛ در صورت null سی روز اخیر' },
+          endDate: { type: ['string', 'null'], description: 'تاریخ پایان YYYY-MM-DD؛ در صورت null امروز' },
+        },
+        required: ['userId', 'startDate', 'endDate'],
+      },
+    },
   ];
 
   constructor(
@@ -82,6 +102,8 @@ export class CrmAssistantToolsService {
     private readonly activities: ActivitiesService,
     private readonly timesheets: TimesheetService,
     private readonly leaveRequests: LeaveRequestService,
+    private readonly reports: ReportsService,
+    private readonly advancedReports: AdvancedReportsService,
   ) {}
 
   listFor(user: CurrentUserPayload) {
@@ -93,6 +115,9 @@ export class CrmAssistantToolsService {
     if (!definition || !this.hasPermission(user, definition.permission)) {
       throw new ForbiddenException('این ابزار برای کاربر جاری قابل دسترس نیست');
     }
+
+    if (name === 'search_report_users') return this.searchReportUsers(rawArguments, user);
+    if (name === 'get_sales_rep_performance') return this.salesRepPerformance(rawArguments, user);
 
     const args = this.normalizeArguments(rawArguments);
     const query = { page: 1, limit: args.limit, ...(args.search ? { search: args.search } : {}) };
@@ -198,6 +223,61 @@ export class CrmAssistantToolsService {
     const search = typeof input.search === 'string' ? input.search.trim().slice(0, 200) : undefined;
     const requestedLimit = typeof input.limit === 'number' ? Math.trunc(input.limit) : 10;
     return { search: search || undefined, limit: Math.min(20, Math.max(1, requestedLimit)) };
+  }
+
+  private async searchReportUsers(value: unknown, user: CurrentUserPayload) {
+    const args = this.normalizeArguments(value);
+    const options = await this.reports.getFilterOptions(user);
+    const needle = args.search?.toLocaleLowerCase('fa');
+    const users = options.users.filter((item) => !needle || [item.fullName, item.teamName, item.teamCode]
+      .filter(Boolean).some((part) => String(part).toLocaleLowerCase('fa').includes(needle)));
+    return { data: users.slice(0, args.limit).map((item) => ({ id: item.id, fullName: item.fullName, teamId: item.teamId, teamName: item.teamName, role: item.role })), meta: { total: users.length, limit: args.limit } };
+  }
+
+  private async salesRepPerformance(value: unknown, user: CurrentUserPayload) {
+    const input = value && typeof value === 'object' ? value as Record<string, unknown> : {};
+    const userId = typeof input.userId === 'string' ? input.userId.trim() : '';
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId)) {
+      throw new BadRequestException('شناسه کارشناس برای گزارش معتبر نیست');
+    }
+    const today = new Date();
+    const defaultStart = new Date(today.getTime() - 30 * 86_400_000);
+    const startDate = this.reportDate(input.startDate, defaultStart);
+    const endDate = this.reportDate(input.endDate, today);
+    if (new Date(startDate) > new Date(endDate)) throw new BadRequestException('تاریخ شروع گزارش بعد از تاریخ پایان است');
+    if (new Date(endDate).getTime() - new Date(startDate).getTime() > 366 * 86_400_000) {
+      throw new BadRequestException('بازه گزارش عملکرد نمی‌تواند بیشتر از ۳۶۶ روز باشد');
+    }
+    const filters = { userIds: [userId], ownerIds: [userId], startDate, endDate, page: 1, limit: 20 };
+    const [performance, tasks, meetings, pipeline] = await Promise.all([
+      this.reports.getUserPerformance(filters, user),
+      this.advancedReports.taskPerformance(filters, user),
+      this.advancedReports.meetingPerformance(filters, user),
+      this.reports.getPipelineByOwner(filters, user),
+    ]);
+    const member = performance.members.find((item) => item.user.id === userId);
+    if (!member) throw new BadRequestException('کارشناس موردنظر در محدوده گزارش قابل دسترس نیست');
+    return {
+      period: performance.period,
+      employee: member.user,
+      sales: { companiesCreated: member.companiesCreated, opportunities: member.opportunities, pipeline: pipeline.find((item) => item.ownerId === userId) ?? null },
+      activity: member.activity,
+      meetings: { createdCount: member.meetings, performance: meetings.summary, employee: meetings.byOrganizer.find((item) => item.organizerId === userId) ?? null },
+      tasks: { createdCount: member.tasksCreated, assigned: member.tasksAssigned, performance: tasks.periodFlow, current: tasks.current, employee: tasks.byAssignee.find((item) => item.userId === userId) ?? null },
+      financialVisible: performance.financialVisible,
+      definitions: {
+        opportunityBasis: 'فرصت‌های ایجادشده توسط کارشناس در بازه بر اساس audit.createdAt',
+        activityBasis: 'فعالیت بر اساس occurredAt', meetingBasis: 'جلسه بر اساس startAt', taskBasis: 'کار بر اساس createdAt/completedAt',
+      },
+    };
+  }
+
+  private reportDate(value: unknown, fallback: Date) {
+    if (value == null || value === '') return fallback.toISOString().slice(0, 10);
+    if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value) || Number.isNaN(Date.parse(`${value}T00:00:00Z`))) {
+      throw new BadRequestException('تاریخ گزارش باید به شکل YYYY-MM-DD باشد');
+    }
+    return value;
   }
 
   private compactPage<T extends Record<string, any>, R>(

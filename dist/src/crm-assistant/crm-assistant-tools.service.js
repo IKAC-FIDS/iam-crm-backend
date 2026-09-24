@@ -19,6 +19,8 @@ const people_service_1 = require("../people/people.service");
 const activities_service_1 = require("../activities/activities.service");
 const timesheet_service_1 = require("../timesheets/timesheet.service");
 const leave_request_service_1 = require("../timesheets/leave-request.service");
+const reports_service_1 = require("../reports/reports.service");
+const advanced_reports_service_1 = require("../reports/advanced-reports.service");
 const listSchema = (searchDescription) => ({
     type: 'object',
     properties: {
@@ -29,7 +31,7 @@ const listSchema = (searchDescription) => ({
     additionalProperties: false,
 });
 let CrmAssistantToolsService = class CrmAssistantToolsService {
-    constructor(companies, opportunities, tasks, meetings, people, activities, timesheets, leaveRequests) {
+    constructor(companies, opportunities, tasks, meetings, people, activities, timesheets, leaveRequests, reports, advancedReports) {
         this.companies = companies;
         this.opportunities = opportunities;
         this.tasks = tasks;
@@ -38,6 +40,8 @@ let CrmAssistantToolsService = class CrmAssistantToolsService {
         this.activities = activities;
         this.timesheets = timesheets;
         this.leaveRequests = leaveRequests;
+        this.reports = reports;
+        this.advancedReports = advancedReports;
         this.definitions = [
             {
                 name: 'search_companies',
@@ -79,6 +83,24 @@ let CrmAssistantToolsService = class CrmAssistantToolsService {
                 name: 'list_my_leave_requests', description: 'نمایش آخرین درخواست‌های مرخصی شخصی کاربر جاری.',
                 permission: 'leave:view', inputSchema: listSchema('برای این ابزار search نادیده گرفته می‌شود'),
             },
+            {
+                name: 'search_report_users', description: 'یافتن کارشناس یا کاربر سازمانی مجاز برای گزارش عملکرد و دریافت شناسه واقعی او.',
+                permission: 'report:view', inputSchema: listSchema('نام، ایمیل یا نام تیم کارشناس'),
+            },
+            {
+                name: 'get_sales_rep_performance',
+                description: 'گزارش تجمیعی و عددی عملکرد یک کارشناس شامل فرصت‌ها، نرخ تبدیل، فعالیت‌ها، جلسات و کارهای او. ابتدا شناسه را با search_report_users پیدا کن.',
+                permission: 'report:view',
+                inputSchema: {
+                    type: 'object', additionalProperties: false,
+                    properties: {
+                        userId: { type: 'string', description: 'شناسه UUID کارشناس از search_report_users' },
+                        startDate: { type: ['string', 'null'], description: 'تاریخ شروع YYYY-MM-DD؛ در صورت null سی روز اخیر' },
+                        endDate: { type: ['string', 'null'], description: 'تاریخ پایان YYYY-MM-DD؛ در صورت null امروز' },
+                    },
+                    required: ['userId', 'startDate', 'endDate'],
+                },
+            },
         ];
     }
     listFor(user) {
@@ -89,6 +111,10 @@ let CrmAssistantToolsService = class CrmAssistantToolsService {
         if (!definition || !this.hasPermission(user, definition.permission)) {
             throw new common_1.ForbiddenException('این ابزار برای کاربر جاری قابل دسترس نیست');
         }
+        if (name === 'search_report_users')
+            return this.searchReportUsers(rawArguments, user);
+        if (name === 'get_sales_rep_performance')
+            return this.salesRepPerformance(rawArguments, user);
         const args = this.normalizeArguments(rawArguments);
         const query = { page: 1, limit: args.limit, ...(args.search ? { search: args.search } : {}) };
         switch (name) {
@@ -192,6 +218,61 @@ let CrmAssistantToolsService = class CrmAssistantToolsService {
         const requestedLimit = typeof input.limit === 'number' ? Math.trunc(input.limit) : 10;
         return { search: search || undefined, limit: Math.min(20, Math.max(1, requestedLimit)) };
     }
+    async searchReportUsers(value, user) {
+        const args = this.normalizeArguments(value);
+        const options = await this.reports.getFilterOptions(user);
+        const needle = args.search?.toLocaleLowerCase('fa');
+        const users = options.users.filter((item) => !needle || [item.fullName, item.teamName, item.teamCode]
+            .filter(Boolean).some((part) => String(part).toLocaleLowerCase('fa').includes(needle)));
+        return { data: users.slice(0, args.limit).map((item) => ({ id: item.id, fullName: item.fullName, teamId: item.teamId, teamName: item.teamName, role: item.role })), meta: { total: users.length, limit: args.limit } };
+    }
+    async salesRepPerformance(value, user) {
+        const input = value && typeof value === 'object' ? value : {};
+        const userId = typeof input.userId === 'string' ? input.userId.trim() : '';
+        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId)) {
+            throw new common_1.BadRequestException('شناسه کارشناس برای گزارش معتبر نیست');
+        }
+        const today = new Date();
+        const defaultStart = new Date(today.getTime() - 30 * 86_400_000);
+        const startDate = this.reportDate(input.startDate, defaultStart);
+        const endDate = this.reportDate(input.endDate, today);
+        if (new Date(startDate) > new Date(endDate))
+            throw new common_1.BadRequestException('تاریخ شروع گزارش بعد از تاریخ پایان است');
+        if (new Date(endDate).getTime() - new Date(startDate).getTime() > 366 * 86_400_000) {
+            throw new common_1.BadRequestException('بازه گزارش عملکرد نمی‌تواند بیشتر از ۳۶۶ روز باشد');
+        }
+        const filters = { userIds: [userId], ownerIds: [userId], startDate, endDate, page: 1, limit: 20 };
+        const [performance, tasks, meetings, pipeline] = await Promise.all([
+            this.reports.getUserPerformance(filters, user),
+            this.advancedReports.taskPerformance(filters, user),
+            this.advancedReports.meetingPerformance(filters, user),
+            this.reports.getPipelineByOwner(filters, user),
+        ]);
+        const member = performance.members.find((item) => item.user.id === userId);
+        if (!member)
+            throw new common_1.BadRequestException('کارشناس موردنظر در محدوده گزارش قابل دسترس نیست');
+        return {
+            period: performance.period,
+            employee: member.user,
+            sales: { companiesCreated: member.companiesCreated, opportunities: member.opportunities, pipeline: pipeline.find((item) => item.ownerId === userId) ?? null },
+            activity: member.activity,
+            meetings: { createdCount: member.meetings, performance: meetings.summary, employee: meetings.byOrganizer.find((item) => item.organizerId === userId) ?? null },
+            tasks: { createdCount: member.tasksCreated, assigned: member.tasksAssigned, performance: tasks.periodFlow, current: tasks.current, employee: tasks.byAssignee.find((item) => item.userId === userId) ?? null },
+            financialVisible: performance.financialVisible,
+            definitions: {
+                opportunityBasis: 'فرصت‌های ایجادشده توسط کارشناس در بازه بر اساس audit.createdAt',
+                activityBasis: 'فعالیت بر اساس occurredAt', meetingBasis: 'جلسه بر اساس startAt', taskBasis: 'کار بر اساس createdAt/completedAt',
+            },
+        };
+    }
+    reportDate(value, fallback) {
+        if (value == null || value === '')
+            return fallback.toISOString().slice(0, 10);
+        if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value) || Number.isNaN(Date.parse(`${value}T00:00:00Z`))) {
+            throw new common_1.BadRequestException('تاریخ گزارش باید به شکل YYYY-MM-DD باشد');
+        }
+        return value;
+    }
     compactPage(result, mapper) {
         return { data: result.data.map(mapper), meta: result.meta };
     }
@@ -206,6 +287,8 @@ exports.CrmAssistantToolsService = CrmAssistantToolsService = __decorate([
         people_service_1.PeopleService,
         activities_service_1.ActivitiesService,
         timesheet_service_1.TimesheetService,
-        leave_request_service_1.LeaveRequestService])
+        leave_request_service_1.LeaveRequestService,
+        reports_service_1.ReportsService,
+        advanced_reports_service_1.AdvancedReportsService])
 ], CrmAssistantToolsService);
 //# sourceMappingURL=crm-assistant-tools.service.js.map

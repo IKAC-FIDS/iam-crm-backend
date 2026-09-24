@@ -22,6 +22,7 @@ import { ReportExportsService } from "./report-exports.service";
   ],
   controllers: [ReportsController],
   exports: [
+    ReportsService,
     AdvancedReportsService,
     CommercialReportsService,
     DataQualityService,

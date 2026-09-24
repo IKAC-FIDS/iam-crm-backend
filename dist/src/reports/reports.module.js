@@ -34,6 +34,7 @@ exports.ReportsModule = ReportsModule = __decorate([
         ],
         controllers: [reports_controller_1.ReportsController],
         exports: [
+            reports_service_1.ReportsService,
             advanced_reports_service_1.AdvancedReportsService,
             commercial_reports_service_1.CommercialReportsService,
             data_quality_service_1.DataQualityService,
