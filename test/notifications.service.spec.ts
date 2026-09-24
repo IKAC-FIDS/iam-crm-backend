@@ -44,6 +44,11 @@ describe('NotificationsService metadata compatibility', () => {
     expect(result.data[0].metadata).toBe(metadata);
     expect(prisma.notification.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
+        include: expect.objectContaining({
+          actor: {
+            select: expect.objectContaining({ avatarObjectKey: true }),
+          },
+        }),
         where: {
           AND: [
             {

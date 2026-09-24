@@ -37,6 +37,7 @@ const notificationInclude = {
       email: true,
       role: true,
       team: true,
+      avatarObjectKey: true,
     },
   },
   actor: {
@@ -46,6 +47,7 @@ const notificationInclude = {
       email: true,
       role: true,
       team: true,
+      avatarObjectKey: true,
     },
   },
 } satisfies Prisma.NotificationInclude;
