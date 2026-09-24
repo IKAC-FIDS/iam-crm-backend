@@ -62,7 +62,7 @@ const crm_assistant_tools_service_1 = require("./crm-assistant-tools.service");
         reports.getPipelineByOwner.mockResolvedValue([]);
         advancedReports.taskPerformance.mockResolvedValue({ periodFlow: {}, current: {}, byAssignee: [] });
         advancedReports.meetingPerformance.mockResolvedValue({ summary: {}, byOrganizer: [] });
-        const result = await service.call('get_sales_rep_performance', { userId: null, userName: 'مهتاب امیری', startDate: null, endDate: null }, reportUser);
+        const result = await service.call('get_sales_rep_performance', { userId: null, userName: 'عملکرد مهتاب در ۳۰ روز گذشته چطور بوده؟', startDate: null, endDate: null }, reportUser);
         (0, globals_1.expect)(result.employee).toEqual({ id: userId, fullName: 'مهتاب امیری' });
         (0, globals_1.expect)(reports.getUserPerformance).toHaveBeenCalledWith(globals_1.expect.objectContaining({ userIds: [userId] }), reportUser);
     });

@@ -89,7 +89,7 @@ let CrmAssistantToolsService = class CrmAssistantToolsService {
             },
             {
                 name: 'get_sales_rep_performance',
-                description: 'گزارش تجمیعی و عددی عملکرد یک کارشناس شامل فرصت‌ها، نرخ تبدیل، فعالیت‌ها، جلسات و کارهای او. ابتدا شناسه را با search_report_users پیدا کن.',
+                description: 'گزارش تجمیعی و عددی عملکرد یک کارشناس شامل فرصت‌ها، نرخ تبدیل، فعالیت‌ها، جلسات و کارهای او؛ نام کارشناس نیز مستقیماً قابل استفاده است.',
                 permission: 'report:view',
                 inputSchema: {
                     type: 'object', additionalProperties: false,
@@ -237,7 +237,11 @@ let CrmAssistantToolsService = class CrmAssistantToolsService {
         if (!candidates.length && requestedName) {
             const needle = this.normalizePersonName(requestedName);
             const exact = options.users.filter((item) => this.normalizePersonName(item.fullName) === needle);
-            candidates = exact.length ? exact : options.users.filter((item) => this.normalizePersonName(item.fullName).includes(needle));
+            candidates = exact.length ? exact : options.users.filter((item) => {
+                const fullName = this.normalizePersonName(item.fullName);
+                const meaningfulParts = fullName.split(' ').filter((part) => part.length >= 3);
+                return fullName.includes(needle) || needle.includes(fullName) || meaningfulParts.some((part) => needle.includes(part));
+            });
         }
         if (candidates.length !== 1) {
             return {

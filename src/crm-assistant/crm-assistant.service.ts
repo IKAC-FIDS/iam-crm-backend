@@ -43,6 +43,24 @@ export class CrmAssistantService {
     }
 
     const toolDefinitions = [...this.tools.listFor(user), ...this.actions.listFor(user)];
+    const directPerformance = await this.tryDirectPerformanceAnswer(dto.message, user, toolDefinitions);
+    if (directPerformance) {
+      await this.audit.recordTenantEvent({
+        actorId: user.userId,
+        actorMembershipId: user.membershipId,
+        organizationId: getCurrentOrganizationId(user),
+        entityType: 'crm-assistant',
+        action: 'crm-assistant.question_answered',
+        metadata: {
+          questionLength: dto.message.length,
+          tools: ['get_sales_rep_performance'],
+          modelProvider: 'deterministic-report',
+          model: 'internal-report-services',
+          proposedActions: [],
+        },
+      });
+      return { answer: directPerformance, toolsUsed: ['get_sales_rep_performance'], pendingActions: [] };
+    }
     const input: unknown[] = [
       ...(dto.history ?? []).map((item) => ({ role: item.role, content: item.content })),
       { role: 'user', content: dto.message.trim() },
@@ -174,6 +192,54 @@ export class CrmAssistantService {
 
   private cleanBaseUrl(value: string) {
     return value.replace(/\/$/, '');
+  }
+
+  private async tryDirectPerformanceAnswer(
+    message: string,
+    user: CurrentUserPayload,
+    definitions: CrmAssistantToolDefinition[],
+  ) {
+    if (!/(عملکرد|کارنامه|ارزیابی)/u.test(message)) return null;
+    if (!definitions.some((tool) => tool.name === 'get_sales_rep_performance')) return null;
+
+    const result = await this.tools.call('get_sales_rep_performance', {
+      userId: null,
+      userName: message,
+      startDate: null,
+      endDate: null,
+    }, user) as Record<string, any>;
+
+    if (result.needsSelection) {
+      const candidates = Array.isArray(result.candidates) ? result.candidates as Array<Record<string, unknown>> : [];
+      if (!candidates.length) return String(result.message ?? 'کارشناس موردنظر در محدوده مجاز پیدا نشد.');
+      const choices = candidates.map((item) => `- ${String(item.fullName ?? 'بدون نام')}${item.teamName ? ` — ${String(item.teamName)}` : ''}`).join('\n');
+      return `${String(result.message ?? 'لطفاً کارشناس را مشخص کنید.')}\n\n${choices}`;
+    }
+
+    const number = (value: unknown) => new Intl.NumberFormat('fa-IR').format(Number(value) || 0);
+    const percent = (value: unknown) => `${number(value)}٪`;
+    const employee = result.employee ?? {};
+    const opportunities = result.sales?.opportunities ?? {};
+    const pipeline = result.sales?.pipeline ?? {};
+    const assigned = result.tasks?.assigned ?? {};
+    const taskEmployee = result.tasks?.employee ?? {};
+    const meetingEmployee = result.meetings?.employee ?? {};
+    const period = result.period ?? {};
+
+    return [
+      `### گزارش عملکرد ${String(employee.fullName ?? 'کارشناس')}`,
+      period.startDate && period.endDate ? `بازه گزارش: ${String(period.startDate)} تا ${String(period.endDate)}` : 'بازه گزارش: ۳۰ روز اخیر',
+      '',
+      `- شرکت‌های ایجادشده: **${number(result.sales?.companiesCreated)}**`,
+      `- فرصت‌ها: **${number(opportunities.total)}** مورد؛ ${number(opportunities.active)} فعال، ${number(opportunities.won)} برنده و ${number(opportunities.lost)} از‌دست‌رفته`,
+      `- نرخ تبدیل فرصت‌ها: **${percent(pipeline.conversionRate)}**`,
+      `- فعالیت‌های ثبت‌شده: **${number(result.activity?.total)}**`,
+      `- جلسات ثبت‌شده: **${number(result.meetings?.createdCount)}**؛ نرخ برگزاری به‌موقع/موفق: **${percent(meetingEmployee.executionRate)}**`,
+      `- کارهای محول‌شده: **${number(assigned.total)}**؛ ${number(assigned.completed)} تکمیل‌شده و ${number(assigned.incomplete)} تکمیل‌نشده`,
+      `- نرخ تکمیل به‌موقع کارها: **${percent(taskEmployee.onTimeCompletionRate)}**`,
+      '',
+      'این گزارش فقط از داده‌های قابل‌دسترسی شما در CRM محاسبه شده است.',
+    ].join('\n');
   }
 
   private parseArguments(value?: string) {

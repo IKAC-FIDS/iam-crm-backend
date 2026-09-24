@@ -86,7 +86,7 @@ describe('CrmAssistantToolsService', () => {
     advancedReports.taskPerformance.mockResolvedValue({ periodFlow: {}, current: {}, byAssignee: [] });
     advancedReports.meetingPerformance.mockResolvedValue({ summary: {}, byOrganizer: [] });
 
-    const result = await service.call('get_sales_rep_performance', { userId: null, userName: 'مهتاب امیری', startDate: null, endDate: null }, reportUser) as any;
+    const result = await service.call('get_sales_rep_performance', { userId: null, userName: 'عملکرد مهتاب در ۳۰ روز گذشته چطور بوده؟', startDate: null, endDate: null }, reportUser) as any;
     expect(result.employee).toEqual({ id: userId, fullName: 'مهتاب امیری' });
     expect(reports.getUserPerformance).toHaveBeenCalledWith(expect.objectContaining({ userIds: [userId] }), reportUser);
   });

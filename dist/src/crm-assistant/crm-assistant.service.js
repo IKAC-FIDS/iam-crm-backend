@@ -31,6 +31,24 @@ let CrmAssistantService = CrmAssistantService_1 = class CrmAssistantService {
             throw new common_1.ServiceUnavailableException('دستیار هوشمند هنوز پیکربندی نشده است');
         }
         const toolDefinitions = [...this.tools.listFor(user), ...this.actions.listFor(user)];
+        const directPerformance = await this.tryDirectPerformanceAnswer(dto.message, user, toolDefinitions);
+        if (directPerformance) {
+            await this.audit.recordTenantEvent({
+                actorId: user.userId,
+                actorMembershipId: user.membershipId,
+                organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
+                entityType: 'crm-assistant',
+                action: 'crm-assistant.question_answered',
+                metadata: {
+                    questionLength: dto.message.length,
+                    tools: ['get_sales_rep_performance'],
+                    modelProvider: 'deterministic-report',
+                    model: 'internal-report-services',
+                    proposedActions: [],
+                },
+            });
+            return { answer: directPerformance, toolsUsed: ['get_sales_rep_performance'], pendingActions: [] };
+        }
         const input = [
             ...(dto.history ?? []).map((item) => ({ role: item.role, content: item.content })),
             { role: 'user', content: dto.message.trim() },
@@ -157,6 +175,48 @@ let CrmAssistantService = CrmAssistantService_1 = class CrmAssistantService {
     }
     cleanBaseUrl(value) {
         return value.replace(/\/$/, '');
+    }
+    async tryDirectPerformanceAnswer(message, user, definitions) {
+        if (!/(عملکرد|کارنامه|ارزیابی)/u.test(message))
+            return null;
+        if (!definitions.some((tool) => tool.name === 'get_sales_rep_performance'))
+            return null;
+        const result = await this.tools.call('get_sales_rep_performance', {
+            userId: null,
+            userName: message,
+            startDate: null,
+            endDate: null,
+        }, user);
+        if (result.needsSelection) {
+            const candidates = Array.isArray(result.candidates) ? result.candidates : [];
+            if (!candidates.length)
+                return String(result.message ?? 'کارشناس موردنظر در محدوده مجاز پیدا نشد.');
+            const choices = candidates.map((item) => `- ${String(item.fullName ?? 'بدون نام')}${item.teamName ? ` — ${String(item.teamName)}` : ''}`).join('\n');
+            return `${String(result.message ?? 'لطفاً کارشناس را مشخص کنید.')}\n\n${choices}`;
+        }
+        const number = (value) => new Intl.NumberFormat('fa-IR').format(Number(value) || 0);
+        const percent = (value) => `${number(value)}٪`;
+        const employee = result.employee ?? {};
+        const opportunities = result.sales?.opportunities ?? {};
+        const pipeline = result.sales?.pipeline ?? {};
+        const assigned = result.tasks?.assigned ?? {};
+        const taskEmployee = result.tasks?.employee ?? {};
+        const meetingEmployee = result.meetings?.employee ?? {};
+        const period = result.period ?? {};
+        return [
+            `### گزارش عملکرد ${String(employee.fullName ?? 'کارشناس')}`,
+            period.startDate && period.endDate ? `بازه گزارش: ${String(period.startDate)} تا ${String(period.endDate)}` : 'بازه گزارش: ۳۰ روز اخیر',
+            '',
+            `- شرکت‌های ایجادشده: **${number(result.sales?.companiesCreated)}**`,
+            `- فرصت‌ها: **${number(opportunities.total)}** مورد؛ ${number(opportunities.active)} فعال، ${number(opportunities.won)} برنده و ${number(opportunities.lost)} از‌دست‌رفته`,
+            `- نرخ تبدیل فرصت‌ها: **${percent(pipeline.conversionRate)}**`,
+            `- فعالیت‌های ثبت‌شده: **${number(result.activity?.total)}**`,
+            `- جلسات ثبت‌شده: **${number(result.meetings?.createdCount)}**؛ نرخ برگزاری به‌موقع/موفق: **${percent(meetingEmployee.executionRate)}**`,
+            `- کارهای محول‌شده: **${number(assigned.total)}**؛ ${number(assigned.completed)} تکمیل‌شده و ${number(assigned.incomplete)} تکمیل‌نشده`,
+            `- نرخ تکمیل به‌موقع کارها: **${percent(taskEmployee.onTimeCompletionRate)}**`,
+            '',
+            'این گزارش فقط از داده‌های قابل‌دسترسی شما در CRM محاسبه شده است.',
+        ].join('\n');
     }
     parseArguments(value) {
         if (!value)
