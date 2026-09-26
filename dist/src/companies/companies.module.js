@@ -18,6 +18,7 @@ const quota_module_1 = require("../quota/quota.module");
 const company_overview_controller_1 = require("./company-overview.controller");
 const company_overview_service_1 = require("./company-overview.service");
 const profile_media_module_1 = require("../profile-media/profile-media.module");
+const company_registry_lookup_service_1 = require("./company-registry-lookup.service");
 let CompaniesModule = class CompaniesModule {
 };
 exports.CompaniesModule = CompaniesModule;
@@ -28,6 +29,7 @@ exports.CompaniesModule = CompaniesModule = __decorate([
             companies_service_1.CompaniesService,
             company_legal_documents_service_1.CompanyLegalDocumentsService,
             company_overview_service_1.CompanyOverviewService,
+            company_registry_lookup_service_1.CompanyRegistryLookupService,
         ],
         controllers: [
             companies_controller_1.CompaniesController,

@@ -9,6 +9,7 @@ import { QuotaModule } from '../quota/quota.module';
 import { CompanyOverviewController } from './company-overview.controller';
 import { CompanyOverviewService } from './company-overview.service';
 import { ProfileMediaModule } from '../profile-media/profile-media.module';
+import { CompanyRegistryLookupService } from './company-registry-lookup.service';
 
 @Module({
   imports: [PipelineConfigModule, AttachmentsModule, QuotaModule, ProfileMediaModule],
@@ -16,6 +17,7 @@ import { ProfileMediaModule } from '../profile-media/profile-media.module';
     CompaniesService,
     CompanyLegalDocumentsService,
     CompanyOverviewService,
+    CompanyRegistryLookupService,
   ],
   controllers: [
     CompaniesController,

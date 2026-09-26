@@ -33,11 +33,16 @@ import { ChangeOwnerDto, BulkChangeOwnerDto } from './dto/change-owner.dto';
 import { FindCompaniesDto } from './dto/find-companies.dto';
 import { ArchiveCompanyDto } from './dto/archive-company.dto';
 import { FindCompanyOptionsDto } from './dto/find-company-options.dto';
+import { CompanyRegistryLookupDto } from './dto/company-registry-lookup.dto';
+import { CompanyRegistryLookupService } from './company-registry-lookup.service';
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('companies')
 export class CompaniesController {
-  constructor(private companiesService: CompaniesService) {}
+  constructor(
+    private companiesService: CompaniesService,
+    private companyRegistryLookup: CompanyRegistryLookupService,
+  ) {}
 
   @Get()
   @Permissions('company:view')
@@ -68,6 +73,12 @@ export class CompaniesController {
     @Query() query: FindCompanyOptionsDto,
   ) {
     return this.companiesService.findOptions(user, query);
+  }
+
+  @Get('registry-lookup')
+  @Permissions('company:create')
+  lookupRegistry(@Query() query: CompanyRegistryLookupDto) {
+    return this.companyRegistryLookup.lookup(query.nationalId);
   }
 
   @Get('options/:id')

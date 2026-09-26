@@ -29,9 +29,12 @@ const change_owner_dto_1 = require("./dto/change-owner.dto");
 const find_companies_dto_1 = require("./dto/find-companies.dto");
 const archive_company_dto_1 = require("./dto/archive-company.dto");
 const find_company_options_dto_1 = require("./dto/find-company-options.dto");
+const company_registry_lookup_dto_1 = require("./dto/company-registry-lookup.dto");
+const company_registry_lookup_service_1 = require("./company-registry-lookup.service");
 let CompaniesController = class CompaniesController {
-    constructor(companiesService) {
+    constructor(companiesService, companyRegistryLookup) {
         this.companiesService = companiesService;
+        this.companyRegistryLookup = companyRegistryLookup;
     }
     findAll(user, query) {
         return this.companiesService.findAll(user, query, {
@@ -51,6 +54,9 @@ let CompaniesController = class CompaniesController {
     }
     findOptions(user, query) {
         return this.companiesService.findOptions(user, query);
+    }
+    lookupRegistry(query) {
+        return this.companyRegistryLookup.lookup(query.nationalId);
     }
     findOption(id, user) {
         return this.companiesService.findOption(id, user);
@@ -118,6 +124,15 @@ __decorate([
     __metadata("design:paramtypes", [Object, find_company_options_dto_1.FindCompanyOptionsDto]),
     __metadata("design:returntype", void 0)
 ], CompaniesController.prototype, "findOptions", null);
+__decorate([
+    (0, common_1.Get)('registry-lookup'),
+    (0, permissions_decorator_1.Permissions)('company:create'),
+    openapi.ApiResponse({ status: 200, type: Object }),
+    __param(0, (0, common_1.Query)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [company_registry_lookup_dto_1.CompanyRegistryLookupDto]),
+    __metadata("design:returntype", void 0)
+], CompaniesController.prototype, "lookupRegistry", null);
 __decorate([
     (0, common_1.Get)('options/:id'),
     (0, permissions_decorator_1.Permissions)('company:view'),
@@ -249,6 +264,7 @@ __decorate([
 exports.CompaniesController = CompaniesController = __decorate([
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, permissions_guard_1.PermissionsGuard),
     (0, common_1.Controller)('companies'),
-    __metadata("design:paramtypes", [companies_service_1.CompaniesService])
+    __metadata("design:paramtypes", [companies_service_1.CompaniesService,
+        company_registry_lookup_service_1.CompanyRegistryLookupService])
 ], CompaniesController);
 //# sourceMappingURL=companies.controller.js.map

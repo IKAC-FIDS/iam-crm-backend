@@ -242,5 +242,7 @@ exports.envValidationSchema = Joi.object({
     OPENAI_API_KEY: Joi.string().allow('').optional(),
     OPENAI_MODEL: Joi.string().optional(),
     OPENAI_BASE_URL: Joi.string().uri().optional(),
+    LINKA_API_TOKEN: Joi.string().allow('').optional(),
+    LINKA_BASE_URL: Joi.string().uri().default('https://api.linka.ir'),
 });
 //# sourceMappingURL=env.validator.js.map
