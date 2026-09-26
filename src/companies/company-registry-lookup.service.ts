@@ -9,6 +9,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 export type CompanyRegistryLookupResult = {
+  schemaVersion?: number;
   legalName?: string;
   brandName?: string;
   registrationNumber?: string;
@@ -24,12 +25,24 @@ export type CompanyRegistryLookupResult = {
   publicEmail?: string;
   postalCode?: string;
   companyType?: string;
+  registrationUnit?: string;
+  registrationOrganization?: string;
+  province?: string;
+  city?: string;
+  latitude?: number;
+  longitude?: number;
   activityDescription?: string;
   signatureAuthority?: string;
+  communications: CompanyRegistryCommunication[];
   director?: CompanyRegistryPerson;
   people: CompanyRegistryPerson[];
   licenses: unknown[];
   cache?: { hit: boolean; fetchedAt: string; expiresAt: string };
+};
+
+export type CompanyRegistryCommunication = {
+  type: string;
+  value: string;
 };
 
 export type CompanyRegistryPerson = {
@@ -71,9 +84,10 @@ export class CompanyRegistryLookupService {
           },
         },
       });
-      if (cached && cached.expiresAt > new Date()) {
+      const cachedResult = cached?.normalizedData as unknown as CompanyRegistryLookupResult | undefined;
+      if (cached && cached.expiresAt > new Date() && cachedResult?.schemaVersion === 2) {
         return withCacheMetadata(
-          cached.normalizedData as unknown as CompanyRegistryLookupResult,
+          cachedResult,
           true,
           cached.fetchedAt,
           cached.expiresAt,
@@ -355,6 +369,7 @@ function mapCompanyRecord(
   const communication = (type: string) =>
     communications.find((row) => String(row.fieldTypeDescription).toLowerCase() === type.toLowerCase())?.value?.toString().trim();
   return compact({
+    schemaVersion: 2,
     legalName: read('name', 'companyName', 'legalName', 'Name', 'CompanyName'),
     brandName: read('brandName', 'tradeName', 'BrandName'),
     registrationNumber: read('registerNumber', 'registrationNumber', 'registerNo', 'RegisterNumber'),
@@ -370,8 +385,20 @@ function mapCompanyRecord(
     publicEmail: communication('Email'),
     postalCode: read('postalCode'),
     companyType: read('companyTypeDescription'),
+    registrationUnit: read('companyRegistrationUnitDescription'),
+    registrationOrganization: read('companyRegistrationOrganDescription'),
+    province: read('provinceTitle'),
+    city: read('cityTitle'),
+    latitude: normalizeCoordinate(source.lat),
+    longitude: normalizeCoordinate(source.long),
     activityDescription: read('activityDescription'),
     signatureAuthority: read('signatureAuthority'),
+    communications: communications
+      .map((row) => ({
+        type: String(row.fieldTypeDescription ?? '').trim(),
+        value: String(row.value ?? '').trim(),
+      }))
+      .filter((item) => item.type && item.value),
     director,
     people,
     licenses,
@@ -391,6 +418,11 @@ function normalizeNumber(value?: string) {
   if (!value) return undefined;
   const normalized = value.replace(/[,،\s]/g, '').replace(/[^\d.]/g, '');
   return /^\d+(\.\d{1,2})?$/.test(normalized) ? normalized : undefined;
+}
+
+function normalizeCoordinate(value: unknown): number | undefined {
+  const coordinate = Number(value);
+  return Number.isFinite(coordinate) ? coordinate : undefined;
 }
 
 function normalizeStatus(value?: string): CompanyRegistryLookupResult['activityStatus'] {

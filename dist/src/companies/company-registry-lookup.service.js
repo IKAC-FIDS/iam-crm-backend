@@ -29,8 +29,9 @@ let CompanyRegistryLookupService = class CompanyRegistryLookupService {
                     },
                 },
             });
-            if (cached && cached.expiresAt > new Date()) {
-                return withCacheMetadata(cached.normalizedData, true, cached.fetchedAt, cached.expiresAt);
+            const cachedResult = cached?.normalizedData;
+            if (cached && cached.expiresAt > new Date() && cachedResult?.schemaVersion === 2) {
+                return withCacheMetadata(cachedResult, true, cached.fetchedAt, cached.expiresAt);
             }
         }
         const token = await this.getAccessToken();
@@ -292,6 +293,7 @@ function mapCompanyRecord(source, requestedNationalId, communications, director,
     const status = read('companyStateDescription', 'tagTypeDescription', 'status', 'companyStatus');
     const communication = (type) => communications.find((row) => String(row.fieldTypeDescription).toLowerCase() === type.toLowerCase())?.value?.toString().trim();
     return compact({
+        schemaVersion: 2,
         legalName: read('name', 'companyName', 'legalName', 'Name', 'CompanyName'),
         brandName: read('brandName', 'tradeName', 'BrandName'),
         registrationNumber: read('registerNumber', 'registrationNumber', 'registerNo', 'RegisterNumber'),
@@ -307,8 +309,20 @@ function mapCompanyRecord(source, requestedNationalId, communications, director,
         publicEmail: communication('Email'),
         postalCode: read('postalCode'),
         companyType: read('companyTypeDescription'),
+        registrationUnit: read('companyRegistrationUnitDescription'),
+        registrationOrganization: read('companyRegistrationOrganDescription'),
+        province: read('provinceTitle'),
+        city: read('cityTitle'),
+        latitude: normalizeCoordinate(source.lat),
+        longitude: normalizeCoordinate(source.long),
         activityDescription: read('activityDescription'),
         signatureAuthority: read('signatureAuthority'),
+        communications: communications
+            .map((row) => ({
+            type: String(row.fieldTypeDescription ?? '').trim(),
+            value: String(row.value ?? '').trim(),
+        }))
+            .filter((item) => item.type && item.value),
         director,
         people,
         licenses,
@@ -330,6 +344,10 @@ function normalizeNumber(value) {
         return undefined;
     const normalized = value.replace(/[,،\s]/g, '').replace(/[^\d.]/g, '');
     return /^\d+(\.\d{1,2})?$/.test(normalized) ? normalized : undefined;
+}
+function normalizeCoordinate(value) {
+    const coordinate = Number(value);
+    return Number.isFinite(coordinate) ? coordinate : undefined;
 }
 function normalizeStatus(value) {
     if (!value)

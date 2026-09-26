@@ -77,7 +77,7 @@ export class CompaniesController {
   }
 
   @Get('registry-lookup')
-  @Permissions('company:create')
+  @Permissions('company:view')
   lookupRegistry(
     @Query() query: CompanyRegistryLookupDto,
     @CurrentUser() user: CurrentUserPayload,

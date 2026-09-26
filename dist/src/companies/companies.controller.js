@@ -127,7 +127,7 @@ __decorate([
 ], CompaniesController.prototype, "findOptions", null);
 __decorate([
     (0, common_1.Get)('registry-lookup'),
-    (0, permissions_decorator_1.Permissions)('company:create'),
+    (0, permissions_decorator_1.Permissions)('company:view'),
     openapi.ApiResponse({ status: 200, type: Object }),
     __param(0, (0, common_1.Query)()),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
