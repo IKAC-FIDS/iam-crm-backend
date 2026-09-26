@@ -83,4 +83,38 @@ describe('CompanyRegistryLookupService', () => {
       }),
     );
   });
+
+  it('combines current and historical company roles for a person', async () => {
+    const config = {
+      get: jest.fn((key: string, fallback?: string) =>
+        key === 'LINKA_API_TOKEN' ? 'secret-token' : fallback,
+      ),
+    } as unknown as ConfigService;
+    jest.spyOn(global, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      const rows = url.includes('PersonCompanyHistory')
+        ? [{
+            companyNationalCode: '14004176070', companyName: 'فاوا ایمن الکا',
+            postDescription: 'مدیرعامل', startDate: '2016-10-31T00:00:00',
+            endDate: '2019-02-07T00:00:00', personAttendanceStatusDescription: 'غیرفعال',
+            fullName: 'فرزاد نوروزی فرد',
+          }]
+        : [{
+            companyNationalCode: '10320508911', companyName: 'نانو فناور ستاره کاسپین',
+            postDescription: 'مدیرعامل', startDate: '2011-04-09T00:00:00',
+            personAttendanceStatusDescription: 'فعال', fullName: 'فرزاد نوروزی فرد',
+          }];
+      return { ok: true, status: 200, json: async () => ({ success: true, data: { rows } }) } as Response;
+    });
+
+    const result = await new CompanyRegistryLookupService(config, prisma() as never)
+      .lookupPersonCompanies('0079474871', 'org-1');
+
+    expect(result).toEqual(expect.objectContaining({
+      nationalCode: '0079474871',
+      fullName: 'فرزاد نوروزی فرد',
+      current: [expect.objectContaining({ companyNationalCode: '10320508911', active: true })],
+      history: [expect.objectContaining({ companyNationalCode: '14004176070', active: false })],
+    }));
+  });
 });

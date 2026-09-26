@@ -45,6 +45,28 @@ export type CompanyRegistryCommunication = {
   value: string;
 };
 
+export type PersonCompanyRole = {
+  companyNationalCode: string;
+  companyName: string;
+  postDescription?: string;
+  startDate?: string;
+  endDate?: string;
+  durationTypeDescription?: string;
+  stockPercentage?: string;
+  stockCount?: string;
+  stockAmount?: string;
+  active: boolean;
+};
+
+export type PersonCompanyLookupResult = {
+  schemaVersion: number;
+  nationalCode: string;
+  fullName?: string;
+  current: PersonCompanyRole[];
+  history: PersonCompanyRole[];
+  cache?: { hit: boolean; fetchedAt: string; expiresAt: string };
+};
+
 export type CompanyRegistryPerson = {
   fullName: string;
   firstName?: string;
@@ -158,6 +180,81 @@ export class CompanyRegistryLookupService {
     return withCacheMetadata(normalized, false, fetchedAt, expiresAt);
   }
 
+  async lookupPersonCompanies(
+    nationalCode: string,
+    organizationId: string,
+    forceRefresh = false,
+  ): Promise<PersonCompanyLookupResult> {
+    const provider = 'LINKA_PERSON_COMPANIES';
+    if (!forceRefresh) {
+      const cached = await this.prisma.companyRegistrySnapshot.findUnique({
+        where: {
+          organizationId_nationalId_provider: {
+            organizationId,
+            nationalId: nationalCode,
+            provider,
+          },
+        },
+      });
+      const cachedResult = cached?.normalizedData as unknown as PersonCompanyLookupResult | undefined;
+      if (cached && cached.expiresAt > new Date() && cachedResult?.schemaVersion === 1) {
+        return withPersonCacheMetadata(cachedResult, true, cached.fetchedAt, cached.expiresAt);
+      }
+    }
+
+    const token = await this.getAccessToken();
+    if (!token) {
+      throw new ServiceUnavailableException({
+        code: 'COMPANY_LOOKUP_NOT_CONFIGURED',
+        message: 'سرویس استعلام شرکت هنوز پیکربندی نشده است',
+      });
+    }
+    const baseUrl = this.config
+      .get<string>('LINKA_BASE_URL', 'https://api.linka.ir')
+      .replace(/\/$/, '');
+    const [currentPayload, historyPayload] = await Promise.all([
+      this.fetchLinka('/API/V1/PersonCompany', nationalCode, token, baseUrl),
+      this.fetchLinka('/API/V1/PersonCompanyHistory', nationalCode, token, baseUrl),
+    ]);
+    const currentRows = findRows(currentPayload);
+    const historyRows = findRows(historyPayload);
+    const personSource = currentRows[0] ?? historyRows[0];
+    const normalized: PersonCompanyLookupResult = {
+      schemaVersion: 1,
+      nationalCode,
+      fullName: personSource?.fullName ? String(personSource.fullName).trim() : undefined,
+      current: currentRows.map(mapPersonCompanyRole).filter(isPersonCompanyRole),
+      history: historyRows.map(mapPersonCompanyRole).filter(isPersonCompanyRole),
+    };
+    const fetchedAt = new Date();
+    const expiresAt = new Date(fetchedAt.getTime() + 24 * 60 * 60_000);
+    await this.prisma.companyRegistrySnapshot.upsert({
+      where: {
+        organizationId_nationalId_provider: {
+          organizationId,
+          nationalId: nationalCode,
+          provider,
+        },
+      },
+      create: {
+        organizationId,
+        nationalId: nationalCode,
+        provider,
+        normalizedData: normalized as unknown as Prisma.InputJsonValue,
+        rawData: { current: currentPayload, history: historyPayload } as Prisma.InputJsonValue,
+        fetchedAt,
+        expiresAt,
+      },
+      update: {
+        normalizedData: normalized as unknown as Prisma.InputJsonValue,
+        rawData: { current: currentPayload, history: historyPayload } as Prisma.InputJsonValue,
+        fetchedAt,
+        expiresAt,
+      },
+    });
+    return withPersonCacheMetadata(normalized, false, fetchedAt, expiresAt);
+  }
+
   async importCachedPeople(companyId: string, nationalId: string, organizationId: string) {
     const snapshot = await this.prisma.companyRegistrySnapshot.findUnique({
       where: {
@@ -219,6 +316,7 @@ export class CompanyRegistryLookupService {
     const url = new URL(path, baseUrl);
     url.searchParams.set('nationalCode', nationalId);
     url.searchParams.set('PageIndex', '1');
+    url.searchParams.set('PageSize', '100');
     let response: Response;
     try {
       response = await fetch(url, {
@@ -486,5 +584,37 @@ function withCacheMetadata(
   fetchedAt: Date,
   expiresAt: Date,
 ): CompanyRegistryLookupResult {
+  return { ...result, cache: { hit, fetchedAt: fetchedAt.toISOString(), expiresAt: expiresAt.toISOString() } };
+}
+
+function mapPersonCompanyRole(source: Record<string, unknown>): PersonCompanyRole | undefined {
+  const text = (key: string) => source[key] == null ? undefined : String(source[key]).trim() || undefined;
+  const companyNationalCode = text('companyNationalCode');
+  const companyName = text('companyName');
+  if (!companyNationalCode || !companyName) return undefined;
+  return compact({
+    companyNationalCode,
+    companyName,
+    postDescription: text('postDescription'),
+    startDate: normalizeDate(text('startDate')),
+    endDate: normalizeDate(text('endDate')),
+    durationTypeDescription: text('durationTypeDescription'),
+    stockPercentage: text('stockPercentage'),
+    stockCount: text('stockCount'),
+    stockAmount: text('stockAmount'),
+    active: text('personAttendanceStatusDescription') === 'فعال',
+  });
+}
+
+function isPersonCompanyRole(value: PersonCompanyRole | undefined): value is PersonCompanyRole {
+  return Boolean(value);
+}
+
+function withPersonCacheMetadata(
+  result: PersonCompanyLookupResult,
+  hit: boolean,
+  fetchedAt: Date,
+  expiresAt: Date,
+): PersonCompanyLookupResult {
   return { ...result, cache: { hit, fetchedAt: fetchedAt.toISOString(), expiresAt: expiresAt.toISOString() } };
 }

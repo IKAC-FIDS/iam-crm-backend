@@ -34,6 +34,7 @@ import { FindCompaniesDto } from './dto/find-companies.dto';
 import { ArchiveCompanyDto } from './dto/archive-company.dto';
 import { FindCompanyOptionsDto } from './dto/find-company-options.dto';
 import { CompanyRegistryLookupDto } from './dto/company-registry-lookup.dto';
+import { PersonCompanyLookupDto } from './dto/person-company-lookup.dto';
 import { CompanyRegistryLookupService } from './company-registry-lookup.service';
 import { getCurrentOrganizationId } from '../common/tenant/tenant-scope.util';
 
@@ -84,6 +85,18 @@ export class CompaniesController {
   ) {
     return this.companyRegistryLookup.lookup(
       query.nationalId,
+      getCurrentOrganizationId(user),
+    );
+  }
+
+  @Get('person-company-lookup')
+  @Permissions('company:view')
+  lookupPersonCompanies(
+    @Query() query: PersonCompanyLookupDto,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.companyRegistryLookup.lookupPersonCompanies(
+      query.nationalCode,
       getCurrentOrganizationId(user),
     );
   }
