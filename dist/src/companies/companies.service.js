@@ -23,6 +23,7 @@ const company_access_service_1 = require("./company-access.service");
 const quota_service_1 = require("../quota/quota.service");
 const company_phone_util_1 = require("./company-phone.util");
 const profile_media_service_1 = require("../profile-media/profile-media.service");
+const company_registry_lookup_service_1 = require("./company-registry-lookup.service");
 const companyOptionSelect = {
     id: true,
     legalName: true,
@@ -33,12 +34,13 @@ const companyOptionSelect = {
     parentCompanyId: true,
 };
 let CompaniesService = class CompaniesService {
-    constructor(prisma, audit, companyAccess, quota, profileMedia) {
+    constructor(prisma, audit, companyAccess, quota, profileMedia, companyRegistryLookup) {
         this.prisma = prisma;
         this.audit = audit;
         this.companyAccess = companyAccess;
         this.quota = quota;
         this.profileMedia = profileMedia;
+        this.companyRegistryLookup = companyRegistryLookup;
     }
     async getLogo(id, user) {
         const company = await this.prisma.company.findFirst({
@@ -364,6 +366,9 @@ let CompaniesService = class CompaniesService {
             throw error;
         }
         await this.quota.commitReservation(reservation.reservationId);
+        const registryImport = dto.nationalId
+            ? await this.companyRegistryLookup.importCachedPeople(company.id, dto.nationalId, organizationId)
+            : { imported: 0, updated: 0 };
         await this.audit.record({
             actorId: user.userId,
             organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
@@ -372,7 +377,7 @@ let CompaniesService = class CompaniesService {
             action: 'company.created',
             after: company,
         });
-        return this.withHierarchy(company);
+        return { ...this.withHierarchy(company), registryImport };
     }
     async update(id, dto, user) {
         if (user.role === client_1.UserRole.BOARDS) {
@@ -895,6 +900,7 @@ exports.CompaniesService = CompaniesService = __decorate([
         audit_log_service_1.AuditLogService,
         company_access_service_1.CompanyAccessService,
         quota_service_1.QuotaService,
-        profile_media_service_1.ProfileMediaService])
+        profile_media_service_1.ProfileMediaService,
+        company_registry_lookup_service_1.CompanyRegistryLookupService])
 ], CompaniesService);
 //# sourceMappingURL=companies.service.js.map

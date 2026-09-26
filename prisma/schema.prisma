@@ -704,6 +704,7 @@ model Organization {
   leaveRequests                LeaveRequest[]
   workSchedules                WorkSchedule[]
   timesheetApprovalHistories   TimesheetApprovalHistory[]
+  companyRegistrySnapshots     CompanyRegistrySnapshot[]
 
   @@index([status])
   @@index([createdAt])
@@ -1088,6 +1089,24 @@ model Company {
   @@map("companies")
 }
 
+model CompanyRegistrySnapshot {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  nationalId     String
+  provider       String       @default("LINKA")
+  normalizedData Json
+  rawData        Json
+  fetchedAt      DateTime     @default(now())
+  expiresAt      DateTime
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([organizationId, nationalId, provider])
+  @@index([organizationId, expiresAt])
+  @@map("company_registry_snapshots")
+}
+
 model CompanyHierarchyRelation {
   id                  String   @id @default(uuid())
   parentCompanyId     String
@@ -1163,6 +1182,8 @@ model Person {
   company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   fullName       String
+  nationalCode   String?
+  registrySource String?
   title          String?
   department     String?
   seniorityLevel String?
@@ -1194,6 +1215,7 @@ model Person {
   primaryOpportunities Opportunity[] @relation("OpportunityPrimaryContact")
 
   @@index([companyId])
+  @@unique([companyId, nationalCode])
   @@index([personaTag])
   @@index([isPrimaryContact])
   @@map("people")

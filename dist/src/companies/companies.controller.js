@@ -31,6 +31,7 @@ const archive_company_dto_1 = require("./dto/archive-company.dto");
 const find_company_options_dto_1 = require("./dto/find-company-options.dto");
 const company_registry_lookup_dto_1 = require("./dto/company-registry-lookup.dto");
 const company_registry_lookup_service_1 = require("./company-registry-lookup.service");
+const tenant_scope_util_1 = require("../common/tenant/tenant-scope.util");
 let CompaniesController = class CompaniesController {
     constructor(companiesService, companyRegistryLookup) {
         this.companiesService = companiesService;
@@ -55,8 +56,8 @@ let CompaniesController = class CompaniesController {
     findOptions(user, query) {
         return this.companiesService.findOptions(user, query);
     }
-    lookupRegistry(query) {
-        return this.companyRegistryLookup.lookup(query.nationalId);
+    lookupRegistry(query, user) {
+        return this.companyRegistryLookup.lookup(query.nationalId, (0, tenant_scope_util_1.getCurrentOrganizationId)(user));
     }
     findOption(id, user) {
         return this.companiesService.findOption(id, user);
@@ -129,8 +130,9 @@ __decorate([
     (0, permissions_decorator_1.Permissions)('company:create'),
     openapi.ApiResponse({ status: 200, type: Object }),
     __param(0, (0, common_1.Query)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [company_registry_lookup_dto_1.CompanyRegistryLookupDto]),
+    __metadata("design:paramtypes", [company_registry_lookup_dto_1.CompanyRegistryLookupDto, Object]),
     __metadata("design:returntype", void 0)
 ], CompaniesController.prototype, "lookupRegistry", null);
 __decorate([

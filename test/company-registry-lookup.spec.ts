@@ -4,6 +4,13 @@ import { CompanyRegistryLookupService } from '../src/companies/company-registry-
 describe('CompanyRegistryLookupService', () => {
   afterEach(() => jest.restoreAllMocks());
 
+  const prisma = () => ({
+    companyRegistrySnapshot: {
+      findUnique: jest.fn().mockResolvedValue(null),
+      upsert: jest.fn().mockResolvedValue({}),
+    },
+  });
+
   it('calls Linka server-side and maps supported company fields', async () => {
     const config = {
       get: jest.fn((key: string, fallback?: string) =>
@@ -26,7 +33,8 @@ describe('CompanyRegistryLookupService', () => {
       }),
     } as Response);
 
-    const result = await new CompanyRegistryLookupService(config).lookup('10101234567');
+    const result = await new CompanyRegistryLookupService(config, prisma() as never)
+      .lookup('10101234567', 'org-1');
 
     expect(fetch).toHaveBeenCalledWith(
       expect.objectContaining({ href: expect.stringContaining('nationalCode=10101234567') }),
@@ -53,20 +61,19 @@ describe('CompanyRegistryLookupService', () => {
       }),
     } as unknown as ConfigService;
     const fetchMock = jest.spyOn(global, 'fetch');
-    fetchMock
-      .mockResolvedValueOnce({
+    fetchMock.mockResolvedValueOnce({
         ok: true,
         status: 200,
         text: async () => JSON.stringify({ response: { authentication: { jwtToken: 'header.payload.signature' } } }),
         headers: new Headers(),
-      } as Response)
-      .mockResolvedValueOnce({
+      } as Response).mockResolvedValue({
         ok: true,
         status: 200,
-        json: async () => ({ companyName: 'شرکت نمونه' }),
+        json: async () => ({ success: true, data: { companyName: 'شرکت نمونه' } }),
       } as Response);
 
-    await new CompanyRegistryLookupService(config).lookup('10101234567');
+    await new CompanyRegistryLookupService(config, prisma() as never)
+      .lookup('10101234567', 'org-1');
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,

@@ -35,6 +35,7 @@ import { QuotaService } from '../quota/quota.service';
 import { FindCompanyOptionsDto } from './dto/find-company-options.dto';
 import { isPhoneLikeSearch, normalizeCompanyPhone } from './company-phone.util';
 import { ProfileMediaService } from '../profile-media/profile-media.service';
+import { CompanyRegistryLookupService } from './company-registry-lookup.service';
 
 const companyOptionSelect = {
   id: true,
@@ -54,6 +55,7 @@ export class CompaniesService {
     private companyAccess: CompanyAccessService,
     private quota: QuotaService,
     private readonly profileMedia: ProfileMediaService,
+    private readonly companyRegistryLookup: CompanyRegistryLookupService,
   ) {}
 
   async getLogo(id: string, user: CurrentUserPayload) {
@@ -452,6 +454,14 @@ export class CompaniesService {
     }
     await this.quota.commitReservation(reservation.reservationId);
 
+    const registryImport = dto.nationalId
+      ? await this.companyRegistryLookup.importCachedPeople(
+          company.id,
+          dto.nationalId,
+          organizationId,
+        )
+      : { imported: 0, updated: 0 };
+
     await this.audit.record({
       actorId: user.userId,
       organizationId: getCurrentOrganizationId(user),
@@ -461,7 +471,7 @@ export class CompaniesService {
       after: company,
     });
 
-    return this.withHierarchy(company);
+    return { ...this.withHierarchy(company), registryImport };
   }
 
   async update(id: string, dto: UpdateCompanyDto, user: CurrentUserPayload) {

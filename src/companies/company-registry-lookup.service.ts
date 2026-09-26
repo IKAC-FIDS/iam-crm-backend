@@ -5,6 +5,8 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Prisma } from '@prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
 
 export type CompanyRegistryLookupResult = {
   legalName?: string;
@@ -19,15 +21,66 @@ export type CompanyRegistryLookupResult = {
   centralPhone?: string;
   website?: string;
   activityStatus?: 'ACTIVE' | 'INACTIVE' | 'UNKNOWN';
+  publicEmail?: string;
+  postalCode?: string;
+  companyType?: string;
+  activityDescription?: string;
+  signatureAuthority?: string;
+  director?: CompanyRegistryPerson;
+  people: CompanyRegistryPerson[];
+  licenses: unknown[];
+  cache?: { hit: boolean; fetchedAt: string; expiresAt: string };
+};
+
+export type CompanyRegistryPerson = {
+  fullName: string;
+  firstName?: string;
+  lastName?: string;
+  nationalCode?: string;
+  postDescription?: string;
+  postCategoryTitle?: string;
+  personTypeDescription?: string;
+  representedOrganizationName?: string;
+  representedOrganizationNationalCode?: string;
+  startDate?: string;
+  endDate?: string;
+  active?: boolean;
 };
 
 @Injectable()
 export class CompanyRegistryLookupService {
   private cachedToken?: { value: string; expiresAt: number };
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(
+    private readonly config: ConfigService,
+    private readonly prisma: PrismaService,
+  ) {}
 
-  async lookup(nationalId: string): Promise<CompanyRegistryLookupResult> {
+  async lookup(
+    nationalId: string,
+    organizationId: string,
+    forceRefresh = false,
+  ): Promise<CompanyRegistryLookupResult> {
+    if (!forceRefresh) {
+      const cached = await this.prisma.companyRegistrySnapshot.findUnique({
+        where: {
+          organizationId_nationalId_provider: {
+            organizationId,
+            nationalId,
+            provider: 'LINKA',
+          },
+        },
+      });
+      if (cached && cached.expiresAt > new Date()) {
+        return withCacheMetadata(
+          cached.normalizedData as unknown as CompanyRegistryLookupResult,
+          true,
+          cached.fetchedAt,
+          cached.expiresAt,
+        );
+      }
+    }
+
     const token = await this.getAccessToken();
     if (!token) {
       throw new ServiceUnavailableException({
@@ -39,37 +92,15 @@ export class CompanyRegistryLookupService {
     const baseUrl = this.config
       .get<string>('LINKA_BASE_URL', 'https://api.linka.ir')
       .replace(/\/$/, '');
-    const url = new URL('/API/V1/CompanyBaseInfo', baseUrl);
-    url.searchParams.set('nationalCode', nationalId);
+    const [base, communications, director, people, licenses] = await Promise.all([
+      this.fetchLinka('/API/V1/CompanyBaseInfo', nationalId, token, baseUrl),
+      this.fetchLinka('/API/V1/Communication', nationalId, token, baseUrl),
+      this.fetchLinka('/API/V1/CompanyDirector', nationalId, token, baseUrl),
+      this.fetchLinka('/API/V1/CompanyPerson', nationalId, token, baseUrl),
+      this.fetchLinka('/API/V1/License', nationalId, token, baseUrl),
+    ]);
 
-    let response: Response;
-    try {
-      response = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
-        signal: AbortSignal.timeout(12_000),
-      });
-    } catch {
-      throw new BadGatewayException({
-        code: 'COMPANY_LOOKUP_UNAVAILABLE',
-        message: 'ارتباط با سرویس استعلام شرکت برقرار نشد',
-      });
-    }
-
-    if (response.status === 404) {
-      throw new NotFoundException({
-        code: 'COMPANY_LOOKUP_NOT_FOUND',
-        message: 'شرکتی با این شناسه ملی پیدا نشد',
-      });
-    }
-    if (!response.ok) {
-      throw new BadGatewayException({
-        code: 'COMPANY_LOOKUP_FAILED',
-        message: 'سرویس استعلام شرکت پاسخ معتبری نداد',
-      });
-    }
-
-    const payload = await response.json().catch(() => null);
-    const source = findCompanyRecord(payload);
+    const source = findCompanyRecord(base);
     if (!source) {
       throw new NotFoundException({
         code: 'COMPANY_LOOKUP_NOT_FOUND',
@@ -77,7 +108,120 @@ export class CompanyRegistryLookupService {
       });
     }
 
-    return mapCompanyRecord(source, nationalId);
+    const communicationRows = findRows(communications);
+    const personRows = findRows(people).map(mapPerson).filter(isRegistryPerson);
+    const directorRecord = findCompanyRecord(director);
+    const normalized = mapCompanyRecord(
+      source,
+      nationalId,
+      communicationRows,
+      directorRecord ? mapPerson(directorRecord) : undefined,
+      personRows,
+      findRows(licenses),
+    );
+    const fetchedAt = new Date();
+    const expiresAt = new Date(fetchedAt.getTime() + 24 * 60 * 60_000);
+    await this.prisma.companyRegistrySnapshot.upsert({
+      where: {
+        organizationId_nationalId_provider: { organizationId, nationalId, provider: 'LINKA' },
+      },
+      create: {
+        organizationId,
+        nationalId,
+        provider: 'LINKA',
+        normalizedData: normalized as unknown as Prisma.InputJsonValue,
+        rawData: { base, communications, director, people, licenses } as Prisma.InputJsonValue,
+        fetchedAt,
+        expiresAt,
+      },
+      update: {
+        normalizedData: normalized as unknown as Prisma.InputJsonValue,
+        rawData: { base, communications, director, people, licenses } as Prisma.InputJsonValue,
+        fetchedAt,
+        expiresAt,
+      },
+    });
+    return withCacheMetadata(normalized, false, fetchedAt, expiresAt);
+  }
+
+  async importCachedPeople(companyId: string, nationalId: string, organizationId: string) {
+    const snapshot = await this.prisma.companyRegistrySnapshot.findUnique({
+      where: {
+        organizationId_nationalId_provider: { organizationId, nationalId, provider: 'LINKA' },
+      },
+    });
+    if (!snapshot) return { imported: 0, updated: 0 };
+    const normalized = snapshot.normalizedData as unknown as CompanyRegistryLookupResult;
+    let imported = 0;
+    let updated = 0;
+    const naturalPeople = new Map<string, CompanyRegistryPerson[]>();
+    const candidates = [
+      ...(normalized.people ?? []),
+      ...(normalized.director ? [normalized.director] : []),
+    ];
+    for (const person of candidates) {
+      if (
+        !person.fullName?.trim() ||
+        !person.nationalCode?.trim() ||
+        person.personTypeDescription === 'حقوقی' ||
+        person.active === false
+      ) continue;
+      const roles = naturalPeople.get(person.nationalCode) ?? [];
+      roles.push(person);
+      naturalPeople.set(person.nationalCode, roles);
+    }
+    for (const [personNationalCode, roles] of naturalPeople) {
+      const preferred = roles.find((person) => person.postDescription === 'مدیرعامل') ?? roles[0];
+      const title = uniqueText(roles.map((person) => person.postDescription));
+      const department = uniqueText(roles.map((person) => person.postCategoryTitle));
+      const existing = await this.prisma.person.findUnique({
+        where: { companyId_nationalCode: { companyId, nationalCode: personNationalCode } },
+      });
+      await this.prisma.person.upsert({
+        where: { companyId_nationalCode: { companyId, nationalCode: personNationalCode } },
+        create: {
+          companyId,
+          fullName: preferred.fullName,
+          nationalCode: personNationalCode,
+          registrySource: 'LINKA',
+          title,
+          department,
+          isPrimaryContact: roles.some((person) => person.postDescription === 'مدیرعامل'),
+        },
+        update: {
+          fullName: preferred.fullName,
+          title,
+          department,
+          registrySource: 'LINKA',
+          isPrimaryContact: roles.some((person) => person.postDescription === 'مدیرعامل') || undefined,
+        },
+      });
+      existing ? updated++ : imported++;
+    }
+    return { imported, updated };
+  }
+
+  private async fetchLinka(path: string, nationalId: string, token: string, baseUrl: string) {
+    const url = new URL(path, baseUrl);
+    url.searchParams.set('nationalCode', nationalId);
+    url.searchParams.set('PageIndex', '1');
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+        signal: AbortSignal.timeout(12_000),
+      });
+    } catch {
+      throw new BadGatewayException({ code: 'COMPANY_LOOKUP_UNAVAILABLE', message: 'ارتباط با سرویس استعلام شرکت برقرار نشد' });
+    }
+    if (!response.ok) {
+      throw new BadGatewayException({ code: 'COMPANY_LOOKUP_FAILED', message: `سرویس استعلام شرکت پاسخ معتبر نداد (${path})` });
+    }
+    const payload = await response.json().catch(() => null);
+    if (payload && typeof payload === 'object' && (payload as { success?: boolean }).success === false) {
+      throw new BadGatewayException({ code: 'COMPANY_LOOKUP_FAILED', message: `استعلام Linka ناموفق بود (${path})` });
+    }
+    return payload;
   }
 
   private async getAccessToken(): Promise<string | undefined> {
@@ -192,6 +336,10 @@ function findCompanyRecord(value: unknown): Record<string, unknown> | null {
 function mapCompanyRecord(
   source: Record<string, unknown>,
   requestedNationalId: string,
+  communications: Record<string, unknown>[],
+  director: CompanyRegistryPerson | undefined,
+  people: CompanyRegistryPerson[],
+  licenses: unknown[],
 ): CompanyRegistryLookupResult {
   const read = (...keys: string[]) => {
     for (const key of keys) {
@@ -203,27 +351,40 @@ function mapCompanyRecord(
     return undefined;
   };
 
-  const status = read('status', 'companyStatus', 'activityStatus', 'Status');
+  const status = read('companyStateDescription', 'tagTypeDescription', 'status', 'companyStatus');
+  const communication = (type: string) =>
+    communications.find((row) => String(row.fieldTypeDescription).toLowerCase() === type.toLowerCase())?.value?.toString().trim();
   return compact({
     legalName: read('name', 'companyName', 'legalName', 'Name', 'CompanyName'),
     brandName: read('brandName', 'tradeName', 'BrandName'),
     registrationNumber: read('registerNumber', 'registrationNumber', 'registerNo', 'RegisterNumber'),
     nationalId: read('nationalCode', 'nationalId', 'NationalCode') ?? requestedNationalId,
     economicCode: read('economicCode', 'taxCode', 'EconomicCode'),
-    establishmentDate: normalizeDate(read('registerDate', 'registrationDate', 'establishmentDate', 'RegisterDate')),
-    registeredCapital: normalizeNumber(read('capital', 'registeredCapital', 'Capital')),
-    headOfficeCity: read('city', 'province', 'location', 'City'),
+    establishmentDate: normalizeDate(read('registerDate', 'registrationDate', 'establishmentDate')),
+    registeredCapital: normalizeNumber(read('capital', 'registeredCapital')),
+    headOfficeCity: read('cityTitle', 'provinceTitle', 'city', 'province'),
     headOfficeAddress: read('address', 'fullAddress', 'Address'),
-    centralPhone: read('phone', 'telephone', 'centralPhone', 'Phone'),
-    website: read('website', 'webSite', 'url', 'Website'),
+    centralPhone: communication('PhoneNumber') ?? read('phone', 'telephone', 'centralPhone'),
+    website: normalizeWebsite(communication('Website') ?? read('website', 'webSite', 'url')),
     activityStatus: normalizeStatus(status),
+    publicEmail: communication('Email'),
+    postalCode: read('postalCode'),
+    companyType: read('companyTypeDescription'),
+    activityDescription: read('activityDescription'),
+    signatureAuthority: read('signatureAuthority'),
+    director,
+    people,
+    licenses,
   });
 }
 
 function normalizeDate(value?: string) {
   if (!value) return undefined;
-  const match = value.match(/\d{4}-\d{2}-\d{2}/);
-  return match?.[0];
+  const iso = value.match(/\d{4}-\d{2}-\d{2}/);
+  if (iso) return iso[0];
+  const us = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (!us) return undefined;
+  return `${us[3]}-${us[1].padStart(2, '0')}-${us[2].padStart(2, '0')}`;
 }
 
 function normalizeNumber(value?: string) {
@@ -244,4 +405,54 @@ function compact<T extends Record<string, unknown>>(value: T): T {
   return Object.fromEntries(
     Object.entries(value).filter(([, item]) => item !== undefined),
   ) as T;
+}
+
+function findRows(value: unknown): Record<string, unknown>[] {
+  if (!value || typeof value !== 'object') return [];
+  const record = value as Record<string, unknown>;
+  const data = record.data && typeof record.data === 'object' ? record.data as Record<string, unknown> : record;
+  return Array.isArray(data.rows) ? data.rows.filter((row): row is Record<string, unknown> => Boolean(row && typeof row === 'object')) : [];
+}
+
+function mapPerson(source: Record<string, unknown>): CompanyRegistryPerson | undefined {
+  const text = (key: string) => source[key] == null ? undefined : String(source[key]).trim() || undefined;
+  const fullName = text('fullName') ?? [text('firstName'), text('lastName')].filter(Boolean).join(' ');
+  if (!fullName) return undefined;
+  return compact({
+    fullName,
+    firstName: text('firstName'),
+    lastName: text('lastName'),
+    nationalCode: text('nationalCode'),
+    postDescription: text('postDescription'),
+    postCategoryTitle: text('postCategoryTitle'),
+    personTypeDescription: text('personTypeDescription'),
+    representedOrganizationName: text('orginFullName'),
+    representedOrganizationNationalCode: text('orginNationalCode'),
+    startDate: normalizeDate(text('startDate')),
+    endDate: normalizeDate(text('endDate')),
+    active: text('personAttendanceStatusDescription') === 'فعال',
+  });
+}
+
+function isRegistryPerson(value: CompanyRegistryPerson | undefined): value is CompanyRegistryPerson {
+  return Boolean(value);
+}
+
+function uniqueText(values: Array<string | undefined>): string | undefined {
+  const unique = [...new Set(values.map((value) => value?.trim()).filter((value): value is string => Boolean(value)))];
+  return unique.length ? unique.join('، ') : undefined;
+}
+
+function normalizeWebsite(value?: string) {
+  if (!value) return undefined;
+  return /^https?:\/\//i.test(value) ? value : `https://${value}`;
+}
+
+function withCacheMetadata(
+  result: CompanyRegistryLookupResult,
+  hit: boolean,
+  fetchedAt: Date,
+  expiresAt: Date,
+): CompanyRegistryLookupResult {
+  return { ...result, cache: { hit, fetchedAt: fetchedAt.toISOString(), expiresAt: expiresAt.toISOString() } };
 }

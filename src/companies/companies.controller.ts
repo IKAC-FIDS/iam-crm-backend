@@ -35,6 +35,7 @@ import { ArchiveCompanyDto } from './dto/archive-company.dto';
 import { FindCompanyOptionsDto } from './dto/find-company-options.dto';
 import { CompanyRegistryLookupDto } from './dto/company-registry-lookup.dto';
 import { CompanyRegistryLookupService } from './company-registry-lookup.service';
+import { getCurrentOrganizationId } from '../common/tenant/tenant-scope.util';
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('companies')
@@ -77,8 +78,14 @@ export class CompaniesController {
 
   @Get('registry-lookup')
   @Permissions('company:create')
-  lookupRegistry(@Query() query: CompanyRegistryLookupDto) {
-    return this.companyRegistryLookup.lookup(query.nationalId);
+  lookupRegistry(
+    @Query() query: CompanyRegistryLookupDto,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.companyRegistryLookup.lookup(
+      query.nationalId,
+      getCurrentOrganizationId(user),
+    );
   }
 
   @Get('options/:id')
