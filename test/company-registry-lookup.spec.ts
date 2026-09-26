@@ -26,7 +26,7 @@ describe('CompanyRegistryLookupService', () => {
           nationalCode: '10101234567',
           registerNumber: '12345',
           registerDate: '2020-04-05T00:00:00',
-          capital: '1,250,000 ریال',
+          totalStock: 75000000000,
           address: 'تهران، خیابان نمونه',
           status: 'فعال',
         },
@@ -47,7 +47,7 @@ describe('CompanyRegistryLookupService', () => {
       nationalId: '10101234567',
       registrationNumber: '12345',
       establishmentDate: '2020-04-05',
-      registeredCapital: '1250000',
+      registeredCapital: '75000000000',
       activityStatus: 'ACTIVE',
     }));
   });
