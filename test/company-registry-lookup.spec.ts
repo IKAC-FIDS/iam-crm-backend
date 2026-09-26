@@ -43,4 +43,37 @@ describe('CompanyRegistryLookupService', () => {
       activityStatus: 'ACTIVE',
     }));
   });
+
+  it('accepts a deeply nested token returned by Linka login', async () => {
+    const config = {
+      get: jest.fn((key: string, fallback?: string) => {
+        if (key === 'LINKA_API_USERNAME') return 'service-user';
+        if (key === 'LINKA_API_PASSWORD') return 'service-password';
+        return fallback;
+      }),
+    } as unknown as ConfigService;
+    const fetchMock = jest.spyOn(global, 'fetch');
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: async () => JSON.stringify({ response: { authentication: { jwtToken: 'header.payload.signature' } } }),
+        headers: new Headers(),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ companyName: 'شرکت نمونه' }),
+      } as Response);
+
+    await new CompanyRegistryLookupService(config).lookup('10101234567');
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      expect.any(URL),
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: 'Bearer header.payload.signature' }),
+      }),
+    );
+  });
 });

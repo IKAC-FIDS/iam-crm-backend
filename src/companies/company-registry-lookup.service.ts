@@ -114,8 +114,17 @@ export class CompanyRegistryLookupService {
         message: 'اطلاعات ورود سرویس استعلام شرکت پذیرفته نشد',
       });
     }
-    const payload = (await response.json().catch(() => null)) as unknown;
-    const token = findToken(payload);
+    const rawBody = await response.text().catch(() => '');
+    let payload: unknown = rawBody;
+    try {
+      payload = rawBody ? JSON.parse(rawBody) : null;
+    } catch {
+      // Some Linka deployments return the access token as plain text.
+    }
+    const authorizationHeader = response.headers?.get('authorization');
+    const token =
+      normalizeToken(authorizationHeader) ??
+      findToken(payload, typeof payload === 'string');
     if (!token) {
       throw new BadGatewayException({
         code: 'COMPANY_LOOKUP_AUTH_FAILED',
@@ -127,17 +136,41 @@ export class CompanyRegistryLookupService {
   }
 }
 
-function findToken(value: unknown): string | undefined {
+function findToken(value: unknown, allowOpaque = false): string | undefined {
+  if (typeof value === 'string') {
+    const token = normalizeToken(value);
+    return token && (allowOpaque || token.split('.').length === 3) ? token : undefined;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const token = findToken(item);
+      if (token) return token;
+    }
+    return undefined;
+  }
   if (!value || typeof value !== 'object') return undefined;
   const record = value as Record<string, unknown>;
-  for (const key of ['accessToken', 'access_token', 'token', 'jwt']) {
-    if (typeof record[key] === 'string' && record[key].trim()) return record[key].trim();
+  for (const [key, candidate] of Object.entries(record)) {
+    if (/token|jwt|authorization/i.test(key) && typeof candidate === 'string') {
+      const token = normalizeToken(candidate);
+      if (token) return token;
+    }
   }
-  for (const key of ['data', 'result', 'value']) {
-    const nested = findToken(record[key]);
+  for (const candidate of Object.values(record)) {
+    const nested = findToken(candidate);
     if (nested) return nested;
   }
   return undefined;
+}
+
+function normalizeToken(value?: string | null): string | undefined {
+  if (!value) return undefined;
+  const normalized = value.trim().replace(/^Bearer\s+/i, '').replace(/^['"]|['"]$/g, '');
+  if (!normalized) return undefined;
+  // JWTs have three base64url segments. Named token properties may contain
+  // opaque access tokens, so non-JWT strings are accepted only by findToken's
+  // token-key branch or when returned as the whole plain-text response.
+  return normalized;
 }
 
 function findCompanyRecord(value: unknown): Record<string, unknown> | null {

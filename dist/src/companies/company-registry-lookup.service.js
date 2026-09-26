@@ -17,7 +17,7 @@ let CompanyRegistryLookupService = class CompanyRegistryLookupService {
         this.config = config;
     }
     async lookup(nationalId) {
-        const token = this.config.get('LINKA_API_TOKEN')?.trim();
+        const token = await this.getAccessToken();
         if (!token) {
             throw new common_1.ServiceUnavailableException({
                 code: 'COMPANY_LOOKUP_NOT_CONFIGURED',
@@ -64,12 +64,102 @@ let CompanyRegistryLookupService = class CompanyRegistryLookupService {
         }
         return mapCompanyRecord(source, nationalId);
     }
+    async getAccessToken() {
+        const configuredToken = this.config.get('LINKA_API_TOKEN')?.trim();
+        if (configuredToken)
+            return configuredToken;
+        if (this.cachedToken && this.cachedToken.expiresAt > Date.now()) {
+            return this.cachedToken.value;
+        }
+        const username = this.config.get('LINKA_API_USERNAME')?.trim();
+        const password = this.config.get('LINKA_API_PASSWORD')?.trim();
+        if (!username || !password)
+            return undefined;
+        const baseUrl = this.config
+            .get('LINKA_BASE_URL', 'https://api.linka.ir')
+            .replace(/\/$/, '');
+        let response;
+        try {
+            response = await fetch(new URL('/Api/V1/Auth/Login', baseUrl), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                body: JSON.stringify({ username, password, isForce: true, refresh: null, captchaCode: null }),
+                signal: AbortSignal.timeout(12_000),
+            });
+        }
+        catch {
+            throw new common_1.BadGatewayException({
+                code: 'COMPANY_LOOKUP_AUTH_FAILED',
+                message: 'ورود به سرویس استعلام شرکت انجام نشد',
+            });
+        }
+        if (!response.ok) {
+            throw new common_1.BadGatewayException({
+                code: 'COMPANY_LOOKUP_AUTH_FAILED',
+                message: 'اطلاعات ورود سرویس استعلام شرکت پذیرفته نشد',
+            });
+        }
+        const rawBody = await response.text().catch(() => '');
+        let payload = rawBody;
+        try {
+            payload = rawBody ? JSON.parse(rawBody) : null;
+        }
+        catch {
+        }
+        const authorizationHeader = response.headers?.get('authorization');
+        const token = normalizeToken(authorizationHeader) ??
+            findToken(payload);
+        if (!token) {
+            throw new common_1.BadGatewayException({
+                code: 'COMPANY_LOOKUP_AUTH_FAILED',
+                message: 'سرویس استعلام شرکت توکن معتبری برنگرداند',
+            });
+        }
+        this.cachedToken = { value: token, expiresAt: Date.now() + 10 * 60_000 };
+        return token;
+    }
 };
 exports.CompanyRegistryLookupService = CompanyRegistryLookupService;
 exports.CompanyRegistryLookupService = CompanyRegistryLookupService = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [config_1.ConfigService])
 ], CompanyRegistryLookupService);
+function findToken(value) {
+    if (typeof value === 'string')
+        return normalizeToken(value);
+    if (Array.isArray(value)) {
+        for (const item of value) {
+            const token = findToken(item);
+            if (token)
+                return token;
+        }
+        return undefined;
+    }
+    if (!value || typeof value !== 'object')
+        return undefined;
+    const record = value;
+    for (const [key, candidate] of Object.entries(record)) {
+        if (/token|jwt|authorization/i.test(key) && typeof candidate === 'string') {
+            const token = normalizeToken(candidate);
+            if (token)
+                return token;
+        }
+    }
+    for (const candidate of Object.values(record)) {
+        const nested = findToken(candidate);
+        if (nested)
+            return nested;
+    }
+    return undefined;
+}
+function normalizeToken(value) {
+    if (!value)
+        return undefined;
+    const normalized = value.trim().replace(/^Bearer\s+/i, '').replace(/^['"]|['"]$/g, '');
+    if (!normalized)
+        return undefined;
+    return normalized;
+}
 function findCompanyRecord(value) {
     if (Array.isArray(value)) {
         return value.length ? findCompanyRecord(value[0]) : null;
