@@ -3,6 +3,18 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const globals_1 = require("@jest/globals");
 const crm_assistant_service_1 = require("./crm-assistant.service");
 (0, globals_1.describe)('CrmAssistantService deterministic performance comparison', () => {
+    (0, globals_1.it)('routes the default task-list suggestion to the task MCP tool', async () => {
+        const mcp = {
+            listFor: globals_1.jest.fn().mockReturnValue([{ name: 'search_tasks' }]),
+            call: globals_1.jest.fn().mockResolvedValue({ data: [], meta: { total: 0 } }),
+        };
+        const audit = { recordTenantEvent: globals_1.jest.fn().mockResolvedValue(undefined) };
+        const config = { get: globals_1.jest.fn().mockReturnValue(undefined) };
+        const service = new crm_assistant_service_1.CrmAssistantService(config, mcp, audit);
+        await service.ask({ message: 'آخرین ۱۰ کار ثبت‌شده را نشان بده.', history: [] }, currentUser());
+        (0, globals_1.expect)(mcp.call).toHaveBeenCalledWith('search_tasks', { search: null, limit: 10 }, globals_1.expect.anything());
+        (0, globals_1.expect)(config.get).not.toHaveBeenCalled();
+    });
     globals_1.it.each([
         'لیست فرصت های پرتو داچک رو بده',
         'فهرست فرصت‌های شرکت پرتو داچک را بده',

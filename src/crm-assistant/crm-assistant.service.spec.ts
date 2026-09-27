@@ -2,6 +2,21 @@ import { describe, expect, it, jest } from '@jest/globals';
 import { CrmAssistantService } from './crm-assistant.service';
 
 describe('CrmAssistantService deterministic performance comparison', () => {
+  it('routes the default task-list suggestion to the task MCP tool', async () => {
+    const mcp = {
+      listFor: jest.fn().mockReturnValue([{ name: 'search_tasks' }]),
+      call: jest.fn<(...args: any[]) => Promise<any>>().mockResolvedValue({ data: [], meta: { total: 0 } }),
+    };
+    const audit = { recordTenantEvent: jest.fn<(...args: any[]) => Promise<any>>().mockResolvedValue(undefined) };
+    const config = { get: jest.fn().mockReturnValue(undefined) };
+    const service = new CrmAssistantService(config as never, mcp as never, audit as never);
+
+    await service.ask({ message: 'آخرین ۱۰ کار ثبت‌شده را نشان بده.', history: [] }, currentUser());
+
+    expect(mcp.call).toHaveBeenCalledWith('search_tasks', { search: null, limit: 10 }, expect.anything());
+    expect(config.get).not.toHaveBeenCalled();
+  });
+
   it.each([
     'لیست فرصت های پرتو داچک رو بده',
     'فهرست فرصت‌های شرکت پرتو داچک را بده',

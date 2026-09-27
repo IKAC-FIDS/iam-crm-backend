@@ -251,7 +251,7 @@ let CrmAssistantService = CrmAssistantService_1 = class CrmAssistantService {
             return null;
         const entities = [
             { pattern: /فرصت/u, tool: 'search_opportunities', label: 'فرصت فروش', plural: 'فرصت‌های فروش' },
-            { pattern: /(?:کارها|کارهای|وظایف|تسک)/u, tool: 'search_tasks', label: 'کار', plural: 'کارها' },
+            { pattern: /(?:کار(?=\s|$)|کارها|کارهای|وظایف|تسک)/u, tool: 'search_tasks', label: 'کار', plural: 'کارها' },
             { pattern: /جلس/u, tool: 'search_meetings', label: 'جلسه', plural: 'جلسات' },
             { pattern: /(?:افراد|مخاطب)/u, tool: 'search_people', label: 'مخاطب', plural: 'مخاطبان' },
             { pattern: /فعالیت/u, tool: 'search_activities', label: 'فعالیت', plural: 'فعالیت‌ها' },
