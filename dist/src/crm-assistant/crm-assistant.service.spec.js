@@ -3,6 +3,36 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const globals_1 = require("@jest/globals");
 const crm_assistant_service_1 = require("./crm-assistant.service");
 (0, globals_1.describe)('CrmAssistantService deterministic performance comparison', () => {
+    (0, globals_1.it)('answers a meeting-participants follow-up through MCP tools without an LLM provider', async () => {
+        const meetingId = '11111111-1111-4111-8111-111111111111';
+        const mcp = {
+            listFor: globals_1.jest.fn().mockReturnValue([{ name: 'search_meetings' }, { name: 'get_meeting_details' }]),
+            call: globals_1.jest.fn(async (name) => name === 'search_meetings'
+                ? { data: [{ id: meetingId, title: 'دیدار دوستانه', startAt: '2026-10-04T05:00:00.000Z' }] }
+                : {
+                    id: meetingId,
+                    title: 'دیدار دوستانه',
+                    organizer: { name: 'فرزاد نوروزی فرد' },
+                    assignees: [{ name: 'مهتاب امیری' }],
+                    attendees: [{ name: 'مخاطب نمونه', title: 'مدیرعامل' }],
+                }),
+        };
+        const audit = { recordTenantEvent: globals_1.jest.fn().mockResolvedValue(undefined) };
+        const config = { get: globals_1.jest.fn().mockReturnValue(undefined) };
+        const service = new crm_assistant_service_1.CrmAssistantService(config, mcp, audit);
+        const result = await service.ask({
+            message: 'شرکت کنندگان جلسه چه کسانی هستن؟',
+            history: [{
+                    role: 'assistant',
+                    content: '| تاریخ و زمان شروع (UTC) | عنوان جلسه | شرکت | برگزارکننده | وضعیت |\n|---|---|---|---|---|\n| 2026-10-04 | دیدار دوستانه | رهسا | فرزاد نوروزی فرد | SCHEDULED |',
+                }],
+        }, currentUser());
+        (0, globals_1.expect)(result.answer).toContain('شرکت‌کنندگان جلسه دیدار دوستانه');
+        (0, globals_1.expect)(result.answer).toContain('فرزاد نوروزی فرد');
+        (0, globals_1.expect)(result.answer).toContain('مخاطب نمونه');
+        (0, globals_1.expect)(result.toolsUsed).toEqual(['search_meetings', 'get_meeting_details']);
+        (0, globals_1.expect)(config.get).not.toHaveBeenCalled();
+    });
     (0, globals_1.it)('creates a confirmation proposal for a task without calling an LLM provider', async () => {
         const proposal = { token: 'signed-token', actionType: 'task.create', title: 'ایجاد کار' };
         const mcp = {
@@ -82,7 +112,7 @@ function currentUser() {
             membershipStatus: 'active',
             resolutionSource: 'token-session',
             tenantRole: 'ADMIN',
-            permissions: ['report:view', 'task:create'],
+            permissions: ['report:view', 'task:create', 'meeting:view'],
             platformAdmin: false,
         },
     };

@@ -25,6 +25,11 @@ let CrmAssistantService = CrmAssistantService_1 = class CrmAssistantService {
     }
     async ask(dto, user) {
         const toolDefinitions = this.mcp.listFor(user);
+        const directMeetingParticipants = await this.tryDirectMeetingParticipants(dto.message, dto.history ?? [], user, toolDefinitions);
+        if (directMeetingParticipants) {
+            await this.recordDeterministicAnswer(user, dto.message, directMeetingParticipants.toolsUsed, 'deterministic-meeting-details');
+            return { ...directMeetingParticipants, pendingActions: [] };
+        }
         const directTask = await this.tryDirectTaskProposal(dto.message, user, toolDefinitions);
         if (directTask) {
             await this.recordDeterministicAnswer(user, dto.message, directTask.toolsUsed, 'deterministic-action-proposal', directTask.pendingActions.map((item) => item.actionType));
@@ -278,6 +283,62 @@ let CrmAssistantService = CrmAssistantService_1 = class CrmAssistantService {
             return null;
         const title = match[2].trim().replace(/^(?:کار|وظیفه|تسک)\s+/u, '').slice(0, 200);
         return { assigneeName: match[1].trim(), title };
+    }
+    async tryDirectMeetingParticipants(message, history, user, definitions) {
+        if (!/(شرکت[‌ ]?کنندگان|حاضرین|مدعوین|چه کسانی.*جلسه|افراد.*جلسه)/u.test(message))
+            return null;
+        if (!definitions.some((tool) => tool.name === 'search_meetings')
+            || !definitions.some((tool) => tool.name === 'get_meeting_details'))
+            return null;
+        const meetingTitle = this.extractMeetingTitle(history);
+        if (!meetingTitle) {
+            return { answer: 'منظورتان کدام جلسه است؟ لطفاً عنوان جلسه را بگویید.', toolsUsed: [] };
+        }
+        const search = await this.mcp.call('search_meetings', { search: meetingTitle, limit: 10 }, user);
+        const meetings = Array.isArray(search.data) ? search.data : [];
+        const needle = this.normalizePersianText(meetingTitle);
+        const exact = meetings.filter((item) => this.normalizePersianText(String(item.title ?? '')) === needle);
+        const selected = exact.length === 1 ? exact[0] : meetings.length === 1 ? meetings[0] : null;
+        if (!selected) {
+            const choices = meetings.map((item) => `- ${String(item.title ?? 'بدون عنوان')} — ${String(item.startAt ?? 'زمان نامشخص')}`).join('\n');
+            return {
+                answer: meetings.length
+                    ? `چند جلسه با عنوان «${meetingTitle}» پیدا شد؛ لطفاً یکی را با زمان آن مشخص کنید:\n\n${choices}`
+                    : `جلسه «${meetingTitle}» در محدوده دسترسی شما پیدا نشد.`,
+                toolsUsed: ['search_meetings'],
+            };
+        }
+        const detail = await this.mcp.call('get_meeting_details', { meetingId: selected.id }, user);
+        const organizer = detail.organizer?.name ? `- برگزارکننده: **${String(detail.organizer.name)}**` : '- برگزارکننده ثبت نشده است.';
+        const assignees = Array.isArray(detail.assignees) ? detail.assignees : [];
+        const attendees = Array.isArray(detail.attendees) ? detail.attendees : [];
+        const internal = assignees.length
+            ? ['- مسئولان داخلی:', ...assignees.map((item) => `  - ${String(item.name ?? 'بدون نام')}`)].join('\n')
+            : '- مسئول داخلی دیگری ثبت نشده است.';
+        const external = attendees.length
+            ? ['- شرکت‌کنندگان/مخاطبان:', ...attendees.map((item) => `  - ${String(item.name ?? 'بدون نام')}${item.title ? ` — ${String(item.title)}` : ''}`)].join('\n')
+            : '- شرکت‌کننده یا مخاطب دیگری برای این جلسه ثبت نشده است.';
+        return {
+            answer: [`### شرکت‌کنندگان جلسه ${String(detail.title ?? meetingTitle)}`, organizer, internal, external].join('\n'),
+            toolsUsed: ['search_meetings', 'get_meeting_details'],
+        };
+    }
+    extractMeetingTitle(history) {
+        for (const item of [...history].reverse()) {
+            if (item.role !== 'assistant')
+                continue;
+            const lines = item.content.split(/\r?\n/).filter((line) => line.trim().startsWith('|'));
+            const header = lines.find((line) => /عنوان جلسه/u.test(line));
+            if (!header)
+                continue;
+            const headerCells = header.split('|').map((cell) => cell.trim()).filter(Boolean);
+            const titleIndex = headerCells.findIndex((cell) => /عنوان جلسه/u.test(cell));
+            const dataLine = lines.find((line) => line !== header && !/^\|?[\s:|-]+\|?$/u.test(line.trim()));
+            const cells = dataLine?.split('|').map((cell) => cell.trim()).filter(Boolean) ?? [];
+            if (titleIndex >= 0 && cells[titleIndex])
+                return cells[titleIndex];
+        }
+        return null;
     }
     async tryDirectPerformanceComparison(message, history, user, definitions) {
         if (!/(مقایسه|نسبت به|بقیه|دیگه|سایر)/u.test(message))

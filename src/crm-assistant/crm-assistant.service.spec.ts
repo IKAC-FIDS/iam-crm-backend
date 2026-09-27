@@ -2,6 +2,39 @@ import { describe, expect, it, jest } from '@jest/globals';
 import { CrmAssistantService } from './crm-assistant.service';
 
 describe('CrmAssistantService deterministic performance comparison', () => {
+  it('answers a meeting-participants follow-up through MCP tools without an LLM provider', async () => {
+    const meetingId = '11111111-1111-4111-8111-111111111111';
+    const mcp = {
+      listFor: jest.fn().mockReturnValue([{ name: 'search_meetings' }, { name: 'get_meeting_details' }]),
+      call: jest.fn<(...args: any[]) => Promise<any>>(async (name: string) => name === 'search_meetings'
+        ? { data: [{ id: meetingId, title: 'دیدار دوستانه', startAt: '2026-10-04T05:00:00.000Z' }] }
+        : {
+          id: meetingId,
+          title: 'دیدار دوستانه',
+          organizer: { name: 'فرزاد نوروزی فرد' },
+          assignees: [{ name: 'مهتاب امیری' }],
+          attendees: [{ name: 'مخاطب نمونه', title: 'مدیرعامل' }],
+        }),
+    };
+    const audit = { recordTenantEvent: jest.fn<(...args: any[]) => Promise<any>>().mockResolvedValue(undefined) };
+    const config = { get: jest.fn().mockReturnValue(undefined) };
+    const service = new CrmAssistantService(config as never, mcp as never, audit as never);
+
+    const result = await service.ask({
+      message: 'شرکت کنندگان جلسه چه کسانی هستن؟',
+      history: [{
+        role: 'assistant',
+        content: '| تاریخ و زمان شروع (UTC) | عنوان جلسه | شرکت | برگزارکننده | وضعیت |\n|---|---|---|---|---|\n| 2026-10-04 | دیدار دوستانه | رهسا | فرزاد نوروزی فرد | SCHEDULED |',
+      }],
+    }, currentUser());
+
+    expect(result.answer).toContain('شرکت‌کنندگان جلسه دیدار دوستانه');
+    expect(result.answer).toContain('فرزاد نوروزی فرد');
+    expect(result.answer).toContain('مخاطب نمونه');
+    expect(result.toolsUsed).toEqual(['search_meetings', 'get_meeting_details']);
+    expect(config.get).not.toHaveBeenCalled();
+  });
+
   it('creates a confirmation proposal for a task without calling an LLM provider', async () => {
     const proposal = { token: 'signed-token', actionType: 'task.create', title: 'ایجاد کار' };
     const mcp = {
@@ -87,7 +120,7 @@ function currentUser() {
       membershipStatus: 'active',
       resolutionSource: 'token-session',
       tenantRole: 'ADMIN',
-      permissions: ['report:view', 'task:create'],
+      permissions: ['report:view', 'task:create', 'meeting:view'],
       platformAdmin: false,
     },
   } as never;

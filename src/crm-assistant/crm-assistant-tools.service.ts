@@ -58,6 +58,16 @@ export class CrmAssistantToolsService {
       inputSchema: listSchema('عنوان جلسه؛ برای فهرست اخیر null'),
     },
     {
+      name: 'get_meeting_details',
+      description: 'نمایش جزئیات یک جلسه قابل مشاهده، شامل برگزارکننده، مسئولان داخلی و شرکت‌کنندگان مخاطب.',
+      permission: 'meeting:view',
+      inputSchema: {
+        type: 'object', additionalProperties: false,
+        properties: { meetingId: { type: 'string', description: 'شناسه UUID جلسه که از جست‌وجوی جلسات به دست آمده است' } },
+        required: ['meetingId'],
+      },
+    },
+    {
       name: 'search_people', description: 'جست‌وجوی مخاطبان قابل مشاهده در دفترچه سازمان.',
       permission: 'people:directory:view', inputSchema: listSchema('نام، عنوان یا مشخصات مخاطب؛ برای فهرست اخیر null'),
     },
@@ -123,6 +133,7 @@ export class CrmAssistantToolsService {
 
     if (name === 'search_report_users' || name === 'search_assignment_users') return this.searchReportUsers(rawArguments, user);
     if (name === 'get_sales_rep_performance') return this.salesRepPerformance(rawArguments, user);
+    if (name === 'get_meeting_details') return this.meetingDetails(rawArguments, user);
 
     const args = this.normalizeArguments(rawArguments);
     const query = { page: 1, limit: args.limit, ...(args.search ? { search: args.search } : {}) };
@@ -237,6 +248,26 @@ export class CrmAssistantToolsService {
     const users = options.users.filter((item) => !needle || [item.fullName, item.teamName, item.teamCode]
       .filter(Boolean).some((part) => String(part).toLocaleLowerCase('fa').includes(needle)));
     return { data: users.slice(0, args.limit).map((item) => ({ id: item.id, fullName: item.fullName, teamId: item.teamId, teamName: item.teamName, role: item.role })), meta: { total: users.length, limit: args.limit } };
+  }
+
+  private async meetingDetails(value: unknown, user: CurrentUserPayload) {
+    const input = value && typeof value === 'object' ? value as Record<string, unknown> : {};
+    const meetingId = typeof input.meetingId === 'string' ? input.meetingId.trim() : '';
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(meetingId)) {
+      throw new BadRequestException('شناسه جلسه معتبر نیست');
+    }
+    const meeting = await this.meetings.findOne(meetingId, user);
+    return {
+      id: meeting.id,
+      title: meeting.title,
+      status: meeting.status,
+      startAt: meeting.startAt,
+      endAt: meeting.endAt,
+      company: meeting.company?.brandName || meeting.company?.legalName || null,
+      organizer: meeting.organizer ? { id: meeting.organizer.id, name: meeting.organizer.fullName, email: meeting.organizer.email } : null,
+      assignees: (meeting.assignees ?? []).map((item) => ({ id: item.user.id, name: item.user.fullName, email: item.user.email, role: item.user.role })),
+      attendees: (meeting.attendees ?? []).map((item) => ({ id: item.person.id, name: item.person.fullName, title: item.person.title })),
+    };
   }
 
   private async salesRepPerformance(value: unknown, user: CurrentUserPayload) {
