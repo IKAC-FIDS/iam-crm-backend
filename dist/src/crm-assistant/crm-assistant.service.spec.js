@@ -3,6 +3,29 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const globals_1 = require("@jest/globals");
 const crm_assistant_service_1 = require("./crm-assistant.service");
 (0, globals_1.describe)('CrmAssistantService deterministic performance comparison', () => {
+    (0, globals_1.it)('finds meetings by organizer or assignee name instead of searching meeting titles', async () => {
+        const userId = '22222222-2222-4222-8222-222222222222';
+        const mcp = {
+            listFor: globals_1.jest.fn().mockReturnValue([{ name: 'search_meeting_users' }, { name: 'get_user_meetings' }]),
+            call: globals_1.jest.fn(async (name, args) => {
+                if (name === 'search_meeting_users') {
+                    (0, globals_1.expect)(args.search).toBe('اسدی');
+                    return { data: [{ id: userId, fullName: 'مرتضی اسدی', teamName: 'فنی نشانه' }] };
+                }
+                (0, globals_1.expect)(args.userId).toBe(userId);
+                return { data: [{ title: 'دیدار دوستانه', startAt: '2026-10-04T05:00:00.000Z', company: 'رهسا', status: 'SCHEDULED', involvement: 'ASSIGNEE' }] };
+            }),
+        };
+        const audit = { recordTenantEvent: globals_1.jest.fn().mockResolvedValue(undefined) };
+        const config = { get: globals_1.jest.fn().mockReturnValue(undefined) };
+        const service = new crm_assistant_service_1.CrmAssistantService(config, mcp, audit);
+        const result = await service.ask({ message: 'جلسات آقای اسدی رو بهم میگی؟', history: [] }, currentUser());
+        (0, globals_1.expect)(result.answer).toContain('جلسات مرتضی اسدی');
+        (0, globals_1.expect)(result.answer).toContain('دیدار دوستانه');
+        (0, globals_1.expect)(result.answer).toContain('مسئول');
+        (0, globals_1.expect)(result.toolsUsed).toEqual(['search_meeting_users', 'get_user_meetings']);
+        (0, globals_1.expect)(config.get).not.toHaveBeenCalled();
+    });
     (0, globals_1.it)('answers a meeting-participants follow-up through MCP tools without an LLM provider', async () => {
         const meetingId = '11111111-1111-4111-8111-111111111111';
         const mcp = {

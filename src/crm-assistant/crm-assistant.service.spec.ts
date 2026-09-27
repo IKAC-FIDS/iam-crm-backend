@@ -2,6 +2,32 @@ import { describe, expect, it, jest } from '@jest/globals';
 import { CrmAssistantService } from './crm-assistant.service';
 
 describe('CrmAssistantService deterministic performance comparison', () => {
+  it('finds meetings by organizer or assignee name instead of searching meeting titles', async () => {
+    const userId = '22222222-2222-4222-8222-222222222222';
+    const mcp = {
+      listFor: jest.fn().mockReturnValue([{ name: 'search_meeting_users' }, { name: 'get_user_meetings' }]),
+      call: jest.fn<(...args: any[]) => Promise<any>>(async (name: string, args: Record<string, unknown>) => {
+        if (name === 'search_meeting_users') {
+          expect(args.search).toBe('اسدی');
+          return { data: [{ id: userId, fullName: 'مرتضی اسدی', teamName: 'فنی نشانه' }] };
+        }
+        expect(args.userId).toBe(userId);
+        return { data: [{ title: 'دیدار دوستانه', startAt: '2026-10-04T05:00:00.000Z', company: 'رهسا', status: 'SCHEDULED', involvement: 'ASSIGNEE' }] };
+      }),
+    };
+    const audit = { recordTenantEvent: jest.fn<(...args: any[]) => Promise<any>>().mockResolvedValue(undefined) };
+    const config = { get: jest.fn().mockReturnValue(undefined) };
+    const service = new CrmAssistantService(config as never, mcp as never, audit as never);
+
+    const result = await service.ask({ message: 'جلسات آقای اسدی رو بهم میگی؟', history: [] }, currentUser());
+
+    expect(result.answer).toContain('جلسات مرتضی اسدی');
+    expect(result.answer).toContain('دیدار دوستانه');
+    expect(result.answer).toContain('مسئول');
+    expect(result.toolsUsed).toEqual(['search_meeting_users', 'get_user_meetings']);
+    expect(config.get).not.toHaveBeenCalled();
+  });
+
   it('answers a meeting-participants follow-up through MCP tools without an LLM provider', async () => {
     const meetingId = '11111111-1111-4111-8111-111111111111';
     const mcp = {

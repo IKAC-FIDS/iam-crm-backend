@@ -36,6 +36,12 @@ export class CrmAssistantService {
 
   async ask(dto: AskCrmAssistantDto, user: CurrentUserPayload) {
     const toolDefinitions = this.mcp.listFor(user);
+    const directUserMeetings = await this.tryDirectUserMeetings(dto.message, user, toolDefinitions);
+    if (directUserMeetings) {
+      await this.recordDeterministicAnswer(user, dto.message, directUserMeetings.toolsUsed, 'deterministic-user-meetings');
+      return { ...directUserMeetings, pendingActions: [] };
+    }
+
     const directMeetingParticipants = await this.tryDirectMeetingParticipants(
       dto.message,
       dto.history ?? [],
@@ -398,6 +404,58 @@ export class CrmAssistantService {
       if (titleIndex >= 0 && cells[titleIndex]) return cells[titleIndex];
     }
     return null;
+  }
+
+  private async tryDirectUserMeetings(
+    message: string,
+    user: CurrentUserPayload,
+    definitions: CrmAssistantToolDefinition[],
+  ): Promise<{ answer: string; toolsUsed: string[] } | null> {
+    const requestedName = this.extractMeetingUserName(message);
+    if (!requestedName) return null;
+    if (!definitions.some((tool) => tool.name === 'search_meeting_users')
+      || !definitions.some((tool) => tool.name === 'get_user_meetings')) return null;
+
+    const search = await this.mcp.call('search_meeting_users', { search: requestedName, limit: 10 }, user) as Record<string, any>;
+    const candidates = Array.isArray(search.data) ? search.data as Array<Record<string, any>> : [];
+    const needle = this.normalizePersianText(requestedName);
+    const exact = candidates.filter((item) => this.normalizePersianText(String(item.fullName ?? '')) === needle);
+    const selected = exact.length === 1 ? exact[0] : candidates.length === 1 ? candidates[0] : null;
+    if (!selected) {
+      const choices = candidates.map((item) => `- ${String(item.fullName ?? 'بدون نام')}${item.teamName ? ` — ${String(item.teamName)}` : ''}`).join('\n');
+      return {
+        answer: candidates.length
+          ? `چند کاربر با نام «${requestedName}» پیدا شد؛ لطفاً یکی را مشخص کنید:\n\n${choices}`
+          : `کاربری با نام «${requestedName}» در محدوده دسترسی شما پیدا نشد.`,
+        toolsUsed: ['search_meeting_users'],
+      };
+    }
+
+    const result = await this.mcp.call('get_user_meetings', { userId: selected.id, limit: 20 }, user) as Record<string, any>;
+    const meetings = Array.isArray(result.data) ? result.data as Array<Record<string, any>> : [];
+    if (!meetings.length) {
+      return {
+        answer: `جلسه‌ای که ${String(selected.fullName)} برگزارکننده یا مسئول آن باشد در محدوده دسترسی شما پیدا نشد.`,
+        toolsUsed: ['search_meeting_users', 'get_user_meetings'],
+      };
+    }
+    const role = (value: unknown) => value === 'ORGANIZER' ? 'برگزارکننده' : 'مسئول';
+    return {
+      answer: [
+        `### جلسات ${String(selected.fullName)}`,
+        '',
+        '| عنوان | زمان شروع | شرکت | وضعیت | نقش |',
+        '|---|---|---|---|---|',
+        ...meetings.map((meeting) => `| ${String(meeting.title ?? 'بدون عنوان')} | ${String(meeting.startAt ?? 'نامشخص')} | ${String(meeting.company ?? '—')} | ${String(meeting.status ?? '—')} | ${role(meeting.involvement)} |`),
+      ].join('\n'),
+      toolsUsed: ['search_meeting_users', 'get_user_meetings'],
+    };
+  }
+
+  private extractMeetingUserName(message: string) {
+    const normalized = message.replace(/\s+/g, ' ').trim();
+    const match = normalized.match(/(?:جلسات|جلسه‌های)\s+(?:آقای|خانم)?\s*(.+?)(?:\s+(?:رو|را|بهم|برایم|بگو|میگی|می‌گی)|[؟?]|$)/u);
+    return match?.[1]?.trim() || null;
   }
 
   private async tryDirectPerformanceComparison(

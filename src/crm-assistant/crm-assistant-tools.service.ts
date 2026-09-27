@@ -68,6 +68,23 @@ export class CrmAssistantToolsService {
       },
     },
     {
+      name: 'search_meeting_users', description: 'یافتن کاربر سازمانی برای جست‌وجوی جلساتی که برگزارکننده یا مسئول آن‌هاست.',
+      permission: 'meeting:view', inputSchema: listSchema('نام کاربر سازمانی'),
+    },
+    {
+      name: 'get_user_meetings',
+      description: 'فهرست جلساتی که کاربر مشخص‌شده برگزارکننده یا مسئول آن‌هاست.',
+      permission: 'meeting:view',
+      inputSchema: {
+        type: 'object', additionalProperties: false,
+        properties: {
+          userId: { type: 'string', description: 'شناسه UUID کاربر که از search_meeting_users به دست آمده است' },
+          limit: { type: ['integer', 'null'], minimum: 1, maximum: 20 },
+        },
+        required: ['userId', 'limit'],
+      },
+    },
+    {
       name: 'search_people', description: 'جست‌وجوی مخاطبان قابل مشاهده در دفترچه سازمان.',
       permission: 'people:directory:view', inputSchema: listSchema('نام، عنوان یا مشخصات مخاطب؛ برای فهرست اخیر null'),
     },
@@ -131,9 +148,10 @@ export class CrmAssistantToolsService {
       throw new ForbiddenException('این ابزار برای کاربر جاری قابل دسترس نیست');
     }
 
-    if (name === 'search_report_users' || name === 'search_assignment_users') return this.searchReportUsers(rawArguments, user);
+    if (name === 'search_report_users' || name === 'search_assignment_users' || name === 'search_meeting_users') return this.searchReportUsers(rawArguments, user);
     if (name === 'get_sales_rep_performance') return this.salesRepPerformance(rawArguments, user);
     if (name === 'get_meeting_details') return this.meetingDetails(rawArguments, user);
+    if (name === 'get_user_meetings') return this.userMeetings(rawArguments, user);
 
     const args = this.normalizeArguments(rawArguments);
     const query = { page: 1, limit: args.limit, ...(args.search ? { search: args.search } : {}) };
@@ -268,6 +286,35 @@ export class CrmAssistantToolsService {
       assignees: (meeting.assignees ?? []).map((item) => ({ id: item.user.id, name: item.user.fullName, email: item.user.email, role: item.user.role })),
       attendees: (meeting.attendees ?? []).map((item) => ({ id: item.person.id, name: item.person.fullName, title: item.person.title })),
     };
+  }
+
+  private async userMeetings(value: unknown, user: CurrentUserPayload) {
+    const input = value && typeof value === 'object' ? value as Record<string, unknown> : {};
+    const userId = typeof input.userId === 'string' ? input.userId.trim() : '';
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId)) {
+      throw new BadRequestException('شناسه کاربر معتبر نیست');
+    }
+    const limit = Math.min(20, Math.max(1, typeof input.limit === 'number' ? Math.trunc(input.limit) : 10));
+    const [organized, assigned] = await Promise.all([
+      this.meetings.findAll({ page: 1, limit, organizerId: userId }, user),
+      this.meetings.findAll({ page: 1, limit, assignedUserId: userId }, user),
+    ]);
+    const unique = new Map<string, any>();
+    for (const meeting of [...organized.data, ...assigned.data]) unique.set(meeting.id, meeting);
+    const data = [...unique.values()]
+      .sort((left, right) => new Date(right.startAt).getTime() - new Date(left.startAt).getTime())
+      .slice(0, limit)
+      .map((meeting) => ({
+        id: meeting.id,
+        title: meeting.title,
+        status: meeting.status,
+        startAt: meeting.startAt,
+        endAt: meeting.endAt,
+        company: meeting.company?.brandName || meeting.company?.legalName || null,
+        organizer: meeting.organizer?.fullName ?? null,
+        involvement: meeting.organizerId === userId ? 'ORGANIZER' : 'ASSIGNEE',
+      }));
+    return { data, meta: { total: unique.size, limit } };
   }
 
   private async salesRepPerformance(value: unknown, user: CurrentUserPayload) {
