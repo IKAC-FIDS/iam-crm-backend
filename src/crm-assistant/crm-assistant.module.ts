@@ -12,10 +12,11 @@ import { ActivitiesModule } from '../activities/activities.module';
 import { PeopleModule } from '../people/people.module';
 import { TimesheetsModule } from '../timesheets/timesheets.module';
 import { ReportsModule } from '../reports/reports.module';
+import { CrmMcpGatewayService } from './crm-mcp-gateway.service';
 
 @Module({
   imports: [CompaniesModule, OpportunitiesModule, TasksModule, MeetingsModule, ActivitiesModule, PeopleModule, TimesheetsModule, ReportsModule],
   controllers: [CrmAssistantController, CrmMcpController],
-  providers: [CrmAssistantService, CrmAssistantToolsService, CrmAssistantActionsService],
+  providers: [CrmAssistantService, CrmAssistantToolsService, CrmAssistantActionsService, CrmMcpGatewayService],
 })
 export class CrmAssistantModule {}

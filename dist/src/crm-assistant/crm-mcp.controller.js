@@ -54,23 +54,29 @@ const z = __importStar(require("zod/v4"));
 const permissions_decorator_1 = require("../common/decorators/permissions.decorator");
 const jwt_auth_guard_1 = require("../common/guards/jwt-auth.guard");
 const permissions_guard_1 = require("../common/guards/permissions.guard");
-const crm_assistant_tools_service_1 = require("./crm-assistant-tools.service");
+const crm_mcp_gateway_service_1 = require("./crm-mcp-gateway.service");
 let CrmMcpController = class CrmMcpController {
-    constructor(tools) {
-        this.tools = tools;
+    constructor(gateway) {
+        this.gateway = gateway;
     }
     async handle(request, response) {
         const user = request.user;
-        const server = new mcp_js_1.McpServer({ name: 'iam-crm-readonly', version: '1.0.0' });
-        const inputSchema = {
-            search: z.string().max(200).nullable().describe('عبارت جست‌وجو یا null'),
-            limit: z.number().int().min(1).max(20).nullable().describe('حداکثر تعداد نتیجه یا null'),
-        };
-        for (const definition of this.tools.listFor(user)) {
-            server.registerTool(definition.name, { description: definition.description, inputSchema }, async (args) => ({
+        const server = new mcp_js_1.McpServer({ name: 'neshane-crm', version: '2.0.0' });
+        for (const definition of this.gateway.listFor(user)) {
+            const action = this.gateway.isAction(definition.name);
+            server.registerTool(definition.name, {
+                description: definition.description,
+                inputSchema: inputShape(definition),
+                annotations: {
+                    readOnlyHint: !action,
+                    destructiveHint: action,
+                    idempotentHint: !action,
+                    openWorldHint: false,
+                },
+            }, async (args) => ({
                 content: [{
                         type: 'text',
-                        text: JSON.stringify(await this.tools.call(definition.name, args, user)),
+                        text: JSON.stringify(await this.gateway.call(definition.name, args, user)),
                     }],
             }));
         }
@@ -101,6 +107,58 @@ __decorate([
 exports.CrmMcpController = CrmMcpController = __decorate([
     (0, common_1.Controller)('mcp'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, permissions_guard_1.PermissionsGuard),
-    __metadata("design:paramtypes", [crm_assistant_tools_service_1.CrmAssistantToolsService])
+    __metadata("design:paramtypes", [crm_mcp_gateway_service_1.CrmMcpGatewayService])
 ], CrmMcpController);
+function inputShape(definition) {
+    const schema = definition.inputSchema;
+    const properties = isRecord(schema.properties) ? schema.properties : {};
+    const required = new Set(Array.isArray(schema.required) ? schema.required.filter((item) => typeof item === 'string') : []);
+    return Object.fromEntries(Object.entries(properties).map(([name, value]) => {
+        const field = jsonSchemaToZod(isRecord(value) ? value : {});
+        return [name, required.has(name) ? field : field.optional()];
+    }));
+}
+function jsonSchemaToZod(schema) {
+    const description = typeof schema.description === 'string' ? schema.description : undefined;
+    const rawTypes = Array.isArray(schema.type) ? schema.type : [schema.type];
+    const nullable = rawTypes.includes('null');
+    const type = rawTypes.find((item) => item !== 'null');
+    const enumValues = Array.isArray(schema.enum)
+        ? schema.enum.filter((item) => typeof item === 'string')
+        : [];
+    let field;
+    if (enumValues.length) {
+        field = z.enum(enumValues);
+    }
+    else if (type === 'integer' || type === 'number') {
+        let numberField = z.number();
+        if (type === 'integer')
+            numberField = numberField.int();
+        if (typeof schema.minimum === 'number')
+            numberField = numberField.min(schema.minimum);
+        if (typeof schema.maximum === 'number')
+            numberField = numberField.max(schema.maximum);
+        field = numberField;
+    }
+    else if (type === 'boolean') {
+        field = z.boolean();
+    }
+    else if (type === 'array') {
+        field = z.array(jsonSchemaToZod(isRecord(schema.items) ? schema.items : {}));
+    }
+    else {
+        let stringField = z.string();
+        if (typeof schema.minLength === 'number')
+            stringField = stringField.min(schema.minLength);
+        if (typeof schema.maxLength === 'number')
+            stringField = stringField.max(schema.maxLength);
+        field = stringField;
+    }
+    if (description)
+        field = field.describe(description);
+    return nullable ? field.nullable() : field;
+}
+function isRecord(value) {
+    return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+}
 //# sourceMappingURL=crm-mcp.controller.js.map

@@ -15,13 +15,11 @@ const common_1 = require("@nestjs/common");
 const config_1 = require("@nestjs/config");
 const audit_log_service_1 = require("../audit-log/audit-log.service");
 const tenant_scope_util_1 = require("../common/tenant/tenant-scope.util");
-const crm_assistant_tools_service_1 = require("./crm-assistant-tools.service");
-const crm_assistant_actions_service_1 = require("./crm-assistant-actions.service");
+const crm_mcp_gateway_service_1 = require("./crm-mcp-gateway.service");
 let CrmAssistantService = CrmAssistantService_1 = class CrmAssistantService {
-    constructor(config, tools, actions, audit) {
+    constructor(config, mcp, audit) {
         this.config = config;
-        this.tools = tools;
-        this.actions = actions;
+        this.mcp = mcp;
         this.audit = audit;
         this.logger = new common_1.Logger(CrmAssistantService_1.name);
     }
@@ -30,7 +28,7 @@ let CrmAssistantService = CrmAssistantService_1 = class CrmAssistantService {
         if (!provider) {
             throw new common_1.ServiceUnavailableException('دستیار هوشمند هنوز پیکربندی نشده است');
         }
-        const toolDefinitions = [...this.tools.listFor(user), ...this.actions.listFor(user)];
+        const toolDefinitions = this.mcp.listFor(user);
         const directPerformance = await this.tryDirectPerformanceAnswer(dto.message, user, toolDefinitions);
         if (directPerformance) {
             await this.audit.recordTenantEvent({
@@ -65,10 +63,8 @@ let CrmAssistantService = CrmAssistantService_1 = class CrmAssistantService {
                 if (!call.name || !call.call_id)
                     continue;
                 const args = this.parseArguments(call.arguments);
-                const result = call.name.startsWith('propose_')
-                    ? await this.actions.propose(call.name, args, user)
-                    : await this.tools.call(call.name, args, user);
-                if (call.name.startsWith('propose_'))
+                const result = await this.mcp.call(call.name, args, user);
+                if (this.mcp.isAction(call.name))
                     pendingActions.push(result);
                 usedTools.push(call.name);
                 input.push({
@@ -181,7 +177,7 @@ let CrmAssistantService = CrmAssistantService_1 = class CrmAssistantService {
             return null;
         if (!definitions.some((tool) => tool.name === 'get_sales_rep_performance'))
             return null;
-        const result = await this.tools.call('get_sales_rep_performance', {
+        const result = await this.mcp.call('get_sales_rep_performance', {
             userId: null,
             userName: message,
             startDate: null,
@@ -240,8 +236,7 @@ exports.CrmAssistantService = CrmAssistantService;
 exports.CrmAssistantService = CrmAssistantService = CrmAssistantService_1 = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [config_1.ConfigService,
-        crm_assistant_tools_service_1.CrmAssistantToolsService,
-        crm_assistant_actions_service_1.CrmAssistantActionsService,
+        crm_mcp_gateway_service_1.CrmMcpGatewayService,
         audit_log_service_1.AuditLogService])
 ], CrmAssistantService);
 //# sourceMappingURL=crm-assistant.service.js.map

@@ -4,9 +4,8 @@ import { AuditLogService } from '../audit-log/audit-log.service';
 import type { CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { getCurrentOrganizationId } from '../common/tenant/tenant-scope.util';
 import type { AskCrmAssistantDto } from './dto/ask-crm-assistant.dto';
-import { CrmAssistantToolsService } from './crm-assistant-tools.service';
-import { CrmAssistantActionsService } from './crm-assistant-actions.service';
 import type { CrmAssistantToolDefinition } from './crm-assistant-tools.service';
+import { CrmMcpGatewayService } from './crm-mcp-gateway.service';
 
 type ResponseOutputItem = {
   type: string;
@@ -31,8 +30,7 @@ export class CrmAssistantService {
 
   constructor(
     private readonly config: ConfigService,
-    private readonly tools: CrmAssistantToolsService,
-    private readonly actions: CrmAssistantActionsService,
+    private readonly mcp: CrmMcpGatewayService,
     private readonly audit: AuditLogService,
   ) {}
 
@@ -42,7 +40,7 @@ export class CrmAssistantService {
       throw new ServiceUnavailableException('دستیار هوشمند هنوز پیکربندی نشده است');
     }
 
-    const toolDefinitions = [...this.tools.listFor(user), ...this.actions.listFor(user)];
+    const toolDefinitions = this.mcp.listFor(user);
     const directPerformance = await this.tryDirectPerformanceAnswer(dto.message, user, toolDefinitions);
     if (directPerformance) {
       await this.audit.recordTenantEvent({
@@ -66,7 +64,7 @@ export class CrmAssistantService {
       { role: 'user', content: dto.message.trim() },
     ];
     const usedTools: string[] = [];
-    const pendingActions: Awaited<ReturnType<CrmAssistantActionsService['propose']>>[] = [];
+    const pendingActions: Array<Record<string, unknown>> = [];
     let response = await this.createResponse(provider, input, toolDefinitions);
 
     for (let round = 0; round < 4; round += 1) {
@@ -77,10 +75,8 @@ export class CrmAssistantService {
       for (const call of calls) {
         if (!call.name || !call.call_id) continue;
         const args = this.parseArguments(call.arguments);
-        const result = call.name.startsWith('propose_')
-          ? await this.actions.propose(call.name, args, user)
-          : await this.tools.call(call.name, args, user);
-        if (call.name.startsWith('propose_')) pendingActions.push(result as Awaited<ReturnType<CrmAssistantActionsService['propose']>>);
+        const result = await this.mcp.call(call.name, args, user);
+        if (this.mcp.isAction(call.name)) pendingActions.push(result as Record<string, unknown>);
         usedTools.push(call.name);
         input.push({
           type: 'function_call_output',
@@ -202,7 +198,7 @@ export class CrmAssistantService {
     if (!/(عملکرد|کارنامه|ارزیابی)/u.test(message)) return null;
     if (!definitions.some((tool) => tool.name === 'get_sales_rep_performance')) return null;
 
-    const result = await this.tools.call('get_sales_rep_performance', {
+    const result = await this.mcp.call('get_sales_rep_performance', {
       userId: null,
       userName: message,
       startDate: null,
