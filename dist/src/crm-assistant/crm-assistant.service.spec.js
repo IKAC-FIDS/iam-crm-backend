@@ -3,6 +3,24 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const globals_1 = require("@jest/globals");
 const crm_assistant_service_1 = require("./crm-assistant.service");
 (0, globals_1.describe)('CrmAssistantService deterministic performance comparison', () => {
+    (0, globals_1.it)('returns the requested recent company list as structured MCP data without an LLM provider', async () => {
+        const companyResult = {
+            data: Array.from({ length: 10 }, (_, index) => ({ id: `company-${index}`, name: `شرکت ${index + 1}`, status: 'ACTIVE' })),
+            meta: { total: 25, limit: 10 },
+        };
+        const mcp = {
+            listFor: globals_1.jest.fn().mockReturnValue([{ name: 'search_companies' }]),
+            call: globals_1.jest.fn().mockResolvedValue(companyResult),
+        };
+        const audit = { recordTenantEvent: globals_1.jest.fn().mockResolvedValue(undefined) };
+        const config = { get: globals_1.jest.fn().mockReturnValue(undefined) };
+        const service = new crm_assistant_service_1.CrmAssistantService(config, mcp, audit);
+        const result = await service.ask({ message: 'لیست ده شرکت آخر سیستم رو بده', history: [] }, currentUser());
+        (0, globals_1.expect)(mcp.call).toHaveBeenCalledWith('search_companies', { search: null, limit: 10 }, globals_1.expect.anything());
+        (0, globals_1.expect)(result.answer).toContain('آخرین ۱۰ شرکت');
+        (0, globals_1.expect)(result.toolData).toEqual([{ tool: 'search_companies', data: companyResult }]);
+        (0, globals_1.expect)(config.get).not.toHaveBeenCalled();
+    });
     (0, globals_1.it)('finds meetings by organizer or assignee name instead of searching meeting titles', async () => {
         const userId = '22222222-2222-4222-8222-222222222222';
         const mcp = {

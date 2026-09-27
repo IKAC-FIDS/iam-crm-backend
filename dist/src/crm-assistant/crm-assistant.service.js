@@ -25,6 +25,11 @@ let CrmAssistantService = CrmAssistantService_1 = class CrmAssistantService {
     }
     async ask(dto, user) {
         const toolDefinitions = this.mcp.listFor(user);
+        const directEntityList = await this.tryDirectEntityList(dto.message, user, toolDefinitions);
+        if (directEntityList) {
+            await this.recordDeterministicAnswer(user, dto.message, directEntityList.toolsUsed, 'deterministic-entity-list');
+            return { ...directEntityList, pendingActions: [] };
+        }
         const directUserMeetings = await this.tryDirectUserMeetings(dto.message, user, toolDefinitions);
         if (directUserMeetings) {
             await this.recordDeterministicAnswer(user, dto.message, directUserMeetings.toolsUsed, 'deterministic-user-meetings');
@@ -241,6 +246,42 @@ let CrmAssistantService = CrmAssistantService_1 = class CrmAssistantService {
         ].join('\n');
         return { answer, toolData: [{ tool: 'get_sales_rep_performance', data: result }] };
     }
+    async tryDirectEntityList(message, user, definitions) {
+        if (!/(لیست|فهرست|آخر(?:ین)?|اخیر)/u.test(message))
+            return null;
+        const entities = [
+            { pattern: /شرکت/u, tool: 'search_companies', label: 'شرکت' },
+            { pattern: /فرصت/u, tool: 'search_opportunities', label: 'فرصت فروش' },
+            { pattern: /(?:کارها|کارهای|وظایف|تسک)/u, tool: 'search_tasks', label: 'کار' },
+            { pattern: /جلس/u, tool: 'search_meetings', label: 'جلسه' },
+            { pattern: /(?:افراد|مخاطب)/u, tool: 'search_people', label: 'مخاطب' },
+            { pattern: /فعالیت/u, tool: 'search_activities', label: 'فعالیت' },
+        ];
+        const entity = entities.find((item) => item.pattern.test(message));
+        if (!entity || !definitions.some((tool) => tool.name === entity.tool))
+            return null;
+        const limit = this.extractRequestedLimit(message);
+        const result = await this.mcp.call(entity.tool, { search: null, limit }, user);
+        const rows = Array.isArray(result.data) ? result.data : [];
+        return {
+            answer: rows.length
+                ? `### آخرین ${new Intl.NumberFormat('fa-IR').format(rows.length)} ${entity.label}\nاطلاعات زیر مستقیماً از داده‌های قابل‌دسترسی شما در CRM دریافت شده است.`
+                : `${entity.label}ی در محدوده دسترسی شما پیدا نشد.`,
+            toolsUsed: [entity.tool],
+            toolData: [{ tool: entity.tool, data: result }],
+        };
+    }
+    extractRequestedLimit(message) {
+        const normalizedDigits = message.replace(/[۰-۹]/g, (digit) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(digit)));
+        const numeric = normalizedDigits.match(/\b(\d{1,2})\b/u)?.[1];
+        if (numeric)
+            return Math.min(20, Math.max(1, Number(numeric)));
+        const words = {
+            یک: 1, دو: 2, سه: 3, چهار: 4, پنج: 5, شش: 6, هفت: 7, هشت: 8, نه: 9, ده: 10, پانزده: 15, بیست: 20,
+        };
+        const requested = message.split(/\s+/u).map((part) => part.replace(/[^\p{L}]/gu, '')).map((part) => words[part]).find(Boolean);
+        return requested ?? 10;
+    }
     async tryDirectTaskProposal(message, user, definitions) {
         if (!/(?:کار|وظیفه|تسک)/u.test(message) || !/(?:بساز|بسازی|ایجاد|ثبت)/u.test(message))
             return null;
@@ -253,6 +294,7 @@ let CrmAssistantService = CrmAssistantService_1 = class CrmAssistantService {
                 answer: 'برای ساخت کار، نام مسئول و عنوان کار را مشخص کنید؛ مثلاً «یک کار برای فرزاد نوروزی فرد برای تهیه مستندات SSO بساز».',
                 toolsUsed: [],
                 pendingActions: [],
+                toolData: [],
             };
         }
         const search = await this.mcp.call('search_assignment_users', { search: parsed.assigneeName, limit: 10 }, user);
@@ -268,6 +310,7 @@ let CrmAssistantService = CrmAssistantService_1 = class CrmAssistantService {
                     : `کاربری با نام «${parsed.assigneeName}» در سازمان پیدا نشد یا امکان واگذاری کار به او وجود ندارد.`,
                 toolsUsed: ['search_assignment_users'],
                 pendingActions: [],
+                toolData: [{ tool: 'search_assignment_users', data: search }],
             };
         }
         const proposal = await this.mcp.call('propose_create_task', {
@@ -283,6 +326,7 @@ let CrmAssistantService = CrmAssistantService_1 = class CrmAssistantService {
             answer: `پیش‌نویس کار «${parsed.title}» برای ${String(selected.fullName)} آماده شد. برای ثبت نهایی، جزئیات زیر را تأیید کنید.`,
             toolsUsed: ['search_assignment_users', 'propose_create_task'],
             pendingActions: [proposal],
+            toolData: [],
         };
     }
     parseTaskRequest(message) {

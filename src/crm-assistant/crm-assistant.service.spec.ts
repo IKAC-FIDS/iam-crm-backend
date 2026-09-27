@@ -2,6 +2,27 @@ import { describe, expect, it, jest } from '@jest/globals';
 import { CrmAssistantService } from './crm-assistant.service';
 
 describe('CrmAssistantService deterministic performance comparison', () => {
+  it('returns the requested recent company list as structured MCP data without an LLM provider', async () => {
+    const companyResult = {
+      data: Array.from({ length: 10 }, (_, index) => ({ id: `company-${index}`, name: `شرکت ${index + 1}`, status: 'ACTIVE' })),
+      meta: { total: 25, limit: 10 },
+    };
+    const mcp = {
+      listFor: jest.fn().mockReturnValue([{ name: 'search_companies' }]),
+      call: jest.fn<(...args: any[]) => Promise<any>>().mockResolvedValue(companyResult),
+    };
+    const audit = { recordTenantEvent: jest.fn<(...args: any[]) => Promise<any>>().mockResolvedValue(undefined) };
+    const config = { get: jest.fn().mockReturnValue(undefined) };
+    const service = new CrmAssistantService(config as never, mcp as never, audit as never);
+
+    const result = await service.ask({ message: 'لیست ده شرکت آخر سیستم رو بده', history: [] }, currentUser());
+
+    expect(mcp.call).toHaveBeenCalledWith('search_companies', { search: null, limit: 10 }, expect.anything());
+    expect(result.answer).toContain('آخرین ۱۰ شرکت');
+    expect((result as any).toolData).toEqual([{ tool: 'search_companies', data: companyResult }]);
+    expect(config.get).not.toHaveBeenCalled();
+  });
+
   it('finds meetings by organizer or assignee name instead of searching meeting titles', async () => {
     const userId = '22222222-2222-4222-8222-222222222222';
     const mcp = {
