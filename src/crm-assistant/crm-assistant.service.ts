@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { AuditLogService } from '../audit-log/audit-log.service';
 import type { CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { getCurrentOrganizationId } from '../common/tenant/tenant-scope.util';
-import type { AskCrmAssistantDto } from './dto/ask-crm-assistant.dto';
+import type { AskCrmAssistantDto, CrmAssistantHistoryItemDto } from './dto/ask-crm-assistant.dto';
 import type { CrmAssistantToolDefinition } from './crm-assistant-tools.service';
 import { CrmMcpGatewayService } from './crm-mcp-gateway.service';
 
@@ -35,29 +35,27 @@ export class CrmAssistantService {
   ) {}
 
   async ask(dto: AskCrmAssistantDto, user: CurrentUserPayload) {
+    const toolDefinitions = this.mcp.listFor(user);
+    const directComparison = await this.tryDirectPerformanceComparison(
+      dto.message,
+      dto.history ?? [],
+      user,
+      toolDefinitions,
+    );
+    if (directComparison) {
+      await this.recordDeterministicAnswer(user, dto.message, directComparison.toolsUsed, 'deterministic-comparison');
+      return { answer: directComparison.answer, toolsUsed: directComparison.toolsUsed, pendingActions: [] };
+    }
+
+    const directPerformance = await this.tryDirectPerformanceAnswer(dto.message, user, toolDefinitions);
+    if (directPerformance) {
+      await this.recordDeterministicAnswer(user, dto.message, ['get_sales_rep_performance'], 'deterministic-report');
+      return { answer: directPerformance, toolsUsed: ['get_sales_rep_performance'], pendingActions: [] };
+    }
+
     const provider = this.resolveProvider();
     if (!provider) {
       throw new ServiceUnavailableException('دستیار هوشمند هنوز پیکربندی نشده است');
-    }
-
-    const toolDefinitions = this.mcp.listFor(user);
-    const directPerformance = await this.tryDirectPerformanceAnswer(dto.message, user, toolDefinitions);
-    if (directPerformance) {
-      await this.audit.recordTenantEvent({
-        actorId: user.userId,
-        actorMembershipId: user.membershipId,
-        organizationId: getCurrentOrganizationId(user),
-        entityType: 'crm-assistant',
-        action: 'crm-assistant.question_answered',
-        metadata: {
-          questionLength: dto.message.length,
-          tools: ['get_sales_rep_performance'],
-          modelProvider: 'deterministic-report',
-          model: 'internal-report-services',
-          proposedActions: [],
-        },
-      });
-      return { answer: directPerformance, toolsUsed: ['get_sales_rep_performance'], pendingActions: [] };
     }
     const input: unknown[] = [
       ...(dto.history ?? []).map((item) => ({ role: item.role, content: item.content })),
@@ -104,6 +102,28 @@ export class CrmAssistantService {
     });
 
     return { answer, toolsUsed: [...new Set(usedTools)], pendingActions };
+  }
+
+  private async recordDeterministicAnswer(
+    user: CurrentUserPayload,
+    message: string,
+    tools: string[],
+    modelProvider: string,
+  ) {
+    await this.audit.recordTenantEvent({
+      actorId: user.userId,
+      actorMembershipId: user.membershipId,
+      organizationId: getCurrentOrganizationId(user),
+      entityType: 'crm-assistant',
+      action: 'crm-assistant.question_answered',
+      metadata: {
+        questionLength: message.length,
+        tools,
+        modelProvider,
+        model: 'internal-report-services',
+        proposedActions: [],
+      },
+    });
   }
 
   private async createResponse(
@@ -236,6 +256,124 @@ export class CrmAssistantService {
       '',
       'این گزارش فقط از داده‌های قابل‌دسترسی شما در CRM محاسبه شده است.',
     ].join('\n');
+  }
+
+  private async tryDirectPerformanceComparison(
+    message: string,
+    history: CrmAssistantHistoryItemDto[],
+    user: CurrentUserPayload,
+    definitions: CrmAssistantToolDefinition[],
+  ): Promise<{ answer: string; toolsUsed: string[] } | null> {
+    if (!/(مقایسه|نسبت به|بقیه|دیگه|سایر)/u.test(message)) return null;
+    if (!definitions.some((tool) => tool.name === 'search_report_users')
+      || !definitions.some((tool) => tool.name === 'get_sales_rep_performance')) return null;
+
+    const subjectName = this.extractPerformanceSubject(history);
+    if (!subjectName) {
+      return {
+        answer: 'برای مقایسه، ابتدا نام کارشناس را بگویید؛ مثلاً «عملکرد مهتاب را با کارشناسان فروش مقایسه کن».',
+        toolsUsed: [],
+      };
+    }
+
+    const usersResult = await this.mcp.call('search_report_users', { search: null, limit: 50 }, user) as Record<string, any>;
+    const users = Array.isArray(usersResult.data) ? usersResult.data as Array<Record<string, any>> : [];
+    const normalizedSubject = this.normalizePersianText(subjectName);
+    const subject = users.find((item) => this.normalizePersianText(String(item.fullName ?? '')) === normalizedSubject)
+      ?? users.find((item) => this.normalizePersianText(String(item.fullName ?? '')).includes(normalizedSubject));
+
+    if (!subject) {
+      return {
+        answer: `کارشناس «${subjectName}» در محدوده دسترسی شما پیدا نشد. لطفاً نام کامل او را وارد کنید.`,
+        toolsUsed: ['search_report_users'],
+      };
+    }
+
+    const sameTeamPeers = users.filter((item) => item.id !== subject.id && item.teamId && item.teamId === subject.teamId);
+    const peers = (sameTeamPeers.length ? sameTeamPeers : users.filter((item) => item.id !== subject.id)).slice(0, 7);
+    if (!peers.length) {
+      return {
+        answer: `برای «${String(subject.fullName)}» کارشناس دیگری در محدوده دسترسی شما پیدا نشد که امکان مقایسه وجود داشته باشد.`,
+        toolsUsed: ['search_report_users'],
+      };
+    }
+
+    const reports = await Promise.all([subject, ...peers].map((employee) => this.mcp.call(
+      'get_sales_rep_performance',
+      { userId: employee.id, userName: null, startDate: null, endDate: null },
+      user,
+    ) as Promise<Record<string, any>>));
+    const validReports = reports.filter((report) => report && !report.needsSelection && report.employee);
+    if (validReports.length < 2) {
+      return {
+        answer: 'داده کافی برای مقایسه عملکرد کارشناسان در دسترس نیست.',
+        toolsUsed: ['search_report_users', 'get_sales_rep_performance'],
+      };
+    }
+
+    return {
+      answer: this.formatPerformanceComparison(validReports, String(subject.fullName ?? subjectName), subject.teamName),
+      toolsUsed: ['search_report_users', 'get_sales_rep_performance'],
+    };
+  }
+
+  private extractPerformanceSubject(history: CrmAssistantHistoryItemDto[]) {
+    for (const item of [...history].reverse()) {
+      if (item.role === 'assistant') {
+        const heading = item.content.match(/^###\s*گزارش عملکرد\s+([^\n\r]+)/mu)?.[1]?.trim();
+        if (heading) return heading;
+      }
+    }
+    for (const item of [...history].reverse()) {
+      if (item.role !== 'user' || !/(عملکرد|کارنامه|ارزیابی)/u.test(item.content)) continue;
+      const match = item.content.match(/(?:عملکرد|کارنامه|ارزیابی)\s+(.+?)(?:\s+(?:را|رو|بده|چطور|چگونه|کن|بگو)|[؟?]|$)/u);
+      if (match?.[1]?.trim()) return match[1].trim();
+    }
+    return null;
+  }
+
+  private formatPerformanceComparison(reports: Array<Record<string, any>>, subjectName: string, teamName?: unknown) {
+    const number = (value: unknown) => new Intl.NumberFormat('fa-IR').format(Number(value) || 0);
+    const metric = (report: Record<string, any>) => ({
+      name: String(report.employee?.fullName ?? 'بدون نام'),
+      opportunities: Number(report.sales?.opportunities?.total) || 0,
+      won: Number(report.sales?.opportunities?.won) || 0,
+      conversion: Number(report.sales?.pipeline?.conversionRate) || 0,
+      activities: Number(report.activity?.total) || 0,
+      taskRate: Number(report.tasks?.employee?.onTimeCompletionRate) || 0,
+    });
+    const rows = reports.map(metric);
+    const subject = rows.find((row) => this.normalizePersianText(row.name) === this.normalizePersianText(subjectName)) ?? rows[0];
+    const peers = rows.filter((row) => row !== subject);
+    const average = (key: keyof Omit<typeof subject, 'name'>) => peers.reduce((sum, row) => sum + row[key], 0) / peers.length;
+    const conversionRank = [...rows].sort((a, b) => b.conversion - a.conversion).findIndex((row) => row === subject) + 1;
+    const diff = (value: number, averageValue: number, suffix = '') => {
+      const delta = value - averageValue;
+      if (Math.abs(delta) < 0.5) return `هم‌سطح میانگین${suffix ? ` (${number(Math.round(averageValue))}${suffix})` : ''}`;
+      return `${number(Math.abs(Math.round(delta)))}${suffix} ${delta > 0 ? 'بالاتر' : 'پایین‌تر'} از میانگین`;
+    };
+    const period = reports[0]?.period ?? {};
+
+    return [
+      `### مقایسه عملکرد ${subject.name} با کارشناسان فروش${teamName ? ` تیم ${String(teamName)}` : ''}`,
+      period.startDate && period.endDate ? `بازه گزارش: ${String(period.startDate)} تا ${String(period.endDate)}` : 'بازه گزارش: ۳۰ روز اخیر',
+      '',
+      '| کارشناس | فرصت‌ها | برنده | نرخ تبدیل | فعالیت | تکمیل به‌موقع کارها |',
+      '|---|---:|---:|---:|---:|---:|',
+      ...rows.map((row) => `| ${row.name} | ${number(row.opportunities)} | ${number(row.won)} | ${number(row.conversion)}٪ | ${number(row.activities)} | ${number(row.taskRate)}٪ |`),
+      '',
+      '#### جمع‌بندی',
+      `- نرخ تبدیل ${subject.name}: **${number(subject.conversion)}٪**؛ رتبه **${number(conversionRank)} از ${number(rows.length)}** و ${diff(subject.conversion, average('conversion'), ' واحد درصد')}.`,
+      `- تعداد فرصت‌ها: **${number(subject.opportunities)}**؛ ${diff(subject.opportunities, average('opportunities'))}.`,
+      `- فعالیت‌های ثبت‌شده: **${number(subject.activities)}**؛ ${diff(subject.activities, average('activities'))}.`,
+      `- نرخ تکمیل به‌موقع کارها: **${number(subject.taskRate)}٪**؛ ${diff(subject.taskRate, average('taskRate'), ' واحد درصد')}.`,
+      '',
+      `مقایسه بر اساس ${number(peers.length)} کارشناس قابل‌دسترسی و داده‌های ثبت‌شده در CRM انجام شده است.`,
+    ].join('\n');
+  }
+
+  private normalizePersianText(value: string) {
+    return value.normalize('NFKC').replace(/ي/g, 'ی').replace(/ك/g, 'ک').replace(/\s+/g, ' ').trim().toLocaleLowerCase('fa-IR');
   }
 
   private parseArguments(value?: string) {
