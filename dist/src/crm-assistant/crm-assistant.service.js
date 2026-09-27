@@ -43,12 +43,12 @@ let CrmAssistantService = CrmAssistantService_1 = class CrmAssistantService {
         const directComparison = await this.tryDirectPerformanceComparison(dto.message, dto.history ?? [], user, toolDefinitions);
         if (directComparison) {
             await this.recordDeterministicAnswer(user, dto.message, directComparison.toolsUsed, 'deterministic-comparison');
-            return { answer: directComparison.answer, toolsUsed: directComparison.toolsUsed, pendingActions: [] };
+            return { answer: directComparison.answer, toolsUsed: directComparison.toolsUsed, pendingActions: [], toolData: directComparison.toolData ?? [] };
         }
         const directPerformance = await this.tryDirectPerformanceAnswer(dto.message, user, toolDefinitions);
         if (directPerformance) {
             await this.recordDeterministicAnswer(user, dto.message, ['get_sales_rep_performance'], 'deterministic-report');
-            return { answer: directPerformance, toolsUsed: ['get_sales_rep_performance'], pendingActions: [] };
+            return { answer: directPerformance.answer, toolsUsed: ['get_sales_rep_performance'], pendingActions: [], toolData: directPerformance.toolData };
         }
         const provider = this.resolveProvider();
         if (!provider) {
@@ -59,6 +59,7 @@ let CrmAssistantService = CrmAssistantService_1 = class CrmAssistantService {
             { role: 'user', content: dto.message.trim() },
         ];
         const usedTools = [];
+        const toolData = [];
         const pendingActions = [];
         let response = await this.createResponse(provider, input, toolDefinitions);
         for (let round = 0; round < 4; round += 1) {
@@ -73,6 +74,8 @@ let CrmAssistantService = CrmAssistantService_1 = class CrmAssistantService {
                 const result = await this.mcp.call(call.name, args, user);
                 if (this.mcp.isAction(call.name))
                     pendingActions.push(result);
+                else
+                    toolData.push({ tool: call.name, data: result });
                 usedTools.push(call.name);
                 input.push({
                     type: 'function_call_output',
@@ -97,7 +100,7 @@ let CrmAssistantService = CrmAssistantService_1 = class CrmAssistantService {
                 proposedActions: pendingActions.map((item) => item.actionType),
             },
         });
-        return { answer, toolsUsed: [...new Set(usedTools)], pendingActions };
+        return { answer, toolsUsed: [...new Set(usedTools)], pendingActions, toolData };
     }
     async recordDeterministicAnswer(user, message, tools, modelProvider, proposedActions = []) {
         await this.audit.recordTenantEvent({
@@ -209,9 +212,9 @@ let CrmAssistantService = CrmAssistantService_1 = class CrmAssistantService {
         if (result.needsSelection) {
             const candidates = Array.isArray(result.candidates) ? result.candidates : [];
             if (!candidates.length)
-                return String(result.message ?? 'کارشناس موردنظر در محدوده مجاز پیدا نشد.');
+                return { answer: String(result.message ?? 'کارشناس موردنظر در محدوده مجاز پیدا نشد.'), toolData: [] };
             const choices = candidates.map((item) => `- ${String(item.fullName ?? 'بدون نام')}${item.teamName ? ` — ${String(item.teamName)}` : ''}`).join('\n');
-            return `${String(result.message ?? 'لطفاً کارشناس را مشخص کنید.')}\n\n${choices}`;
+            return { answer: `${String(result.message ?? 'لطفاً کارشناس را مشخص کنید.')}\n\n${choices}`, toolData: [{ tool: 'get_sales_rep_performance', data: result }] };
         }
         const number = (value) => new Intl.NumberFormat('fa-IR').format(Number(value) || 0);
         const percent = (value) => `${number(value)}٪`;
@@ -222,7 +225,7 @@ let CrmAssistantService = CrmAssistantService_1 = class CrmAssistantService {
         const taskEmployee = result.tasks?.employee ?? {};
         const meetingEmployee = result.meetings?.employee ?? {};
         const period = result.period ?? {};
-        return [
+        const answer = [
             `### گزارش عملکرد ${String(employee.fullName ?? 'کارشناس')}`,
             period.startDate && period.endDate ? `بازه گزارش: ${String(period.startDate)} تا ${String(period.endDate)}` : 'بازه گزارش: ۳۰ روز اخیر',
             '',
@@ -236,6 +239,7 @@ let CrmAssistantService = CrmAssistantService_1 = class CrmAssistantService {
             '',
             'این گزارش فقط از داده‌های قابل‌دسترسی شما در CRM محاسبه شده است.',
         ].join('\n');
+        return { answer, toolData: [{ tool: 'get_sales_rep_performance', data: result }] };
     }
     async tryDirectTaskProposal(message, user, definitions) {
         if (!/(?:کار|وظیفه|تسک)/u.test(message) || !/(?:بساز|بسازی|ایجاد|ثبت)/u.test(message))
@@ -326,6 +330,7 @@ let CrmAssistantService = CrmAssistantService_1 = class CrmAssistantService {
         return {
             answer: [`### شرکت‌کنندگان جلسه ${String(detail.title ?? meetingTitle)}`, organizer, internal, external].join('\n'),
             toolsUsed: ['search_meetings', 'get_meeting_details'],
+            toolData: [{ tool: 'get_meeting_details', data: detail }],
         };
     }
     extractMeetingTitle(history) {
@@ -384,6 +389,7 @@ let CrmAssistantService = CrmAssistantService_1 = class CrmAssistantService {
                 ...meetings.map((meeting) => `| ${String(meeting.title ?? 'بدون عنوان')} | ${String(meeting.startAt ?? 'نامشخص')} | ${String(meeting.company ?? '—')} | ${String(meeting.status ?? '—')} | ${role(meeting.involvement)} |`),
             ].join('\n'),
             toolsUsed: ['search_meeting_users', 'get_user_meetings'],
+            toolData: [{ tool: 'get_user_meetings', data: result }],
         };
     }
     extractMeetingUserName(message) {
@@ -434,6 +440,21 @@ let CrmAssistantService = CrmAssistantService_1 = class CrmAssistantService {
         return {
             answer: this.formatPerformanceComparison(validReports, String(subject.fullName ?? subjectName), subject.teamName),
             toolsUsed: ['search_report_users', 'get_sales_rep_performance'],
+            toolData: [{
+                    tool: 'compare_sales_rep_performance',
+                    data: {
+                        subject: subject.fullName,
+                        team: subject.teamName ?? null,
+                        data: validReports.map((report) => ({
+                            fullName: report.employee?.fullName ?? null,
+                            opportunities: report.sales?.opportunities?.total ?? 0,
+                            won: report.sales?.opportunities?.won ?? 0,
+                            conversionRate: report.sales?.pipeline?.conversionRate ?? 0,
+                            activities: report.activity?.total ?? 0,
+                            onTimeTaskRate: report.tasks?.employee?.onTimeCompletionRate ?? 0,
+                        })),
+                    },
+                }],
         };
     }
     extractPerformanceSubject(history) {
