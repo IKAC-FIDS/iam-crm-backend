@@ -2,6 +2,28 @@ import { describe, expect, it, jest } from '@jest/globals';
 import { CrmAssistantService } from './crm-assistant.service';
 
 describe('CrmAssistantService deterministic performance comparison', () => {
+  it.each([
+    'لیست فرصت های پرتو داچک رو بده',
+    'فهرست فرصت‌های شرکت پرتو داچک را بده',
+    'فرصت‌های مربوط به شرکت پرتو داچک را نمایش بده',
+    'فرصت‌های فروش برای پرتو داچک رو نشان بده',
+  ])('passes the company filter from opportunity-list wording to MCP search: %s', async (message) => {
+    const opportunityResult = { data: [{ id: 'opportunity-1', title: 'خرید توکن فایدو', company: 'پرتو داچک' }], meta: { total: 1 } };
+    const mcp = {
+      listFor: jest.fn().mockReturnValue([{ name: 'search_opportunities' }]),
+      call: jest.fn<(...args: any[]) => Promise<any>>().mockResolvedValue(opportunityResult),
+    };
+    const audit = { recordTenantEvent: jest.fn<(...args: any[]) => Promise<any>>().mockResolvedValue(undefined) };
+    const config = { get: jest.fn().mockReturnValue(undefined) };
+    const service = new CrmAssistantService(config as never, mcp as never, audit as never);
+
+    const result = await service.ask({ message, history: [] }, currentUser());
+
+    expect(mcp.call).toHaveBeenCalledWith('search_opportunities', { search: 'پرتو داچک', limit: 10 }, expect.anything());
+    expect(result.answer).toContain('فرصت‌های فروش مرتبط با «پرتو داچک»');
+    expect(config.get).not.toHaveBeenCalled();
+  });
+
   it('returns the requested recent company list as structured MCP data without an LLM provider', async () => {
     const companyResult = {
       data: Array.from({ length: 10 }, (_, index) => ({ id: `company-${index}`, name: `شرکت ${index + 1}`, status: 'ACTIVE' })),

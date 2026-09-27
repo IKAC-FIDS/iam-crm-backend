@@ -3,6 +3,25 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const globals_1 = require("@jest/globals");
 const crm_assistant_service_1 = require("./crm-assistant.service");
 (0, globals_1.describe)('CrmAssistantService deterministic performance comparison', () => {
+    globals_1.it.each([
+        'لیست فرصت های پرتو داچک رو بده',
+        'فهرست فرصت‌های شرکت پرتو داچک را بده',
+        'فرصت‌های مربوط به شرکت پرتو داچک را نمایش بده',
+        'فرصت‌های فروش برای پرتو داچک رو نشان بده',
+    ])('passes the company filter from opportunity-list wording to MCP search: %s', async (message) => {
+        const opportunityResult = { data: [{ id: 'opportunity-1', title: 'خرید توکن فایدو', company: 'پرتو داچک' }], meta: { total: 1 } };
+        const mcp = {
+            listFor: globals_1.jest.fn().mockReturnValue([{ name: 'search_opportunities' }]),
+            call: globals_1.jest.fn().mockResolvedValue(opportunityResult),
+        };
+        const audit = { recordTenantEvent: globals_1.jest.fn().mockResolvedValue(undefined) };
+        const config = { get: globals_1.jest.fn().mockReturnValue(undefined) };
+        const service = new crm_assistant_service_1.CrmAssistantService(config, mcp, audit);
+        const result = await service.ask({ message, history: [] }, currentUser());
+        (0, globals_1.expect)(mcp.call).toHaveBeenCalledWith('search_opportunities', { search: 'پرتو داچک', limit: 10 }, globals_1.expect.anything());
+        (0, globals_1.expect)(result.answer).toContain('فرصت‌های فروش مرتبط با «پرتو داچک»');
+        (0, globals_1.expect)(config.get).not.toHaveBeenCalled();
+    });
     (0, globals_1.it)('returns the requested recent company list as structured MCP data without an LLM provider', async () => {
         const companyResult = {
             data: Array.from({ length: 10 }, (_, index) => ({ id: `company-${index}`, name: `شرکت ${index + 1}`, status: 'ACTIVE' })),

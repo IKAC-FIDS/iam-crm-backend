@@ -247,29 +247,52 @@ let CrmAssistantService = CrmAssistantService_1 = class CrmAssistantService {
         return { answer, toolData: [{ tool: 'get_sales_rep_performance', data: result }] };
     }
     async tryDirectEntityList(message, user, definitions) {
-        if (!/(لیست|فهرست|آخر(?:ین)?|اخیر)/u.test(message))
+        if (!/(لیست|فهرست|آخر(?:ین)?|اخیر|(?:بده|نمایش بده|نشان بده))/u.test(message))
             return null;
         const entities = [
-            { pattern: /شرکت/u, tool: 'search_companies', label: 'شرکت' },
-            { pattern: /فرصت/u, tool: 'search_opportunities', label: 'فرصت فروش' },
-            { pattern: /(?:کارها|کارهای|وظایف|تسک)/u, tool: 'search_tasks', label: 'کار' },
-            { pattern: /جلس/u, tool: 'search_meetings', label: 'جلسه' },
-            { pattern: /(?:افراد|مخاطب)/u, tool: 'search_people', label: 'مخاطب' },
-            { pattern: /فعالیت/u, tool: 'search_activities', label: 'فعالیت' },
+            { pattern: /فرصت/u, tool: 'search_opportunities', label: 'فرصت فروش', plural: 'فرصت‌های فروش' },
+            { pattern: /(?:کارها|کارهای|وظایف|تسک)/u, tool: 'search_tasks', label: 'کار', plural: 'کارها' },
+            { pattern: /جلس/u, tool: 'search_meetings', label: 'جلسه', plural: 'جلسات' },
+            { pattern: /(?:افراد|مخاطب)/u, tool: 'search_people', label: 'مخاطب', plural: 'مخاطبان' },
+            { pattern: /فعالیت/u, tool: 'search_activities', label: 'فعالیت', plural: 'فعالیت‌ها' },
+            { pattern: /شرکت/u, tool: 'search_companies', label: 'شرکت', plural: 'شرکت‌ها' },
         ];
         const entity = entities.find((item) => item.pattern.test(message));
         if (!entity || !definitions.some((tool) => tool.name === entity.tool))
             return null;
         const limit = this.extractRequestedLimit(message);
-        const result = await this.mcp.call(entity.tool, { search: null, limit }, user);
+        const search = this.extractEntityListSearch(message, entity.tool);
+        const result = await this.mcp.call(entity.tool, { search, limit }, user);
         const rows = Array.isArray(result.data) ? result.data : [];
         return {
             answer: rows.length
-                ? `### آخرین ${new Intl.NumberFormat('fa-IR').format(rows.length)} ${entity.label}\nاطلاعات زیر مستقیماً از داده‌های قابل‌دسترسی شما در CRM دریافت شده است.`
-                : `${entity.label}ی در محدوده دسترسی شما پیدا نشد.`,
+                ? `### ${search ? `${entity.plural} مرتبط با «${search}»` : `آخرین ${new Intl.NumberFormat('fa-IR').format(rows.length)} ${entity.label}`}\nاطلاعات زیر مستقیماً از داده‌های قابل‌دسترسی شما در CRM دریافت شده است.`
+                : `${entity.label}ی${search ? ` مرتبط با «${search}»` : ''} در محدوده دسترسی شما پیدا نشد.`,
             toolsUsed: [entity.tool],
             toolData: [{ tool: entity.tool, data: result }],
         };
+    }
+    extractEntityListSearch(message, tool) {
+        const patterns = {
+            search_opportunities: /فرصت(?:‌|\s)*های(?:\s+فروش)?\s+(.+?)(?=\s+(?:رو|را|بده|نمایش|نشان)|[؟?]|$)/u,
+            search_companies: /شرکت(?:‌|\s)*های\s+(.+?)(?=\s+(?:رو|را|بده|نمایش|نشان)|[؟?]|$)/u,
+            search_tasks: /(?:کار|وظیفه|تسک)(?:‌|\s)*های\s+(.+?)(?=\s+(?:رو|را|بده|نمایش|نشان)|[؟?]|$)/u,
+            search_meetings: /جلس(?:ه|ات)(?:‌|\s)*های?\s+(.+?)(?=\s+(?:رو|را|بده|نمایش|نشان)|[؟?]|$)/u,
+            search_people: /(?:افراد|مخاطب(?:‌|\s)*های)\s+(.+?)(?=\s+(?:رو|را|بده|نمایش|نشان)|[؟?]|$)/u,
+            search_activities: /فعالیت(?:‌|\s)*های\s+(.+?)(?=\s+(?:رو|را|بده|نمایش|نشان)|[؟?]|$)/u,
+        };
+        const candidate = patterns[tool]?.exec(message)?.[1]?.trim();
+        if (!candidate || /^(?:آخر|آخرین|اخیر|سیستم|من|ما|همه)(?:\s|$)/u.test(candidate))
+            return null;
+        const cleaned = candidate
+            .normalize('NFKC')
+            .replace(/[يى]/g, 'ی')
+            .replace(/ك/g, 'ک')
+            .replace(/^(?:(?:مربوط|مرتبط)\s+به\s+|برای\s+)?(?:شرکت\s+)?/u, '')
+            .replace(/\s+(?:در\s+)?(?:سیستم|CRM)$/iu, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+        return cleaned.slice(0, 200) || null;
     }
     extractRequestedLimit(message) {
         const normalizedDigits = message.replace(/[۰-۹]/g, (digit) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(digit)));
