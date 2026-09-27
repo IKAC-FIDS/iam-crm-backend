@@ -2,6 +2,36 @@ import { describe, expect, it, jest } from '@jest/globals';
 import { CrmAssistantService } from './crm-assistant.service';
 
 describe('CrmAssistantService deterministic performance comparison', () => {
+  it('creates a confirmation proposal for a task without calling an LLM provider', async () => {
+    const proposal = { token: 'signed-token', actionType: 'task.create', title: 'ایجاد کار' };
+    const mcp = {
+      listFor: jest.fn().mockReturnValue([
+        { name: 'search_assignment_users' },
+        { name: 'propose_create_task' },
+      ]),
+      call: jest.fn<(...args: any[]) => Promise<any>>(async (name: string, args: Record<string, unknown>) => {
+        if (name === 'search_assignment_users') {
+          return { data: [{ id: 'farzad-id', fullName: 'فرزاد نوروزی فرد', teamName: 'فنی نشانه' }] };
+        }
+        expect(args).toMatchObject({ title: 'تهیه مستندات sso', assignedToId: 'farzad-id' });
+        return proposal;
+      }),
+    };
+    const audit = { recordTenantEvent: jest.fn<(...args: any[]) => Promise<any>>().mockResolvedValue(undefined) };
+    const config = { get: jest.fn().mockReturnValue(undefined) };
+    const service = new CrmAssistantService(config as never, mcp as never, audit as never);
+
+    const result = await service.ask({
+      message: 'میتونی یک کار جدید برای فرزاد نوروزی فرد برای تهیه مستندات sso بسازی؟',
+      history: [],
+    }, currentUser());
+
+    expect(result.answer).toContain('پیش‌نویس کار «تهیه مستندات sso»');
+    expect(result.pendingActions).toEqual([proposal]);
+    expect(result.toolsUsed).toEqual(['search_assignment_users', 'propose_create_task']);
+    expect(config.get).not.toHaveBeenCalled();
+  });
+
   it('uses conversation context and internal reports without calling an LLM provider', async () => {
     const reports: Record<string, Record<string, unknown>> = {
       'user-mahtab': performanceReport('مهتاب امیری', 16, 3, 19, 118, 100),
@@ -34,22 +64,7 @@ describe('CrmAssistantService deterministic performance comparison', () => {
         { role: 'user', content: 'یک گزارش از عملکرد مهتاب بده' },
         { role: 'assistant', content: '### گزارش عملکرد مهتاب امیری\nبازه گزارش: ۳۰ روز اخیر' },
       ],
-    }, {
-      userId: 'admin',
-      membershipId: 'membership',
-      organizationId: 'organization',
-      tenantContext: {
-        tenantId: 'organization',
-        organizationId: 'organization',
-        userId: 'admin',
-        membershipId: 'membership',
-        membershipStatus: 'active',
-        resolutionSource: 'token-session',
-        tenantRole: 'ADMIN',
-        permissions: ['report:view'],
-        platformAdmin: false,
-      },
-    } as never);
+    }, currentUser());
 
     expect(result.answer).toContain('مقایسه عملکرد مهتاب امیری');
     expect(result.answer).toContain('کارشناس هم‌تیم');
@@ -58,6 +73,25 @@ describe('CrmAssistantService deterministic performance comparison', () => {
     expect(config.get).not.toHaveBeenCalled();
   });
 });
+
+function currentUser() {
+  return {
+    userId: 'admin',
+    membershipId: 'membership',
+    organizationId: 'organization',
+    tenantContext: {
+      tenantId: 'organization',
+      organizationId: 'organization',
+      userId: 'admin',
+      membershipId: 'membership',
+      membershipStatus: 'active',
+      resolutionSource: 'token-session',
+      tenantRole: 'ADMIN',
+      permissions: ['report:view', 'task:create'],
+      platformAdmin: false,
+    },
+  } as never;
+}
 
 function performanceReport(
   fullName: string,

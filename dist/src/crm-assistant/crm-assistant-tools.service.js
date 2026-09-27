@@ -88,6 +88,10 @@ let CrmAssistantToolsService = class CrmAssistantToolsService {
                 permission: 'report:view', inputSchema: listSchema('نام، ایمیل یا نام تیم کارشناس'),
             },
             {
+                name: 'search_assignment_users', description: 'یافتن کاربر سازمانی مجاز برای واگذاری کار و دریافت شناسه واقعی او.',
+                permission: 'task:create', inputSchema: listSchema('نام کاربری که کار باید به او واگذار شود'),
+            },
+            {
                 name: 'get_sales_rep_performance',
                 description: 'گزارش تجمیعی و عددی عملکرد یک کارشناس شامل فرصت‌ها، نرخ تبدیل، فعالیت‌ها، جلسات و کارهای او؛ نام کارشناس نیز مستقیماً قابل استفاده است.',
                 permission: 'report:view',
@@ -112,7 +116,7 @@ let CrmAssistantToolsService = class CrmAssistantToolsService {
         if (!definition || !this.hasPermission(user, definition.permission)) {
             throw new common_1.ForbiddenException('این ابزار برای کاربر جاری قابل دسترس نیست');
         }
-        if (name === 'search_report_users')
+        if (name === 'search_report_users' || name === 'search_assignment_users')
             return this.searchReportUsers(rawArguments, user);
         if (name === 'get_sales_rep_performance')
             return this.salesRepPerformance(rawArguments, user);

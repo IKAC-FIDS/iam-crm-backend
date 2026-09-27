@@ -25,6 +25,11 @@ let CrmAssistantService = CrmAssistantService_1 = class CrmAssistantService {
     }
     async ask(dto, user) {
         const toolDefinitions = this.mcp.listFor(user);
+        const directTask = await this.tryDirectTaskProposal(dto.message, user, toolDefinitions);
+        if (directTask) {
+            await this.recordDeterministicAnswer(user, dto.message, directTask.toolsUsed, 'deterministic-action-proposal', directTask.pendingActions.map((item) => item.actionType));
+            return directTask;
+        }
         const directComparison = await this.tryDirectPerformanceComparison(dto.message, dto.history ?? [], user, toolDefinitions);
         if (directComparison) {
             await this.recordDeterministicAnswer(user, dto.message, directComparison.toolsUsed, 'deterministic-comparison');
@@ -84,7 +89,7 @@ let CrmAssistantService = CrmAssistantService_1 = class CrmAssistantService {
         });
         return { answer, toolsUsed: [...new Set(usedTools)], pendingActions };
     }
-    async recordDeterministicAnswer(user, message, tools, modelProvider) {
+    async recordDeterministicAnswer(user, message, tools, modelProvider, proposedActions = []) {
         await this.audit.recordTenantEvent({
             actorId: user.userId,
             actorMembershipId: user.membershipId,
@@ -96,7 +101,7 @@ let CrmAssistantService = CrmAssistantService_1 = class CrmAssistantService {
                 tools,
                 modelProvider,
                 model: 'internal-report-services',
-                proposedActions: [],
+                proposedActions,
             },
         });
     }
@@ -221,6 +226,58 @@ let CrmAssistantService = CrmAssistantService_1 = class CrmAssistantService {
             '',
             'این گزارش فقط از داده‌های قابل‌دسترسی شما در CRM محاسبه شده است.',
         ].join('\n');
+    }
+    async tryDirectTaskProposal(message, user, definitions) {
+        if (!/(?:کار|وظیفه|تسک)/u.test(message) || !/(?:بساز|بسازی|ایجاد|ثبت)/u.test(message))
+            return null;
+        if (!definitions.some((tool) => tool.name === 'search_assignment_users')
+            || !definitions.some((tool) => tool.name === 'propose_create_task'))
+            return null;
+        const parsed = this.parseTaskRequest(message);
+        if (!parsed) {
+            return {
+                answer: 'برای ساخت کار، نام مسئول و عنوان کار را مشخص کنید؛ مثلاً «یک کار برای فرزاد نوروزی فرد برای تهیه مستندات SSO بساز».',
+                toolsUsed: [],
+                pendingActions: [],
+            };
+        }
+        const search = await this.mcp.call('search_assignment_users', { search: parsed.assigneeName, limit: 10 }, user);
+        const candidates = Array.isArray(search.data) ? search.data : [];
+        const needle = this.normalizePersianText(parsed.assigneeName);
+        const exact = candidates.filter((item) => this.normalizePersianText(String(item.fullName ?? '')) === needle);
+        const selected = exact.length === 1 ? exact[0] : candidates.length === 1 ? candidates[0] : null;
+        if (!selected) {
+            const choices = candidates.map((item) => `- ${String(item.fullName ?? 'بدون نام')}${item.teamName ? ` — ${String(item.teamName)}` : ''}`).join('\n');
+            return {
+                answer: candidates.length
+                    ? `چند کاربر با نام «${parsed.assigneeName}» پیدا شد. لطفاً نام کامل یکی را مشخص کنید:\n\n${choices}`
+                    : `کاربری با نام «${parsed.assigneeName}» در سازمان پیدا نشد یا امکان واگذاری کار به او وجود ندارد.`,
+                toolsUsed: ['search_assignment_users'],
+                pendingActions: [],
+            };
+        }
+        const proposal = await this.mcp.call('propose_create_task', {
+            title: parsed.title,
+            description: null,
+            priority: null,
+            dueAt: null,
+            companyId: null,
+            opportunityId: null,
+            assignedToId: selected.id,
+        }, user);
+        return {
+            answer: `پیش‌نویس کار «${parsed.title}» برای ${String(selected.fullName)} آماده شد. برای ثبت نهایی، جزئیات زیر را تأیید کنید.`,
+            toolsUsed: ['search_assignment_users', 'propose_create_task'],
+            pendingActions: [proposal],
+        };
+    }
+    parseTaskRequest(message) {
+        const normalized = message.replace(/\s+/g, ' ').trim();
+        const match = normalized.match(/برای\s+(.+?)\s+برای\s+(.+?)(?:\s+(?:بساز|بسازی|ایجاد کن|ثبت کن)(?:ید)?|[؟?]|$)/u);
+        if (!match?.[1]?.trim() || !match[2]?.trim())
+            return null;
+        const title = match[2].trim().replace(/^(?:کار|وظیفه|تسک)\s+/u, '').slice(0, 200);
+        return { assigneeName: match[1].trim(), title };
     }
     async tryDirectPerformanceComparison(message, history, user, definitions) {
         if (!/(مقایسه|نسبت به|بقیه|دیگه|سایر)/u.test(message))
