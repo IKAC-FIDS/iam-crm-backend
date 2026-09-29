@@ -1,5 +1,6 @@
 import { ValidationPipe } from "@nestjs/common";
 import { AccountWorkspaceController } from "../src/account-workspace/account-workspace.controller";
+import { AccountWorkspaceService } from "../src/account-workspace/account-workspace.service";
 import { AccountWorkspaceQueryDto } from "../src/account-workspace/dto/account-workspace-query.dto";
 
 const pipe = new ValidationPipe({
@@ -28,6 +29,43 @@ describe("account workspace", () => {
     );
     await expect(validateQuery({ recentLimit: "11" })).rejects.toThrow();
     await expect(validateQuery({ startDate: "not-a-date" })).rejects.toThrow();
+    await expect(
+      validateQuery({ userId: "00000000-0000-4000-8000-000000000099" }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        userId: "00000000-0000-4000-8000-000000000099",
+      }),
+    );
+    await expect(validateQuery({ userId: "not-a-uuid" })).rejects.toThrow();
+  });
+
+  it("rejects cross-user workspace access for non-admin users", async () => {
+    const service = new AccountWorkspaceService({} as any);
+    await expect(
+      service.getWorkspace(
+        {
+          recentLimit: 5,
+          userId: "00000000-0000-4000-8000-000000000099",
+        },
+        {
+          userId: "00000000-0000-4000-8000-000000000012",
+          email: "rep@example.com",
+          role: "REP",
+          organizationId: "00000000-0000-4000-8000-000000000001",
+          tenantContext: {
+            tenantId: "00000000-0000-4000-8000-000000000001",
+            organizationId: "00000000-0000-4000-8000-000000000001",
+            userId: "00000000-0000-4000-8000-000000000012",
+            membershipId: "00000000-0000-4000-8000-000000000013",
+            tenantRole: "REP",
+            permissions: [],
+            platformAdmin: false,
+            membershipStatus: "active",
+            resolutionSource: "token-session",
+          },
+        },
+      ),
+    ).rejects.toThrow("فقط مدیر سیستم");
   });
 
   it("passes only the authenticated user and validated query to the personal workspace service", async () => {

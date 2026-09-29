@@ -19,10 +19,15 @@ class AccountWorkspaceQueryDto {
         this.recentLimit = 5;
     }
     static _OPENAPI_METADATA_FACTORY() {
-        return { startDate: { required: false, type: () => String }, endDate: { required: false, type: () => String }, recentLimit: { required: true, type: () => Object, default: 5, minimum: 3, maximum: 10 } };
+        return { userId: { required: false, type: () => String }, startDate: { required: false, type: () => String }, endDate: { required: false, type: () => String }, recentLimit: { required: true, type: () => Object, default: 5, minimum: 3, maximum: 10 } };
     }
 }
 exports.AccountWorkspaceQueryDto = AccountWorkspaceQueryDto;
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsUUID)(),
+    __metadata("design:type", String)
+], AccountWorkspaceQueryDto.prototype, "userId", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, api_date_string_validator_1.IsApiDateString)(),

@@ -23,12 +23,26 @@ let AccountWorkspaceService = class AccountWorkspaceService {
     }
     async getWorkspace(query, user) {
         const tenant = tenant_scope_util_1.tenantScope.require(user);
+        const targetUserId = query.userId ?? user.userId;
+        if (targetUserId !== user.userId && user.role !== "ADMIN") {
+            throw new common_1.ForbiddenException("فقط مدیر سیستم می‌تواند فضای کاری کاربران دیگر را مشاهده کند");
+        }
         const financialVisible = (0, financial_visibility_1.canViewFinancials)(user);
         const now = new Date();
         const defaultStart = new Date(now.getTime() - 30 * 86_400_000);
         const requestedRange = (0, api_date_util_1.parseApiDateRange)(query.startDate, query.endDate);
         const period = requestedRange ?? { gte: defaultStart, lte: now };
         return this.prisma.withTenantTransaction(tenant, async (tx) => {
+            const targetUser = await tx.user.findFirst({
+                where: {
+                    id: targetUserId,
+                    organizationId: tenant.organizationId,
+                },
+                select: { id: true },
+            });
+            if (!targetUser) {
+                throw new common_1.NotFoundException("کاربر موردنظر در سازمان فعلی پیدا نشد");
+            }
             const organization = await tx.organization.findUnique({
                 where: { id: tenant.organizationId },
                 select: { timezone: true },
@@ -41,14 +55,14 @@ let AccountWorkspaceService = class AccountWorkspaceService {
                     by: ["status"],
                     where: {
                         organizationId: tenant.organizationId,
-                        assignedToId: user.userId,
+                        assignedToId: targetUserId,
                     },
                     _count: { id: true },
                 }),
                 tx.task.count({
                     where: {
                         organizationId: tenant.organizationId,
-                        assignedToId: user.userId,
+                        assignedToId: targetUserId,
                         status: openTaskStatus,
                         dueAt: { lt: todayStart },
                     },
@@ -56,7 +70,7 @@ let AccountWorkspaceService = class AccountWorkspaceService {
                 tx.task.count({
                     where: {
                         organizationId: tenant.organizationId,
-                        assignedToId: user.userId,
+                        assignedToId: targetUserId,
                         status: openTaskStatus,
                         dueAt: { gte: todayStart, lt: tomorrowStart },
                     },
@@ -64,7 +78,7 @@ let AccountWorkspaceService = class AccountWorkspaceService {
                 tx.task.findMany({
                     where: {
                         organizationId: tenant.organizationId,
-                        assignedToId: user.userId,
+                        assignedToId: targetUserId,
                         status: openTaskStatus,
                     },
                     select: {
@@ -88,7 +102,7 @@ let AccountWorkspaceService = class AccountWorkspaceService {
                 tx.opportunity.findMany({
                     where: {
                         organizationId: tenant.organizationId,
-                        ownerId: user.userId,
+                        ownerId: targetUserId,
                         archivedAt: null,
                     },
                     select: {
@@ -99,7 +113,7 @@ let AccountWorkspaceService = class AccountWorkspaceService {
                 tx.opportunity.findMany({
                     where: {
                         organizationId: tenant.organizationId,
-                        ownerId: user.userId,
+                        ownerId: targetUserId,
                         archivedAt: null,
                     },
                     select: {
@@ -131,14 +145,14 @@ let AccountWorkspaceService = class AccountWorkspaceService {
                 tx.company.count({
                     where: {
                         organizationId: tenant.organizationId,
-                        ownerId: user.userId,
+                        ownerId: targetUserId,
                         archivedAt: null,
                     },
                 }),
                 tx.company.findMany({
                     where: {
                         organizationId: tenant.organizationId,
-                        ownerId: user.userId,
+                        ownerId: targetUserId,
                         archivedAt: null,
                     },
                     select: {
@@ -158,8 +172,8 @@ let AccountWorkspaceService = class AccountWorkspaceService {
                         status: "SCHEDULED",
                         startAt: { gte: now },
                         OR: [
-                            { organizerId: user.userId },
-                            { assignees: { some: { userId: user.userId } } },
+                            { organizerId: targetUserId },
+                            { assignees: { some: { userId: targetUserId } } },
                         ],
                     },
                 }),
@@ -169,8 +183,8 @@ let AccountWorkspaceService = class AccountWorkspaceService {
                         status: "SCHEDULED",
                         startAt: { gte: now },
                         OR: [
-                            { organizerId: user.userId },
-                            { assignees: { some: { userId: user.userId } } },
+                            { organizerId: targetUserId },
+                            { assignees: { some: { userId: targetUserId } } },
                         ],
                     },
                     select: {
@@ -202,7 +216,7 @@ let AccountWorkspaceService = class AccountWorkspaceService {
                 tx.activity.groupBy({
                     by: ["type"],
                     where: {
-                        userId: user.userId,
+                        userId: targetUserId,
                         user: { organizationId: tenant.organizationId },
                         type: { not: "STAGE_CHANGE" },
                         occurredAt: period,
@@ -212,7 +226,7 @@ let AccountWorkspaceService = class AccountWorkspaceService {
                 tx.notification.count({
                     where: {
                         organizationId: tenant.organizationId,
-                        recipientId: user.userId,
+                        recipientId: targetUserId,
                         readAt: null,
                         archivedAt: null,
                     },
@@ -220,7 +234,7 @@ let AccountWorkspaceService = class AccountWorkspaceService {
                 tx.notification.findMany({
                     where: {
                         organizationId: tenant.organizationId,
-                        recipientId: user.userId,
+                        recipientId: targetUserId,
                         archivedAt: null,
                     },
                     select: {
@@ -240,7 +254,7 @@ let AccountWorkspaceService = class AccountWorkspaceService {
                 }),
                 tx.conversationParticipant.findMany({
                     where: {
-                        userId: user.userId,
+                        userId: targetUserId,
                         thread: { organizationId: tenant.organizationId },
                     },
                     select: {
@@ -281,7 +295,7 @@ let AccountWorkspaceService = class AccountWorkspaceService {
                     where: {
                         threadId: participant.thread.id,
                         organizationId: tenant.organizationId,
-                        authorId: { not: user.userId },
+                        authorId: { not: targetUserId },
                         deletedAt: null,
                         ...(participant.lastReadAt
                             ? { createdAt: { gt: participant.lastReadAt } }
