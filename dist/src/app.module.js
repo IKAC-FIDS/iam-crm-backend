@@ -61,6 +61,7 @@ const notification_core_module_1 = require("./notification-core/notification-cor
 const conversations_module_1 = require("./conversations/conversations.module");
 const account_workspace_module_1 = require("./account-workspace/account-workspace.module");
 const crm_assistant_module_1 = require("./crm-assistant/crm-assistant.module");
+const operations_module_1 = require("./operations/operations.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -79,8 +80,8 @@ exports.AppModule = AppModule = __decorate([
                 useFactory: (config) => ({
                     throttlers: [
                         {
-                            ttl: config.get('THROTTLE_TTL', 60000),
-                            limit: config.get('THROTTLE_LIMIT', 100),
+                            ttl: config.get("THROTTLE_TTL", 60000),
+                            limit: config.get("THROTTLE_LIMIT", 100),
                         },
                     ],
                 }),
@@ -132,6 +133,7 @@ exports.AppModule = AppModule = __decorate([
             conversations_module_1.ConversationsModule,
             account_workspace_module_1.AccountWorkspaceModule,
             crm_assistant_module_1.CrmAssistantModule,
+            operations_module_1.OperationsModule,
         ],
         providers: [
             {
