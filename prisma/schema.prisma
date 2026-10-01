@@ -293,6 +293,20 @@ enum TaskAssignmentScope {
   ORGANIZATION
 }
 
+enum PersonalTodoStatus {
+  TODO
+  DONE
+  CANCELLED
+}
+
+enum PersonalTodoRecurrenceType {
+  NONE
+  DAILY
+  WEEKLY
+  MONTHLY
+  CUSTOM
+}
+
 enum TimeEntryType {
   REGULAR
   OVERTIME
@@ -385,6 +399,7 @@ enum NotificationType {
   PAYMENT_UPDATED
   ATTACHMENT_UPLOADED
   MEETING_REMINDER
+  PERSONAL_TODO_REMINDER
   TENDER_WORKFLOW
 }
 
@@ -405,6 +420,7 @@ enum NotificationEntityType {
   PAYMENT
   ATTACHMENT
   MEETING
+  PERSONAL_TODO
   TENDER
 }
 
@@ -526,6 +542,7 @@ model User {
   tasksToReview        Task[]            @relation("TaskReviewer")
   taskReviewsAssigned  TaskReviewRound[] @relation("TaskReviewReviewer")
   taskReviewsSubmitted TaskReviewRound[] @relation("TaskReviewSubmittedBy")
+  personalTodos        PersonalTodo[]
 
   organizedMeetings      Meeting[]              @relation("MeetingOrganizer")
   createdMeetings        Meeting[]              @relation("MeetingCreatedBy")
@@ -654,6 +671,7 @@ model Organization {
   companies            Company[]
   opportunities        Opportunity[]
   tasks                Task[]
+  personalTodos        PersonalTodo[]
   notifications        Notification[]
   fileAttachments      FileAttachment[]
   artifactLinks        ArtifactLink[]
@@ -1062,6 +1080,7 @@ model Company {
   stageHistory            PipelineStageHistory[]
   opportunities           Opportunity[]
   tasks                   Task[]
+  personalTodos           PersonalTodo[]
   legalDocuments          CompanyLegalDocument[]
   personEmploymentHistory PersonEmploymentHistory[]
   meetings                Meeting[]
@@ -1214,8 +1233,8 @@ model Person {
   activities           Activity[]
   primaryOpportunities Opportunity[] @relation("OpportunityPrimaryContact")
 
-  @@index([companyId])
   @@unique([companyId, nationalCode])
+  @@index([companyId])
   @@index([personaTag])
   @@index([isPrimaryContact])
   @@map("people")
@@ -1440,6 +1459,7 @@ model Opportunity {
   commercialDocuments OpportunityCommercialDocument[]
   payments            OpportunityPayment[]
   tasks               Task[]
+  personalTodos       PersonalTodo[]
   meetings            Meeting[]
   technicalDocuments  TechnicalDocument[]
   tenders             Tender[]
@@ -1776,6 +1796,7 @@ model Task {
   organization      Organization        @relation(fields: [organizationId], references: [id])
   TenderRequirement TenderRequirement[]
   timesheetEntries  TimesheetEntry[]
+  personalTodos     PersonalTodo[]
 
   @@unique([id, organizationId])
   @@index([status])
@@ -1803,6 +1824,51 @@ model Task {
   @@index([organizationId])
   @@index([organizationId, assignedToId, status, dueAt])
   @@map("tasks")
+}
+
+model PersonalTodo {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title String
+  note  String?
+
+  status PersonalTodoStatus @default(TODO)
+
+  dueAt          DateTime?
+  reminderAt     DateTime?
+  reminderSentAt DateTime?
+
+  recurrenceType     PersonalTodoRecurrenceType @default(NONE)
+  recurrenceInterval Int                        @default(1)
+
+  companyId String?
+  company   Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  opportunityId String?
+  opportunity   Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+
+  taskId String?
+  task   Task?   @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
+  previousOccurrenceId String?       @unique
+  previousOccurrence   PersonalTodo? @relation("PersonalTodoRecurrence", fields: [previousOccurrenceId], references: [id], onDelete: SetNull)
+  nextOccurrence       PersonalTodo? @relation("PersonalTodoRecurrence")
+
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([id, organizationId])
+  @@index([organizationId, userId, status, dueAt])
+  @@index([organizationId, userId, reminderAt, reminderSentAt])
+  @@index([companyId])
+  @@index([opportunityId])
+  @@index([taskId])
+  @@map("personal_todos")
 }
 
 // ============================================================

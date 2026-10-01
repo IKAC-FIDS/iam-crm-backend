@@ -53,6 +53,7 @@ import { ConversationsModule } from "./conversations/conversations.module";
 import { AccountWorkspaceModule } from "./account-workspace/account-workspace.module";
 import { CrmAssistantModule } from "./crm-assistant/crm-assistant.module";
 import { OperationsModule } from "./operations/operations.module";
+import { PersonalTodosModule } from "./personal-todos/personal-todos.module";
 
 @Module({
   imports: [
@@ -122,6 +123,7 @@ import { OperationsModule } from "./operations/operations.module";
     AccountWorkspaceModule,
     CrmAssistantModule,
     OperationsModule,
+    PersonalTodosModule,
   ],
   providers: [
     {

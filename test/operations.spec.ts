@@ -49,6 +49,10 @@ function transaction(overrides: Record<string, unknown> = {}) {
     task: { findMany: jest.fn().mockResolvedValue([]) },
     meeting: { findMany: jest.fn().mockResolvedValue([]) },
     activity: { findMany: jest.fn().mockResolvedValue([]) },
+    personalTodo: {
+      findMany: jest.fn().mockResolvedValue([]),
+      count: jest.fn().mockResolvedValue(0),
+    },
     conversationThread: { findMany: jest.fn().mockResolvedValue([]) },
     $queryRaw: jest.fn().mockResolvedValue([]),
     ...overrides,

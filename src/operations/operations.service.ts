@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 import {
   ConversationEntityType,
   MeetingStatus,
+  PersonalTodoStatus,
   Prisma,
   TaskStatus,
 } from "@prisma/client";
@@ -66,6 +67,10 @@ export class OperationsService {
         activeOpportunities,
         unreadConversationMessages,
         recentParticipants,
+        personalTodosToday,
+        personalTodosUpcoming,
+        personalTodosCompleted,
+        personalTodosOverdue,
       ] = await Promise.all([
         tx.task.count({
           where: {
@@ -162,6 +167,30 @@ export class OperationsService {
           orderBy: { thread: { updatedAt: "desc" } },
           take: recentLimit,
         }),
+        tx.personalTodo.findMany({
+          where: {
+            organizationId: tenant.organizationId,
+            userId: user.userId,
+            status: PersonalTodoStatus.TODO,
+            OR: [{ dueAt: null }, { dueAt: { lt: tomorrowStart } }],
+          },
+          include: { company: { select: { id: true, legalName: true, brandName: true } }, opportunity: { select: { id: true, title: true } }, task: { select: { id: true, title: true } } },
+          orderBy: [{ dueAt: "asc" }, { createdAt: "desc" }],
+          take: recentLimit,
+        }),
+        tx.personalTodo.findMany({
+          where: { organizationId: tenant.organizationId, userId: user.userId, status: PersonalTodoStatus.TODO, dueAt: { gte: tomorrowStart } },
+          include: { company: { select: { id: true, legalName: true, brandName: true } }, opportunity: { select: { id: true, title: true } }, task: { select: { id: true, title: true } } },
+          orderBy: { dueAt: "asc" },
+          take: recentLimit,
+        }),
+        tx.personalTodo.findMany({
+          where: { organizationId: tenant.organizationId, userId: user.userId, status: PersonalTodoStatus.DONE },
+          include: { company: { select: { id: true, legalName: true, brandName: true } }, opportunity: { select: { id: true, title: true } }, task: { select: { id: true, title: true } } },
+          orderBy: { completedAt: "desc" },
+          take: recentLimit,
+        }),
+        tx.personalTodo.count({ where: { organizationId: tenant.organizationId, userId: user.userId, status: PersonalTodoStatus.TODO, dueAt: { lt: todayStart } } }),
       ]);
 
       const threadUnread = await this.getUnreadThreadCounts(
@@ -180,6 +209,12 @@ export class OperationsService {
           activeOpportunities,
         },
         today: { tasks: todayTasks, meetings: meetingsToday },
+        personalTodos: {
+          today: personalTodosToday,
+          upcoming: personalTodosUpcoming,
+          completed: personalTodosCompleted,
+          counts: { today: personalTodosToday.length, overdue: personalTodosOverdue, upcoming: personalTodosUpcoming.length },
+        },
         recentConversations: recentParticipants.map((participant) => ({
           threadId: participant.threadId,
           entityType: participant.thread.entityType,
