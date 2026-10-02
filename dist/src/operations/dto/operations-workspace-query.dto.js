@@ -19,10 +19,16 @@ class OperationsWorkspaceQueryDto {
         this.recentLimit = 5;
     }
     static _OPENAPI_METADATA_FACTORY() {
-        return { recentLimit: { required: false, type: () => Number, default: 5, minimum: 1, maximum: 20 } };
+        return { userId: { required: false, type: () => String }, recentLimit: { required: false, type: () => Number, default: 5, minimum: 1, maximum: 20 } };
     }
 }
 exports.OperationsWorkspaceQueryDto = OperationsWorkspaceQueryDto;
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ description: "Admin-only target user" }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsUUID)(),
+    __metadata("design:type", String)
+], OperationsWorkspaceQueryDto.prototype, "userId", void 0);
 __decorate([
     (0, swagger_1.ApiPropertyOptional)({ minimum: 1, maximum: 20, default: 5 }),
     (0, class_validator_1.IsOptional)(),

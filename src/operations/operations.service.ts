@@ -1,4 +1,8 @@
-import { Injectable } from "@nestjs/common";
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import {
   ConversationEntityType,
   MeetingStatus,
@@ -37,7 +41,11 @@ export class OperationsService {
     const tenant = tenantScope.require(user);
     return this.prisma.withTenantTransaction(tenant, async (tx) => {
       const company = await tx.company.findFirst({
-        where: { id: companyId, organizationId: tenant.organizationId, archivedAt: null },
+        where: {
+          id: companyId,
+          organizationId: tenant.organizationId,
+          archivedAt: null,
+        },
         select: { id: true },
       });
       if (!company) return { data: [], total: 0 };
@@ -66,6 +74,12 @@ export class OperationsService {
     user: CurrentUserPayload,
   ) {
     const tenant = tenantScope.require(user);
+    const targetUserId = await this.resolveTargetUserId(
+      query.userId,
+      user,
+      tenant.organizationId,
+    );
+    const scopeUser = { ...user, userId: targetUserId };
     const now = new Date();
     const recentLimit = query.recentLimit ?? 5;
     const permissions = new Set(user.tenantContext?.permissions ?? []);
@@ -84,13 +98,13 @@ export class OperationsService {
       );
       const taskWhere: Prisma.TaskWhereInput = {
         organizationId: tenant.organizationId,
-        assignedToId: user.userId,
+        assignedToId: scopeUser.userId,
         status: { in: OPEN_TASK_STATUSES },
       };
       const meetingAccess: Prisma.MeetingWhereInput = {
         OR: [
-          { organizerId: user.userId },
-          { assignees: { some: { userId: user.userId } } },
+          { organizerId: scopeUser.userId },
+          { assignees: { some: { userId: scopeUser.userId } } },
         ],
       };
 
@@ -107,67 +121,77 @@ export class OperationsService {
         personalTodosCompleted,
         personalTodosOverdue,
       ] = await Promise.all([
-        canViewTasks ? tx.task.count({
-          where: {
-            ...taskWhere,
-            dueAt: { gte: todayStart, lt: tomorrowStart },
-          },
-        }) : Promise.resolve(0),
-        canViewTasks ? tx.task.count({
-          where: { ...taskWhere, dueAt: { lt: todayStart } },
-        }) : Promise.resolve(0),
-        canViewTasks ? tx.task.findMany({
-          where: {
-            ...taskWhere,
-            dueAt: { gte: todayStart, lt: tomorrowStart },
-          },
-          select: {
-            id: true,
-            title: true,
-            status: true,
-            priority: true,
-            dueAt: true,
-            opportunityId: true,
-            company: {
-              select: { id: true, legalName: true, brandName: true },
-            },
-          },
-          orderBy: [{ dueAt: "asc" }, { updatedAt: "desc" }],
-        }) : Promise.resolve([]),
-        canViewMeetings ? tx.meeting.findMany({
-          where: {
-            organizationId: tenant.organizationId,
-            status: MeetingStatus.SCHEDULED,
-            startAt: { gte: todayStart, lt: tomorrowStart },
-            ...meetingAccess,
-          },
-          select: {
-            id: true,
-            title: true,
-            startAt: true,
-            endAt: true,
-            mode: true,
-            company: {
-              select: { id: true, legalName: true, brandName: true },
-            },
-          },
-          orderBy: { startAt: "asc" },
-        }) : Promise.resolve([]),
-        canViewOpportunities ? tx.opportunity.count({
-          where: {
-            AND: [
-              activeOpportunityStateWhere(),
-              {
-                organizationId: tenant.organizationId,
-                ownerId: user.userId,
+        canViewTasks
+          ? tx.task.count({
+              where: {
+                ...taskWhere,
+                dueAt: { gte: todayStart, lt: tomorrowStart },
               },
-            ],
-          },
-        }) : Promise.resolve(0),
-        this.getUnreadTotal(tx, tenant.organizationId, user.userId),
+            })
+          : Promise.resolve(0),
+        canViewTasks
+          ? tx.task.count({
+              where: { ...taskWhere, dueAt: { lt: todayStart } },
+            })
+          : Promise.resolve(0),
+        canViewTasks
+          ? tx.task.findMany({
+              where: {
+                ...taskWhere,
+                dueAt: { gte: todayStart, lt: tomorrowStart },
+              },
+              select: {
+                id: true,
+                title: true,
+                status: true,
+                priority: true,
+                dueAt: true,
+                opportunityId: true,
+                company: {
+                  select: { id: true, legalName: true, brandName: true },
+                },
+              },
+              orderBy: [{ dueAt: "asc" }, { updatedAt: "desc" }],
+            })
+          : Promise.resolve([]),
+        canViewMeetings
+          ? tx.meeting.findMany({
+              where: {
+                organizationId: tenant.organizationId,
+                status: MeetingStatus.SCHEDULED,
+                startAt: { gte: todayStart, lt: tomorrowStart },
+                ...meetingAccess,
+              },
+              select: {
+                id: true,
+                title: true,
+                startAt: true,
+                endAt: true,
+                mode: true,
+                company: {
+                  select: { id: true, legalName: true, brandName: true },
+                },
+              },
+              orderBy: { startAt: "asc" },
+            })
+          : Promise.resolve([]),
+        canViewOpportunities
+          ? tx.opportunity.count({
+              where: {
+                AND: [
+                  activeOpportunityStateWhere(),
+                  {
+                    organizationId: tenant.organizationId,
+                    ownerId: scopeUser.userId,
+                  },
+                ],
+              },
+            })
+          : Promise.resolve(0),
+        this.getUnreadTotal(tx, tenant.organizationId, scopeUser.userId),
         tx.conversationParticipant.findMany({
           where: {
-            userId: user.userId,
+            userId: scopeUser.userId,
             thread: { organizationId: tenant.organizationId },
           },
           select: {
@@ -205,37 +229,69 @@ export class OperationsService {
         tx.personalTodo.findMany({
           where: {
             organizationId: tenant.organizationId,
-            userId: user.userId,
+            userId: scopeUser.userId,
             status: PersonalTodoStatus.TODO,
             OR: [{ dueAt: null }, { dueAt: { lt: tomorrowStart } }],
           },
-          include: { company: { select: { id: true, legalName: true, brandName: true } }, opportunity: { select: { id: true, title: true } }, task: { select: { id: true, title: true } } },
+          include: {
+            company: { select: { id: true, legalName: true, brandName: true } },
+            opportunity: { select: { id: true, title: true } },
+            task: { select: { id: true, title: true } },
+          },
           orderBy: [{ dueAt: "asc" }, { createdAt: "desc" }],
           take: recentLimit,
         }),
         tx.personalTodo.findMany({
-          where: { organizationId: tenant.organizationId, userId: user.userId, status: PersonalTodoStatus.TODO, dueAt: { gte: tomorrowStart } },
-          include: { company: { select: { id: true, legalName: true, brandName: true } }, opportunity: { select: { id: true, title: true } }, task: { select: { id: true, title: true } } },
+          where: {
+            organizationId: tenant.organizationId,
+            userId: scopeUser.userId,
+            status: PersonalTodoStatus.TODO,
+            dueAt: { gte: tomorrowStart },
+          },
+          include: {
+            company: { select: { id: true, legalName: true, brandName: true } },
+            opportunity: { select: { id: true, title: true } },
+            task: { select: { id: true, title: true } },
+          },
           orderBy: { dueAt: "asc" },
           take: recentLimit,
         }),
         tx.personalTodo.findMany({
-          where: { organizationId: tenant.organizationId, userId: user.userId, status: PersonalTodoStatus.DONE },
-          include: { company: { select: { id: true, legalName: true, brandName: true } }, opportunity: { select: { id: true, title: true } }, task: { select: { id: true, title: true } } },
+          where: {
+            organizationId: tenant.organizationId,
+            userId: scopeUser.userId,
+            status: PersonalTodoStatus.DONE,
+          },
+          include: {
+            company: { select: { id: true, legalName: true, brandName: true } },
+            opportunity: { select: { id: true, title: true } },
+            task: { select: { id: true, title: true } },
+          },
           orderBy: { completedAt: "desc" },
           take: recentLimit,
         }),
-        tx.personalTodo.count({ where: { organizationId: tenant.organizationId, userId: user.userId, status: PersonalTodoStatus.TODO, dueAt: { lt: todayStart } } }),
+        tx.personalTodo.count({
+          where: {
+            organizationId: tenant.organizationId,
+            userId: scopeUser.userId,
+            status: PersonalTodoStatus.TODO,
+            dueAt: { lt: todayStart },
+          },
+        }),
       ]);
 
       const threadUnread = await this.getUnreadThreadCounts(
         tx,
         tenant.organizationId,
-        user.userId,
+        scopeUser.userId,
         recentParticipants.map((participant) => participant.threadId),
       );
 
       return {
+        subject: {
+          userId: scopeUser.userId,
+          isCurrentUser: scopeUser.userId === user.userId,
+        },
         capabilities: {
           tasks: canViewTasks,
           meetings: canViewMeetings,
@@ -254,7 +310,11 @@ export class OperationsService {
           today: personalTodosToday,
           upcoming: personalTodosUpcoming,
           completed: personalTodosCompleted,
-          counts: { today: personalTodosToday.length, overdue: personalTodosOverdue, upcoming: personalTodosUpcoming.length },
+          counts: {
+            today: personalTodosToday.length,
+            overdue: personalTodosOverdue,
+            upcoming: personalTodosUpcoming.length,
+          },
         },
         recentConversations: recentParticipants.map((participant) => ({
           threadId: participant.threadId,
@@ -274,6 +334,12 @@ export class OperationsService {
     user: CurrentUserPayload,
   ) {
     const tenant = tenantScope.require(user);
+    const targetUserId = await this.resolveTargetUserId(
+      query.userId,
+      user,
+      tenant.organizationId,
+    );
+    const scopeUser = { ...user, userId: targetUserId };
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const now = new Date();
@@ -284,9 +350,17 @@ export class OperationsService {
     const canViewActivities = permissions.has("activity:view");
     const safeQuery: OperationsCompaniesQueryDto = {
       ...query,
-      attentionState: canViewTasks && canViewMeetings && canViewOpportunities ? query.attentionState : undefined,
-      hasNoNextAction: canViewTasks && canViewMeetings && canViewOpportunities ? query.hasNoNextAction : undefined,
-      hasActiveOpportunity: canViewOpportunities ? query.hasActiveOpportunity : undefined,
+      attentionState:
+        canViewTasks && canViewMeetings && canViewOpportunities
+          ? query.attentionState
+          : undefined,
+      hasNoNextAction:
+        canViewTasks && canViewMeetings && canViewOpportunities
+          ? query.hasNoNextAction
+          : undefined,
+      hasActiveOpportunity: canViewOpportunities
+        ? query.hasActiveOpportunity
+        : undefined,
     };
 
     return this.prisma.withTenantTransaction(tenant, async (tx) => {
@@ -301,7 +375,7 @@ export class OperationsService {
       const companyWhere = await this.buildCompanyWhere(
         tx,
         safeQuery,
-        user,
+        scopeUser,
         tenant.organizationId,
         todayStart,
         tomorrowStart,
@@ -342,66 +416,79 @@ export class OperationsService {
         conversationThreads,
         unreadCounts,
       ] = await Promise.all([
-        canViewOpportunities ? tx.opportunity.groupBy({
-          by: ["companyId"],
-          where: {
-            AND: [
-              activeOpportunityStateWhere(),
-              {
+        canViewOpportunities
+          ? tx.opportunity.groupBy({
+              by: ["companyId"],
+              where: {
+                AND: [
+                  activeOpportunityStateWhere(),
+                  {
+                    organizationId: tenant.organizationId,
+                    companyId: { in: companyIds },
+                  },
+                ],
+              },
+              _count: { id: true },
+            })
+          : Promise.resolve([]),
+        canViewTasks
+          ? tx.task.findMany({
+              where: {
                 organizationId: tenant.organizationId,
                 companyId: { in: companyIds },
+                assignedToId: scopeUser.userId,
+                status: { in: OPEN_TASK_STATUSES },
               },
-            ],
-          },
-          _count: { id: true },
-        }) : Promise.resolve([]),
-        canViewTasks ? tx.task.findMany({
-          where: {
-            organizationId: tenant.organizationId,
-            companyId: { in: companyIds },
-            assignedToId: user.userId,
-            status: { in: OPEN_TASK_STATUSES },
-          },
-          select: {
-            id: true,
-            companyId: true,
-            title: true,
-            dueAt: true,
-            priority: true,
-            opportunityId: true,
-          },
-          orderBy: [{ dueAt: "asc" }, { updatedAt: "desc" }],
-        }) : Promise.resolve([]),
-        canViewMeetings ? tx.meeting.findMany({
-          where: {
-            organizationId: tenant.organizationId,
-            companyId: { in: companyIds },
-            status: MeetingStatus.SCHEDULED,
-            startAt: { gte: now },
-            OR: [
-              { organizerId: user.userId },
-              { assignees: { some: { userId: user.userId } } },
-            ],
-          },
-          select: {
-            id: true,
-            companyId: true,
-            title: true,
-            startAt: true,
-            mode: true,
-          },
-          orderBy: { startAt: "asc" },
-        }) : Promise.resolve([]),
-        canViewActivities ? tx.activity.findMany({
-          where: {
-            companyId: { in: companyIds },
-            company: { organizationId: tenant.organizationId },
-            type: { not: "STAGE_CHANGE" },
-          },
-          select: { id: true, companyId: true, type: true, occurredAt: true },
-          orderBy: { occurredAt: "desc" },
-          distinct: ["companyId"],
-        }) : Promise.resolve([]),
+              select: {
+                id: true,
+                companyId: true,
+                title: true,
+                dueAt: true,
+                priority: true,
+                opportunityId: true,
+              },
+              orderBy: [{ dueAt: "asc" }, { updatedAt: "desc" }],
+            })
+          : Promise.resolve([]),
+        canViewMeetings
+          ? tx.meeting.findMany({
+              where: {
+                organizationId: tenant.organizationId,
+                companyId: { in: companyIds },
+                status: MeetingStatus.SCHEDULED,
+                startAt: { gte: now },
+                OR: [
+                  { organizerId: scopeUser.userId },
+                  { assignees: { some: { userId: scopeUser.userId } } },
+                ],
+              },
+              select: {
+                id: true,
+                companyId: true,
+                title: true,
+                startAt: true,
+                mode: true,
+              },
+              orderBy: { startAt: "asc" },
+            })
+          : Promise.resolve([]),
+        canViewActivities
+          ? tx.activity.findMany({
+              where: {
+                companyId: { in: companyIds },
+                company: { organizationId: tenant.organizationId },
+                type: { not: "STAGE_CHANGE" },
+              },
+              select: {
+                id: true,
+                companyId: true,
+                type: true,
+                occurredAt: true,
+              },
+              orderBy: { occurredAt: "desc" },
+              distinct: ["companyId"],
+            })
+          : Promise.resolve([]),
         tx.conversationThread.findMany({
           where: {
             organizationId: tenant.organizationId,
@@ -433,17 +520,20 @@ export class OperationsService {
         this.getUnreadOperationalCompanyCounts(
           tx,
           tenant.organizationId,
-          user.userId,
+          scopeUser.userId,
           companyIds,
           canViewTasks,
           canViewActivities,
-          user.role === "ADMIN" || permissions.has("activity:view-organization"),
+          user.role === "ADMIN" ||
+            permissions.has("activity:view-organization"),
           user.role === "ADMIN" || permissions.has("task:view-organization"),
         ),
       ]);
 
       const opportunityCountMap = new Map<string, number>(
-        opportunityCounts.map((item) => [item.companyId, item._count.id] as const),
+        opportunityCounts.map(
+          (item) => [item.companyId, item._count.id] as const,
+        ),
       );
       const taskMap = this.groupByCompany(tasks);
       const meetingMap = this.groupByCompany(meetings);
@@ -706,6 +796,28 @@ export class OperationsService {
     return grouped;
   }
 
+  private async resolveTargetUserId(
+    requestedUserId: string | undefined,
+    user: CurrentUserPayload,
+    organizationId: string,
+  ) {
+    const targetUserId = requestedUserId ?? user.userId;
+    if (targetUserId === user.userId) return targetUserId;
+    if (user.role !== "ADMIN") {
+      throw new ForbiddenException(
+        "فقط مدیر سیستم می‌تواند عملیات کاربران دیگر را مشاهده کند",
+      );
+    }
+    const target = await this.prisma.user.findFirst({
+      where: { id: targetUserId, organizationId, isActive: true },
+      select: { id: true },
+    });
+    if (!target) {
+      throw new NotFoundException("کاربر موردنظر در سازمان فعلی پیدا نشد");
+    }
+    return target.id;
+  }
+
   private paginated<T>(data: T[], total: number, page: number, limit: number) {
     const totalPages = Math.ceil(total / limit);
     return {
@@ -762,12 +874,14 @@ export class OperationsService {
   ) {
     if (!companyIds.length) return new Map<string, number>();
     const taskScope = canViewTasks
-      ? (canViewOrganizationTasks
+      ? canViewOrganizationTasks
         ? Prisma.sql`TRUE`
-        : Prisma.sql`(task."assignedToId" = ${userId} OR task."createdById" = ${userId} OR task."reviewerId" = ${userId})`)
+        : Prisma.sql`(task."assignedToId" = ${userId} OR task."createdById" = ${userId} OR task."reviewerId" = ${userId})`
       : Prisma.sql`FALSE`;
     const activityScope = canViewActivities
-      ? (canViewOrganizationActivities ? Prisma.sql`TRUE` : Prisma.sql`activity."userId" = ${userId}`)
+      ? canViewOrganizationActivities
+        ? Prisma.sql`TRUE`
+        : Prisma.sql`activity."userId" = ${userId}`
       : Prisma.sql`FALSE`;
     const rows = await tx.$queryRaw<UnreadCompanyRow[]>(Prisma.sql`
       SELECT mapped."companyId", COUNT(message.id)::int AS "unreadCount"

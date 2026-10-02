@@ -55696,6 +55696,15 @@
         "operationId": "operationsCompaniesGet",
         "parameters": [
           {
+            "description": "Admin-only target user",
+            "in": "query",
+            "name": "userId",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "in": "query",
             "name": "priority",
             "required": false,
@@ -56133,6 +56142,15 @@
         "description": "Tenant-scoped operations derive Organization from trusted TenantContext; clients cannot override it.",
         "operationId": "operationsWorkspaceGet",
         "parameters": [
+          {
+            "description": "Admin-only target user",
+            "in": "query",
+            "name": "userId",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
           {
             "in": "query",
             "name": "recentLimit",

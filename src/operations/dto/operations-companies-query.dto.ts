@@ -1,6 +1,12 @@
 import { Priority } from "@prisma/client";
 import { ApiPropertyOptional } from "@nestjs/swagger";
-import { IsBooleanString, IsEnum, IsOptional, IsString } from "class-validator";
+import {
+  IsBooleanString,
+  IsEnum,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from "class-validator";
 import { OwnershipScope } from "../../common/dto/ownership-scope.dto";
 import { PaginationDto } from "../../common/dto/pagination.dto";
 
@@ -13,6 +19,11 @@ export enum OperationsAttentionState {
 }
 
 export class OperationsCompaniesQueryDto extends PaginationDto {
+  @ApiPropertyOptional({ description: "Admin-only target user" })
+  @IsOptional()
+  @IsUUID()
+  userId?: string;
+
   @IsOptional()
   @IsString()
   search?: string;

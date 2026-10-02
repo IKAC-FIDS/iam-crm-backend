@@ -30,10 +30,16 @@ class OperationsCompaniesQueryDto extends pagination_dto_1.PaginationDto {
         this.ownershipScope = ownership_scope_dto_1.OwnershipScope.MINE;
     }
     static _OPENAPI_METADATA_FACTORY() {
-        return { search: { required: false, type: () => String }, priority: { required: false, type: () => Object }, attentionState: { required: false, enum: require("./operations-companies-query.dto").OperationsAttentionState }, hasUnreadMessages: { required: false, type: () => String }, hasActiveOpportunity: { required: false, type: () => String }, hasNoNextAction: { required: false, type: () => String }, ownershipScope: { required: false, default: ownership_scope_dto_1.OwnershipScope.MINE, enum: require("../../common/dto/ownership-scope.dto").OwnershipScope } };
+        return { userId: { required: false, type: () => String }, search: { required: false, type: () => String }, priority: { required: false, type: () => Object }, attentionState: { required: false, enum: require("./operations-companies-query.dto").OperationsAttentionState }, hasUnreadMessages: { required: false, type: () => String }, hasActiveOpportunity: { required: false, type: () => String }, hasNoNextAction: { required: false, type: () => String }, ownershipScope: { required: false, default: ownership_scope_dto_1.OwnershipScope.MINE, enum: require("../../common/dto/ownership-scope.dto").OwnershipScope } };
     }
 }
 exports.OperationsCompaniesQueryDto = OperationsCompaniesQueryDto;
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ description: "Admin-only target user" }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsUUID)(),
+    __metadata("design:type", String)
+], OperationsCompaniesQueryDto.prototype, "userId", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),

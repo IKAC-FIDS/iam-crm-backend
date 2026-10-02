@@ -1,3 +1,4 @@
+import { ForbiddenException } from "@nestjs/common";
 import { Priority, UserRole } from "@prisma/client";
 import {
   PERMISSIONS_KEY,
@@ -69,6 +70,11 @@ function transaction(overrides: Record<string, unknown> = {}) {
 function serviceFor(tx: ReturnType<typeof transaction>) {
   const prisma = {
     withTenantTransaction: jest.fn((_tenant, callback) => callback(tx)),
+    user: {
+      findFirst: jest.fn().mockResolvedValue({
+        id: "00000000-0000-4000-8000-000000000099",
+      }),
+    },
   };
   return { service: new OperationsService(prisma as any), prisma };
 }
@@ -294,6 +300,39 @@ describe("Operations workspace", () => {
     expect(result.data).toHaveLength(1);
     expect(tx.meeting.findMany).not.toHaveBeenCalled();
     expect(tx.activity.findMany).not.toHaveBeenCalled();
+  });
+
+  it("lets an admin inspect another active user without leaving the tenant", async () => {
+    const admin = tenantUser({
+      ...user,
+      userId: "00000000-0000-4000-8000-000000000003",
+      role: UserRole.ADMIN,
+    } as any);
+    (admin as any).tenantContext.permissions = (user as any).tenantContext.permissions;
+    const targetUserId = "00000000-0000-4000-8000-000000000099";
+    const tx = transaction();
+    const { service, prisma } = serviceFor(tx);
+
+    await service.getCompanies({ userId: targetUserId } as any, admin);
+
+    expect(prisma.user.findFirst).toHaveBeenCalledWith({
+      where: { id: targetUserId, organizationId, isActive: true },
+      select: { id: true },
+    });
+    expect(tx.company.findMany.mock.calls[0][0].where.AND).toContainEqual({
+      ownerId: targetUserId,
+    });
+  });
+
+  it("rejects another-user operations access for non-admin users", async () => {
+    const tx = transaction();
+    const { service } = serviceFor(tx);
+    await expect(
+      service.getCompanies(
+        { userId: "00000000-0000-4000-8000-000000000099" } as any,
+        user,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it("builds an explicit active-opportunity filter for no-next-action queries", async () => {
