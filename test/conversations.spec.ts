@@ -5,6 +5,8 @@ import { validate } from 'class-validator';
 import { ConversationAccessService } from '../src/conversations/conversation-access.service';
 import { CreateConversationMessageDto } from '../src/conversations/dto/conversation.dto';
 import { NotificationRulesService } from '../src/notification-core/notification-rules.service';
+import { ConversationsService } from '../src/conversations/conversations.service';
+import { tenantUser } from './helpers/tenant-user';
 
 describe('Conversation architecture', () => {
   const companies = { assertCompanyReadable: jest.fn() };
@@ -70,5 +72,54 @@ describe('Conversation architecture', () => {
         expect.objectContaining({ property: 'mentionedUserIds' }),
       ]),
     );
+  });
+
+  it('loads the newest message page and renders that page chronologically', async () => {
+    const messages = [
+      { id: 'newest', createdAt: new Date('2026-10-02T10:00:00Z'), body: 'new', deletedAt: null, author: {}, parentMessage: null },
+      { id: 'older', createdAt: new Date('2026-10-02T09:00:00Z'), body: 'old', deletedAt: null, author: {}, parentMessage: null },
+    ];
+    const tx = {
+      conversationThread: { findUnique: jest.fn().mockResolvedValue({ id: 'thread-1', status: 'OPEN', createdById: 'user-1', createdAt: new Date(), updatedAt: new Date(), participants: [] }) },
+      conversationMessage: {
+        findMany: jest.fn().mockResolvedValue(messages),
+        count: jest.fn().mockResolvedValueOnce(150).mockResolvedValueOnce(0),
+      },
+    };
+    const prisma = { withTenantTransaction: jest.fn((_tenant, callback) => callback(tx)) };
+    const access = { assertReadable: jest.fn().mockResolvedValue({}) };
+    const conversations = new ConversationsService(prisma as never, access as never, {} as never, {} as never);
+    const scopedUser = tenantUser({ userId: 'user-1', email: 'u@example.com', role: 'REP' as never, organizationId: 'org-1' } as never);
+    const result = await conversations.find(ConversationEntityType.COMPANY, 'company-1', { page: 1, limit: 100 }, scopedUser);
+    expect(tx.conversationMessage.findMany).toHaveBeenCalledWith(expect.objectContaining({ orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 100 }));
+    expect(result.messages.map((item) => item.id)).toEqual(['older', 'newest']);
+    expect(result.meta).toMatchObject({ total: 150, hasNext: true });
+  });
+
+  it('builds a company hub from direct, task and activity threads in batched queries', async () => {
+    const tx = {
+      company: { findFirst: jest.fn().mockResolvedValue({ id: 'company-1', legalName: 'شرکت', brandName: null }) },
+      task: { findMany: jest.fn().mockResolvedValue([{ id: 'task-1', title: 'پیگیری پیشنهاد' }]) },
+      activity: { findMany: jest.fn().mockResolvedValue([{ id: 'activity-1', type: 'CALL', notes: 'تماس تلفنی' }]) },
+      conversationThread: { findMany: jest.fn().mockResolvedValue([
+        { id: 'thread-company', entityType: 'COMPANY', entityId: 'company-1', status: 'OPEN', updatedAt: new Date(), participants: [], messages: [] },
+        { id: 'thread-task', entityType: 'TASK', entityId: 'task-1', status: 'OPEN', updatedAt: new Date(), participants: [], messages: [] },
+        { id: 'thread-activity', entityType: 'ACTIVITY', entityId: 'activity-1', status: 'OPEN', updatedAt: new Date(), participants: [], messages: [] },
+      ]) },
+      $queryRaw: jest.fn().mockResolvedValue([{ threadId: 'thread-task', unreadCount: 2 }]),
+    };
+    const prisma = { withTenantTransaction: jest.fn((_tenant, callback) => callback(tx)) };
+    const access = { assertReadable: jest.fn().mockResolvedValue({}) };
+    const conversations = new ConversationsService(prisma as never, access as never, {} as never, {} as never);
+    const scopedUser = tenantUser({ userId: 'user-1', email: 'u@example.com', role: 'ADMIN' as never, organizationId: 'org-1' } as never);
+    (scopedUser as any).tenantContext.permissions = ['task:view', 'activity:view', 'task:view-organization', 'activity:view-organization'];
+    const result = await conversations.findCompanyHub('company-1', scopedUser);
+    expect(result.threads).toEqual(expect.arrayContaining([
+      expect.objectContaining({ entityType: 'TASK', entityLabel: 'پیگیری پیشنهاد', unreadCount: 2 }),
+      expect.objectContaining({ entityType: 'ACTIVITY', entityLabel: 'تماس تلفنی' }),
+    ]));
+    expect(result.counts).toMatchObject({ all: 3, company: 1, tasks: 1, activities: 1, unread: 2 });
+    expect(tx.conversationThread.findMany).toHaveBeenCalledTimes(1);
+    expect(tx.$queryRaw).toHaveBeenCalledTimes(1);
   });
 });

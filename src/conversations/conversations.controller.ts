@@ -16,6 +16,11 @@ export class ConversationsController {
     return this.conversations.findMentionOptions(query, user);
   }
 
+  @Get('company-hub/:companyId')
+  companyHub(@Param('companyId') companyId: string, @CurrentUser() user: CurrentUserPayload) {
+    return this.conversations.findCompanyHub(companyId, user);
+  }
+
   @Get(':entityType/:entityId')
   find(@Param('entityType') entityType: ConversationEntityType, @Param('entityId') entityId: string, @Query() query: FindConversationDto, @CurrentUser() user: CurrentUserPayload) {
     return this.conversations.find(entityType, entityId, query, user);

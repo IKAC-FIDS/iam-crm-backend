@@ -1,9 +1,9 @@
-import { Controller, Get, Query, UseGuards } from "@nestjs/common";
+import { Controller, Get, Param, Query, UseGuards } from "@nestjs/common";
 import {
   CurrentUser,
   CurrentUserPayload,
 } from "../common/decorators/current-user.decorator";
-import { Permissions } from "../common/decorators/permissions.decorator";
+import { AnyPermission, Permissions } from "../common/decorators/permissions.decorator";
 import { JwtAuthGuard } from "../common/guards/jwt-auth.guard";
 import { PermissionsGuard } from "../common/guards/permissions.guard";
 import { OperationsCompaniesQueryDto } from "./dto/operations-companies-query.dto";
@@ -16,7 +16,7 @@ export class OperationsController {
   constructor(private readonly service: OperationsService) {}
 
   @Get("workspace")
-  @Permissions("task:view", "meeting:view", "opportunity:view")
+  @AnyPermission("task:view", "meeting:view", "opportunity:view", "company:view")
   getWorkspace(
     @Query() query: OperationsWorkspaceQueryDto,
     @CurrentUser() user: CurrentUserPayload,
@@ -25,17 +25,20 @@ export class OperationsController {
   }
 
   @Get("companies")
-  @Permissions(
-    "company:view",
-    "task:view",
-    "opportunity:view",
-    "activity:view",
-    "meeting:view",
-  )
+  @Permissions("company:view")
   getCompanies(
     @Query() query: OperationsCompaniesQueryDto,
     @CurrentUser() user: CurrentUserPayload,
   ) {
     return this.service.getCompanies(query, user);
+  }
+
+  @Get("companies/:companyId/opportunities")
+  @Permissions("company:view", "opportunity:view")
+  getCompanyOpportunities(
+    @Param("companyId") companyId: string,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.service.getCompanyActiveOpportunities(companyId, user);
   }
 }

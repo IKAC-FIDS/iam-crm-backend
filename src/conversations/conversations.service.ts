@@ -63,11 +63,94 @@ export class ConversationsService {
       const participant = thread.participants[0];
       const where = { threadId: thread.id, organizationId };
       const [messages, total, unreadCount] = await Promise.all([
-        tx.conversationMessage.findMany({ where, include: messageInclude, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }], skip: (page - 1) * limit, take: limit }),
+        tx.conversationMessage.findMany({ where, include: messageInclude, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], skip: (page - 1) * limit, take: limit }),
         tx.conversationMessage.count({ where }),
         tx.conversationMessage.count({ where: { ...where, authorId: { not: user.userId }, deletedAt: null, ...(participant?.lastReadAt ? { createdAt: { gt: participant.lastReadAt } } : {}) } }),
       ]);
-      return { thread: { id: thread.id, status: thread.status, createdById: thread.createdById, createdAt: thread.createdAt, updatedAt: thread.updatedAt }, messages: messages.map(this.presentMessage), unreadCount, meta: this.meta(total, page, limit) };
+      return { thread: { id: thread.id, status: thread.status, createdById: thread.createdById, createdAt: thread.createdAt, updatedAt: thread.updatedAt }, messages: messages.reverse().map(this.presentMessage), unreadCount, meta: this.meta(total, page, limit) };
+    });
+  }
+
+  async findCompanyHub(companyId: string, user: CurrentUserPayload) {
+    await this.access.assertReadable(ConversationEntityType.COMPANY, companyId, user);
+    const organizationId = getCurrentOrganizationId(user);
+    const permissions = new Set(user.tenantContext?.permissions ?? []);
+    const canViewTasks = permissions.has('task:view');
+    const canViewActivities = permissions.has('activity:view');
+    const canViewOrganizationActivities = user.role === 'ADMIN' || permissions.has('activity:view-organization');
+
+    return this.prisma.withTenantTransaction(tenantScope.require(user), async (tx) => {
+      const [company, tasks, activities] = await Promise.all([
+        tx.company.findFirst({ where: { id: companyId, organizationId, archivedAt: null }, select: { id: true, legalName: true, brandName: true } }),
+        canViewTasks ? tx.task.findMany({
+          where: {
+            organizationId,
+            companyId,
+            ...(user.role === 'ADMIN' || permissions.has('task:view-organization') ? {} : {
+              OR: [{ assignedToId: user.userId }, { createdById: user.userId }, { reviewerId: user.userId }, { company: { ownerId: user.userId } }],
+            }),
+          },
+          select: { id: true, title: true },
+        }) : Promise.resolve([]),
+        canViewActivities ? tx.activity.findMany({
+          where: { companyId, ...(canViewOrganizationActivities ? {} : { userId: user.userId }) },
+          select: { id: true, type: true, notes: true },
+        }) : Promise.resolve([]),
+      ]);
+      if (!company) throw new NotFoundException('Company not found');
+      const taskLabels = new Map<string, string>(tasks.map((item) => [item.id, item.title] as const));
+      const activityLabels = new Map<string, string>(activities.map((item) => [item.id, item.notes?.trim() || item.type] as const));
+      const scopes: Prisma.ConversationThreadWhereInput[] = [
+        { entityType: ConversationEntityType.COMPANY, entityId: companyId },
+        ...(tasks.length ? [{ entityType: ConversationEntityType.TASK, entityId: { in: tasks.map((item) => item.id) } } as Prisma.ConversationThreadWhereInput] : []),
+        ...(activities.length ? [{ entityType: ConversationEntityType.ACTIVITY, entityId: { in: activities.map((item) => item.id) } } as Prisma.ConversationThreadWhereInput] : []),
+      ];
+      const threads = await tx.conversationThread.findMany({
+        where: { organizationId, OR: scopes },
+        select: {
+          id: true, entityType: true, entityId: true, status: true, updatedAt: true,
+          participants: { where: { userId: user.userId }, select: { lastReadAt: true } },
+          messages: { where: { deletedAt: null }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 1, select: { id: true, body: true, type: true, createdAt: true, author: { select: { id: true, fullName: true, avatarObjectKey: true } } } },
+        },
+        orderBy: { updatedAt: 'desc' },
+      });
+      const threadIds = threads.map((item) => item.id);
+      const unreadRows = threadIds.length ? await tx.$queryRaw<Array<{ threadId: string; unreadCount: number }>>(Prisma.sql`
+        SELECT thread.id AS "threadId", COUNT(message.id)::int AS "unreadCount"
+        FROM "conversation_threads" thread
+        INNER JOIN "conversation_participants" participant ON participant."threadId" = thread.id AND participant."userId" = ${user.userId}
+        INNER JOIN "conversation_messages" message ON message."threadId" = thread.id AND message."authorId" <> ${user.userId} AND message."deletedAt" IS NULL
+          AND (participant."lastReadAt" IS NULL OR message."createdAt" > participant."lastReadAt")
+        WHERE thread."organizationId" = ${organizationId} AND thread.id IN (${Prisma.join(threadIds)})
+        GROUP BY thread.id
+      `) : [];
+      const unread = new Map(unreadRows.map((item) => [item.threadId, Number(item.unreadCount)]));
+      const data = threads.map((thread) => ({
+        threadId: thread.id,
+        entityType: thread.entityType,
+        entityId: thread.entityId,
+        entityLabel: thread.entityType === ConversationEntityType.COMPANY
+          ? (company.brandName || company.legalName)
+          : thread.entityType === ConversationEntityType.TASK
+            ? taskLabels.get(thread.entityId)
+            : activityLabels.get(thread.entityId),
+        status: thread.status,
+        updatedAt: thread.updatedAt,
+        unreadCount: unread.get(thread.id) ?? 0,
+        latestMessage: thread.messages[0] ?? null,
+      }));
+      return {
+        company: { id: company.id, name: company.brandName || company.legalName },
+        direct: data.find((item) => item.entityType === ConversationEntityType.COMPANY) ?? null,
+        threads: data,
+        counts: {
+          all: data.length,
+          company: data.filter((item) => item.entityType === ConversationEntityType.COMPANY).length,
+          tasks: data.filter((item) => item.entityType === ConversationEntityType.TASK).length,
+          activities: data.filter((item) => item.entityType === ConversationEntityType.ACTIVITY).length,
+          unread: data.reduce((sum, item) => sum + item.unreadCount, 0),
+        },
+      };
     });
   }
 

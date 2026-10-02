@@ -18,6 +18,13 @@ const user = tenantUser({
   organizationId,
   teamId: "team-1",
 });
+(user as any).tenantContext.permissions = [
+  "company:view",
+  "task:view",
+  "meeting:view",
+  "opportunity:view",
+  "activity:view",
+];
 
 function transaction(overrides: Record<string, unknown> = {}) {
   return {
@@ -170,10 +177,8 @@ describe("Operations workspace", () => {
     const result = await service.getCompanies({} as any, user);
 
     expect(result.data[0].activeOpportunities.count).toBe(2);
-    expect(result.data[0].activeOpportunities.items).toHaveLength(2);
-    expect(result.data[0].activeOpportunities.items[0]).not.toHaveProperty(
-      "estimatedValue",
-    );
+    expect(result.data[0].activeOpportunities.preview).toEqual([]);
+    expect(result.data[0].activeOpportunities.hasMore).toBe(true);
   });
 
   it("uses the canonical non-terminal opportunity predicate", async () => {
@@ -277,15 +282,18 @@ describe("Operations workspace", () => {
       OperationsController.prototype.getCompanies,
     ) as PermissionPolicyMetadata;
     expect(policy.mode).toBe("all");
-    expect(policy.actions).toEqual(
-      expect.arrayContaining([
-        "company:view",
-        "task:view",
-        "opportunity:view",
-        "activity:view",
-        "meeting:view",
-      ]),
-    );
+    expect(policy.actions).toEqual(["company:view"]);
+  });
+
+  it("keeps the companies workspace available with partial permissions", async () => {
+    const partial = tenantUser({ ...user, tenantContext: undefined } as any);
+    (partial as any).tenantContext.permissions = ["company:view", "task:view", "opportunity:view"];
+    const tx = transaction();
+    const { service } = serviceFor(tx);
+    const result = await service.getCompanies({} as any, partial);
+    expect(result.data).toHaveLength(1);
+    expect(tx.meeting.findMany).not.toHaveBeenCalled();
+    expect(tx.activity.findMany).not.toHaveBeenCalled();
   });
 
   it("builds an explicit active-opportunity filter for no-next-action queries", async () => {
