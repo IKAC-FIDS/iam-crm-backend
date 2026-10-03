@@ -266,6 +266,24 @@ let AccountWorkspaceService = class AccountWorkspaceService {
                                 entityId: true,
                                 status: true,
                                 updatedAt: true,
+                                createdBy: {
+                                    select: {
+                                        id: true,
+                                        fullName: true,
+                                        avatarObjectKey: true,
+                                    },
+                                },
+                                participants: {
+                                    select: {
+                                        user: {
+                                            select: {
+                                                id: true,
+                                                fullName: true,
+                                                avatarObjectKey: true,
+                                            },
+                                        },
+                                    },
+                                },
                                 messages: {
                                     where: { deletedAt: null },
                                     select: {
@@ -290,7 +308,70 @@ let AccountWorkspaceService = class AccountWorkspaceService {
                     orderBy: { thread: { updatedAt: "desc" } },
                 }),
             ]);
+            const companyThreadIds = participants
+                .filter((item) => item.thread.entityType === client_1.ConversationEntityType.COMPANY)
+                .map((item) => item.thread.entityId);
+            const taskThreadIds = participants
+                .filter((item) => item.thread.entityType === client_1.ConversationEntityType.TASK)
+                .map((item) => item.thread.entityId);
+            const activityThreadIds = participants
+                .filter((item) => item.thread.entityType === client_1.ConversationEntityType.ACTIVITY)
+                .map((item) => item.thread.entityId);
+            const [conversationCompanies, conversationTasks, conversationActivities] = await Promise.all([
+                companyThreadIds.length
+                    ? tx.company.findMany({
+                        where: {
+                            organizationId: tenant.organizationId,
+                            id: { in: companyThreadIds },
+                        },
+                        select: { id: true, legalName: true, brandName: true },
+                    })
+                    : Promise.resolve([]),
+                taskThreadIds.length
+                    ? tx.task.findMany({
+                        where: {
+                            organizationId: tenant.organizationId,
+                            id: { in: taskThreadIds },
+                        },
+                        select: {
+                            id: true,
+                            title: true,
+                            company: {
+                                select: { id: true, legalName: true, brandName: true },
+                            },
+                            opportunity: { select: { id: true, title: true } },
+                        },
+                    })
+                    : Promise.resolve([]),
+                activityThreadIds.length
+                    ? tx.activity.findMany({
+                        where: { id: { in: activityThreadIds } },
+                        select: {
+                            id: true,
+                            company: {
+                                select: { id: true, legalName: true, brandName: true },
+                            },
+                            opportunity: { select: { id: true, title: true } },
+                            task: { select: { id: true, title: true } },
+                        },
+                    })
+                    : Promise.resolve([]),
+            ]);
+            const companyContext = new Map();
+            conversationCompanies.forEach((item) => companyContext.set(item.id, item));
+            const taskContext = new Map();
+            conversationTasks.forEach((item) => taskContext.set(item.id, item));
+            const activityContext = new Map();
+            conversationActivities.forEach((item) => activityContext.set(item.id, item));
             const conversations = await Promise.all(participants.map(async (participant) => {
+                const directCompany = companyContext.get(participant.thread.entityId);
+                const task = taskContext.get(participant.thread.entityId);
+                const activity = activityContext.get(participant.thread.entityId);
+                const company = directCompany ?? task?.company ?? activity?.company;
+                const opportunity = task?.opportunity ?? activity?.opportunity;
+                const relatedTask = task
+                    ? { id: task.id, title: task.title }
+                    : activity?.task;
                 const unreadCount = await tx.conversationMessage.count({
                     where: {
                         threadId: participant.thread.id,
@@ -310,6 +391,21 @@ let AccountWorkspaceService = class AccountWorkspaceService {
                     updatedAt: participant.thread.updatedAt,
                     unreadCount,
                     actionUrl: this.conversationUrl(participant.thread.entityType, participant.thread.entityId),
+                    createdBy: participant.thread.createdBy,
+                    relatedUsers: participant.thread.participants
+                        .map((item) => item.user)
+                        .filter((item) => item.id !== participant.thread.createdBy.id &&
+                        item.id !== targetUserId),
+                    context: {
+                        company: company
+                            ? {
+                                id: company.id,
+                                name: company.brandName || company.legalName,
+                            }
+                            : null,
+                        opportunity: opportunity ?? null,
+                        task: relatedTask ?? null,
+                    },
                     latestMessage: participant.thread.messages[0] ?? null,
                 };
             }));
