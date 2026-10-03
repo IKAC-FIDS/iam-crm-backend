@@ -56329,7 +56329,7 @@
             "required": false,
             "schema": {
               "default": 5,
-              "maximum": 20,
+              "maximum": 100,
               "minimum": 1,
               "type": "number"
             }

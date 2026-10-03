@@ -8,11 +8,11 @@ export class OperationsWorkspaceQueryDto {
   @IsUUID()
   userId?: string;
 
-  @ApiPropertyOptional({ minimum: 1, maximum: 20, default: 5 })
+  @ApiPropertyOptional({ minimum: 1, maximum: 100, default: 5 })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(20)
+  @Max(100)
   recentLimit?: number = 5;
 }

@@ -19,7 +19,7 @@ class OperationsWorkspaceQueryDto {
         this.recentLimit = 5;
     }
     static _OPENAPI_METADATA_FACTORY() {
-        return { userId: { required: false, type: () => String }, recentLimit: { required: false, type: () => Number, default: 5, minimum: 1, maximum: 20 } };
+        return { userId: { required: false, type: () => String }, recentLimit: { required: false, type: () => Number, default: 5, minimum: 1, maximum: 100 } };
     }
 }
 exports.OperationsWorkspaceQueryDto = OperationsWorkspaceQueryDto;
@@ -30,12 +30,12 @@ __decorate([
     __metadata("design:type", String)
 ], OperationsWorkspaceQueryDto.prototype, "userId", void 0);
 __decorate([
-    (0, swagger_1.ApiPropertyOptional)({ minimum: 1, maximum: 20, default: 5 }),
+    (0, swagger_1.ApiPropertyOptional)({ minimum: 1, maximum: 100, default: 5 }),
     (0, class_validator_1.IsOptional)(),
     (0, class_transformer_1.Type)(() => Number),
     (0, class_validator_1.IsInt)(),
     (0, class_validator_1.Min)(1),
-    (0, class_validator_1.Max)(20),
+    (0, class_validator_1.Max)(100),
     __metadata("design:type", Number)
 ], OperationsWorkspaceQueryDto.prototype, "recentLimit", void 0);
 //# sourceMappingURL=operations-workspace-query.dto.js.map
