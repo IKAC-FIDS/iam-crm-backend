@@ -50,6 +50,24 @@ let AttachmentsController = class AttachmentsController {
         response.setHeader('Content-Disposition', `attachment; filename="${safeFileName}"; filename*=UTF-8''${encodedFileName}`);
         return new common_1.StreamableFile(stream);
     }
+    async preview(id, user, response) {
+        const { attachment, stream } = await this.service.getDownloadStream(id, user);
+        const mimeType = attachment.mimeType || 'application/octet-stream';
+        if (mimeType !== 'application/pdf' && !mimeType.startsWith('image/')) {
+            throw new common_1.BadRequestException('این نوع فایل قابلیت پیش‌نمایش در مرورگر را ندارد');
+        }
+        const previewName = attachment.originalFileName || attachment.name || 'preview';
+        const safeFileName = this.safeContentDispositionFileName(previewName);
+        const encodedFileName = encodeURIComponent(previewName)
+            .replace(/['()]/g, (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`)
+            .replace(/\*/g, '%2A');
+        response.setHeader('Content-Type', mimeType);
+        if (attachment.sizeBytes !== null)
+            response.setHeader('Content-Length', String(attachment.sizeBytes));
+        response.setHeader('Content-Disposition', `inline; filename="${safeFileName}"; filename*=UTF-8''${encodedFileName}`);
+        response.setHeader('X-Content-Type-Options', 'nosniff');
+        return new common_1.StreamableFile(stream);
+    }
     remove(id, user) {
         return this.service.remove(id, user);
     }
@@ -110,6 +128,17 @@ __decorate([
     __metadata("design:paramtypes", [String, Object, Object]),
     __metadata("design:returntype", Promise)
 ], AttachmentsController.prototype, "download", null);
+__decorate([
+    (0, common_1.Get)(':id/preview'),
+    (0, permissions_decorator_1.Permissions)('attachment:view'),
+    openapi.ApiResponse({ status: 200 }),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __param(2, (0, common_1.Res)({ passthrough: true })),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object, Object]),
+    __metadata("design:returntype", Promise)
+], AttachmentsController.prototype, "preview", null);
 __decorate([
     (0, common_1.Delete)(':id'),
     (0, permissions_decorator_1.Permissions)('attachment:manage'),

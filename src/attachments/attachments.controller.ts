@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -87,6 +88,35 @@ export class AttachmentsController {
       `attachment; filename="${safeFileName}"; filename*=UTF-8''${encodedFileName}`,
     );
 
+    return new StreamableFile(stream);
+  }
+
+  @Get(':id/preview')
+  @Permissions('attachment:view')
+  async preview(
+    @Param('id') id: string,
+    @CurrentUser() user: CurrentUserPayload,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const { attachment, stream } = await this.service.getDownloadStream(id, user);
+    const mimeType = attachment.mimeType || 'application/octet-stream';
+    if (mimeType !== 'application/pdf' && !mimeType.startsWith('image/')) {
+      throw new BadRequestException('این نوع فایل قابلیت پیش‌نمایش در مرورگر را ندارد');
+    }
+    const previewName = attachment.originalFileName || attachment.name || 'preview';
+    const safeFileName = this.safeContentDispositionFileName(previewName);
+    const encodedFileName = encodeURIComponent(previewName)
+      .replace(/['()]/g, (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`)
+      .replace(/\*/g, '%2A');
+
+    response.setHeader('Content-Type', mimeType);
+    if (attachment.sizeBytes !== null)
+      response.setHeader('Content-Length', String(attachment.sizeBytes));
+    response.setHeader(
+      'Content-Disposition',
+      `inline; filename="${safeFileName}"; filename*=UTF-8''${encodedFileName}`,
+    );
+    response.setHeader('X-Content-Type-Options', 'nosniff');
     return new StreamableFile(stream);
   }
 

@@ -356,7 +356,14 @@ export class AttachmentsService {
 
     const allowedMimeTypes = this.getAllowedMimeTypes();
 
-    if (!allowedMimeTypes.includes(file.mimetype)) {
+    const extension = extname(file.originalname || '').toLowerCase();
+    const archiveWithGenericMime =
+      ['.zip', '.rar'].includes(extension) &&
+      ['application/octet-stream', 'application/x-compressed'].includes(
+        file.mimetype,
+      );
+
+    if (!allowedMimeTypes.includes(file.mimetype) && !archiveWithGenericMime) {
       throw new BadRequestException('نوع فایل مجاز نیست');
     }
 
@@ -388,7 +395,7 @@ export class AttachmentsService {
   }
 
   private getAllowedMimeTypes() {
-    return this.config
+    const configured = this.config
       .get<string>(
         'ALLOWED_ATTACHMENT_MIME_TYPES',
         [
@@ -402,6 +409,10 @@ export class AttachmentsService {
           'application/vnd.ms-powerpoint',
           'application/vnd.openxmlformats-officedocument.presentationml.presentation',
           'application/zip',
+          'application/x-zip-compressed',
+          'application/vnd.rar',
+          'application/x-rar-compressed',
+          'application/x-rar',
           'application/json',
           'application/xml',
           'text/xml',
@@ -414,6 +425,17 @@ export class AttachmentsService {
       .split(',')
       .map((item) => item.trim())
       .filter(Boolean);
+
+    return Array.from(
+      new Set([
+        ...configured,
+        'application/zip',
+        'application/x-zip-compressed',
+        'application/vnd.rar',
+        'application/x-rar-compressed',
+        'application/x-rar',
+      ]),
+    );
   }
 
   private sanitizeFileName(fileName: string) {

@@ -250,7 +250,10 @@ let AttachmentsService = AttachmentsService_1 = class AttachmentsService {
             throw new common_1.BadRequestException(`حجم فایل بیشتر از حد مجاز است. حداکثر مجاز: ${maxSize} بایت`);
         }
         const allowedMimeTypes = this.getAllowedMimeTypes();
-        if (!allowedMimeTypes.includes(file.mimetype)) {
+        const extension = (0, node_path_1.extname)(file.originalname || '').toLowerCase();
+        const archiveWithGenericMime = ['.zip', '.rar'].includes(extension) &&
+            ['application/octet-stream', 'application/x-compressed'].includes(file.mimetype);
+        if (!allowedMimeTypes.includes(file.mimetype) && !archiveWithGenericMime) {
             throw new common_1.BadRequestException('نوع فایل مجاز نیست');
         }
         if (!file.buffer?.length) {
@@ -276,7 +279,7 @@ let AttachmentsService = AttachmentsService_1 = class AttachmentsService {
         });
     }
     getAllowedMimeTypes() {
-        return this.config
+        const configured = this.config
             .get('ALLOWED_ATTACHMENT_MIME_TYPES', [
             'application/pdf',
             'image/png',
@@ -288,6 +291,10 @@ let AttachmentsService = AttachmentsService_1 = class AttachmentsService {
             'application/vnd.ms-powerpoint',
             'application/vnd.openxmlformats-officedocument.presentationml.presentation',
             'application/zip',
+            'application/x-zip-compressed',
+            'application/vnd.rar',
+            'application/x-rar-compressed',
+            'application/x-rar',
             'application/json',
             'application/xml',
             'text/xml',
@@ -299,6 +306,14 @@ let AttachmentsService = AttachmentsService_1 = class AttachmentsService {
             .split(',')
             .map((item) => item.trim())
             .filter(Boolean);
+        return Array.from(new Set([
+            ...configured,
+            'application/zip',
+            'application/x-zip-compressed',
+            'application/vnd.rar',
+            'application/x-rar-compressed',
+            'application/x-rar',
+        ]));
     }
     sanitizeFileName(fileName) {
         const unsafeCharacters = new Set([
