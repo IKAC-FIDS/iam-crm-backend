@@ -202,6 +202,24 @@ export class OperationsService {
                 entityId: true,
                 status: true,
                 updatedAt: true,
+                createdBy: {
+                  select: {
+                    id: true,
+                    fullName: true,
+                    avatarObjectKey: true,
+                  },
+                },
+                participants: {
+                  select: {
+                    user: {
+                      select: {
+                        id: true,
+                        fullName: true,
+                        avatarObjectKey: true,
+                      },
+                    },
+                  },
+                },
                 messages: {
                   where: { deletedAt: null },
                   orderBy: { createdAt: "desc" },
@@ -286,6 +304,83 @@ export class OperationsService {
         scopeUser.userId,
         recentParticipants.map((participant) => participant.threadId),
       );
+      const companyThreadIds = recentParticipants
+        .filter(
+          (item) =>
+            item.thread.entityType === ConversationEntityType.COMPANY,
+        )
+        .map((item) => item.thread.entityId);
+      const taskThreadIds = recentParticipants
+        .filter(
+          (item) => item.thread.entityType === ConversationEntityType.TASK,
+        )
+        .map((item) => item.thread.entityId);
+      const activityThreadIds = recentParticipants
+        .filter(
+          (item) =>
+            item.thread.entityType === ConversationEntityType.ACTIVITY,
+        )
+        .map((item) => item.thread.entityId);
+      const [conversationCompanies, conversationTasks, conversationActivities] =
+        await Promise.all([
+          companyThreadIds.length
+            ? tx.company.findMany({
+                where: {
+                  organizationId: tenant.organizationId,
+                  id: { in: companyThreadIds },
+                },
+                select: { id: true, legalName: true, brandName: true },
+              })
+            : Promise.resolve([]),
+          taskThreadIds.length
+            ? tx.task.findMany({
+                where: {
+                  organizationId: tenant.organizationId,
+                  id: { in: taskThreadIds },
+                },
+                select: {
+                  id: true,
+                  title: true,
+                  company: {
+                    select: { id: true, legalName: true, brandName: true },
+                  },
+                  opportunity: { select: { id: true, title: true } },
+                },
+              })
+            : Promise.resolve([]),
+          activityThreadIds.length
+            ? tx.activity.findMany({
+                where: { id: { in: activityThreadIds } },
+                select: {
+                  id: true,
+                  company: {
+                    select: { id: true, legalName: true, brandName: true },
+                  },
+                  opportunity: { select: { id: true, title: true } },
+                  task: { select: { id: true, title: true } },
+                },
+              })
+            : Promise.resolve([]),
+        ]);
+      const companyContext = new Map<
+        string,
+        (typeof conversationCompanies)[number]
+      >();
+      conversationCompanies.forEach((item) =>
+        companyContext.set(item.id, item),
+      );
+      const taskContext = new Map<
+        string,
+        (typeof conversationTasks)[number]
+      >();
+      conversationTasks.forEach((item) => taskContext.set(item.id, item));
+      const activityContext = new Map<
+        string,
+        (typeof conversationActivities)[number]
+      >();
+      conversationActivities.forEach((item) =>
+        activityContext.set(item.id, item),
+      );
 
       return {
         subject: {
@@ -316,15 +411,43 @@ export class OperationsService {
             upcoming: personalTodosUpcoming.length,
           },
         },
-        recentConversations: recentParticipants.map((participant) => ({
-          threadId: participant.threadId,
-          entityType: participant.thread.entityType,
-          entityId: participant.thread.entityId,
-          status: participant.thread.status,
-          updatedAt: participant.thread.updatedAt,
-          unreadCount: threadUnread.get(participant.threadId) ?? 0,
-          latestMessage: participant.thread.messages[0] ?? null,
-        })),
+        recentConversations: recentParticipants.map((participant) => {
+          const directCompany = companyContext.get(participant.thread.entityId);
+          const task = taskContext.get(participant.thread.entityId);
+          const activity = activityContext.get(participant.thread.entityId);
+          const company = directCompany ?? task?.company ?? activity?.company;
+          const opportunity = task?.opportunity ?? activity?.opportunity;
+          const relatedTask = task
+            ? { id: task.id, title: task.title }
+            : activity?.task;
+          return {
+            threadId: participant.threadId,
+            entityType: participant.thread.entityType,
+            entityId: participant.thread.entityId,
+            status: participant.thread.status,
+            updatedAt: participant.thread.updatedAt,
+            unreadCount: threadUnread.get(participant.threadId) ?? 0,
+            createdBy: participant.thread.createdBy,
+            relatedUsers: participant.thread.participants
+              .map((item) => item.user)
+              .filter(
+                (item) =>
+                  item.id !== participant.thread.createdBy.id &&
+                  item.id !== scopeUser.userId,
+              ),
+            context: {
+              company: company
+                ? {
+                    id: company.id,
+                    name: company.brandName || company.legalName,
+                  }
+                : null,
+              opportunity: opportunity ?? null,
+              task: relatedTask ?? null,
+            },
+            latestMessage: participant.thread.messages[0] ?? null,
+          };
+        }),
       };
     });
   }
