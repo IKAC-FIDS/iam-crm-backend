@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { ForbiddenException } from '@nestjs/common';
 import { ConversationEntityType } from '@prisma/client';
 import { validate } from 'class-validator';
 import { ConversationAccessService } from '../src/conversations/conversation-access.service';
@@ -12,8 +13,19 @@ describe('Conversation architecture', () => {
   const companies = { assertCompanyReadable: jest.fn() };
   const tasks = { assertReadable: jest.fn() };
   const activities = { assertReadable: jest.fn() };
-  const service = new ConversationAccessService(companies as never, tasks as never, activities as never);
-  const user = { userId: 'user-1' } as never;
+  const opportunities = { findOne: jest.fn() };
+  const meetings = { findOne: jest.fn() };
+  const service = new ConversationAccessService(
+    companies as never,
+    tasks as never,
+    activities as never,
+    opportunities as never,
+    meetings as never,
+  );
+  const user = {
+    userId: 'user-1',
+    tenantContext: { permissions: ['opportunity:view', 'meeting:view'] },
+  } as never;
 
   beforeEach(() => jest.clearAllMocks());
 
@@ -31,6 +43,63 @@ describe('Conversation architecture', () => {
   it('inherits Activity access and resolves the activity user', async () => {
     activities.assertReadable.mockResolvedValue({ id: 'activity-1', type: 'CALL', outcome: null, notes: null, userId: 'user-4' });
     await expect(service.assertReadable(ConversationEntityType.ACTIVITY, 'activity-1', user)).resolves.toEqual(expect.objectContaining({ responsibleUserIds: ['user-4'] }));
+  });
+
+  it('inherits Opportunity access and resolves its owner', async () => {
+    opportunities.findOne.mockResolvedValue({
+      id: 'opportunity-1',
+      title: 'فرصت فروش',
+      ownerId: 'owner-1',
+    });
+    await expect(
+      service.assertReadable(
+        ConversationEntityType.OPPORTUNITY,
+        'opportunity-1',
+        user,
+      ),
+    ).resolves.toEqual(
+      expect.objectContaining({ responsibleUserIds: ['owner-1'] }),
+    );
+  });
+
+  it('inherits Meeting access and resolves organizer and assignees', async () => {
+    meetings.findOne.mockResolvedValue({
+      id: 'meeting-1',
+      title: 'جلسه فروش',
+      organizerId: 'organizer-1',
+      assignees: [
+        { userId: 'assignee-1' },
+        { userId: 'organizer-1' },
+      ],
+    });
+    await expect(
+      service.assertReadable(ConversationEntityType.MEETING, 'meeting-1', user),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        responsibleUserIds: ['organizer-1', 'assignee-1'],
+      }),
+    );
+  });
+
+  it('does not expose opportunity or meeting conversations without entity view permission', async () => {
+    const restrictedUser = {
+      userId: 'user-1',
+      tenantContext: { permissions: [] },
+    } as never;
+    await expect(
+      service.assertReadable(
+        ConversationEntityType.OPPORTUNITY,
+        'opportunity-1',
+        restrictedUser,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(
+      service.assertReadable(
+        ConversationEntityType.MEETING,
+        'meeting-1',
+        restrictedUser,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it('defines additive uniqueness, indexes and fail-closed RLS policies', () => {

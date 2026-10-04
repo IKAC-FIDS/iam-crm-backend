@@ -484,6 +484,8 @@ enum ConversationEntityType {
   COMPANY
   TASK
   ACTIVITY
+  OPPORTUNITY
+  MEETING
 }
 
 enum ConversationMessageType {
