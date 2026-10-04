@@ -5557,6 +5557,33 @@
         "properties": {},
         "type": "object"
       },
+      "UpdateCompanyEngagementDto": {
+        "properties": {
+          "nextReviewAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "reason": {
+            "maxLength": 500,
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ACTIVE",
+              "NEEDS_ACTION",
+              "NURTURE",
+              "SNOOZED",
+              "DORMANT",
+              "DISQUALIFIED"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "type": "object"
+      },
       "UpdateCompanyLegalDocumentDto": {
         "properties": {
           "description": {
@@ -5574,6 +5601,17 @@
             "type": "object"
           }
         },
+        "type": "object"
+      },
+      "UpdateCompanyPinDto": {
+        "properties": {
+          "isPinned": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "isPinned"
+        ],
         "type": "object"
       },
       "UpdateCompanySocialChannelDto": {
@@ -43201,6 +43239,188 @@
         ]
       }
     },
+    "/api/companies/{id}/engagement": {
+      "patch": {
+        "description": "Tenant-scoped operations derive Organization from trusted TenantContext; clients cannot override it.",
+        "operationId": "companiesEngagementPatch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional caller correlation ID; a generated value is used when omitted.",
+            "in": "header",
+            "name": "x-request-id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCompanyEngagementDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SuccessEnvelope"
+                    },
+                    {
+                      "properties": {
+                        "data": {
+                          "additionalProperties": true,
+                          "description": "Explicit public response payload; never a published Prisma model.",
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "data"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Successful response",
+            "headers": {
+              "x-request-id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Bad request or validation failure",
+            "headers": {
+              "x-request-id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Authentication required or invalid",
+            "headers": {
+              "x-request-id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Permission, Tenant lifecycle, or feature entitlement denied",
+            "headers": {
+              "x-request-id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Resource not found",
+            "headers": {
+              "x-request-id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Conflict",
+            "headers": {
+              "x-request-id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Rate or quota limit exceeded; quota failures use code QUOTA_EXCEEDED",
+            "headers": {
+              "x-request-id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Internal server error",
+            "headers": {
+              "x-request-id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "Companies"
+        ]
+      }
+    },
     "/api/companies/{id}/logo": {
       "delete": {
         "description": "Tenant-scoped operations derive Organization from trusted TenantContext; clients cannot override it.",
@@ -43913,6 +44133,188 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/ChangeOwnerDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SuccessEnvelope"
+                    },
+                    {
+                      "properties": {
+                        "data": {
+                          "additionalProperties": true,
+                          "description": "Explicit public response payload; never a published Prisma model.",
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "data"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Successful response",
+            "headers": {
+              "x-request-id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Bad request or validation failure",
+            "headers": {
+              "x-request-id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Authentication required or invalid",
+            "headers": {
+              "x-request-id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Permission, Tenant lifecycle, or feature entitlement denied",
+            "headers": {
+              "x-request-id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Resource not found",
+            "headers": {
+              "x-request-id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Conflict",
+            "headers": {
+              "x-request-id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Rate or quota limit exceeded; quota failures use code QUOTA_EXCEEDED",
+            "headers": {
+              "x-request-id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Internal server error",
+            "headers": {
+              "x-request-id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "Companies"
+        ]
+      }
+    },
+    "/api/companies/{id}/pin": {
+      "patch": {
+        "description": "Tenant-scoped operations derive Organization from trusted TenantContext; clients cannot override it.",
+        "operationId": "companiesPinPatch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional caller correlation ID; a generated value is used when omitted.",
+            "in": "header",
+            "name": "x-request-id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCompanyPinDto"
               }
             }
           },
@@ -55892,6 +56294,22 @@
           },
           {
             "in": "query",
+            "name": "engagementStatus",
+            "required": false,
+            "schema": {
+              "enum": [
+                "ACTIVE",
+                "NEEDS_ACTION",
+                "NURTURE",
+                "SNOOZED",
+                "DORMANT",
+                "DISQUALIFIED"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
             "name": "ownershipScope",
             "required": false,
             "schema": {
@@ -55908,6 +56326,22 @@
           {
             "in": "query",
             "name": "search",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pinnedOnly",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "includeInactivePortfolio",
             "required": false,
             "schema": {
               "type": "string"

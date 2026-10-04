@@ -1,4 +1,4 @@
-import { Priority } from "@prisma/client";
+import { CompanyEngagementStatus, Priority } from "@prisma/client";
 import { ApiPropertyOptional } from "@nestjs/swagger";
 import {
   IsBooleanString,
@@ -32,6 +32,19 @@ export class OperationsCompaniesQueryDto extends PaginationDto {
   @IsEnum(Priority)
   @ApiPropertyOptional({ enum: Priority })
   priority?: Priority;
+
+  @IsOptional()
+  @IsEnum(CompanyEngagementStatus)
+  @ApiPropertyOptional({ enum: CompanyEngagementStatus })
+  engagementStatus?: CompanyEngagementStatus;
+
+  @IsOptional()
+  @IsBooleanString()
+  pinnedOnly?: string;
+
+  @IsOptional()
+  @IsBooleanString()
+  includeInactivePortfolio?: string;
 
   @IsOptional()
   @IsEnum(OperationsAttentionState)

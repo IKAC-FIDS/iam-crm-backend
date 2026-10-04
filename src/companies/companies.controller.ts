@@ -35,6 +35,10 @@ import { ArchiveCompanyDto } from './dto/archive-company.dto';
 import { FindCompanyOptionsDto } from './dto/find-company-options.dto';
 import { CompanyRegistryLookupDto } from './dto/company-registry-lookup.dto';
 import { PersonCompanyLookupDto } from './dto/person-company-lookup.dto';
+import {
+  UpdateCompanyEngagementDto,
+  UpdateCompanyPinDto,
+} from './dto/company-engagement.dto';
 import { CompanyRegistryLookupService } from './company-registry-lookup.service';
 import { getCurrentOrganizationId } from '../common/tenant/tenant-scope.util';
 
@@ -166,6 +170,26 @@ export class CompaniesController {
     @CurrentUser() user: CurrentUserPayload,
   ) {
     return this.companiesService.update(id, dto, user);
+  }
+
+  @Patch(':id/engagement')
+  @Permissions('company:update')
+  updateEngagement(
+    @Param('id') id: string,
+    @Body() dto: UpdateCompanyEngagementDto,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.companiesService.updateEngagement(id, dto, user);
+  }
+
+  @Patch(':id/pin')
+  @Permissions('company:view')
+  setPinned(
+    @Param('id') id: string,
+    @Body() dto: UpdateCompanyPinDto,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.companiesService.setPinned(id, dto, user);
   }
 
   @Patch(':id/stage')

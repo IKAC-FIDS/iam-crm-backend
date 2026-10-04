@@ -1,4 +1,5 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { CompanyEngagementStatus } from '@prisma/client';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { CompaniesService } from '../src/companies/companies.service';
@@ -16,6 +17,97 @@ const user = tenantUser({
   email: 'user@example.com',
   role: 'ADMIN' as const,
   organizationId,
+});
+
+describe('CompaniesService sales portfolio', () => {
+  function portfolioService() {
+    const company = {
+      ...option,
+      engagementStatus: CompanyEngagementStatus.NEEDS_ACTION,
+      engagementReason: null,
+      nextReviewAt: null,
+    };
+    const prisma = {
+      company: {
+        update: jest.fn().mockImplementation(({ data }) =>
+          Promise.resolve({ ...company, ...data }),
+        ),
+      },
+      companyUserPreference: {
+        upsert: jest.fn().mockResolvedValue({ companyId, isPinned: true }),
+      },
+    };
+    const audit = { record: jest.fn().mockResolvedValue(undefined) };
+    const access = {
+      assertCompanyMutable: jest.fn().mockResolvedValue(company),
+      assertCompanyReadable: jest.fn().mockResolvedValue(company),
+    };
+    return {
+      service: new CompaniesService(
+        prisma as any,
+        audit as any,
+        access as any,
+        quotaMock() as any,
+        {} as any,
+        {} as any,
+      ),
+      prisma,
+      audit,
+    };
+  }
+
+  it('requires a future review for nurture and snoozed states', async () => {
+    const { service } = portfolioService();
+    await expect(
+      service.updateEngagement(
+        companyId,
+        { status: CompanyEngagementStatus.NURTURE },
+        user,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('updates engagement independently and records an audit event', async () => {
+    const { service, prisma, audit } = portfolioService();
+    const nextReviewAt = new Date(Date.now() + 86_400_000);
+    await service.updateEngagement(
+      companyId,
+      {
+        status: CompanyEngagementStatus.SNOOZED,
+        reason: 'بودجه فصل بعد',
+        nextReviewAt,
+      },
+      user,
+    );
+    expect(prisma.company.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: companyId },
+        data: expect.objectContaining({
+          engagementStatus: CompanyEngagementStatus.SNOOZED,
+          nextReviewAt,
+        }),
+      }),
+    );
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'company.engagement_changed' }),
+    );
+  });
+
+  it('stores pinning as a current-user preference', async () => {
+    const { service, prisma } = portfolioService();
+    await service.setPinned(companyId, { isPinned: true }, user);
+    expect(prisma.companyUserPreference.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          organizationId_userId_companyId: {
+            organizationId,
+            userId: user.userId,
+            companyId,
+          },
+        },
+      }),
+    );
+  });
 });
 
 const option = {
@@ -50,6 +142,8 @@ function createService(overrides: Record<string, unknown> = {}) {
       {} as any,
       {} as any,
       quotaMock() as any,
+      {} as any,
+      {} as any,
     ),
     prisma,
   };

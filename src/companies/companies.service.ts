@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import {
   LegacyPipelineStage,
+  CompanyEngagementStatus,
   Priority,
   Prisma,
   QuotaMetric,
@@ -36,6 +37,10 @@ import { FindCompanyOptionsDto } from './dto/find-company-options.dto';
 import { isPhoneLikeSearch, normalizeCompanyPhone } from './company-phone.util';
 import { ProfileMediaService } from '../profile-media/profile-media.service';
 import { CompanyRegistryLookupService } from './company-registry-lookup.service';
+import {
+  UpdateCompanyEngagementDto,
+  UpdateCompanyPinDto,
+} from './dto/company-engagement.dto';
 
 const companyOptionSelect = {
   id: true,
@@ -590,6 +595,82 @@ export class CompaniesService {
     });
 
     return this.withHierarchy(updated);
+  }
+
+  async updateEngagement(
+    id: string,
+    dto: UpdateCompanyEngagementDto,
+    user: CurrentUserPayload,
+  ) {
+    if (user.role === UserRole.BOARDS) {
+      throw new ForbiddenException('شما اجازه ویرایش وضعیت فروش شرکت را ندارید');
+    }
+    const company = await this.companyAccess.assertCompanyMutable(id, user);
+    const requiresReviewAt =
+      dto.status === CompanyEngagementStatus.NURTURE ||
+      dto.status === CompanyEngagementStatus.SNOOZED;
+    if (requiresReviewAt && !dto.nextReviewAt) {
+      throw new BadRequestException(
+        'برای وضعیت پرورش یا تعویق، زمان پیگیری بعدی الزامی است',
+      );
+    }
+    if (requiresReviewAt && dto.nextReviewAt!.getTime() <= Date.now()) {
+      throw new BadRequestException('زمان پیگیری بعدی باید در آینده باشد');
+    }
+    const updated = await this.prisma.company.update({
+      where: { id },
+      data: {
+        engagementStatus: dto.status,
+        engagementReason: dto.reason?.trim() || null,
+        nextReviewAt: requiresReviewAt ? dto.nextReviewAt : null,
+        engagementUpdatedAt: new Date(),
+        engagementUpdatedById: user.userId,
+      },
+    });
+    await this.audit.record({
+      actorId: user.userId,
+      organizationId: getCurrentOrganizationId(user),
+      entityType: 'company',
+      entityId: id,
+      action: 'company.engagement_changed',
+      before: {
+        engagementStatus: company.engagementStatus,
+        engagementReason: company.engagementReason,
+        nextReviewAt: company.nextReviewAt,
+      },
+      after: {
+        engagementStatus: updated.engagementStatus,
+        engagementReason: updated.engagementReason,
+        nextReviewAt: updated.nextReviewAt,
+      },
+    });
+    return updated;
+  }
+
+  async setPinned(
+    id: string,
+    dto: UpdateCompanyPinDto,
+    user: CurrentUserPayload,
+  ) {
+    await this.companyAccess.assertCompanyReadable(id, user);
+    const organizationId = getCurrentOrganizationId(user);
+    return this.prisma.companyUserPreference.upsert({
+      where: {
+        organizationId_userId_companyId: {
+          organizationId,
+          userId: user.userId,
+          companyId: id,
+        },
+      },
+      create: {
+        organizationId,
+        userId: user.userId,
+        companyId: id,
+        isPinned: dto.isPinned,
+      },
+      update: { isPinned: dto.isPinned },
+      select: { companyId: true, isPinned: true },
+    });
   }
 
   async changeOwner(id: string, dto: ChangeOwnerDto, user: CurrentUserPayload) {

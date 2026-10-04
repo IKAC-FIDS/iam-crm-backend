@@ -143,6 +143,15 @@ enum CompanyActivityStatus {
   UNKNOWN
 }
 
+enum CompanyEngagementStatus {
+  ACTIVE
+  NEEDS_ACTION
+  NURTURE
+  SNOOZED
+  DORMANT
+  DISQUALIFIED
+}
+
 enum CompanyLegalDocumentType {
   OFFICIAL_GAZETTE
   LATEST_CHANGES
@@ -525,6 +534,8 @@ model User {
 
   ownedCompanies          Company[]                 @relation("CompanyOwner")
   archivedCompanies       Company[]                 @relation("CompanyArchivedBy")
+  engagementUpdatedCompanies Company[]              @relation("CompanyEngagementUpdatedBy")
+  companyPreferences      CompanyUserPreference[]
   ownedOpportunities      Opportunity[]             @relation("OpportunityOwner")
   archivedOpportunities   Opportunity[]             @relation("OpportunityArchivedBy")
   opportunityStageChanges OpportunityStageHistory[]
@@ -669,6 +680,7 @@ model Organization {
   users                User[]
   teams                Team[]
   companies            Company[]
+  companyUserPreferences CompanyUserPreference[]
   opportunities        Opportunity[]
   tasks                Task[]
   personalTodos        PersonalTodo[]
@@ -1015,6 +1027,12 @@ model Company {
   companyType         String?
   ownership           CompanyOwnership?
   activityStatus      CompanyActivityStatus      @default(UNKNOWN)
+  engagementStatus    CompanyEngagementStatus    @default(NEEDS_ACTION)
+  engagementReason    String?
+  nextReviewAt        DateTime?
+  engagementUpdatedAt DateTime?
+  engagementUpdatedById String?
+  engagementUpdatedBy User? @relation("CompanyEngagementUpdatedBy", fields: [engagementUpdatedById], references: [id], onDelete: SetNull)
   activityGroup       String?
   marketSize          String?
   logoStorageProvider AttachmentStorageProvider?
@@ -1081,6 +1099,7 @@ model Company {
   opportunities           Opportunity[]
   tasks                   Task[]
   personalTodos           PersonalTodo[]
+  userPreferences         CompanyUserPreference[]
   legalDocuments          CompanyLegalDocument[]
   personEmploymentHistory PersonEmploymentHistory[]
   meetings                Meeting[]
@@ -1105,7 +1124,25 @@ model Company {
   @@index([stage, priority])
   @@index([organizationId])
   @@index([organizationId, ownerId])
+  @@index([organizationId, engagementStatus, nextReviewAt])
   @@map("companies")
+}
+
+model CompanyUserPreference {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyId      String
+  company        Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  isPinned       Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([organizationId, userId, companyId])
+  @@index([organizationId, userId, isPinned])
+  @@map("company_user_preferences")
 }
 
 model CompanyRegistrySnapshot {

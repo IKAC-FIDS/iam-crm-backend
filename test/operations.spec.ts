@@ -1,5 +1,5 @@
 import { ForbiddenException } from "@nestjs/common";
-import { Priority, UserRole } from "@prisma/client";
+import { CompanyEngagementStatus, Priority, UserRole } from "@prisma/client";
 import {
   PERMISSIONS_KEY,
   PermissionPolicyMetadata,
@@ -42,6 +42,10 @@ function transaction(overrides: Record<string, unknown> = {}) {
           logoObjectKey: null,
           priority: Priority.HIGH,
           activityStatus: "ACTIVE",
+          engagementStatus: CompanyEngagementStatus.NEEDS_ACTION,
+          engagementReason: null,
+          nextReviewAt: null,
+          userPreferences: [],
           owner: {
             id: user.userId,
             fullName: "کارشناس فروش",
@@ -154,6 +158,48 @@ describe("Operations workspace", () => {
       (user as any).tenantContext,
       expect.any(Function),
     );
+  });
+
+  it("defaults the portfolio to pinned, active, actionable, or due follow-ups", async () => {
+    const tx = transaction();
+    const { service } = serviceFor(tx);
+    await service.getCompanies({} as any, user);
+    expect(tx.company.findMany.mock.calls[0][0].where.AND).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          OR: expect.arrayContaining([
+            expect.objectContaining({ userPreferences: expect.any(Object) }),
+            expect.objectContaining({
+              engagementStatus: { in: ["ACTIVE", "NEEDS_ACTION"] },
+            }),
+          ]),
+        }),
+      ]),
+    );
+  });
+
+  it("supports an explicit dormant portfolio filter", async () => {
+    const tx = transaction();
+    const { service } = serviceFor(tx);
+    await service.getCompanies(
+      { engagementStatus: CompanyEngagementStatus.DORMANT } as any,
+      user,
+    );
+    const filters = tx.company.findMany.mock.calls[0][0].where.AND;
+    expect(filters).toContainEqual({
+      engagementStatus: CompanyEngagementStatus.DORMANT,
+    });
+  });
+
+  it("returns the requesting user's pin state", async () => {
+    const tx = transaction();
+    const company = (await transaction().company.findMany())[0];
+    tx.company.findMany.mockResolvedValue([
+      { ...company, userPreferences: [{ isPinned: true }] },
+    ]);
+    const { service } = serviceFor(tx);
+    const result = await service.getCompanies({} as any, user);
+    expect(result.data[0].company.isPinned).toBe(true);
   });
 
   it("counts and returns multiple active opportunities without financial values", async () => {

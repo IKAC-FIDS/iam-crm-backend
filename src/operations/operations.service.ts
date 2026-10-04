@@ -516,6 +516,17 @@ export class OperationsService {
             logoObjectKey: true,
             priority: true,
             activityStatus: true,
+            engagementStatus: true,
+            engagementReason: true,
+            nextReviewAt: true,
+            userPreferences: {
+              where: {
+                organizationId: tenant.organizationId,
+                userId: scopeUser.userId,
+              },
+              select: { isPinned: true },
+              take: 1,
+            },
             owner: {
               select: { id: true, fullName: true, avatarObjectKey: true },
             },
@@ -670,6 +681,7 @@ export class OperationsService {
       );
 
       const data = companies.map((company) => {
+        const { userPreferences, ...companyData } = company;
         const companyTasks = taskMap.get(company.id) ?? [];
         const companyMeetings = meetingMap.get(company.id) ?? [];
         const activeCount = opportunityCountMap.get(company.id) ?? 0;
@@ -703,7 +715,10 @@ export class OperationsService {
         const thread = conversationMap.get(company.id);
 
         return {
-          company,
+          company: {
+            ...companyData,
+            isPinned: userPreferences[0]?.isPinned ?? false,
+          },
           activeOpportunities: {
             count: activeCount,
             preview: [],
@@ -753,6 +768,39 @@ export class OperationsService {
       });
     }
     if (query.priority) and.push({ priority: query.priority });
+    if (query.engagementStatus) {
+      and.push({ engagementStatus: query.engagementStatus });
+    } else if (query.includeInactivePortfolio !== "true") {
+      and.push({
+        OR: [
+          {
+            userPreferences: {
+              some: {
+                organizationId,
+                userId: user.userId,
+                isPinned: true,
+              },
+            },
+          },
+          { engagementStatus: { in: ["ACTIVE", "NEEDS_ACTION"] } },
+          {
+            engagementStatus: { in: ["NURTURE", "SNOOZED"] },
+            nextReviewAt: { lte: now },
+          },
+        ],
+      });
+    }
+    if (query.pinnedOnly === "true") {
+      and.push({
+        userPreferences: {
+          some: {
+            organizationId,
+            userId: user.userId,
+            isPinned: true,
+          },
+        },
+      });
+    }
 
     const ownershipScope = query.ownershipScope ?? OwnershipScope.MINE;
     if (ownershipScope === OwnershipScope.MINE) {
