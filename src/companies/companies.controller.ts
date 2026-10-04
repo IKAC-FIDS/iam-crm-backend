@@ -69,6 +69,8 @@ export class CompaniesController {
       ownershipScope: query.ownershipScope,
       includeArchived: query.includeArchived === 'true',
       archivedOnly: query.archivedOnly === 'true',
+      engagementStatus: query.engagementStatus,
+      pinnedOnly: query.pinnedOnly === 'true',
     });
   }
 

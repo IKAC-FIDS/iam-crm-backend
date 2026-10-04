@@ -207,6 +207,8 @@ export class CompaniesService {
       ownershipScope?: OwnershipScope;
       includeArchived?: boolean;
       archivedOnly?: boolean;
+      engagementStatus?: CompanyEngagementStatus;
+      pinnedOnly?: boolean;
     },
   ): Promise<PaginatedResponse<any>> {
     const page = pagination.page ?? 1;
@@ -287,6 +289,20 @@ export class CompaniesService {
       where.archivedAt = null;
     }
 
+    if (filters?.engagementStatus) {
+      where.engagementStatus = filters.engagementStatus;
+    }
+
+    if (filters?.pinnedOnly) {
+      where.userPreferences = {
+        some: {
+          organizationId: getCurrentOrganizationId(user),
+          userId: user.userId,
+          isPinned: true,
+        },
+      };
+    }
+
     const [data, total] = await Promise.all([
       this.prisma.company.findMany({
         where,
@@ -315,6 +331,14 @@ export class CompaniesService {
               isActive: true,
             },
           },
+          userPreferences: {
+            where: {
+              organizationId: getCurrentOrganizationId(user),
+              userId: user.userId,
+            },
+            select: { isPinned: true },
+            take: 1,
+          },
         },
         orderBy: { updatedAt: 'desc' },
         skip,
@@ -326,7 +350,10 @@ export class CompaniesService {
     const totalPages = Math.ceil(total / limit);
 
     return {
-      data,
+      data: data.map(({ userPreferences, ...company }) => ({
+        ...company,
+        isPinned: userPreferences[0]?.isPinned ?? false,
+      })),
       meta: {
         total,
         page,
@@ -363,12 +390,24 @@ export class CompaniesService {
         parentRelations: { include: { parentCompany: true } },
         subsidiaryRelations: { include: { subsidiaryCompany: true } },
         legalDocuments: { orderBy: { createdAt: 'desc' } },
+        userPreferences: {
+          where: {
+            organizationId: getCurrentOrganizationId(user),
+            userId: user.userId,
+          },
+          select: { isPinned: true },
+          take: 1,
+        },
       },
     });
 
     if (!company) throw new NotFoundException('شرکت پیدا نشد');
 
-    return this.withHierarchy(company);
+    const { userPreferences, ...companyData } = company;
+    return {
+      ...this.withHierarchy(companyData),
+      isPinned: userPreferences[0]?.isPinned ?? false,
+    };
   }
 
   async create(dto: CreateCompanyDto, user: CurrentUserPayload) {

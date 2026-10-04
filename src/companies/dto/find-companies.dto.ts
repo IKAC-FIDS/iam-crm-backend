@@ -7,7 +7,11 @@ import {
   IsString,
   IsUUID,
 } from 'class-validator';
-import { LegacyPipelineStage, Priority } from '@prisma/client';
+import {
+  CompanyEngagementStatus,
+  LegacyPipelineStage,
+  Priority,
+} from '@prisma/client';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 import { OwnershipScope } from '../../common/dto/ownership-scope.dto';
 
@@ -67,4 +71,12 @@ export class FindCompaniesDto extends PaginationDto {
   @IsOptional()
   @IsBooleanString()
   archivedOnly?: string;
+
+  @IsOptional()
+  @IsEnum(CompanyEngagementStatus)
+  engagementStatus?: CompanyEngagementStatus;
+
+  @IsOptional()
+  @IsBooleanString()
+  pinnedOnly?: string;
 }

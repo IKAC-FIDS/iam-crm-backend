@@ -260,6 +260,38 @@ describe('CompaniesService company options', () => {
   });
 });
 
+describe('CompaniesService company portfolio list', () => {
+  it('returns the current user pin state and scopes pinned filtering to that user and tenant', async () => {
+    const row = {
+      ...option,
+      engagementStatus: CompanyEngagementStatus.ACTIVE,
+      userPreferences: [{ isPinned: true }],
+    };
+    const { service, prisma } = createService();
+    prisma.company.findMany.mockResolvedValue([row]);
+
+    const result = await service.findAll(
+      user,
+      { page: 1, limit: 20 },
+      { pinnedOnly: true, engagementStatus: CompanyEngagementStatus.ACTIVE },
+    );
+
+    expect(result.data).toEqual([
+      expect.objectContaining({ id: companyId, isPinned: true }),
+    ]);
+    expect(result.data[0]).not.toHaveProperty('userPreferences');
+    expect(prisma.company.findMany.mock.calls[0][0].where).toEqual(
+      expect.objectContaining({
+        organizationId,
+        engagementStatus: CompanyEngagementStatus.ACTIVE,
+        userPreferences: {
+          some: { organizationId, userId: user.userId, isPinned: true },
+        },
+      }),
+    );
+  });
+});
+
 describe('CompaniesService hierarchy validation', () => {
   it('rejects self-parenting', async () => {
     const { service, prisma } = createService();
