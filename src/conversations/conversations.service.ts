@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { ConversationEntityType, ConversationMessageType, Prisma } from '@prisma/client';
+import { ConversationEntityType, ConversationMessageReferenceType, ConversationMessageType, FileAttachmentEntityType, Prisma } from '@prisma/client';
 import { AuditLogService } from '../audit-log/audit-log.service';
 import { CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { getCurrentOrganizationId, tenantScope } from '../common/tenant/tenant-scope.util';
@@ -7,10 +7,12 @@ import { NotificationCoreService } from '../notification-core/notification-core.
 import { PrismaService } from '../prisma/prisma.service';
 import { ConversationAccessService } from './conversation-access.service';
 import { CreateConversationMessageDto, FindConversationDto, FindConversationMentionOptionsDto, UpdateConversationMessageDto, UpdateConversationStatusDto } from './dto/conversation.dto';
+import { AttachmentsService } from '../attachments/attachments.service';
 
 const messageInclude = {
   author: { select: { id: true, fullName: true, avatarObjectKey: true } },
   parentMessage: { select: { id: true, body: true, type: true, author: { select: { id: true, fullName: true } } } },
+  references: { select: { id: true, referenceType: true, referenceId: true, labelSnapshot: true } },
 } satisfies Prisma.ConversationMessageInclude;
 
 @Injectable()
@@ -20,7 +22,13 @@ export class ConversationsService {
     private readonly access: ConversationAccessService,
     private readonly notifications: NotificationCoreService,
     private readonly audit: AuditLogService,
+    private readonly attachments: AttachmentsService,
   ) {}
+
+  async uploadChannelAttachment(channelId: string, file: Express.Multer.File | undefined, user: CurrentUserPayload) {
+    await this.access.assertReadable(ConversationEntityType.COLLABORATION_CHANNEL, channelId, user);
+    return this.attachments.upload({ entityType: FileAttachmentEntityType.COLLABORATION_CHANNEL, entityId: channelId }, file, user);
+  }
 
   async findMentionOptions(query: FindConversationMentionOptionsDto, user: CurrentUserPayload) {
     const organizationId = getCurrentOrganizationId(user);
@@ -67,7 +75,8 @@ export class ConversationsService {
         tx.conversationMessage.count({ where }),
         tx.conversationMessage.count({ where: { ...where, authorId: { not: user.userId }, deletedAt: null, ...(participant?.lastReadAt ? { createdAt: { gt: participant.lastReadAt } } : {}) } }),
       ]);
-      return { thread: { id: thread.id, status: thread.status, createdById: thread.createdById, createdAt: thread.createdAt, updatedAt: thread.updatedAt }, messages: messages.reverse().map(this.presentMessage), unreadCount, meta: this.meta(total, page, limit) };
+      const presented = await this.withAttachments(tx, organizationId, messages.reverse().map(this.presentMessage));
+      return { thread: { id: thread.id, status: thread.status, createdById: thread.createdById, createdAt: thread.createdAt, updatedAt: thread.updatedAt }, messages: presented, unreadCount, meta: this.meta(total, page, limit) };
     });
   }
 
@@ -158,9 +167,10 @@ export class ConversationsService {
     this.assertEntityType(entityType);
     const entity = await this.access.assertReadable(entityType, entityId, user);
     const body = dto.body.trim();
-    if (!body) throw new BadRequestException('متن پیام الزامی است.');
+    if (!body && !dto.attachmentIds?.length) throw new BadRequestException('متن پیام یا پیوست الزامی است.');
     if (dto.type === ConversationMessageType.ANSWER && !dto.parentMessageId) throw new BadRequestException('پاسخ باید به یک پیام مرتبط باشد.');
     const organizationId = getCurrentOrganizationId(user);
+    const references = await this.resolveReferences(dto.references ?? [], user);
     const created = await this.prisma.withTenantTransaction(tenantScope.require(user), async (tx) => {
       const thread = await tx.conversationThread.upsert({
         where: { organizationId_entityType_entityId: { organizationId, entityType, entityId } },
@@ -184,9 +194,15 @@ export class ConversationsService {
       }
       const mentionedUserIds = mentionableUsers.map((item) => item.id);
       const message = await tx.conversationMessage.create({
-        data: { organizationId, threadId: thread.id, authorId: user.userId, body, type: dto.parentMessageId ? ConversationMessageType.ANSWER : dto.type, parentMessageId: parent?.id },
+        data: { organizationId, threadId: thread.id, authorId: user.userId, body, type: dto.parentMessageId ? ConversationMessageType.ANSWER : dto.type, parentMessageId: parent?.id, references: { create: references.map((reference) => ({ organizationId, referenceType: reference.type, referenceId: reference.id, labelSnapshot: reference.label })) } },
         include: messageInclude,
       });
+      if (dto.attachmentIds?.length) {
+        if (entityType !== ConversationEntityType.COLLABORATION_CHANNEL) throw new BadRequestException('پیوست پیام فقط در کانال همکاری پشتیبانی می‌شود.');
+        const attachments = await tx.fileAttachment.findMany({ where: { id: { in: dto.attachmentIds }, organizationId, entityType: FileAttachmentEntityType.COLLABORATION_CHANNEL, entityId, deletedAt: null, uploadedById: user.userId }, select: { id: true } });
+        if (attachments.length !== new Set(dto.attachmentIds).size) throw new BadRequestException('یک یا چند پیوست معتبر یا قابل دسترس نیستند.');
+        await tx.artifactLink.createMany({ data: attachments.map((attachment) => ({ organizationId, artifactId: attachment.id, entityType: FileAttachmentEntityType.CONVERSATION_MESSAGE, entityId: message.id, createdById: user.userId })), skipDuplicates: true });
+      }
       const participantIds = [...new Set([user.userId, ...entity.responsibleUserIds, parent?.authorId, ...mentionedUserIds].filter((id): id is string => Boolean(id)))];
       await Promise.all(participantIds.map((userId) => tx.conversationParticipant.upsert({ where: { threadId_userId: { threadId: thread.id, userId } }, create: { threadId: thread.id, userId, ...(userId === user.userId ? { lastReadAt: new Date() } : {}) }, update: userId === user.userId ? { lastReadAt: new Date() } : {} })));
       return { thread, message, participantIds, mentionedUserIds };
@@ -221,7 +237,11 @@ export class ConversationsService {
     const current = await this.getMessageWithAccess(messageId, user);
     if (current.message.authorId !== user.userId && !this.canModerate(user)) throw new ForbiddenException('اجازه ویرایش این پیام را ندارید.');
     if (current.message.deletedAt) throw new BadRequestException('پیام حذف‌شده قابل ویرایش نیست.');
-    const updated = await this.prisma.withTenantTransaction(tenantScope.require(user), (tx) => tx.conversationMessage.update({ where: { id: messageId }, data: { body, editedAt: new Date() }, include: messageInclude }));
+    const references = dto.references ? await this.resolveReferences(dto.references, user) : undefined;
+    const updated = await this.prisma.withTenantTransaction(tenantScope.require(user), async (tx) => {
+      if (references) { await tx.conversationMessageReference.deleteMany({ where: { messageId, organizationId: current.message.organizationId } }); await tx.conversationMessageReference.createMany({ data: references.map((reference) => ({ organizationId: current.message.organizationId, messageId, referenceType: reference.type, referenceId: reference.id, labelSnapshot: reference.label })) }); }
+      return tx.conversationMessage.update({ where: { id: messageId }, data: { body, editedAt: new Date() }, include: messageInclude });
+    });
     await this.audit.record({ actorId: user.userId, organizationId: current.message.organizationId, entityType: 'conversation-message', entityId: messageId, action: 'conversation.message_edited' });
     return this.presentMessage(updated);
   }
@@ -265,6 +285,17 @@ export class ConversationsService {
   }
 
   private canModerate(user: CurrentUserPayload) { return user.role === 'ADMIN' || user.role === 'MANAGER'; }
+  private async resolveReferences(input: Array<{ type: ConversationMessageReferenceType; id: string }>, user: CurrentUserPayload) {
+    const unique = [...new Map(input.map((item) => [`${item.type}:${item.id}`, item])).values()];
+    return Promise.all(unique.map(async (item) => { const access = await this.access.assertReadable(item.type as unknown as ConversationEntityType, item.id, user); return { ...item, label: access.label }; }));
+  }
+  private async withAttachments(tx: Prisma.TransactionClient, organizationId: string, messages: any[]) {
+    if (!messages.length) return messages;
+    if (!(tx as any).artifactLink) return messages.map((message) => ({ ...message, attachments: [] }));
+    const links = await tx.artifactLink.findMany({ where: { organizationId, entityType: FileAttachmentEntityType.CONVERSATION_MESSAGE, entityId: { in: messages.map((message) => message.id) }, artifact: { deletedAt: null } }, include: { artifact: { select: { id: true, name: true, originalFileName: true, mimeType: true, sizeBytes: true } } } });
+    const byMessage = new Map<string, any[]>(); for (const link of links) byMessage.set(link.entityId, [...(byMessage.get(link.entityId) ?? []), link.artifact]);
+    return messages.map((message) => ({ ...message, attachments: byMessage.get(message.id) ?? [] }));
+  }
   private assertEntityType(value: ConversationEntityType) { if (!Object.values(ConversationEntityType).includes(value)) throw new BadRequestException('نوع موجودیت گفتگو نامعتبر است.'); }
   private presentMessage(message: any) { return { ...message, body: message.deletedAt ? null : message.body, deletedById: undefined }; }
   private meta(total: number, page: number, limit: number) { const totalPages = Math.ceil(total / limit); return { total, page, limit, totalPages, hasNext: page < totalPages, hasPrevious: page > 1 }; }

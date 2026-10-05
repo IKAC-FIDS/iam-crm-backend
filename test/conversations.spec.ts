@@ -181,7 +181,7 @@ describe('Conversation architecture', () => {
     };
     const prisma = { withTenantTransaction: jest.fn((_tenant, callback) => callback(tx)) };
     const access = { assertReadable: jest.fn().mockResolvedValue({}) };
-    const conversations = new ConversationsService(prisma as never, access as never, {} as never, {} as never);
+    const conversations = new ConversationsService(prisma as never, access as never, {} as never, {} as never, {} as never);
     const scopedUser = tenantUser({ userId: 'user-1', email: 'u@example.com', role: 'REP' as never, organizationId: 'org-1' } as never);
     const result = await conversations.find(ConversationEntityType.COMPANY, 'company-1', { page: 1, limit: 100 }, scopedUser);
     expect(tx.conversationMessage.findMany).toHaveBeenCalledWith(expect.objectContaining({ orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 100 }));
@@ -203,7 +203,7 @@ describe('Conversation architecture', () => {
     };
     const prisma = { withTenantTransaction: jest.fn((_tenant, callback) => callback(tx)) };
     const access = { assertReadable: jest.fn().mockResolvedValue({}) };
-    const conversations = new ConversationsService(prisma as never, access as never, {} as never, {} as never);
+    const conversations = new ConversationsService(prisma as never, access as never, {} as never, {} as never, {} as never);
     const scopedUser = tenantUser({ userId: 'user-1', email: 'u@example.com', role: 'ADMIN' as never, organizationId: 'org-1' } as never);
     (scopedUser as any).tenantContext.permissions = ['task:view', 'activity:view', 'task:view-organization', 'activity:view-organization'];
     const result = await conversations.findCompanyHub('company-1', scopedUser);

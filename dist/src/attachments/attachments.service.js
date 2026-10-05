@@ -25,13 +25,15 @@ const audit_log_service_1 = require("../audit-log/audit-log.service");
 const prisma_service_1 = require("../prisma/prisma.service");
 const attachment_storage_types_1 = require("./storage/attachment-storage.types");
 const quota_service_1 = require("../quota/quota.service");
+const collaboration_access_service_1 = require("../collaboration/collaboration-access.service");
 let AttachmentsService = AttachmentsService_1 = class AttachmentsService {
-    constructor(prisma, config, audit, storage, quota) {
+    constructor(prisma, config, audit, storage, quota, collaborationAccess) {
         this.prisma = prisma;
         this.config = config;
         this.audit = audit;
         this.storage = storage;
         this.quota = quota;
+        this.collaborationAccess = collaborationAccess;
         this.logger = new common_1.Logger(AttachmentsService_1.name);
     }
     async findAll(query, user) {
@@ -344,6 +346,19 @@ let AttachmentsService = AttachmentsService_1 = class AttachmentsService {
         if (mutation && user.role === client_1.UserRole.BOARDS) {
             throw new common_1.ForbiddenException('Attachments are read-only for this role');
         }
+        if (entityType === client_1.FileAttachmentEntityType.COLLABORATION_CHANNEL) {
+            await this.collaborationAccess.assertReadable(entityId, user);
+            return;
+        }
+        if (entityType === client_1.FileAttachmentEntityType.CONVERSATION_MESSAGE) {
+            const message = await this.prisma.conversationMessage.findFirst({ where: { id: entityId, organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user) }, include: { thread: true } });
+            if (!message)
+                throw new common_1.NotFoundException('Message not found');
+            if (message.thread.entityType !== 'COLLABORATION_CHANNEL')
+                throw new common_1.NotFoundException('Message not found');
+            await this.collaborationAccess.assertReadable(message.thread.entityId, user);
+            return;
+        }
         if (entityType === client_1.FileAttachmentEntityType.ORGANIZATION) {
             if (entityId !== (0, tenant_scope_util_1.getCurrentOrganizationId)(user))
                 throw new common_1.NotFoundException('Organization not found');
@@ -557,6 +572,7 @@ exports.AttachmentsService = AttachmentsService = AttachmentsService_1 = __decor
     __param(3, (0, common_1.Inject)(attachment_storage_types_1.ATTACHMENT_STORAGE)),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
         config_1.ConfigService,
-        audit_log_service_1.AuditLogService, Object, quota_service_1.QuotaService])
+        audit_log_service_1.AuditLogService, Object, quota_service_1.QuotaService,
+        collaboration_access_service_1.CollaborationAccessService])
 ], AttachmentsService);
 //# sourceMappingURL=attachments.service.js.map

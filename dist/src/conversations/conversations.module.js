@@ -15,6 +15,9 @@ const tasks_module_1 = require("../tasks/tasks.module");
 const opportunities_module_1 = require("../opportunities/opportunities.module");
 const meetings_module_1 = require("../meetings/meetings.module");
 const collaboration_module_1 = require("../collaboration/collaboration.module");
+const attachments_module_1 = require("../attachments/attachments.module");
+const companies_module_1 = require("../companies/companies.module");
+const conversation_reference_options_service_1 = require("./conversation-reference-options.service");
 const conversation_access_service_1 = require("./conversation-access.service");
 const conversations_controller_1 = require("./conversations.controller");
 const conversations_service_1 = require("./conversations.service");
@@ -31,9 +34,11 @@ exports.ConversationsModule = ConversationsModule = __decorate([
             notification_core_module_1.NotificationCoreModule,
             audit_log_module_1.AuditLogModule,
             collaboration_module_1.CollaborationModule,
+            attachments_module_1.AttachmentsModule,
+            companies_module_1.CompaniesModule,
         ],
         controllers: [conversations_controller_1.ConversationsController],
-        providers: [conversation_access_service_1.ConversationAccessService, conversations_service_1.ConversationsService],
+        providers: [conversation_access_service_1.ConversationAccessService, conversation_reference_options_service_1.ConversationReferenceOptionsService, conversations_service_1.ConversationsService],
     })
 ], ConversationsModule);
 //# sourceMappingURL=conversations.module.js.map

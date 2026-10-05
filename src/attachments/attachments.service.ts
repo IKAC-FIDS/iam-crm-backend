@@ -32,6 +32,7 @@ import {
   AttachmentStorageService,
 } from './storage/attachment-storage.types';
 import { QuotaService } from '../quota/quota.service';
+import { CollaborationAccessService } from '../collaboration/collaboration-access.service';
 
 @Injectable()
 export class AttachmentsService {
@@ -44,6 +45,7 @@ export class AttachmentsService {
     @Inject(ATTACHMENT_STORAGE)
     private readonly storage: AttachmentStorageService,
     private readonly quota: QuotaService,
+    private readonly collaborationAccess: CollaborationAccessService,
   ) {}
 
   async findAll(query: FindAttachmentsDto, user: CurrentUserPayload) {
@@ -478,6 +480,18 @@ export class AttachmentsService {
   ) {
     if (mutation && user.role === UserRole.BOARDS) {
       throw new ForbiddenException('Attachments are read-only for this role');
+    }
+
+    if (entityType === FileAttachmentEntityType.COLLABORATION_CHANNEL) {
+      await this.collaborationAccess.assertReadable(entityId, user);
+      return;
+    }
+    if (entityType === FileAttachmentEntityType.CONVERSATION_MESSAGE) {
+      const message = await this.prisma.conversationMessage.findFirst({ where: { id: entityId, organizationId: getCurrentOrganizationId(user) }, include: { thread: true } });
+      if (!message) throw new NotFoundException('Message not found');
+      if (message.thread.entityType !== 'COLLABORATION_CHANNEL') throw new NotFoundException('Message not found');
+      await this.collaborationAccess.assertReadable(message.thread.entityId, user);
+      return;
     }
 
     if (entityType === FileAttachmentEntityType.ORGANIZATION) {

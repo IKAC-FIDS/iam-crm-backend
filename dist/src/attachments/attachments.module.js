@@ -15,12 +15,13 @@ const attachment_storage_types_1 = require("./storage/attachment-storage.types")
 const local_attachment_storage_service_1 = require("./storage/local-attachment-storage.service");
 const minio_attachment_storage_service_1 = require("./storage/minio-attachment-storage.service");
 const quota_module_1 = require("../quota/quota.module");
+const collaboration_module_1 = require("../collaboration/collaboration.module");
 let AttachmentsModule = class AttachmentsModule {
 };
 exports.AttachmentsModule = AttachmentsModule;
 exports.AttachmentsModule = AttachmentsModule = __decorate([
     (0, common_1.Module)({
-        imports: [quota_module_1.QuotaModule],
+        imports: [quota_module_1.QuotaModule, collaboration_module_1.CollaborationModule],
         controllers: [attachments_controller_1.AttachmentsController],
         providers: [
             attachments_service_1.AttachmentsService,

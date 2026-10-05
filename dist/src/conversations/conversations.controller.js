@@ -15,19 +15,24 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ConversationsController = void 0;
 const openapi = require("@nestjs/swagger");
 const common_1 = require("@nestjs/common");
+const platform_express_1 = require("@nestjs/platform-express");
+const multer_1 = require("multer");
 const client_1 = require("@prisma/client");
 const current_user_decorator_1 = require("../common/decorators/current-user.decorator");
 const jwt_auth_guard_1 = require("../common/guards/jwt-auth.guard");
 const permissions_guard_1 = require("../common/guards/permissions.guard");
 const conversation_dto_1 = require("./dto/conversation.dto");
 const conversations_service_1 = require("./conversations.service");
+const conversation_reference_options_service_1 = require("./conversation-reference-options.service");
 let ConversationsController = class ConversationsController {
-    constructor(conversations) {
+    constructor(conversations, referenceOptions) {
         this.conversations = conversations;
+        this.referenceOptions = referenceOptions;
     }
     mentionOptions(query, user) {
         return this.conversations.findMentionOptions(query, user);
     }
+    findReferenceOptions(query, user) { return this.referenceOptions.find(query, user); }
     companyHub(companyId, user) {
         return this.conversations.findCompanyHub(companyId, user);
     }
@@ -36,6 +41,9 @@ let ConversationsController = class ConversationsController {
     }
     createMessage(entityType, entityId, dto, user) {
         return this.conversations.createMessage(entityType, entityId, dto, user);
+    }
+    uploadChannelAttachment(entityId, file, user) {
+        return this.conversations.uploadChannelAttachment(entityId, file, user);
     }
     markRead(entityType, entityId, user) {
         return this.conversations.markRead(entityType, entityId, user);
@@ -60,6 +68,15 @@ __decorate([
     __metadata("design:paramtypes", [conversation_dto_1.FindConversationMentionOptionsDto, Object]),
     __metadata("design:returntype", void 0)
 ], ConversationsController.prototype, "mentionOptions", null);
+__decorate([
+    (0, common_1.Get)('reference-options'),
+    openapi.ApiResponse({ status: 200 }),
+    __param(0, (0, common_1.Query)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [conversation_dto_1.FindConversationReferenceOptionsDto, Object]),
+    __metadata("design:returntype", void 0)
+], ConversationsController.prototype, "findReferenceOptions", null);
 __decorate([
     (0, common_1.Get)('company-hub/:companyId'),
     openapi.ApiResponse({ status: 200 }),
@@ -91,6 +108,17 @@ __decorate([
     __metadata("design:paramtypes", [String, String, conversation_dto_1.CreateConversationMessageDto, Object]),
     __metadata("design:returntype", void 0)
 ], ConversationsController.prototype, "createMessage", null);
+__decorate([
+    (0, common_1.Post)('COLLABORATION_CHANNEL/:entityId/attachments'),
+    (0, common_1.UseInterceptors)((0, platform_express_1.FileInterceptor)('file', { storage: (0, multer_1.memoryStorage)(), limits: { fileSize: 25 * 1024 * 1024 } })),
+    openapi.ApiResponse({ status: 201 }),
+    __param(0, (0, common_1.Param)('entityId')),
+    __param(1, (0, common_1.UploadedFile)()),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object, Object]),
+    __metadata("design:returntype", void 0)
+], ConversationsController.prototype, "uploadChannelAttachment", null);
 __decorate([
     (0, common_1.Post)(':entityType/:entityId/read'),
     openapi.ApiResponse({ status: 201, type: Object }),
@@ -133,6 +161,6 @@ __decorate([
 exports.ConversationsController = ConversationsController = __decorate([
     (0, common_1.Controller)('conversations'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, permissions_guard_1.PermissionsGuard),
-    __metadata("design:paramtypes", [conversations_service_1.ConversationsService])
+    __metadata("design:paramtypes", [conversations_service_1.ConversationsService, conversation_reference_options_service_1.ConversationReferenceOptionsService])
 ], ConversationsController);
 //# sourceMappingURL=conversations.controller.js.map

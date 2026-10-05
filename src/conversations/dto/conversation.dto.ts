@@ -1,5 +1,6 @@
-import { ConversationMessageType, ConversationThreadStatus } from '@prisma/client';
-import { ArrayMaxSize, ArrayUnique, IsArray, IsEnum, IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
+import { ConversationMessageReferenceType, ConversationMessageType, ConversationThreadStatus } from '@prisma/client';
+import { ArrayMaxSize, ArrayUnique, IsArray, IsEnum, IsOptional, IsString, IsUUID, MaxLength, MinLength, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 
 export class FindConversationDto extends PaginationDto {}
@@ -10,10 +11,13 @@ export class FindConversationMentionOptionsDto {
   @MaxLength(100)
   search?: string;
 }
+export class FindConversationReferenceOptionsDto {
+  @IsEnum(ConversationMessageReferenceType) type!: ConversationMessageReferenceType;
+  @IsOptional() @IsString() @MaxLength(100) search?: string;
+}
 
 export class CreateConversationMessageDto {
   @IsString()
-  @MinLength(1)
   @MaxLength(4000)
   body!: string;
 
@@ -30,6 +34,17 @@ export class CreateConversationMessageDto {
   @ArrayMaxSize(20)
   @IsUUID('4', { each: true })
   mentionedUserIds?: string[];
+
+  @IsOptional() @IsArray() @ArrayMaxSize(20) @ValidateNested({ each: true }) @Type(() => ConversationReferenceDto)
+  references?: ConversationReferenceDto[];
+
+  @IsOptional() @IsArray() @ArrayUnique() @ArrayMaxSize(10) @IsUUID('4', { each: true })
+  attachmentIds?: string[];
+}
+
+export class ConversationReferenceDto {
+  @IsEnum(ConversationMessageReferenceType) type!: ConversationMessageReferenceType;
+  @IsUUID() id!: string;
 }
 
 export class UpdateConversationMessageDto {
@@ -37,6 +52,8 @@ export class UpdateConversationMessageDto {
   @MinLength(1)
   @MaxLength(4000)
   body!: string;
+  @IsOptional() @IsArray() @ArrayMaxSize(20) @ValidateNested({ each: true }) @Type(() => ConversationReferenceDto)
+  references?: ConversationReferenceDto[];
 }
 
 export class UpdateConversationStatusDto {

@@ -116,6 +116,7 @@ function setup(meetingStatus: MeetingStatus | null = MeetingStatus.COMPLETED) {
       audit as any,
       storage as any,
       quotaMock() as any,
+      { assertReadable: jest.fn() } as any,
     ),
   };
 }

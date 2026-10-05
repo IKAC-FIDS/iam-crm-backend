@@ -6,6 +6,9 @@ import { TasksModule } from '../tasks/tasks.module';
 import { OpportunitiesModule } from '../opportunities/opportunities.module';
 import { MeetingsModule } from '../meetings/meetings.module';
 import { CollaborationModule } from '../collaboration/collaboration.module';
+import { AttachmentsModule } from '../attachments/attachments.module';
+import { CompaniesModule } from '../companies/companies.module';
+import { ConversationReferenceOptionsService } from './conversation-reference-options.service';
 import { ConversationAccessService } from './conversation-access.service';
 import { ConversationsController } from './conversations.controller';
 import { ConversationsService } from './conversations.service';
@@ -19,8 +22,10 @@ import { ConversationsService } from './conversations.service';
     NotificationCoreModule,
     AuditLogModule,
     CollaborationModule,
+    AttachmentsModule,
+    CompaniesModule,
   ],
   controllers: [ConversationsController],
-  providers: [ConversationAccessService, ConversationsService],
+  providers: [ConversationAccessService, ConversationReferenceOptionsService, ConversationsService],
 })
 export class ConversationsModule {}

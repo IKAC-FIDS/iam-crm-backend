@@ -6,9 +6,10 @@ import { ATTACHMENT_STORAGE } from './storage/attachment-storage.types';
 import { LocalAttachmentStorageService } from './storage/local-attachment-storage.service';
 import { MinioAttachmentStorageService } from './storage/minio-attachment-storage.service';
 import { QuotaModule } from '../quota/quota.module';
+import { CollaborationModule } from '../collaboration/collaboration.module';
 
 @Module({
-  imports: [QuotaModule],
+  imports: [QuotaModule, CollaborationModule],
   controllers: [AttachmentsController],
   providers: [
     AttachmentsService,

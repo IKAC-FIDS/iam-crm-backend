@@ -235,6 +235,15 @@ enum FileAttachmentEntityType {
   ORGANIZATION
   TECHNICAL_DOCUMENT
   TECHNICAL_RESOURCE
+  COLLABORATION_CHANNEL
+  CONVERSATION_MESSAGE
+}
+
+enum ConversationMessageReferenceType {
+  COMPANY
+  OPPORTUNITY
+  TASK
+  MEETING
 }
 
 enum AttachmentStorageProvider {
@@ -711,6 +720,7 @@ model Organization {
   meetings             Meeting[]
   conversationThreads  ConversationThread[]
   conversationMessages ConversationMessage[]
+  conversationMessageReferences ConversationMessageReference[]
   collaborationTopics  CollaborationTopic[]
   collaborationChannels CollaborationChannel[]
   memberships          OrganizationMembership[]
@@ -2196,11 +2206,29 @@ model ConversationMessage {
   deletedBy       User?                   @relation("ConversationMessageDeletedBy", fields: [deletedById], references: [id], onDelete: SetNull)
   createdAt       DateTime                @default(now())
   updatedAt       DateTime                @updatedAt
+  references      ConversationMessageReference[]
 
   @@index([organizationId, threadId, createdAt])
   @@index([parentMessageId])
   @@index([authorId])
   @@map("conversation_messages")
+}
+
+model ConversationMessageReference {
+  id             String @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  messageId      String
+  message        ConversationMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  referenceType  ConversationMessageReferenceType
+  referenceId    String
+  labelSnapshot  String
+  createdAt      DateTime @default(now())
+
+  @@unique([messageId, referenceType, referenceId])
+  @@index([organizationId, referenceType, referenceId])
+  @@index([messageId])
+  @@map("conversation_message_references")
 }
 
 model ConversationParticipant {

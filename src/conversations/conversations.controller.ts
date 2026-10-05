@@ -1,20 +1,24 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { ConversationEntityType } from '@prisma/client';
 import { CurrentUser, CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
-import { CreateConversationMessageDto, FindConversationDto, FindConversationMentionOptionsDto, UpdateConversationMessageDto, UpdateConversationStatusDto } from './dto/conversation.dto';
+import { CreateConversationMessageDto, FindConversationDto, FindConversationMentionOptionsDto, FindConversationReferenceOptionsDto, UpdateConversationMessageDto, UpdateConversationStatusDto } from './dto/conversation.dto';
 import { ConversationsService } from './conversations.service';
+import { ConversationReferenceOptionsService } from './conversation-reference-options.service';
 
 @Controller('conversations')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class ConversationsController {
-  constructor(private readonly conversations: ConversationsService) {}
+  constructor(private readonly conversations: ConversationsService, private readonly referenceOptions: ConversationReferenceOptionsService) {}
 
   @Get('mention-options')
   mentionOptions(@Query() query: FindConversationMentionOptionsDto, @CurrentUser() user: CurrentUserPayload) {
     return this.conversations.findMentionOptions(query, user);
   }
+  @Get('reference-options') findReferenceOptions(@Query() query: FindConversationReferenceOptionsDto, @CurrentUser() user: CurrentUserPayload) { return this.referenceOptions.find(query, user); }
 
   @Get('company-hub/:companyId')
   companyHub(@Param('companyId') companyId: string, @CurrentUser() user: CurrentUserPayload) {
@@ -29,6 +33,12 @@ export class ConversationsController {
   @Post(':entityType/:entityId/messages')
   createMessage(@Param('entityType') entityType: ConversationEntityType, @Param('entityId') entityId: string, @Body() dto: CreateConversationMessageDto, @CurrentUser() user: CurrentUserPayload) {
     return this.conversations.createMessage(entityType, entityId, dto, user);
+  }
+
+  @Post('COLLABORATION_CHANNEL/:entityId/attachments')
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } }))
+  uploadChannelAttachment(@Param('entityId') entityId: string, @UploadedFile() file: Express.Multer.File, @CurrentUser() user: CurrentUserPayload) {
+    return this.conversations.uploadChannelAttachment(entityId, file, user);
   }
 
   @Post(':entityType/:entityId/read')
