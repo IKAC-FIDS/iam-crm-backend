@@ -5,6 +5,7 @@ import { NotificationCoreModule } from '../notification-core/notification-core.m
 import { TasksModule } from '../tasks/tasks.module';
 import { OpportunitiesModule } from '../opportunities/opportunities.module';
 import { MeetingsModule } from '../meetings/meetings.module';
+import { CollaborationModule } from '../collaboration/collaboration.module';
 import { ConversationAccessService } from './conversation-access.service';
 import { ConversationsController } from './conversations.controller';
 import { ConversationsService } from './conversations.service';
@@ -17,6 +18,7 @@ import { ConversationsService } from './conversations.service';
     MeetingsModule,
     NotificationCoreModule,
     AuditLogModule,
+    CollaborationModule,
   ],
   controllers: [ConversationsController],
   providers: [ConversationAccessService, ConversationsService],

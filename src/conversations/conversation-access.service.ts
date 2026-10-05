@@ -6,6 +6,7 @@ import { CompanyAccessService } from '../companies/company-access.service';
 import { TasksService } from '../tasks/tasks.service';
 import { OpportunitiesService } from '../opportunities/opportunities.service';
 import { MeetingsService } from '../meetings/meetings.service';
+import { CollaborationAccessService } from '../collaboration/collaboration-access.service';
 
 export type ConversationEntityAccess = {
   entityType: ConversationEntityType;
@@ -23,9 +24,20 @@ export class ConversationAccessService {
     private readonly activities: ActivitiesService,
     private readonly opportunities: OpportunitiesService,
     private readonly meetings: MeetingsService,
+    private readonly collaboration: CollaborationAccessService,
   ) {}
 
   async assertReadable(entityType: ConversationEntityType, entityId: string, user: CurrentUserPayload): Promise<ConversationEntityAccess> {
+    if (entityType === ConversationEntityType.COLLABORATION_CHANNEL) {
+      const channel = await this.collaboration.assertReadable(entityId, user);
+      return {
+        entityType,
+        entityId,
+        label: `${channel.topic.name} / ${channel.name}`,
+        responsibleUserIds: channel.members.length ? [user.userId] : [],
+        actionUrl: `/collaboration?channel=${encodeURIComponent(entityId)}`,
+      };
+    }
     if (entityType === ConversationEntityType.COMPANY) {
       const company = await this.companies.assertCompanyReadable(entityId, user);
       return {

@@ -180,7 +180,7 @@ let ConversationsService = class ConversationsService {
             const requestedMentionIds = [...new Set(dto.mentionedUserIds ?? [])].filter((id) => id !== user.userId);
             const mentionableUsers = requestedMentionIds.length
                 ? await tx.user.findMany({
-                    where: { id: { in: requestedMentionIds }, organizationId, isActive: true },
+                    where: { id: { in: requestedMentionIds }, organizationId, isActive: true, ...(entityType === client_1.ConversationEntityType.COLLABORATION_CHANNEL ? { collaborationMemberships: { some: { channelId: entityId } } } : {}) },
                     select: { id: true },
                 })
                 : [];

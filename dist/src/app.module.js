@@ -63,6 +63,7 @@ const account_workspace_module_1 = require("./account-workspace/account-workspac
 const crm_assistant_module_1 = require("./crm-assistant/crm-assistant.module");
 const operations_module_1 = require("./operations/operations.module");
 const personal_todos_module_1 = require("./personal-todos/personal-todos.module");
+const collaboration_module_1 = require("./collaboration/collaboration.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -136,6 +137,7 @@ exports.AppModule = AppModule = __decorate([
             crm_assistant_module_1.CrmAssistantModule,
             operations_module_1.OperationsModule,
             personal_todos_module_1.PersonalTodosModule,
+            collaboration_module_1.CollaborationModule,
         ],
         providers: [
             {

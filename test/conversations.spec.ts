@@ -15,12 +15,14 @@ describe('Conversation architecture', () => {
   const activities = { assertReadable: jest.fn() };
   const opportunities = { findOne: jest.fn() };
   const meetings = { findOne: jest.fn() };
+  const collaboration = { assertReadable: jest.fn() };
   const service = new ConversationAccessService(
     companies as never,
     tasks as never,
     activities as never,
     opportunities as never,
     meetings as never,
+    collaboration as never,
   );
   const user = {
     userId: 'user-1',
@@ -79,6 +81,28 @@ describe('Conversation architecture', () => {
         responsibleUserIds: ['organizer-1', 'assignee-1'],
       }),
     );
+  });
+
+  it('routes collaboration channels through collaboration access without duplicating messaging', async () => {
+    collaboration.assertReadable.mockResolvedValue({
+      id: 'channel-1',
+      name: 'فروش',
+      topic: { name: 'پروژه IAM' },
+      members: [{ role: 'MEMBER' }],
+    });
+    await expect(
+      service.assertReadable(
+        ConversationEntityType.COLLABORATION_CHANNEL,
+        'channel-1',
+        user,
+      ),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        label: 'پروژه IAM / فروش',
+        actionUrl: '/collaboration?channel=channel-1',
+      }),
+    );
+    expect(collaboration.assertReadable).toHaveBeenCalledWith('channel-1', user);
   });
 
   it('does not expose opportunity or meeting conversations without entity view permission', async () => {

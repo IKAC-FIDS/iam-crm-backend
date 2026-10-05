@@ -31,6 +31,7 @@ const archive_company_dto_1 = require("./dto/archive-company.dto");
 const find_company_options_dto_1 = require("./dto/find-company-options.dto");
 const company_registry_lookup_dto_1 = require("./dto/company-registry-lookup.dto");
 const person_company_lookup_dto_1 = require("./dto/person-company-lookup.dto");
+const company_engagement_dto_1 = require("./dto/company-engagement.dto");
 const company_registry_lookup_service_1 = require("./company-registry-lookup.service");
 const tenant_scope_util_1 = require("../common/tenant/tenant-scope.util");
 let CompaniesController = class CompaniesController {
@@ -52,6 +53,8 @@ let CompaniesController = class CompaniesController {
             ownershipScope: query.ownershipScope,
             includeArchived: query.includeArchived === 'true',
             archivedOnly: query.archivedOnly === 'true',
+            engagementStatus: query.engagementStatus,
+            pinnedOnly: query.pinnedOnly === 'true',
         });
     }
     findOptions(user, query) {
@@ -86,6 +89,12 @@ let CompaniesController = class CompaniesController {
     }
     update(id, dto, user) {
         return this.companiesService.update(id, dto, user);
+    }
+    updateEngagement(id, dto, user) {
+        return this.companiesService.updateEngagement(id, dto, user);
+    }
+    setPinned(id, dto, user) {
+        return this.companiesService.setPinned(id, dto, user);
     }
     changeStageDeprecated(id) {
         throw new common_1.GoneException({
@@ -162,7 +171,7 @@ __decorate([
 __decorate([
     (0, common_1.Get)(':id'),
     (0, permissions_decorator_1.Permissions)('company:view'),
-    openapi.ApiResponse({ status: 200, type: Object }),
+    openapi.ApiResponse({ status: 200 }),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, current_user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
@@ -226,6 +235,28 @@ __decorate([
     __metadata("design:paramtypes", [String, update_company_dto_1.UpdateCompanyDto, Object]),
     __metadata("design:returntype", void 0)
 ], CompaniesController.prototype, "update", null);
+__decorate([
+    (0, common_1.Patch)(':id/engagement'),
+    (0, permissions_decorator_1.Permissions)('company:update'),
+    openapi.ApiResponse({ status: 200 }),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, company_engagement_dto_1.UpdateCompanyEngagementDto, Object]),
+    __metadata("design:returntype", void 0)
+], CompaniesController.prototype, "updateEngagement", null);
+__decorate([
+    (0, common_1.Patch)(':id/pin'),
+    (0, permissions_decorator_1.Permissions)('company:view'),
+    openapi.ApiResponse({ status: 200 }),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, company_engagement_dto_1.UpdateCompanyPinDto, Object]),
+    __metadata("design:returntype", void 0)
+], CompaniesController.prototype, "setPinned", null);
 __decorate([
     (0, common_1.Patch)(':id/stage'),
     (0, permissions_decorator_1.Permissions)('company:view'),

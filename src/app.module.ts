@@ -54,6 +54,7 @@ import { AccountWorkspaceModule } from "./account-workspace/account-workspace.mo
 import { CrmAssistantModule } from "./crm-assistant/crm-assistant.module";
 import { OperationsModule } from "./operations/operations.module";
 import { PersonalTodosModule } from "./personal-todos/personal-todos.module";
+import { CollaborationModule } from "./collaboration/collaboration.module";
 
 @Module({
   imports: [
@@ -124,6 +125,7 @@ import { PersonalTodosModule } from "./personal-todos/personal-todos.module";
     CrmAssistantModule,
     OperationsModule,
     PersonalTodosModule,
+    CollaborationModule,
   ],
   providers: [
     {

@@ -486,6 +486,18 @@ enum ConversationEntityType {
   ACTIVITY
   OPPORTUNITY
   MEETING
+  COLLABORATION_CHANNEL
+}
+
+enum CollaborationChannelVisibility {
+  PUBLIC
+  PRIVATE
+}
+
+enum CollaborationChannelMemberRole {
+  OWNER
+  ADMIN
+  MEMBER
 }
 
 enum ConversationMessageType {
@@ -533,6 +545,7 @@ model User {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  lastSeenAt DateTime?
 
   ownedCompanies          Company[]                 @relation("CompanyOwner")
   archivedCompanies       Company[]                 @relation("CompanyArchivedBy")
@@ -611,6 +624,10 @@ model User {
   conversationMessagesAuthored  ConversationMessage[]         @relation("ConversationMessageAuthor")
   conversationMessagesDeleted   ConversationMessage[]         @relation("ConversationMessageDeletedBy")
   conversationParticipants      ConversationParticipant[]
+  collaborationTopicsCreated    CollaborationTopic[]         @relation("CollaborationTopicCreatedBy")
+  collaborationChannelsCreated  CollaborationChannel[]       @relation("CollaborationChannelCreatedBy")
+  collaborationMemberships      CollaborationChannelMember[] @relation("CollaborationChannelMemberUser")
+  collaborationMembersAdded     CollaborationChannelMember[] @relation("CollaborationChannelMemberAddedBy")
   timesheetEntries              TimesheetEntry[]
   leaveRequests                 LeaveRequest[]
 
@@ -694,6 +711,8 @@ model Organization {
   meetings             Meeting[]
   conversationThreads  ConversationThread[]
   conversationMessages ConversationMessage[]
+  collaborationTopics  CollaborationTopic[]
+  collaborationChannels CollaborationChannel[]
   memberships          OrganizationMembership[]
   ssoProviders         SsoProvider[]
   ssoRoutes            SsoProviderRoute[]
@@ -741,6 +760,62 @@ model Organization {
   @@index([status])
   @@index([createdAt])
   @@map("organizations")
+}
+
+model CollaborationTopic {
+  id             String   @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  description    String?
+  createdById    String
+  createdBy      User     @relation("CollaborationTopicCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  archivedAt     DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  channels       CollaborationChannel[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId, archivedAt, updatedAt])
+  @@map("collaboration_topics")
+}
+
+model CollaborationChannel {
+  id             String   @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  topicId        String
+  topic          CollaborationTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  name           String
+  description    String?
+  visibility     CollaborationChannelVisibility @default(PUBLIC)
+  createdById    String
+  createdBy      User     @relation("CollaborationChannelCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  archivedAt     DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  members        CollaborationChannelMember[]
+
+  @@unique([topicId, name])
+  @@unique([id, organizationId])
+  @@index([organizationId, topicId, archivedAt])
+  @@map("collaboration_channels")
+}
+
+model CollaborationChannelMember {
+  channelId String
+  channel   CollaborationChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User @relation("CollaborationChannelMemberUser", fields: [userId], references: [id], onDelete: Cascade)
+  role      CollaborationChannelMemberRole @default(MEMBER)
+  joinedAt  DateTime @default(now())
+  addedById String?
+  addedBy   User? @relation("CollaborationChannelMemberAddedBy", fields: [addedById], references: [id], onDelete: SetNull)
+
+  @@id([channelId, userId])
+  @@index([userId, joinedAt])
+  @@index([channelId, role])
+  @@map("collaboration_channel_members")
 }
 
 model OrganizationSettings {

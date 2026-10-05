@@ -231,6 +231,18 @@ let CompaniesService = class CompaniesService {
         else if (!filters?.includeArchived) {
             where.archivedAt = null;
         }
+        if (filters?.engagementStatus) {
+            where.engagementStatus = filters.engagementStatus;
+        }
+        if (filters?.pinnedOnly) {
+            where.userPreferences = {
+                some: {
+                    organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
+                    userId: user.userId,
+                    isPinned: true,
+                },
+            };
+        }
         const [data, total] = await Promise.all([
             this.prisma.company.findMany({
                 where,
@@ -259,6 +271,14 @@ let CompaniesService = class CompaniesService {
                             isActive: true,
                         },
                     },
+                    userPreferences: {
+                        where: {
+                            organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
+                            userId: user.userId,
+                        },
+                        select: { isPinned: true },
+                        take: 1,
+                    },
                 },
                 orderBy: { updatedAt: 'desc' },
                 skip,
@@ -268,7 +288,10 @@ let CompaniesService = class CompaniesService {
         ]);
         const totalPages = Math.ceil(total / limit);
         return {
-            data,
+            data: data.map(({ userPreferences, ...company }) => ({
+                ...company,
+                isPinned: userPreferences[0]?.isPinned ?? false,
+            })),
             meta: {
                 total,
                 page,
@@ -304,11 +327,23 @@ let CompaniesService = class CompaniesService {
                 parentRelations: { include: { parentCompany: true } },
                 subsidiaryRelations: { include: { subsidiaryCompany: true } },
                 legalDocuments: { orderBy: { createdAt: 'desc' } },
+                userPreferences: {
+                    where: {
+                        organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
+                        userId: user.userId,
+                    },
+                    select: { isPinned: true },
+                    take: 1,
+                },
             },
         });
         if (!company)
             throw new common_1.NotFoundException('شرکت پیدا نشد');
-        return this.withHierarchy(company);
+        const { userPreferences, ...companyData } = company;
+        return {
+            ...this.withHierarchy(companyData),
+            isPinned: userPreferences[0]?.isPinned ?? false,
+        };
     }
     async create(dto, user) {
         if (user.role === client_1.UserRole.BOARDS) {
@@ -453,6 +488,69 @@ let CompaniesService = class CompaniesService {
             after: updated,
         });
         return this.withHierarchy(updated);
+    }
+    async updateEngagement(id, dto, user) {
+        if (user.role === client_1.UserRole.BOARDS) {
+            throw new common_1.ForbiddenException('شما اجازه ویرایش وضعیت فروش شرکت را ندارید');
+        }
+        const company = await this.companyAccess.assertCompanyMutable(id, user);
+        const requiresReviewAt = dto.status === client_1.CompanyEngagementStatus.NURTURE ||
+            dto.status === client_1.CompanyEngagementStatus.SNOOZED;
+        if (requiresReviewAt && !dto.nextReviewAt) {
+            throw new common_1.BadRequestException('برای وضعیت پرورش یا تعویق، زمان پیگیری بعدی الزامی است');
+        }
+        if (requiresReviewAt && dto.nextReviewAt.getTime() <= Date.now()) {
+            throw new common_1.BadRequestException('زمان پیگیری بعدی باید در آینده باشد');
+        }
+        const updated = await this.prisma.company.update({
+            where: { id },
+            data: {
+                engagementStatus: dto.status,
+                engagementReason: dto.reason?.trim() || null,
+                nextReviewAt: requiresReviewAt ? dto.nextReviewAt : null,
+                engagementUpdatedAt: new Date(),
+                engagementUpdatedById: user.userId,
+            },
+        });
+        await this.audit.record({
+            actorId: user.userId,
+            organizationId: (0, tenant_scope_util_1.getCurrentOrganizationId)(user),
+            entityType: 'company',
+            entityId: id,
+            action: 'company.engagement_changed',
+            before: {
+                engagementStatus: company.engagementStatus,
+                engagementReason: company.engagementReason,
+                nextReviewAt: company.nextReviewAt,
+            },
+            after: {
+                engagementStatus: updated.engagementStatus,
+                engagementReason: updated.engagementReason,
+                nextReviewAt: updated.nextReviewAt,
+            },
+        });
+        return updated;
+    }
+    async setPinned(id, dto, user) {
+        await this.companyAccess.assertCompanyReadable(id, user);
+        const organizationId = (0, tenant_scope_util_1.getCurrentOrganizationId)(user);
+        return this.prisma.companyUserPreference.upsert({
+            where: {
+                organizationId_userId_companyId: {
+                    organizationId,
+                    userId: user.userId,
+                    companyId: id,
+                },
+            },
+            create: {
+                organizationId,
+                userId: user.userId,
+                companyId: id,
+                isPinned: dto.isPinned,
+            },
+            update: { isPinned: dto.isPinned },
+            select: { companyId: true, isPinned: true },
+        });
     }
     async changeOwner(id, dto, user) {
         if (user.role === client_1.UserRole.BOARDS) {

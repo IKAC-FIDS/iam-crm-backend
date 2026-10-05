@@ -30,7 +30,7 @@ class OperationsCompaniesQueryDto extends pagination_dto_1.PaginationDto {
         this.ownershipScope = ownership_scope_dto_1.OwnershipScope.MINE;
     }
     static _OPENAPI_METADATA_FACTORY() {
-        return { userId: { required: false, type: () => String }, search: { required: false, type: () => String }, priority: { required: false, type: () => Object }, attentionState: { required: false, enum: require("./operations-companies-query.dto").OperationsAttentionState }, hasUnreadMessages: { required: false, type: () => String }, hasActiveOpportunity: { required: false, type: () => String }, hasNoNextAction: { required: false, type: () => String }, ownershipScope: { required: false, default: ownership_scope_dto_1.OwnershipScope.MINE, enum: require("../../common/dto/ownership-scope.dto").OwnershipScope } };
+        return { userId: { required: false, type: () => String }, search: { required: false, type: () => String }, priority: { required: false, type: () => Object }, engagementStatus: { required: false, type: () => Object }, pinnedOnly: { required: false, type: () => String }, includeInactivePortfolio: { required: false, type: () => String }, attentionState: { required: false, enum: require("./operations-companies-query.dto").OperationsAttentionState }, hasUnreadMessages: { required: false, type: () => String }, hasActiveOpportunity: { required: false, type: () => String }, hasNoNextAction: { required: false, type: () => String }, ownershipScope: { required: false, default: ownership_scope_dto_1.OwnershipScope.MINE, enum: require("../../common/dto/ownership-scope.dto").OwnershipScope } };
     }
 }
 exports.OperationsCompaniesQueryDto = OperationsCompaniesQueryDto;
@@ -51,6 +51,22 @@ __decorate([
     (0, swagger_1.ApiPropertyOptional)({ enum: client_1.Priority }),
     __metadata("design:type", String)
 ], OperationsCompaniesQueryDto.prototype, "priority", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsEnum)(client_1.CompanyEngagementStatus),
+    (0, swagger_1.ApiPropertyOptional)({ enum: client_1.CompanyEngagementStatus }),
+    __metadata("design:type", String)
+], OperationsCompaniesQueryDto.prototype, "engagementStatus", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsBooleanString)(),
+    __metadata("design:type", String)
+], OperationsCompaniesQueryDto.prototype, "pinnedOnly", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsBooleanString)(),
+    __metadata("design:type", String)
+], OperationsCompaniesQueryDto.prototype, "includeInactivePortfolio", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsEnum)(OperationsAttentionState),

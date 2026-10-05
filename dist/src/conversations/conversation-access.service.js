@@ -15,13 +15,29 @@ const client_1 = require("@prisma/client");
 const activities_service_1 = require("../activities/activities.service");
 const company_access_service_1 = require("../companies/company-access.service");
 const tasks_service_1 = require("../tasks/tasks.service");
+const opportunities_service_1 = require("../opportunities/opportunities.service");
+const meetings_service_1 = require("../meetings/meetings.service");
+const collaboration_access_service_1 = require("../collaboration/collaboration-access.service");
 let ConversationAccessService = class ConversationAccessService {
-    constructor(companies, tasks, activities) {
+    constructor(companies, tasks, activities, opportunities, meetings, collaboration) {
         this.companies = companies;
         this.tasks = tasks;
         this.activities = activities;
+        this.opportunities = opportunities;
+        this.meetings = meetings;
+        this.collaboration = collaboration;
     }
     async assertReadable(entityType, entityId, user) {
+        if (entityType === client_1.ConversationEntityType.COLLABORATION_CHANNEL) {
+            const channel = await this.collaboration.assertReadable(entityId, user);
+            return {
+                entityType,
+                entityId,
+                label: `${channel.topic.name} / ${channel.name}`,
+                responsibleUserIds: channel.members.length ? [user.userId] : [],
+                actionUrl: `/collaboration?channel=${encodeURIComponent(entityId)}`,
+            };
+        }
         if (entityType === client_1.ConversationEntityType.COMPANY) {
             const company = await this.companies.assertCompanyReadable(entityId, user);
             return {
@@ -42,6 +58,31 @@ let ConversationAccessService = class ConversationAccessService {
                 actionUrl: `/tasks/${entityId}#conversation`,
             };
         }
+        if (entityType === client_1.ConversationEntityType.OPPORTUNITY) {
+            this.assertPermission(user, 'opportunity:view');
+            const opportunity = await this.opportunities.findOne(entityId, user);
+            return {
+                entityType,
+                entityId,
+                label: opportunity.title,
+                responsibleUserIds: opportunity.ownerId ? [opportunity.ownerId] : [],
+                actionUrl: `/opportunities/${entityId}#conversation`,
+            };
+        }
+        if (entityType === client_1.ConversationEntityType.MEETING) {
+            this.assertPermission(user, 'meeting:view');
+            const meeting = await this.meetings.findOne(entityId, user);
+            return {
+                entityType,
+                entityId,
+                label: meeting.title,
+                responsibleUserIds: [
+                    meeting.organizerId,
+                    ...(meeting.assignees ?? []).map((item) => item.userId),
+                ].filter((id, index, values) => Boolean(id) && values.indexOf(id) === index),
+                actionUrl: `/meetings/${entityId}#conversation`,
+            };
+        }
         const activity = await this.activities.assertReadable(entityId, user);
         return {
             entityType,
@@ -51,12 +92,20 @@ let ConversationAccessService = class ConversationAccessService {
             actionUrl: `/activities?activityId=${encodeURIComponent(entityId)}&conversation=1`,
         };
     }
+    assertPermission(user, permission) {
+        if (!user.tenantContext?.permissions.includes(permission)) {
+            throw new common_1.ForbiddenException('شما اجازه مشاهده این گفتگو را ندارید');
+        }
+    }
 };
 exports.ConversationAccessService = ConversationAccessService;
 exports.ConversationAccessService = ConversationAccessService = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [company_access_service_1.CompanyAccessService,
         tasks_service_1.TasksService,
-        activities_service_1.ActivitiesService])
+        activities_service_1.ActivitiesService,
+        opportunities_service_1.OpportunitiesService,
+        meetings_service_1.MeetingsService,
+        collaboration_access_service_1.CollaborationAccessService])
 ], ConversationAccessService);
 //# sourceMappingURL=conversation-access.service.js.map

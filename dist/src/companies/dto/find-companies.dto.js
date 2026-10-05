@@ -17,7 +17,7 @@ const pagination_dto_1 = require("../../common/dto/pagination.dto");
 const ownership_scope_dto_1 = require("../../common/dto/ownership-scope.dto");
 class FindCompaniesDto extends pagination_dto_1.PaginationDto {
     static _OPENAPI_METADATA_FACTORY() {
-        return { ownershipScope: { required: false, enum: require("../../common/dto/ownership-scope.dto").OwnershipScope }, stage: { required: false, type: () => Object }, priority: { required: false, type: () => Object }, industryId: { required: false, type: () => String }, industry: { required: false, type: () => String, description: "Deprecated compatibility filter.\nPrefer industryId." }, sourceId: { required: false, type: () => String }, source: { required: false, type: () => String, description: "Deprecated compatibility filter.\nPrefer sourceId." }, withoutOwner: { required: false, type: () => String }, search: { required: false, type: () => String }, ownerId: { required: false, type: () => String }, includeArchived: { required: false, type: () => String }, archivedOnly: { required: false, type: () => String } };
+        return { ownershipScope: { required: false, enum: require("../../common/dto/ownership-scope.dto").OwnershipScope }, stage: { required: false, type: () => Object }, priority: { required: false, type: () => Object }, industryId: { required: false, type: () => String }, industry: { required: false, type: () => String, description: "Deprecated compatibility filter.\nPrefer industryId." }, sourceId: { required: false, type: () => String }, source: { required: false, type: () => String, description: "Deprecated compatibility filter.\nPrefer sourceId." }, withoutOwner: { required: false, type: () => String }, search: { required: false, type: () => String }, ownerId: { required: false, type: () => String }, includeArchived: { required: false, type: () => String }, archivedOnly: { required: false, type: () => String }, engagementStatus: { required: false, type: () => Object }, pinnedOnly: { required: false, type: () => String } };
     }
 }
 exports.FindCompaniesDto = FindCompaniesDto;
@@ -81,4 +81,14 @@ __decorate([
     (0, class_validator_1.IsBooleanString)(),
     __metadata("design:type", String)
 ], FindCompaniesDto.prototype, "archivedOnly", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsEnum)(client_1.CompanyEngagementStatus),
+    __metadata("design:type", String)
+], FindCompaniesDto.prototype, "engagementStatus", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsBooleanString)(),
+    __metadata("design:type", String)
+], FindCompaniesDto.prototype, "pinnedOnly", void 0);
 //# sourceMappingURL=find-companies.dto.js.map
