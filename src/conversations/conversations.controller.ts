@@ -5,7 +5,7 @@ import { ConversationEntityType } from '@prisma/client';
 import { CurrentUser, CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
-import { CreateConversationMessageDto, FindConversationDto, FindConversationMentionOptionsDto, FindConversationReferenceOptionsDto, UpdateConversationMessageDto, UpdateConversationStatusDto } from './dto/conversation.dto';
+import { AskConversationBotDto, CreateConversationMessageDto, FindConversationDto, FindConversationMentionOptionsDto, FindConversationReferenceOptionsDto, UpdateConversationMessageDto, UpdateConversationStatusDto } from './dto/conversation.dto';
 import { ConversationsService } from './conversations.service';
 import { ConversationReferenceOptionsService } from './conversation-reference-options.service';
 
@@ -33,6 +33,11 @@ export class ConversationsController {
   @Post(':entityType/:entityId/messages')
   createMessage(@Param('entityType') entityType: ConversationEntityType, @Param('entityId') entityId: string, @Body() dto: CreateConversationMessageDto, @CurrentUser() user: CurrentUserPayload) {
     return this.conversations.createMessage(entityType, entityId, dto, user);
+  }
+
+  @Post('COLLABORATION_CHANNEL/:entityId/bot')
+  askBot(@Param('entityId') entityId: string, @Body() dto: AskConversationBotDto, @CurrentUser() user: CurrentUserPayload) {
+    return this.conversations.askBot(entityId, dto, user);
   }
 
   @Post('COLLABORATION_CHANNEL/:entityId/attachments')

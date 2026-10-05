@@ -93,6 +93,35 @@ export class ConversationAccessService {
     };
   }
 
+  async resolveAssistantReference(entityType: ConversationEntityType, entityId: string, user: CurrentUserPayload) {
+    const permission = {
+      [ConversationEntityType.COMPANY]: 'company:view',
+      [ConversationEntityType.OPPORTUNITY]: 'opportunity:view',
+      [ConversationEntityType.TASK]: 'task:view',
+      [ConversationEntityType.MEETING]: 'meeting:view',
+    }[entityType];
+    if (!permission) throw new ForbiddenException('این نوع مرجع برای دستیار پشتیبانی نمی‌شود');
+    this.assertPermission(user, permission);
+    const access = await this.assertReadable(entityType, entityId, user);
+    if (entityType === ConversationEntityType.COMPANY) {
+      const company = await this.companies.assertCompanyReadable(entityId, user);
+      return { type: entityType, id: entityId, label: access.label, priority: company.priority, ownerId: company.ownerId, industry: company.industry };
+    }
+    if (entityType === ConversationEntityType.OPPORTUNITY) {
+      const opportunity = await this.opportunities.findOne(entityId, user);
+      return { type: entityType, id: entityId, label: opportunity.title, stage: opportunity.stage?.label, priority: opportunity.priority, estimatedValue: opportunity.estimatedValue, expectedCloseDate: opportunity.expectedCloseDate, owner: opportunity.owner?.fullName };
+    }
+    if (entityType === ConversationEntityType.TASK) {
+      const task = await this.tasks.findOne(entityId, user);
+      return { type: entityType, id: entityId, label: task.title, status: task.status, priority: task.priority, dueAt: task.dueAt, assignee: task.assignedTo?.fullName };
+    }
+    if (entityType === ConversationEntityType.MEETING) {
+      const meeting = await this.meetings.findOne(entityId, user);
+      return { type: entityType, id: entityId, label: meeting.title, status: meeting.status, startAt: meeting.startAt, endAt: meeting.endAt, organizer: meeting.organizer?.fullName };
+    }
+    throw new ForbiddenException('این نوع مرجع برای دستیار پشتیبانی نمی‌شود');
+  }
+
   private assertPermission(user: CurrentUserPayload, permission: string) {
     if (!user.tenantContext?.permissions.includes(permission)) {
       throw new ForbiddenException('شما اجازه مشاهده این گفتگو را ندارید');

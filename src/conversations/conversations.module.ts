@@ -8,6 +8,7 @@ import { MeetingsModule } from '../meetings/meetings.module';
 import { CollaborationModule } from '../collaboration/collaboration.module';
 import { AttachmentsModule } from '../attachments/attachments.module';
 import { CompaniesModule } from '../companies/companies.module';
+import { CrmAssistantModule } from '../crm-assistant/crm-assistant.module';
 import { ConversationReferenceOptionsService } from './conversation-reference-options.service';
 import { ConversationAccessService } from './conversation-access.service';
 import { ConversationsController } from './conversations.controller';
@@ -24,6 +25,7 @@ import { ConversationsService } from './conversations.service';
     CollaborationModule,
     AttachmentsModule,
     CompaniesModule,
+    CrmAssistantModule,
   ],
   controllers: [ConversationsController],
   providers: [ConversationAccessService, ConversationReferenceOptionsService, ConversationsService],

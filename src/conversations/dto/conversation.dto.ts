@@ -47,6 +47,11 @@ export class ConversationReferenceDto {
   @IsUUID() id!: string;
 }
 
+export class AskConversationBotDto extends CreateConversationMessageDto {
+  @IsUUID('4')
+  requestId!: string;
+}
+
 export class UpdateConversationMessageDto {
   @IsString()
   @MinLength(1)

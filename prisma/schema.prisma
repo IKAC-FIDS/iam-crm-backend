@@ -2187,14 +2187,31 @@ model ConversationThread {
   @@map("conversation_threads")
 }
 
+enum ConversationSenderType {
+  USER
+  ASSISTANT
+}
+
+enum ConversationBotStatus {
+  PENDING
+  FAILED
+  COMPLETE
+}
+
 model ConversationMessage {
   id              String                  @id @default(uuid())
   organizationId  String
   organization    Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   threadId        String
   thread          ConversationThread      @relation(fields: [threadId], references: [id], onDelete: Cascade)
-  authorId        String
-  author          User                    @relation("ConversationMessageAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+  authorId        String?
+  author          User?                   @relation("ConversationMessageAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+  senderType      ConversationSenderType  @default(USER)
+  botRequestKey   String?                 @unique
+  botStatus       ConversationBotStatus?
+  botResponseToId String?                 @unique
+  botResponseTo   ConversationMessage?    @relation("ConversationBotResponse", fields: [botResponseToId], references: [id], onDelete: Restrict)
+  botResponse     ConversationMessage?    @relation("ConversationBotResponse")
   parentMessageId String?
   parentMessage   ConversationMessage?    @relation("ConversationMessageReplies", fields: [parentMessageId], references: [id], onDelete: Restrict)
   replies         ConversationMessage[]   @relation("ConversationMessageReplies")

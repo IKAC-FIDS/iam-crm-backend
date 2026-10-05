@@ -18,5 +18,6 @@ import { CrmMcpGatewayService } from './crm-mcp-gateway.service';
   imports: [CompaniesModule, OpportunitiesModule, TasksModule, MeetingsModule, ActivitiesModule, PeopleModule, TimesheetsModule, ReportsModule],
   controllers: [CrmAssistantController, CrmMcpController],
   providers: [CrmAssistantService, CrmAssistantToolsService, CrmAssistantActionsService, CrmMcpGatewayService],
+  exports: [CrmAssistantService, CrmAssistantToolsService],
 })
 export class CrmAssistantModule {}
