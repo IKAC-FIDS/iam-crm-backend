@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { BadGatewayException, BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { ConversationEntityType, ConversationMessageReferenceType, ConversationMessageType, FileAttachmentEntityType, Prisma } from '@prisma/client';
 import { AuditLogService } from '../audit-log/audit-log.service';
 import { CurrentUserPayload } from '../common/decorators/current-user.decorator';
@@ -93,7 +93,7 @@ export class ConversationsService {
     } catch (error) {
       await this.prisma.withTenantTransaction(tenantScope.require(user), (tx) => tx.conversationMessage.updateMany({ where: { id: requestMessage!.id, organizationId, botStatus: 'PENDING' }, data: { botStatus: 'FAILED' } }));
       this.logger.error(`Collaboration bot failed request=${dto.requestId} channel=${channelId}`);
-      if (error instanceof ForbiddenException || error instanceof BadRequestException || error instanceof ServiceUnavailableException) throw error;
+      if (error instanceof ForbiddenException || error instanceof NotFoundException || error instanceof BadRequestException || error instanceof BadGatewayException || error instanceof ServiceUnavailableException) throw error;
       throw new ServiceUnavailableException('دستیار CRM موقتاً پاسخ‌گو نیست؛ دوباره تلاش کنید.');
     }
   }

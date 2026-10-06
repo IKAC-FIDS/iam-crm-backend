@@ -1,4 +1,5 @@
-import { describe, expect, it, jest } from '@jest/globals';
+import { afterEach, describe, expect, it, jest } from '@jest/globals';
+import { ForbiddenException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { CrmAssistantService } from './crm-assistant.service';
 
 describe('CrmAssistantService deterministic performance comparison', () => {
@@ -191,6 +192,185 @@ describe('CrmAssistantService deterministic performance comparison', () => {
   });
 });
 
+describe('CrmAssistantService model intelligence and provider handling', () => {
+  afterEach(() => { jest.restoreAllMocks(); });
+
+  it('answers a general question directly without requiring a tool call', async () => {
+    const { service, mcp } = modelService([{ name: 'search_companies', description: 'search', inputSchema: {} }]);
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue(providerResponse({ output_text: 'اصل BATNA را توضیح می‌دهم.' }));
+
+    const result = await service.ask({ message: 'مفهوم BATNA در مذاکره چیست؟', history: [] }, currentUser());
+
+    expect(result.answer).toContain('BATNA');
+    expect(mcp.call).not.toHaveBeenCalled();
+    const request = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
+    expect(request.tool_choice).toBe('auto');
+    expect(request.instructions).toContain('دانش عمومی و استدلال');
+    expect(request.instructions).not.toContain('فقط بر اساس خروجی ابزارها پاسخ دهید');
+  });
+
+  it('uses an authorized CRM tool for current facts and returns the grounded answer', async () => {
+    const definition = { name: 'search_opportunities', description: 'search', inputSchema: {} };
+    const { service, mcp } = modelService([definition]);
+    jest.spyOn(global, 'fetch')
+      .mockResolvedValueOnce(providerResponse({ output: [{ type: 'function_call', name: definition.name, call_id: 'call-1', arguments: '{"search":"پرتو","limit":10}' }] }))
+      .mockResolvedValueOnce(providerResponse({ output_text: 'طبق داده CRM، یک فرصت فعال وجود دارد.' }));
+    mcp.call.mockResolvedValue({ data: [{ title: 'تمدید قرارداد', status: 'ACTIVE' }] });
+
+    const result = await service.ask({ message: 'فرصت‌های فعلی پرتو چیست؟', history: [] }, currentUser());
+
+    expect(mcp.call).toHaveBeenCalledWith('search_opportunities', { search: 'پرتو', limit: 10 }, expect.anything());
+    expect(result.answer).toContain('طبق داده CRM');
+    expect(result.toolsUsed).toEqual(['search_opportunities']);
+  });
+
+  it('combines authorized CRM facts with model reasoning for a hybrid recommendation', async () => {
+    const definition = { name: 'search_meetings', description: 'search', inputSchema: {} };
+    const { service, mcp } = modelService([definition]);
+    jest.spyOn(global, 'fetch')
+      .mockResolvedValueOnce(providerResponse({ output: [{ type: 'function_call', name: definition.name, call_id: 'call-1', arguments: '{"search":"مشتری الف","limit":10}' }] }))
+      .mockResolvedValueOnce(providerResponse({ output_text: 'واقعیت CRM: دو جلسه برگزار شده است. تحلیل: جلسه بعدی را روی تصمیم‌گیر اقتصادی متمرکز کنید.' }));
+    mcp.call.mockResolvedValue({ data: [{ title: 'نیازسنجی' }, { title: 'دمو' }] });
+
+    const result = await service.ask({ message: 'با توجه به جلسات مشتری الف چه راهبرد فروشی پیشنهاد می‌کنی؟', history: [] }, currentUser());
+
+    expect(mcp.call).toHaveBeenCalledTimes(1);
+    expect(result.answer).toContain('تحلیل:');
+    expect(result.answer).toContain('تصمیم‌گیر اقتصادی');
+  });
+
+  it('keeps Collaboration read-only while allowing general knowledge', async () => {
+    const definitions = [
+      { name: 'search_tasks', description: 'search', inputSchema: {} },
+      { name: 'propose_create_task', description: 'propose', inputSchema: {} },
+    ];
+    const { service, mcp } = modelService(definitions);
+    mcp.isAction.mockImplementation((name: string) => name.startsWith('propose_'));
+    const assertAccess = jest.fn<() => Promise<void>>().mockResolvedValue(undefined);
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue(providerResponse({ output_text: 'برای مدیریت تعارض، ابتدا مسئله را از موضع افراد جدا کنید.' }));
+
+    const result = await service.ask(
+      { message: 'برای مدیریت تعارض تیمی چه پیشنهادی داری؟', history: [] },
+      currentUser(),
+      { context: { recentMessages: [] }, assertAccess },
+    );
+
+    const request = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
+    expect(request.tools.map((tool: { name: string }) => tool.name)).toEqual(['search_tasks']);
+    expect(request.instructions).toContain('دانش عمومی و استدلال');
+    expect(request.instructions).toContain('فقط خواندنی');
+    expect(assertAccess).toHaveBeenCalledTimes(1);
+    expect(mcp.call).not.toHaveBeenCalled();
+    expect(result.answer).toContain('مدیریت تعارض');
+  });
+
+  it('grounds Collaboration CRM facts with a read-only tool and revalidates access', async () => {
+    const definition = { name: 'search_tasks', description: 'search', inputSchema: {} };
+    const { service, mcp } = modelService([definition]);
+    const assertAccess = jest.fn<() => Promise<void>>().mockResolvedValue(undefined);
+    jest.spyOn(global, 'fetch')
+      .mockResolvedValueOnce(providerResponse({ output: [{ type: 'function_call', name: definition.name, call_id: 'call-1', arguments: '{"search":"پیگیری","limit":10}' }] }))
+      .mockResolvedValueOnce(providerResponse({ output_text: 'طبق داده مجاز CRM، یک کار پیگیری باز است.' }));
+    mcp.call.mockResolvedValue({ data: [{ title: 'پیگیری', status: 'OPEN' }] });
+
+    const result = await service.ask(
+      { message: 'وضعیت کار پیگیری چیست؟', history: [] },
+      currentUser(),
+      { context: { recentMessages: [] }, assertAccess },
+    );
+
+    expect(mcp.call).toHaveBeenCalledWith('search_tasks', { search: 'پیگیری', limit: 10 }, expect.anything());
+    expect(assertAccess).toHaveBeenCalledTimes(2);
+    expect(result.answer).toContain('طبق داده مجاز CRM');
+  });
+
+  it.each([400, 401, 404])('does not retry non-transient provider status %s', async (status) => {
+    const { service } = modelService([]);
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue(providerError(status, 'invalid_request_error', 'bad_parameter', 'private provider detail'));
+
+    await expect(service.ask({ message: 'یک متن عمومی بنویس', history: [] }, currentUser()))
+      .rejects.toMatchObject({ response: expect.objectContaining({ message: 'در پردازش درخواست توسط سرویس هوش مصنوعی خطایی رخ داد' }) });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([408, 429, 500, 502, 503, 504])('retries transient provider status %s with a bounded attempt count', async (status) => {
+    immediateRetryTimers();
+    const { service } = modelService([]);
+    const fetchMock = jest.spyOn(global, 'fetch').mockImplementation(async () => providerError(status, 'server_error', 'temporarily_unavailable', 'private provider detail'));
+
+    await expect(service.ask({ message: 'یک متن عمومی بنویس', history: [] }, currentUser()))
+      .rejects.toMatchObject({ response: expect.objectContaining({ message: expect.stringContaining(status === 429 ? 'پرترافیک' : 'موقتاً در دسترس نیست') }) });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('retries network failures without logging exception messages or request content', async () => {
+    immediateRetryTimers();
+    const { service } = modelService([]);
+    const logger = { warn: jest.fn() };
+    (service as any).logger = logger;
+    const fetchMock = jest.spyOn(global, 'fetch').mockRejectedValue(new Error('secret-url?token=api-key'));
+
+    await expect(service.ask({ message: 'private CRM prompt', history: [] }, currentUser())).rejects.toBeInstanceOf(ServiceUnavailableException);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    const logs = logger.warn.mock.calls.flat().join(' ');
+    expect(logs).toContain('errorName=Error');
+    expect(logs).not.toContain('secret-url');
+    expect(logs).not.toContain('private CRM prompt');
+    expect(logs).not.toContain('api-key');
+  });
+
+  it('logs only sanitized provider metadata and never the raw provider message', async () => {
+    const { service } = modelService([]);
+    const logger = { warn: jest.fn() };
+    (service as any).logger = logger;
+    jest.spyOn(global, 'fetch').mockResolvedValue(providerError(400, 'invalid_request_error', 'unsupported_model', 'prompt and CRM data echoed here'));
+
+    await expect(service.ask({ message: 'sensitive prompt', history: [] }, currentUser())).rejects.toBeDefined();
+    const logs = logger.warn.mock.calls.flat().join(' ');
+    expect(logs).toContain('status=400');
+    expect(logs).toContain('requestId=req-safe-123');
+    expect(logs).toContain('errorType=invalid_request_error');
+    expect(logs).toContain('errorCode=unsupported_model');
+    expect(logs).not.toContain('prompt and CRM data');
+    expect(logs).not.toContain('sensitive prompt');
+  });
+
+  it('detects bounded tool-loop exhaustion instead of returning an empty answer', async () => {
+    const definition = { name: 'search_tasks', description: 'search', inputSchema: {} };
+    const { service, mcp } = modelService([definition]);
+    jest.spyOn(global, 'fetch').mockImplementation(async () => providerResponse({ output: [{ type: 'function_call', name: definition.name, call_id: 'call', arguments: '{"search":null,"limit":10}' }] }));
+    mcp.call.mockResolvedValue({ data: [] });
+
+    await expect(service.ask({ message: 'درخواست پیچیده', history: [] }, currentUser()))
+      .rejects.toMatchObject({ response: expect.objectContaining({ message: expect.stringContaining('مراحل بیشتری') }) });
+    expect(mcp.call).toHaveBeenCalledTimes(4);
+  });
+
+  it('returns recoverable domain outcomes to the model but preserves authorization failures', async () => {
+    const definition = { name: 'search_tasks', description: 'search', inputSchema: {} };
+    const first = providerResponse({ output: [{ type: 'function_call', name: definition.name, call_id: 'call-1', arguments: '{"search":"ناموجود","limit":10}' }] });
+    const { service, mcp } = modelService([definition]);
+    const fetchMock = jest.spyOn(global, 'fetch')
+      .mockResolvedValueOnce(first)
+      .mockResolvedValueOnce(providerResponse({ output_text: 'موردی در محدوده دسترسی پیدا نشد.' }));
+    mcp.call.mockRejectedValueOnce(new NotFoundException('internal entity detail'));
+
+    const result = await service.ask({ message: 'وضعیت کار ناموجود چیست؟', history: [] }, currentUser());
+
+    const secondRequest = JSON.parse(String(fetchMock.mock.calls[1][1]?.body));
+    expect(secondRequest.input).toEqual(expect.arrayContaining([
+      expect.objectContaining({ output: expect.stringContaining('NOT_FOUND') }),
+    ]));
+    expect(result.answer).toContain('پیدا نشد');
+
+    jest.restoreAllMocks();
+    const secured = modelService([definition]);
+    jest.spyOn(global, 'fetch').mockResolvedValue(providerResponse({ output: [{ type: 'function_call', name: definition.name, call_id: 'call-2', arguments: '{"search":null,"limit":10}' }] }));
+    secured.mcp.call.mockRejectedValue(new ForbiddenException('private authorization detail'));
+    await expect(secured.service.ask({ message: 'همه کارها را بده', history: [] }, currentUser())).rejects.toBeInstanceOf(ForbiddenException);
+  });
+});
+
 function currentUser() {
   return {
     userId: 'admin',
@@ -225,4 +405,41 @@ function performanceReport(
     activity: { total: activities },
     tasks: { employee: { onTimeCompletionRate: taskRate } },
   };
+}
+
+function modelService(definitions: Array<{ name: string; description: string; inputSchema: Record<string, unknown> }>) {
+  const configValues: Record<string, string> = {
+    OPENAI_API_KEY: 'test-api-key',
+    OPENAI_BASE_URL: 'https://provider.example/v1',
+    OPENAI_MODEL: 'test-model',
+  };
+  const config = { get: jest.fn((key: string, fallback?: string) => configValues[key] ?? fallback) };
+  const mcp = {
+    listFor: jest.fn().mockReturnValue(definitions),
+    isAction: jest.fn<(name: string) => boolean>().mockReturnValue(false),
+    call: jest.fn<(...args: any[]) => Promise<any>>(),
+  };
+  const audit = { recordTenantEvent: jest.fn<(...args: any[]) => Promise<any>>().mockResolvedValue(undefined) };
+  return { service: new CrmAssistantService(config as never, mcp as never, audit as never), mcp, audit };
+}
+
+function providerResponse(body: Record<string, unknown>, status = 200) {
+  return new Response(JSON.stringify({ id: 'response-id', ...body }), {
+    status,
+    headers: { 'content-type': 'application/json', 'x-request-id': 'req-safe-123' },
+  });
+}
+
+function providerError(status: number, type: string, code: string, message: string) {
+  return new Response(JSON.stringify({ error: { type, code, message } }), {
+    status,
+    headers: { 'content-type': 'application/json', 'x-request-id': 'req-safe-123' },
+  });
+}
+
+function immediateRetryTimers() {
+  jest.spyOn(global, 'setTimeout').mockImplementation(((callback: (...args: any[]) => void) => {
+    callback();
+    return 0 as any;
+  }) as typeof setTimeout);
 }
