@@ -2454,6 +2454,7 @@ model PipelineStage {
   code         String   @unique
   label        String
   description  String?
+  maxDurationDays Int?
   sortOrder    Int      @default(0)
   color        String?
   isActive     Boolean  @default(true)

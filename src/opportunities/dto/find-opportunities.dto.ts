@@ -23,4 +23,5 @@ export class FindOpportunitiesDto extends PaginationDto {
   @IsOptional() @IsBooleanString() includeArchived?: string;
   @IsOptional() @IsBooleanString() archivedOnly?: string;
   @IsOptional() @IsBooleanString() activeOnly?: string;
+  @IsOptional() @IsBooleanString() stageOverdueOnly?: string;
 }

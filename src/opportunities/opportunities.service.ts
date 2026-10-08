@@ -30,6 +30,11 @@ import { OwnershipScope } from '../common/dto/ownership-scope.dto';
 import { activeOpportunityStateWhere } from '../common/opportunities/active-opportunity-scope';
 import { QuotaService } from '../quota/quota.service';
 import { NotificationCoreService } from '../notification-core/notification-core.service';
+import {
+  addOrganizationCalendarDays,
+  organizationDayBounds,
+  zonedDateParts,
+} from '../common/dates/timezone-boundary.util';
 
 const opportunityInclude = {
   company: {
@@ -59,7 +64,13 @@ const opportunityInclude = {
       color: true,
       isTerminal: true,
       terminalType: true,
+      maxDurationDays: true,
     },
+  },
+  stageHistories: {
+    select: { toStageId: true, changedAt: true },
+    orderBy: { changedAt: 'desc' },
+    take: 1,
   },
   sourceOption: {
     select: {
@@ -137,7 +148,12 @@ export class OpportunitiesService {
   async findAll(query: FindOpportunitiesDto, user: CurrentUserPayload) {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
-    const where = this.buildWhere(query, user);
+    const now = new Date();
+    const timeZone = await this.getOrganizationTimezone(user);
+    const overdueWhere = query.stageOverdueOnly === 'true'
+      ? await this.buildStageOverdueWhere(now, timeZone)
+      : undefined;
+    const where = this.buildWhere(query, user, overdueWhere);
 
     const [data, total] = await Promise.all([
       this.prisma.opportunity.findMany({
@@ -155,7 +171,7 @@ export class OpportunitiesService {
     const totalPages = Math.ceil(total / limit);
 
     return {
-      data,
+      data: data.map((item) => this.withAging(item, now, timeZone)),
       meta: {
         total,
         page,
@@ -294,7 +310,11 @@ export class OpportunitiesService {
       throw new NotFoundException('Opportunity not found');
     }
 
-    return opportunity;
+    return this.withAging(
+      opportunity,
+      new Date(),
+      await this.getOrganizationTimezone(user),
+    );
   }
 
   async create(dto: CreateOpportunityDto, user: CurrentUserPayload) {
@@ -658,6 +678,7 @@ export class OpportunitiesService {
   private buildWhere(
     query: FindOpportunitiesDto,
     user: CurrentUserPayload,
+    stageOverdueWhere?: Prisma.OpportunityWhereInput,
   ): Prisma.OpportunityWhereInput {
     if (query.activeOnly === 'true' && query.archivedOnly === 'true') {
       throw new BadRequestException(
@@ -675,6 +696,8 @@ export class OpportunitiesService {
         },
       },
     ];
+
+    if (stageOverdueWhere) and.push(stageOverdueWhere);
 
     if (query.companyId) {
       and.push({
@@ -850,6 +873,100 @@ export class OpportunitiesService {
     return {
       AND: and,
     };
+  }
+
+  private async buildStageOverdueWhere(
+    now: Date,
+    timeZone: string,
+  ): Promise<Prisma.OpportunityWhereInput> {
+    const stages = await this.prisma.pipelineStage.findMany({
+      where: {
+        isActive: true,
+        isTerminal: false,
+        maxDurationDays: { not: null },
+      },
+      select: { id: true, maxDurationDays: true },
+    });
+    const today = organizationDayBounds(now, timeZone).start;
+    const overdueStages = stages.flatMap((stage) => {
+      if (!stage.maxDurationDays) return [];
+      const threshold = addOrganizationCalendarDays(
+        today,
+        -stage.maxDurationDays,
+        timeZone,
+      );
+      return [{
+        stageId: stage.id,
+        archivedAt: null,
+        stage: { isTerminal: false },
+        OR: [
+          {
+            AND: [
+              { stageHistories: { some: { toStageId: stage.id } } },
+              {
+                stageHistories: {
+                  none: {
+                    toStageId: stage.id,
+                    changedAt: { gte: threshold },
+                  },
+                },
+              },
+            ],
+          },
+          {
+            stageHistories: { none: { toStageId: stage.id } },
+            createdAt: { lt: threshold },
+          },
+        ],
+      } satisfies Prisma.OpportunityWhereInput];
+    });
+    return overdueStages.length ? { OR: overdueStages } : { id: { in: [] } };
+  }
+
+  private async getOrganizationTimezone(user: CurrentUserPayload) {
+    const organization = await this.prisma.organization.findUnique({
+      where: { id: getCurrentOrganizationId(user) },
+      select: { timezone: true },
+    });
+    return organization?.timezone || 'Asia/Tehran';
+  }
+
+  private withAging<T extends {
+    stageId: string;
+    createdAt: Date;
+    archivedAt: Date | null;
+    stage: { isTerminal: boolean; maxDurationDays: number | null };
+    stageHistories: Array<{ toStageId: string; changedAt: Date }>;
+  }>(opportunity: T, now: Date, timeZone: string) {
+    const latestStageEntry = opportunity.stageHistories.find(
+      (entry) => entry.toStageId === opportunity.stageId,
+    );
+    const stageEnteredAt = latestStageEntry?.changedAt ?? opportunity.createdAt;
+    const ageDays = this.calendarDayDifference(opportunity.createdAt, now, timeZone);
+    const currentStageAgeDays = this.calendarDayDifference(stageEnteredAt, now, timeZone);
+    const maxDurationDays = opportunity.stage.maxDurationDays;
+    const active = !opportunity.archivedAt && !opportunity.stage.isTerminal;
+    const stageOverdueDays = active && maxDurationDays !== null
+      ? Math.max(0, currentStageAgeDays - maxDurationDays)
+      : 0;
+    return {
+      ...opportunity,
+      ageDays,
+      currentStageAgeDays,
+      maxDurationDays,
+      isStageOverdue: stageOverdueDays > 0,
+      stageOverdueDays,
+    };
+  }
+
+  private calendarDayDifference(from: Date, to: Date, timeZone: string) {
+    const start = zonedDateParts(from, timeZone);
+    const end = zonedDateParts(to, timeZone);
+    return Math.max(0, Math.floor(
+      (Date.UTC(end.year, end.month - 1, end.day) -
+        Date.UTC(start.year, start.month - 1, start.day)) /
+        86_400_000,
+    ));
   }
 
   private readOwnershipScopeWhere(
