@@ -143,7 +143,7 @@ export const envValidationSchema = Joi.object({
     }),
 
   THROTTLE_LIMIT: Joi.number()
-    .default(100)
+    .default(6000)
     .integer()
     .min(1)
     .messages({

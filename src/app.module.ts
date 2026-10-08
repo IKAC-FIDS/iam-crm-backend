@@ -71,7 +71,7 @@ import { CollaborationModule } from "./collaboration/collaboration.module";
         throttlers: [
           {
             ttl: config.get<number>("THROTTLE_TTL", 60000),
-            limit: config.get<number>("THROTTLE_LIMIT", 100),
+            limit: config.get<number>("THROTTLE_LIMIT", 6000),
           },
         ],
       }),
