@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { ForbiddenException } from '@nestjs/common';
-import { ConversationEntityType } from '@prisma/client';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import { ConversationEntityType, ConversationMessageType } from '@prisma/client';
 import { validate } from 'class-validator';
 import { ConversationAccessService } from '../src/conversations/conversation-access.service';
 import { CreateConversationMessageDto } from '../src/conversations/dto/conversation.dto';
@@ -214,5 +214,108 @@ describe('Conversation architecture', () => {
     expect(result.counts).toMatchObject({ all: 3, company: 1, tasks: 1, activities: 1, unread: 2 });
     expect(tx.conversationThread.findMany).toHaveBeenCalledTimes(1);
     expect(tx.$queryRaw).toHaveBeenCalledTimes(1);
+  });
+
+  describe('nested replies', () => {
+    const scopedUser = tenantUser({
+      userId: 'user-1',
+      email: 'u@example.com',
+      role: 'REP' as never,
+      organizationId: 'org-1',
+    } as never);
+
+    function setup(parent: { id: string; authorId: string | null; parentMessageId: string | null } | null) {
+      const createdAt = new Date('2026-10-08T08:00:00Z');
+      const tx = {
+        conversationThread: {
+          upsert: jest.fn().mockResolvedValue({ id: 'thread-1' }),
+        },
+        conversationMessage: {
+          findFirst: jest.fn().mockResolvedValue(parent),
+          create: jest.fn().mockImplementation(({ data }) => Promise.resolve({
+            id: 'message-new',
+            ...data,
+            senderType: 'USER',
+            botStatus: null,
+            botResponseToId: null,
+            editedAt: null,
+            deletedAt: null,
+            deletedById: null,
+            createdAt,
+            updatedAt: createdAt,
+            author: { id: 'user-1', fullName: 'کاربر', avatarObjectKey: null },
+            parentMessage: parent ? { id: parent.id, body: 'والد', type: ConversationMessageType.ANSWER, author: null } : null,
+            references: [],
+          })),
+        },
+        user: { findMany: jest.fn().mockResolvedValue([]) },
+        conversationParticipant: { upsert: jest.fn().mockResolvedValue({}) },
+      };
+      const prisma = { withTenantTransaction: jest.fn((_tenant, callback) => callback(tx)) };
+      const access = { assertReadable: jest.fn().mockResolvedValue({ responsibleUserIds: [], actionUrl: '/companies/company-1', label: 'شرکت' }) };
+      const notifications = { publishDomainEvent: jest.fn().mockResolvedValue(undefined) };
+      const audit = { record: jest.fn().mockResolvedValue(undefined) };
+      const conversations = new ConversationsService(prisma as never, access as never, notifications as never, audit as never, {} as never, {} as never);
+      return { conversations, tx };
+    }
+
+    async function createReply(parent: { id: string; authorId: string | null; parentMessageId: string | null }) {
+      const { conversations, tx } = setup(parent);
+      const result = await conversations.createMessage(
+        ConversationEntityType.COMPANY,
+        'company-1',
+        { body: 'پاسخ', type: ConversationMessageType.ANSWER, parentMessageId: parent.id },
+        scopedUser,
+      );
+      return { result, tx };
+    }
+
+    it.each([
+      ['root message', null],
+      ['first-level reply', 'message-root'],
+      ['second-level reply', 'message-level-1'],
+    ])('allows replying to a %s and stores the immediate parent', async (_label, parentMessageId) => {
+      const parent = { id: 'selected-parent', authorId: 'user-2', parentMessageId };
+      const { result, tx } = await createReply(parent);
+
+      expect(tx.conversationMessage.create).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ parentMessageId: 'selected-parent' }),
+      }));
+      expect(result).toEqual(expect.objectContaining({ parentMessageId: 'selected-parent' }));
+    });
+
+    it.each([
+      ['missing'],
+      ['deleted'],
+      ['another thread'],
+      ['another organization'],
+    ])('rejects a %s parent message', async () => {
+      const { conversations, tx } = setup(null);
+      await expect(conversations.createMessage(
+        ConversationEntityType.COMPANY,
+        'company-1',
+        { body: 'پاسخ', type: ConversationMessageType.ANSWER, parentMessageId: 'invalid-parent' },
+        scopedUser,
+      )).rejects.toBeInstanceOf(BadRequestException);
+      expect(tx.conversationMessage.findFirst).toHaveBeenCalledWith({
+        where: {
+          id: 'invalid-parent',
+          threadId: 'thread-1',
+          organizationId: 'org-1',
+          deletedAt: null,
+        },
+        select: { id: true, authorId: true, parentMessageId: true },
+      });
+    });
+
+    it('still rejects an ANSWER without a parent message', async () => {
+      const { conversations } = setup(null);
+      await expect(conversations.createMessage(
+        ConversationEntityType.COMPANY,
+        'company-1',
+        { body: 'پاسخ', type: ConversationMessageType.ANSWER },
+        scopedUser,
+      )).rejects.toBeInstanceOf(BadRequestException);
+    });
   });
 });

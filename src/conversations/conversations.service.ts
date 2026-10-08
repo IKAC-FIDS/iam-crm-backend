@@ -278,7 +278,7 @@ export class ConversationsService {
       let parent: { id: string; authorId: string | null; parentMessageId: string | null } | null = null;
       if (dto.parentMessageId) {
         parent = await tx.conversationMessage.findFirst({ where: { id: dto.parentMessageId, threadId: thread.id, organizationId, deletedAt: null }, select: { id: true, authorId: true, parentMessageId: true } });
-        if (!parent || parent.parentMessageId) throw new BadRequestException('پیام مرجع نامعتبر است.');
+        if (!parent) throw new BadRequestException('پیام مرجع نامعتبر است.');
       }
       const requestedMentionIds = [...new Set(dto.mentionedUserIds ?? [])].filter((id) => id !== user.userId);
       const mentionableUsers = requestedMentionIds.length
