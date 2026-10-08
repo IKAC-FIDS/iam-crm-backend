@@ -948,6 +948,15 @@ async function main() {
     { action: 'notification:manage', description: 'مدیریت اعلان‌های شخصی' },
     { action: 'notification:send', description: 'ارسال اعلان داخلی' },
 
+    { action: 'collaboration:view', name: 'مشاهده مرکز همکاری', group: 'مرکز همکاری', description: 'مشاهده موضوع‌ها، کانال‌ها و گفتگوهای قابل دسترس' },
+    { action: 'collaboration:topic:create', name: 'ایجاد موضوع', group: 'مرکز همکاری', description: 'ایجاد موضوع همکاری' },
+    { action: 'collaboration:topic:update', name: 'ویرایش موضوع', group: 'مرکز همکاری', description: 'ویرایش موضوع همکاری' },
+    { action: 'collaboration:topic:delete', name: 'بایگانی موضوع', group: 'مرکز همکاری', description: 'بایگانی موضوع و کانال‌های آن' },
+    { action: 'collaboration:channel:create', name: 'ایجاد کانال', group: 'مرکز همکاری', description: 'ایجاد کانال در موضوع‌های همکاری' },
+    { action: 'collaboration:channel:update', name: 'ویرایش کانال', group: 'مرکز همکاری', description: 'ویرایش کانال همکاری' },
+    { action: 'collaboration:channel:delete', name: 'بایگانی کانال', group: 'مرکز همکاری', description: 'بایگانی کانال همکاری' },
+    { action: 'collaboration:member:manage', name: 'مدیریت اعضای کانال', group: 'مرکز همکاری', description: 'افزودن و حذف اعضای کانال‌های قابل دسترس' },
+
     { action: 'timesheet:report', description: 'گزارش کارکرد در محدوده مجاز' },
     { action: 'timesheet:export', description: 'خروجی کارکرد در محدوده مجاز' },
     { action: 'timesheet:view', description: 'مشاهده کارکرد شخصی' },
@@ -1076,6 +1085,11 @@ async function main() {
     'notification:manage',
     'notification:send',
 
+    'collaboration:view',
+    'collaboration:topic:create', 'collaboration:topic:update', 'collaboration:topic:delete',
+    'collaboration:channel:create', 'collaboration:channel:update', 'collaboration:channel:delete',
+    'collaboration:member:manage',
+
     'organization:view',
     'team:view',
 
@@ -1162,6 +1176,8 @@ async function main() {
     'notification:view',
     'notification:manage',
 
+    'collaboration:view',
+
     'organization:view',
 
     'technical-release:view',
@@ -1194,6 +1210,8 @@ async function main() {
     'meeting:view',
 
     'notification:view',
+
+    'collaboration:view',
 
     'organization:view',
 

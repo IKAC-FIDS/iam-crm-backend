@@ -503,6 +503,11 @@ enum CollaborationChannelVisibility {
   PRIVATE
 }
 
+enum CollaborationTopicCategory {
+  TENDER
+  INTERNAL
+}
+
 enum CollaborationChannelMemberRole {
   OWNER
   ADMIN
@@ -778,6 +783,7 @@ model CollaborationTopic {
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   name           String
   description    String?
+  category       CollaborationTopicCategory @default(INTERNAL)
   createdById    String
   createdBy      User     @relation("CollaborationTopicCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   archivedAt     DateTime?
@@ -786,6 +792,7 @@ model CollaborationTopic {
   channels       CollaborationChannel[]
 
   @@unique([organizationId, name])
+  @@index([organizationId, category, archivedAt])
   @@index([organizationId, archivedAt, updatedAt])
   @@map("collaboration_topics")
 }

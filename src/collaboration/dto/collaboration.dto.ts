@@ -1,14 +1,20 @@
-import { CollaborationChannelMemberRole, CollaborationChannelVisibility } from '@prisma/client';
+import { CollaborationChannelMemberRole, CollaborationChannelVisibility, CollaborationTopicCategory } from '@prisma/client';
 import { ArrayMaxSize, ArrayUnique, IsArray, IsEnum, IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
 
 export class CreateCollaborationTopicDto {
   @IsString() @MinLength(1) @MaxLength(120) name!: string;
   @IsOptional() @IsString() @MaxLength(500) description?: string;
+  @IsEnum(CollaborationTopicCategory) category!: CollaborationTopicCategory;
 }
 
 export class UpdateCollaborationTopicDto {
   @IsOptional() @IsString() @MinLength(1) @MaxLength(120) name?: string;
   @IsOptional() @IsString() @MaxLength(500) description?: string;
+  @IsOptional() @IsEnum(CollaborationTopicCategory) category?: CollaborationTopicCategory;
+}
+
+export class CollaborationTopicsQueryDto {
+  @IsOptional() @IsEnum(CollaborationTopicCategory) category?: CollaborationTopicCategory;
 }
 
 export class CreateCollaborationChannelDto {
