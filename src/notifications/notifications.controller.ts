@@ -51,7 +51,7 @@ export class NotificationsController {
   }
 
   @Patch('read-all')
-  @Permissions('notification:manage')
+  @Permissions('notification:view')
   readAll(
     @Body() dto: ReadAllNotificationsDto,
     @CurrentUser() user: CurrentUserPayload,
@@ -66,13 +66,13 @@ export class NotificationsController {
   }
 
   @Patch(':id/read')
-  @Permissions('notification:manage')
+  @Permissions('notification:view')
   markRead(@Param('id') id: string, @CurrentUser() user: CurrentUserPayload) {
     return this.service.markRead(id, user);
   }
 
   @Patch(':id/unread')
-  @Permissions('notification:manage')
+  @Permissions('notification:view')
   markUnread(@Param('id') id: string, @CurrentUser() user: CurrentUserPayload) {
     return this.service.markUnread(id, user);
   }

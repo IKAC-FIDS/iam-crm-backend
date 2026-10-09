@@ -3,8 +3,19 @@ import {
   NotificationPriority,
   NotificationType,
 } from '@prisma/client';
-import { IsEnum, IsOptional, IsString } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsArray, IsEnum, IsIn, IsOptional, IsString } from 'class-validator';
 import { PaginationDto } from '../../common/dto/pagination.dto';
+
+export enum NotificationSortBy {
+  CREATED_AT = 'createdAt',
+  PRIORITY = 'priority',
+}
+
+export enum NotificationSortOrder {
+  ASC = 'asc',
+  DESC = 'desc',
+}
 
 export class FindNotificationsDto extends PaginationDto {
   @IsOptional()
@@ -12,8 +23,28 @@ export class FindNotificationsDto extends PaginationDto {
   type?: NotificationType;
 
   @IsOptional()
+  @Transform(({ value }) =>
+    (Array.isArray(value) ? value : String(value).split(','))
+      .map((item) => String(item).trim())
+      .filter(Boolean),
+  )
+  @IsArray()
+  @IsEnum(NotificationType, { each: true })
+  types?: NotificationType[];
+
+  @IsOptional()
   @IsEnum(NotificationPriority)
   priority?: NotificationPriority;
+
+  @IsOptional()
+  @Transform(({ value }) =>
+    (Array.isArray(value) ? value : String(value).split(','))
+      .map((item) => String(item).trim())
+      .filter(Boolean),
+  )
+  @IsArray()
+  @IsEnum(NotificationPriority, { each: true })
+  priorities?: NotificationPriority[];
 
   @IsOptional()
   @IsEnum(NotificationEntityType)
@@ -24,7 +55,7 @@ export class FindNotificationsDto extends PaginationDto {
   entityId?: string;
 
   @IsOptional()
-  @IsString()
+  @IsIn(['unread', 'read', 'all'])
   status?: 'unread' | 'read' | 'all';
 
   @IsOptional()
@@ -38,4 +69,20 @@ export class FindNotificationsDto extends PaginationDto {
   @IsOptional()
   @IsString()
   search?: string;
+
+  @IsOptional()
+  @IsString()
+  dateFrom?: string;
+
+  @IsOptional()
+  @IsString()
+  dateTo?: string;
+
+  @IsOptional()
+  @IsEnum(NotificationSortBy)
+  sortBy?: NotificationSortBy = NotificationSortBy.CREATED_AT;
+
+  @IsOptional()
+  @IsEnum(NotificationSortOrder)
+  sortOrder?: NotificationSortOrder = NotificationSortOrder.DESC;
 }

@@ -20,8 +20,13 @@ import {
   TenantTransactionClient,
 } from '../prisma/prisma.service';
 import { CreateNotificationDto } from './dto/create-notification.dto';
-import { FindNotificationsDto } from './dto/find-notifications.dto';
+import {
+  FindNotificationsDto,
+  NotificationSortBy,
+  NotificationSortOrder,
+} from './dto/find-notifications.dto';
 import { ReadAllNotificationsDto } from './dto/read-all-notifications.dto';
+import { parseApiDateRange } from '../common/dates/api-date.util';
 import {
   getCurrentOrganizationId,
   tenantScope,
@@ -78,14 +83,13 @@ export class NotificationsService {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const where = this.buildWhere(query, user);
+    const orderBy = this.buildOrderBy(query);
 
     const [data, total] = await this.withTenant(user, async (tx) => Promise.all([
       tx.notification.findMany({
         where,
         include: notificationInclude,
-        orderBy: {
-          createdAt: 'desc',
-        },
+        orderBy,
         skip: (page - 1) * limit,
         take: limit,
       }),
@@ -409,15 +413,25 @@ export class NotificationsService {
       },
     ];
 
-    if (query.type) {
+    if (query.type && !query.types?.length) {
       and.push({
         type: query.type,
       });
     }
 
-    if (query.priority) {
+    if (query.types?.length) {
+      and.push({ type: { in: query.types } });
+    }
+
+    if (query.priority && !query.priorities?.length) {
       and.push({
         priority: query.priority,
+      });
+    }
+
+    if (query.priorities?.length) {
+      and.push({
+        priority: { in: query.priorities },
       });
     }
 
@@ -479,10 +493,33 @@ export class NotificationsService {
         ],
       });
     }
+    const createdAt = parseApiDateRange(
+      query.dateFrom,
+      query.dateTo,
+      'dateFrom',
+      'dateTo',
+    );
+    if (createdAt) and.push({ createdAt });
 
     return {
       AND: and,
     };
+  }
+
+  private buildOrderBy(
+    query: FindNotificationsDto,
+  ): Prisma.NotificationOrderByWithRelationInput[] {
+    const direction = query.sortOrder === NotificationSortOrder.ASC ? 'asc' : 'desc';
+
+    if (query.sortBy === NotificationSortBy.PRIORITY) {
+      return [
+        { priority: direction },
+        { createdAt: direction },
+        { id: direction },
+      ];
+    }
+
+    return [{ createdAt: direction }, { id: direction }];
   }
 
   private async getNotificationInScope(
