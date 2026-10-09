@@ -36,7 +36,7 @@ import {
   zonedDateParts,
 } from '../common/dates/timezone-boundary.util';
 
-const opportunityInclude = {
+const opportunityListInclude = {
   company: {
     select: {
       id: true,
@@ -98,6 +98,10 @@ const opportunityInclude = {
       tasks: true,
     },
   },
+} satisfies Prisma.OpportunityInclude;
+
+const opportunityInclude = {
+  ...opportunityListInclude,
   commercialDocuments: {
     orderBy: [{ createdAt: 'desc' }],
     include: {
@@ -158,7 +162,7 @@ export class OpportunitiesService {
     const [data, total] = await Promise.all([
       this.prisma.opportunity.findMany({
         where,
-        include: opportunityInclude,
+        include: opportunityListInclude,
         orderBy: {
           updatedAt: 'desc',
         },

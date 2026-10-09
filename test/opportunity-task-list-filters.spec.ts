@@ -75,6 +75,17 @@ describe('activeOnly opportunity filtering', () => {
       prisma.opportunity.findMany.mock.calls[0][0].where.AND,
     ).toContainEqual({ archivedAt: null });
   });
+  it('uses the lightweight relation set for list results', async () => {
+    const { prisma, service } = setup();
+
+    await service.findAll({}, user as any);
+
+    const include = prisma.opportunity.findMany.mock.calls[0][0].include;
+    expect(include.company).toBeDefined();
+    expect(include.stage).toBeDefined();
+    expect(include.commercialDocuments).toBeUndefined();
+    expect(include.payments).toBeUndefined();
+  });
   it('returns the same three-opportunity active population used by report reconciliation fixtures', async () => {
     const prisma = {
       organization: {
