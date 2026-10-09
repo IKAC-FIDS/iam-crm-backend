@@ -41,6 +41,10 @@ services:
   api:
     build: .
     restart: unless-stopped
+    networks:
+      default:
+        aliases:
+          - iam-crm-backend-api
     depends_on:
       - db
       - minio
