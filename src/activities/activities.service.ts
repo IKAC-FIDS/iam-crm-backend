@@ -31,6 +31,7 @@ const activityCenterSelect = {
   completedAt: true,
   createdAt: true,
   person: { select: { id: true, fullName: true } },
+  opportunity: { select: { id: true, title: true } },
   company: {
     select: {
       id: true,
@@ -280,6 +281,7 @@ export class ActivitiesService {
       },
       include: {
         company: true,
+        opportunity: { select: { id: true, title: true } },
         task: true,
         person: true,
         user: { select: { id: true, fullName: true } },
@@ -537,6 +539,7 @@ export class ActivitiesService {
       },
       include: {
         company: true,
+        opportunity: { select: { id: true, title: true } },
         task: true,
         person: true,
         user: { select: { id: true, fullName: true } },
