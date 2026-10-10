@@ -11,6 +11,7 @@ import { CompleteActivityDto } from './dto/complete-activity.dto';
 import { RescheduleActivityDto } from './dto/reschedule-activity.dto';
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { FindTaskActivitiesDto } from './dto/find-task-activities.dto';
+import { FindActivityOpportunityOptionsDto } from './dto/find-activity-opportunity-options.dto';
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('activities')
@@ -20,6 +21,15 @@ export class ActivitiesController {
   @Get('types/options')
   @AnyPermission('activity:view', 'activity:create', 'activity:update')
   findTypes() { return this.activitiesService.findTypes(); }
+
+  @Get('opportunities/options')
+  @AnyPermission('activity:view', 'activity:create', 'activity:update')
+  findOpportunityOptions(
+    @Query() query: FindActivityOpportunityOptionsDto,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.activitiesService.findOpportunityOptions(query, user);
+  }
 
   @Get()
   @Permissions('activity:view')

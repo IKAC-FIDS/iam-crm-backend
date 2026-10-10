@@ -15,6 +15,7 @@ import { userTeamFilterWhere, userTeamScopeWhere } from '../common/tenant/team-s
 import { OwnershipScope } from '../common/dto/ownership-scope.dto';
 import { parseApiDateRange } from '../common/dates/api-date.util';
 import { ActivityListStatus, FindActivitiesDto } from './dto/find-activities.dto';
+import { FindActivityOpportunityOptionsDto } from './dto/find-activity-opportunity-options.dto';
 
 const activityCenterSelect = {
   id: true,
@@ -66,6 +67,36 @@ export class ActivitiesService {
       where: { group: 'activity-types' },
       orderBy: [{ sortOrder: 'asc' }, { label: 'asc' }],
     });
+  }
+
+  async findOpportunityOptions(
+    query: FindActivityOpportunityOptionsDto,
+    user: CurrentUserPayload,
+  ) {
+    await this.assertCompanyReadable(query.companyId, user);
+    const search = query.search?.trim();
+    const opportunities = await this.prisma.opportunity.findMany({
+      where: {
+        companyId: query.companyId,
+        archivedAt: null,
+        ...(search && {
+          title: { contains: search, mode: Prisma.QueryMode.insensitive },
+        }),
+      },
+      select: {
+        id: true,
+        title: true,
+        stage: { select: { label: true } },
+      },
+      orderBy: [{ updatedAt: 'desc' }, { title: 'asc' }],
+      take: 50,
+    });
+
+    return opportunities.map((opportunity) => ({
+      id: opportunity.id,
+      label: opportunity.title,
+      secondary: opportunity.stage.label,
+    }));
   }
 
   private canViewOrganizationActivities(user: CurrentUserPayload) {
