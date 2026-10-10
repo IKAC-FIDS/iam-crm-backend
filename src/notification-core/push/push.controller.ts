@@ -25,4 +25,8 @@ export class PushSubscriptionController {
   @Get("subscriptions") list(@CurrentUser() user: CurrentUserPayload) { return this.push.listOwn(tenantScope.require(user)) }
   @Post("subscriptions") register(@Body() dto: RegisterPushSubscriptionDto, @CurrentUser() user: CurrentUserPayload, @Headers("user-agent") userAgent?: string) { return this.push.register(tenantScope.require(user), dto, userAgent) }
   @Delete("subscriptions/:id") remove(@Param("id") id: string, @CurrentUser() user: CurrentUserPayload) { return this.push.removeOwn(tenantScope.require(user), id) }
+  @Post("test") test(@CurrentUser() user: CurrentUserPayload) {
+    const context = tenantScope.require(user)
+    return this.push.test(context, { recipientUserId: context.userId })
+  }
 }

@@ -24,7 +24,7 @@ describe("Notification delivery deduplication", () => {
   ])("separates identities by %s", (_name, changed) => expect(keys.build(changed)).not.toBe(keys.build(identity)))
 
   it("separates 24h, 1h and rescheduled reminder occurrences", () => {
-    const common = { organizationId: "org-a", recipientUserId: "user-1", channel: NotificationChannel.PUSH }
+    const common = { organizationId: "org-a", recipientUserId: "user-1", channel: NotificationChannel.DESKTOP_PUSH }
     const day = keys.build({ ...common, eventOccurrenceKey: "MEETING.REMINDER:meeting-1:2026-09-20T10:00:00.000Z:OFFSET:-1440" })
     const hour = keys.build({ ...common, eventOccurrenceKey: "MEETING.REMINDER:meeting-1:2026-09-20T10:00:00.000Z:OFFSET:-60" })
     const rescheduled = keys.build({ ...common, eventOccurrenceKey: "MEETING.REMINDER:meeting-1:2026-09-21T10:00:00.000Z:OFFSET:-60" })

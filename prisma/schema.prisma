@@ -3658,7 +3658,7 @@ model TenderReview {
 enum NotificationChannel {
   EMAIL
   SMS
-  PUSH
+  DESKTOP_PUSH
   IN_APP
 }
 

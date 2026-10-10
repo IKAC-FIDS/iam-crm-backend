@@ -24,7 +24,7 @@ export class PushSettingsService {
     void provider
     const publicKey = dto.publicKey?.trim() || null
     const subject = dto.subject?.trim() || null
-    if (dto.enabled && (!publicKey || !privateKeyEnc || !subject)) throw new BadRequestException("کلید عمومی، کلید خصوصی و Subject برای فعال‌سازی پوش الزامی‌اند")
+    if (dto.enabled && (!publicKey || !privateKeyEnc || !subject)) throw new BadRequestException("کلید عمومی، کلید خصوصی و Subject برای فعال‌سازی اعلان دسکتاپ الزامی‌اند")
     const row = await this.prisma.withTenantTransaction(context, tx => tx.notificationPushSettings.upsert({
       where: { organizationId: context.organizationId },
       create: { organizationId: context.organizationId, provider: dto.provider, publicKey, privateKeyEnc, subject, enabled: dto.enabled, timeoutMs: dto.timeoutMs ?? 10000 },
@@ -36,14 +36,14 @@ export class PushSettingsService {
 
   async configured(context: TenantContext) {
     const row = await this.prisma.withTenantTransaction(context, tx => tx.notificationPushSettings.findUnique({ where: { organizationId: context.organizationId } }))
-    if (!row?.enabled || !row.publicKey || !row.privateKeyEnc || !row.subject) throw new BadRequestException("کانال پوش فعال یا کامل نیست")
+    if (!row?.enabled || !row.publicKey || !row.privateKeyEnc || !row.subject) throw new BadRequestException("کانال اعلان دسکتاپ فعال یا کامل نیست")
     const config: PushProviderConfig = { publicKey: row.publicKey, privateKey: this.secrets.decryptSecret(row.privateKeyEnc), subject: row.subject, timeoutMs: row.timeoutMs }
     return { row, provider: this.providers.get(row.provider), config }
   }
 
   async status(context: TenantContext) {
     const settings = await this.get(context)
-    return { channel: "PUSH", available: true, configured: settings.configured, enabled: settings.enabled, usable: settings.usable, provider: settings.provider || null, configurationPath: "/admin/notifications?tab=channels" }
+    return { channel: "DESKTOP_PUSH", available: true, configured: settings.configured, enabled: settings.enabled, usable: settings.usable, provider: settings.provider || null, configurationPath: "/admin/notifications?tab=channels" }
   }
 
   async publicConfig(context: TenantContext) {
@@ -53,7 +53,7 @@ export class PushSettingsService {
 
   async register(context: TenantContext, dto: RegisterPushSubscriptionDto, userAgent?: string) {
     const settings = await this.get(context)
-    if (!settings.usable || settings.provider !== "WEB_PUSH") throw new BadRequestException("کانال Web Push سازمان فعال نیست")
+    if (!settings.usable || settings.provider !== "WEB_PUSH") throw new BadRequestException("کانال اعلان دسکتاپ سازمان فعال نیست")
     const subscription: WebPushSubscriptionData = { endpoint: dto.endpoint, expirationTime: dto.expirationTime ?? null, keys: dto.keys }
     const externalEndpointId = this.endpointHash(dto.endpoint)
     return this.prisma.withTenantTransaction(context, tx => tx.notificationPushEndpoint.upsert({
@@ -67,7 +67,7 @@ export class PushSettingsService {
   listOwn(context: TenantContext) { return this.prisma.withTenantTransaction(context, tx => tx.notificationPushEndpoint.findMany({ where: { organizationId: context.organizationId, userId: context.userId, active: true }, select: { id: true, provider: true, endpointType: true, metadata: true, active: true, lastSeenAt: true, createdAt: true }, orderBy: { lastSeenAt: "desc" } })) }
   async removeOwn(context: TenantContext, id: string) {
     const result = await this.prisma.withTenantTransaction(context, tx => tx.notificationPushEndpoint.updateMany({ where: { id, organizationId: context.organizationId, userId: context.userId }, data: { active: false } }))
-    if (!result.count) throw new BadRequestException("اشتراک پوش متعلق به کاربر جاری یافت نشد")
+    if (!result.count) throw new BadRequestException("اشتراک اعلان دسکتاپ متعلق به کاربر جاری یافت نشد")
     return { disabled: true }
   }
 

@@ -47,7 +47,7 @@ export type NotificationEventName =
   | (typeof NOTIFICATION_EVENT_CATALOG.OVERTIME)[keyof typeof NOTIFICATION_EVENT_CATALOG.OVERTIME]
   | (typeof NOTIFICATION_EVENT_CATALOG.LEAVE)[keyof typeof NOTIFICATION_EVENT_CATALOG.LEAVE]
 
-export const NOTIFICATION_CHANNELS = ["EMAIL", "SMS", "PUSH", "IN_APP"] as const
+export const NOTIFICATION_CHANNELS = ["EMAIL", "SMS", "DESKTOP_PUSH", "IN_APP"] as const
 export type NotificationChannelCode = (typeof NOTIFICATION_CHANNELS)[number]
 
 export type NotificationTemplateVariable = {
