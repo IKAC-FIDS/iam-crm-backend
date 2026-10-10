@@ -132,8 +132,20 @@ export class PipelineConfigService {
 
   async assertTransitionAllowed(fromStageId: string, toStageId: string, role: UserRole) {
     const target = await this.getStage(toStageId);
-    const rules = await this.prisma.pipelineStageTransition.findMany({ where: { fromStageId, toStageId, OR: [{ role }, { role: null }] } });
-    const rule = rules.find((item) => item.role === role) ?? rules.find((item) => item.role === null);
+    const rules = await this.prisma.pipelineStageTransition.findMany({
+      where: {
+        toStageId,
+        AND: [
+          { OR: [{ fromStageId }, { fromStageId: null }] },
+          { OR: [{ role }, { role: null }] },
+        ],
+      },
+    });
+    const rule =
+      rules.find((item) => item.role === role && item.fromStageId === fromStageId) ??
+      rules.find((item) => item.role === role && item.fromStageId === null) ??
+      rules.find((item) => item.role === null && item.fromStageId === fromStageId) ??
+      rules.find((item) => item.role === null && item.fromStageId === null);
     if (!target.isActive || !rule?.isAllowed) throw new BadRequestException('انتقال از این مرحله به مرحله انتخاب‌شده مجاز نیست.');
     return target;
   }
