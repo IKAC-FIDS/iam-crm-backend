@@ -5,6 +5,7 @@ import {
   TechnicalDocumentStatus,
   TechnicalConfidentiality,
   TechnicalReleaseStatus,
+  TechnicalResourceType,
   TechnicalResourceStatus,
   TenderStatus,
   TenderRequirementStatus,
@@ -362,6 +363,21 @@ describe('TechnicalCenterService', () => {
     expect(prisma.technicalResource.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ organizationId, productId }) }));
     await service.listResources({ page: 1, limit: 20, type: 'SDK', status: 'DRAFT' }, user());
     expect(prisma.technicalResource.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ organizationId, resourceType: 'SDK', status: 'DRAFT' }) }));
+  });
+
+  it('supports the unified technical library content types', async () => {
+    const resource = { id: 'library-item', organizationId, title: 'Release notes', resourceType: TechnicalResourceType.RELEASE, status: TechnicalResourceStatus.DRAFT, archivedAt: null };
+    prisma.technicalResource.create.mockResolvedValue(resource);
+
+    await service.createResource({ title: 'Release notes', resourceType: TechnicalResourceType.RELEASE }, user());
+    expect(prisma.technicalResource.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ organizationId, resourceType: TechnicalResourceType.RELEASE }),
+    }));
+
+    await service.listResources({ page: 1, limit: 20, type: TechnicalResourceType.DOCUMENT }, user());
+    expect(prisma.technicalResource.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ organizationId, resourceType: TechnicalResourceType.DOCUMENT }),
+    }));
   });
 
   it('creates a tender, protects submit permission, and rejects invalid lifecycle jumps', async () => {

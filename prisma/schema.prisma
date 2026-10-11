@@ -3231,6 +3231,9 @@ enum TechnicalConfidentiality {
 }
 
 enum TechnicalResourceType {
+  RELEASE
+  DOCUMENT
+  TOOL
   SDK
   SAMPLE_CODE
   API_COLLECTION
