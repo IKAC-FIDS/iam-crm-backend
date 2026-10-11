@@ -79,6 +79,38 @@ describe("NotificationTemplateEngineService", () => {
       .rejects.toThrow(NotFoundException)
   })
 
+  it("falls back to the active in-app template for desktop push", async () => {
+    const { prisma, service } = setup()
+    prisma.notificationTemplate.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: "in-app-template", channel: NotificationChannel.IN_APP, version: 3 })
+
+    await expect(
+      service.resolve(organizationId, "TASK.ASSIGNED", NotificationChannel.DESKTOP_PUSH, "fa-IR"),
+    ).resolves.toMatchObject({ id: "in-app-template" })
+
+    expect(prisma.notificationTemplate.findFirst).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      where: expect.objectContaining({ channel: NotificationChannel.DESKTOP_PUSH }),
+    }))
+    expect(prisma.notificationTemplate.findFirst).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      where: expect.objectContaining({ channel: NotificationChannel.IN_APP }),
+    }))
+  })
+
+  it("prefers a dedicated desktop-push template over the in-app fallback", async () => {
+    const { prisma, service } = setup()
+    prisma.notificationTemplate.findFirst.mockResolvedValue({
+      id: "desktop-template",
+      channel: NotificationChannel.DESKTOP_PUSH,
+      version: 1,
+    })
+
+    await expect(
+      service.resolve(organizationId, "TASK.ASSIGNED", NotificationChannel.DESKTOP_PUSH, "fa-IR"),
+    ).resolves.toMatchObject({ id: "desktop-template" })
+    expect(prisma.notificationTemplate.findFirst).toHaveBeenCalledTimes(1)
+  })
+
   it("builds tenant-scoped context and links the exact template", async () => {
     const { prisma, service } = setup()
     prisma.organization.findUnique.mockResolvedValue({ id: organizationId, name: "نشان", locale: "fa-IR" })

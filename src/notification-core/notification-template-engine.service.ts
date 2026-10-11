@@ -68,8 +68,28 @@ export class NotificationTemplateEngineService {
       where: { organizationId, eventName, channel, locale, isActive: true },
       orderBy: [{ version: "desc" }, { createdAt: "desc" }],
     })
-    if (!template) throw new NotFoundException("No active notification template found")
-    return template
+    if (template) return template
+
+    // Desktop push and the in-app inbox are both short, user-facing notification
+    // surfaces. Reusing the active inbox template keeps existing rules functional
+    // when DESKTOP_PUSH is added to them without forcing administrators to create
+    // an identical second template. A channel-specific desktop template still
+    // takes precedence whenever one has been configured.
+    if (channel === NotificationChannel.DESKTOP_PUSH) {
+      const inAppTemplate = await db.notificationTemplate.findFirst({
+        where: {
+          organizationId,
+          eventName,
+          channel: NotificationChannel.IN_APP,
+          locale,
+          isActive: true,
+        },
+        orderBy: [{ version: "desc" }, { createdAt: "desc" }],
+      })
+      if (inAppTemplate) return inAppTemplate
+    }
+
+    throw new NotFoundException("No active notification template found")
   }
 
   async renderDelivery(event: NotificationEvent, recipientUserId: string, channel: NotificationChannel, db: TenantTransactionClient = this.prisma) {

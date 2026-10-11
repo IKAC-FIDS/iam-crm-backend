@@ -103,6 +103,29 @@ describe('Notification Core automatic inbox dispatch', () => {
     expect(deliveries.createPendingDelivery).toHaveBeenCalledTimes(1);
     expect(deliveries.createPendingDelivery).toHaveBeenCalledWith(expect.objectContaining({ recipientUserId: 'user-1', channel: 'DESKTOP_PUSH', ruleId: 'mandatory-rule' }), db);
   });
+  it('targets the assignee when another user creates the task', async () => {
+    const recipient = { id: 'recipient-1', type: 'ASSIGNEE', targetId: null, channels: ['DESKTOP_PUSH'], enabled: true };
+    const db = {
+      notificationRule: { findMany: jest.fn().mockResolvedValue([
+        { id: 'assignment-rule', mandatory: true, schedule: null, conditions: null, recipientRules: [recipient] },
+      ]) },
+      user: { findMany: jest.fn().mockResolvedValue([{ id: 'assignee-user' }]) },
+    };
+    const templates = { renderDelivery: jest.fn().mockResolvedValue({ template: { id: 'template-1' } }) };
+    const deliveries = { createPendingDelivery: jest.fn().mockResolvedValue({ status: 'CREATED' }) };
+    const engine = new NotificationRuleEngineService(db as any, templates as any, {} as any, { hasConditions: jest.fn().mockReturnValue(false) } as any, deliveries as any);
+
+    await engine.evaluateEvent({
+      id: 'event-1', organizationId: 'org-a', eventName: 'TASK.ASSIGNED', aggregateType: 'TASK', aggregateId: 'task-1',
+      actorId: 'creator-user', payload: { assigneeUserIds: ['assignee-user'] }, idempotencyKey: 'TASK.ASSIGNED:task-1:v1',
+    } as any);
+
+    expect(deliveries.createPendingDelivery).toHaveBeenCalledTimes(1);
+    expect(deliveries.createPendingDelivery).toHaveBeenCalledWith(expect.objectContaining({
+      recipientUserId: 'assignee-user',
+      channel: 'DESKTOP_PUSH',
+    }), db);
+  });
   it('evaluates only scheduled rules for the occurrence offset while allowing multiple rules at that offset', async () => {
     const recipient = { id: 'recipient-1', type: 'USER', targetId: 'user-1', channels: ['EMAIL'], enabled: true };
     const db = {

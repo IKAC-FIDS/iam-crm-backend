@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, Optional } from "@nestjs/common"
+import { Injectable, Logger, NotFoundException, Optional } from "@nestjs/common"
 import {
   NotificationRecipientType,
   OrganizationMembershipStatus,
@@ -14,6 +14,8 @@ import { NotificationOrchestrationService } from "./orchestration/notification-o
 
 @Injectable()
 export class NotificationRuleEngineService {
+  private readonly logger = new Logger(NotificationRuleEngineService.name)
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly templateEngine: NotificationTemplateEngineService,
@@ -74,6 +76,9 @@ export class NotificationRuleEngineService {
               else duplicate += 1
             } catch (error) {
               if (error instanceof NotFoundException) {
+                this.logger.warn(
+                  `Notification delivery unresolved event=${event.eventName} ruleId=${rule.id} recipientUserId=${recipientUserId} channel=${channel} reason=${error.message}`,
+                )
                 unresolved += 1
                 continue
               }
