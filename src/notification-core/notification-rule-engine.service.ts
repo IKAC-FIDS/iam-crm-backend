@@ -52,7 +52,13 @@ export class NotificationRuleEngineService {
       if (policyContext && !this.policyEvaluator.evaluate(rule.conditions, policyContext).matches) continue
       matchedRules += 1
       for (const recipientRule of rule.recipientRules) {
-        const recipientIds = (await this.resolveRecipientIds(event, recipientRule, db)).filter(id => id !== event.actorId)
+        const resolvedRecipientIds = await this.resolveRecipientIds(event, recipientRule, db)
+        // Ordinary rules avoid notifying the user who caused the event. A mandatory
+        // organization rule is authoritative and must also apply when the actor is
+        // the assignee (for example, a task created and assigned to oneself).
+        const recipientIds = rule.mandatory
+          ? resolvedRecipientIds
+          : resolvedRecipientIds.filter(id => id !== event.actorId)
         if (!recipientIds.length) {
           unresolved += recipientRule.channels.length
           continue

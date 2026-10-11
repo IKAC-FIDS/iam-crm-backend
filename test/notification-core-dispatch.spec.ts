@@ -81,6 +81,28 @@ describe('Notification Core automatic inbox dispatch', () => {
     expect(result).toMatchObject({ rules: 2, matchedRules: 1, created: 1 });
     expect(db.notificationDelivery.createMany).toHaveBeenCalledTimes(1);
   });
+  it('notifies an actor-assignee for a mandatory assignment rule while ordinary rules still suppress self-notifications', async () => {
+    const recipient = { id: 'recipient-1', type: 'ASSIGNEE', targetId: null, channels: ['DESKTOP_PUSH'], enabled: true };
+    const db = {
+      notificationRule: { findMany: jest.fn().mockResolvedValue([
+        { id: 'mandatory-rule', mandatory: true, schedule: null, conditions: null, recipientRules: [recipient] },
+        { id: 'ordinary-rule', mandatory: false, schedule: null, conditions: null, recipientRules: [{ ...recipient, id: 'recipient-2' }] },
+      ]) },
+      user: { findMany: jest.fn().mockResolvedValue([{ id: 'user-1' }]) },
+    };
+    const templates = { renderDelivery: jest.fn().mockResolvedValue({ template: { id: 'template-1' } }) };
+    const deliveries = { createPendingDelivery: jest.fn().mockResolvedValue({ status: 'CREATED' }) };
+    const engine = new NotificationRuleEngineService(db as any, templates as any, {} as any, { hasConditions: jest.fn().mockReturnValue(false) } as any, deliveries as any);
+
+    const result = await engine.evaluateEvent({
+      id: 'event-1', organizationId: 'org-a', eventName: 'TASK.ASSIGNED', aggregateType: 'TASK', aggregateId: 'task-1',
+      actorId: 'user-1', payload: { assigneeUserIds: ['user-1'] }, idempotencyKey: 'TASK.ASSIGNED:task-1:v1',
+    } as any);
+
+    expect(result).toMatchObject({ matchedRules: 2, created: 1, unresolved: 1 });
+    expect(deliveries.createPendingDelivery).toHaveBeenCalledTimes(1);
+    expect(deliveries.createPendingDelivery).toHaveBeenCalledWith(expect.objectContaining({ recipientUserId: 'user-1', channel: 'DESKTOP_PUSH', ruleId: 'mandatory-rule' }), db);
+  });
   it('evaluates only scheduled rules for the occurrence offset while allowing multiple rules at that offset', async () => {
     const recipient = { id: 'recipient-1', type: 'USER', targetId: 'user-1', channels: ['EMAIL'], enabled: true };
     const db = {
