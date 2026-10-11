@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Headers, Param, Patch, Post, UseGuards } from "@nestjs/common"
+import { Body, Controller, Delete, Get, Headers, Param, Patch, Post, Query, UseGuards } from "@nestjs/common"
 import { CurrentUser, type CurrentUserPayload } from "../../common/decorators/current-user.decorator"
 import { Permissions } from "../../common/decorators/permissions.decorator"
 import { JwtAuthGuard } from "../../common/guards/jwt-auth.guard"
@@ -13,6 +13,7 @@ import { PushSettingsService } from "./push-settings.service"
 export class PushAdminController {
   constructor(private readonly push: PushSettingsService) {}
   @Get() get(@CurrentUser() user: CurrentUserPayload) { return this.push.get(tenantScope.require(user)) }
+  @Get("recipients") recipients(@CurrentUser() user: CurrentUserPayload, @Query("search") search?: string) { return this.push.recipientTargets(tenantScope.require(user), search) }
   @Patch() update(@Body() dto: UpdatePushSettingsDto, @CurrentUser() user: CurrentUserPayload) { return this.push.update(tenantScope.require(user), dto) }
   @Post("test") test(@Body() dto: TestPushDto, @CurrentUser() user: CurrentUserPayload) { return this.push.test(tenantScope.require(user), dto) }
 }

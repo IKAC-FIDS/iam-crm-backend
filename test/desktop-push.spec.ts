@@ -99,4 +99,36 @@ describe("desktop push subscriptions", () => {
     expect(first.create).toMatchObject({ organizationId: "org-a", userId: "user-a" })
     expect(first.update).toMatchObject({ userId: "user-a", active: true })
   })
+
+  it("sends an admin test to the selected recipient subscriptions, never the sender", async () => {
+    const recipientEndpoint = {
+      id: "endpoint-b",
+      endpointEnc: "encrypted-subscription-b",
+    }
+    const tx = {
+      notificationPushSettings: { findUnique: jest.fn().mockResolvedValue(settings) },
+      notificationPushEndpoint: {
+        findMany: jest.fn().mockResolvedValue([recipientEndpoint]),
+        updateMany: jest.fn(),
+      },
+    }
+    const provider = { send: jest.fn().mockResolvedValue({ success: true, providerStatus: "201" }) }
+    const prisma = { withTenantTransaction: jest.fn((_tenant, operation) => operation(tx)) }
+    const secrets = {
+      decryptSecret: jest.fn((value: string) => value === settings.privateKeyEnc ? "private" : JSON.stringify(endpoint)),
+    }
+    const providers = { get: jest.fn(() => provider), list: jest.fn(() => ["WEB_PUSH"]) }
+    const service = new PushSettingsService(prisma as never, secrets as never, providers as never, {} as never)
+
+    const result = await service.test(context, { recipientUserId: "user-b" })
+
+    expect(tx.notificationPushEndpoint.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { organizationId: "org-a", userId: "user-b", active: true },
+    }))
+    expect(provider.send).toHaveBeenCalledWith(expect.objectContaining({
+      recipientUserId: "user-b",
+      endpointId: "endpoint-b",
+    }), expect.anything())
+    expect(result).toMatchObject({ recipientUserId: "user-b", subscriptionCount: 1, accepted: 1, displayConfirmed: false })
+  })
 })

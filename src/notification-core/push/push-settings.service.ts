@@ -64,6 +64,40 @@ export class PushSettingsService {
     }))
   }
 
+  async recipientTargets(context: TenantContext, search?: string) {
+    const value = search?.trim()
+    const endpoints = await this.prisma.withTenantTransaction(context, tx => tx.notificationPushEndpoint.findMany({
+      where: {
+        organizationId: context.organizationId,
+        active: true,
+        user: {
+          isActive: true,
+          ...(value ? { OR: [{ fullName: { contains: value, mode: "insensitive" } }, { email: { contains: value, mode: "insensitive" } }] } : {}),
+        },
+      },
+      select: {
+        userId: true,
+        lastSeenAt: true,
+        metadata: true,
+        user: { select: { id: true, fullName: true, email: true } },
+      },
+      orderBy: { lastSeenAt: "desc" },
+      take: 200,
+    }))
+
+    const recipients = new Map<string, { id: string; fullName: string; email: string; subscriptionCount: number; lastSeenAt: Date; devices: unknown[] }>()
+    for (const endpoint of endpoints) {
+      const existing = recipients.get(endpoint.userId)
+      if (existing) {
+        existing.subscriptionCount += 1
+        existing.devices.push(endpoint.metadata)
+      } else {
+        recipients.set(endpoint.userId, { ...endpoint.user, subscriptionCount: 1, lastSeenAt: endpoint.lastSeenAt, devices: [endpoint.metadata] })
+      }
+    }
+    return [...recipients.values()].slice(0, 100)
+  }
+
   listOwn(context: TenantContext) { return this.prisma.withTenantTransaction(context, tx => tx.notificationPushEndpoint.findMany({ where: { organizationId: context.organizationId, userId: context.userId, active: true }, select: { id: true, provider: true, endpointType: true, metadata: true, active: true, lastSeenAt: true, createdAt: true }, orderBy: { lastSeenAt: "desc" } })) }
   async removeOwn(context: TenantContext, id: string) {
     const result = await this.prisma.withTenantTransaction(context, tx => tx.notificationPushEndpoint.updateMany({ where: { id, organizationId: context.organizationId, userId: context.userId }, data: { active: false } }))
@@ -81,7 +115,17 @@ export class PushSettingsService {
     const results = await Promise.all(endpoints.map(endpoint => provider.send({ recipientUserId: dto.recipientUserId, endpointId: endpoint.id, subscription: this.decodeEndpoint(endpoint.endpointEnc), title: dto.title?.trim() || "اعلان آزمایشی CRM", body: dto.body?.trim() || "تنظیمات اعلان پوش با موفقیت بررسی شد.", actionUrl: "/notifications", idempotencyKey: `push-test:${context.organizationId}:${endpoint.id}:${Date.now()}` }, config)))
     const invalid = endpoints.filter((_, index) => results[index]?.invalidEndpoint).map(item => item.id)
     if (invalid.length) await this.prisma.withTenantTransaction(context, tx => this.deactivate(context, invalid, tx))
-    return { attempted: endpoints.length, successful: results.filter(item => item.success).length, failed: results.filter(item => !item.success).length, results: results.map((item, index) => ({ endpointId: endpoints[index]?.id, success: item.success, providerStatus: item.providerStatus, errorCode: item.errorCode, errorMessage: item.errorMessage })) }
+    const accepted = results.filter(item => item.success).length
+    return {
+      recipientUserId: dto.recipientUserId,
+      subscriptionCount: endpoints.length,
+      attempted: endpoints.length,
+      accepted,
+      successful: accepted,
+      failed: results.filter(item => !item.success).length,
+      displayConfirmed: false,
+      results: results.map((item, index) => ({ endpointId: endpoints[index]?.id, acceptedByPushService: item.success, success: item.success, providerStatus: item.providerStatus, errorCode: item.errorCode, errorMessage: item.errorMessage })),
+    }
   }
 
   private endpointHash(value: string) { return createHash("sha256").update(value).digest("hex") }
