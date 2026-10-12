@@ -45,6 +45,33 @@ enum CustomerMembershipStatus {
   REVOKED
 }
 
+enum CustomerRequestAvailabilityPolicy {
+  ALL_PORTAL_COMPANIES
+  SELECTED_COMPANIES
+}
+
+enum CustomerRequestFormVersionStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum CustomerRequestStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  IN_PROGRESS
+  WAITING_FOR_CUSTOMER
+  RESOLVED
+  CLOSED
+  CANCELLED
+}
+
+enum CustomerRequestActorType {
+  CUSTOMER
+  INTERNAL
+  SYSTEM
+}
+
 enum PlatformRole {
   PLATFORM_ADMIN
 }
@@ -618,43 +645,47 @@ model User {
   exchangeRatesCreated   CurrencyExchangeRate[] @relation("ExchangeRateCreatedBy")
   productPriceChanges    ProductPriceHistory[]  @relation("ProductPriceHistoryChangedBy")
 
-  notifications                     Notification[]              @relation("NotificationRecipient")
-  notificationActions               Notification[]              @relation("NotificationActor")
-  managedTeams                      Team[]                      @relation("TeamManager")
+  notifications                     Notification[]                 @relation("NotificationRecipient")
+  notificationActions               Notification[]                 @relation("NotificationActor")
+  managedTeams                      Team[]                         @relation("TeamManager")
   organizationMemberships           OrganizationMembership[]
-  customerCompanyMemberships        CustomerCompanyMembership[] @relation("CustomerMembershipUser")
-  customerMembershipsInvited        CustomerCompanyMembership[] @relation("CustomerMembershipInvitedBy")
-  customerInvitationsSent           CustomerInvitation[]        @relation("CustomerInvitationInvitedBy")
-  customerInvitationsAccepted       CustomerInvitation[]        @relation("CustomerInvitationAcceptedBy")
-  technicalReleasesCreated          TechnicalRelease[]          @relation("TechnicalReleaseCreatedBy")
-  technicalReleasesUpdated          TechnicalRelease[]          @relation("TechnicalReleaseUpdatedBy")
-  knowledgeArticlesOwned            KnowledgeBaseArticle[]      @relation("KnowledgeArticleOwner")
-  knowledgeArticlesAuthored         KnowledgeBaseArticle[]      @relation("KnowledgeArticleAuthor")
-  knowledgeArticlesReviewed         KnowledgeBaseArticle[]      @relation("KnowledgeArticleReviewer")
-  technicalDocumentsOwned           TechnicalDocument[]         @relation("TechnicalDocumentOwner")
-  technicalDocumentsCreated         TechnicalDocument[]         @relation("TechnicalDocumentCreatedBy")
-  technicalDocumentsUpdated         TechnicalDocument[]         @relation("TechnicalDocumentUpdatedBy")
-  technicalDocumentVersionsCreated  TechnicalDocumentVersion[]  @relation("TechnicalDocumentVersionCreatedBy")
-  technicalDocumentVersionsApproved TechnicalDocumentVersion[]  @relation("TechnicalDocumentVersionApprovedBy")
-  technicalResourcesOwned           TechnicalResource[]         @relation("TechnicalResourceOwner")
-  technicalResourcesCreated         TechnicalResource[]         @relation("TechnicalResourceCreatedBy")
-  technicalResourcesUpdated         TechnicalResource[]         @relation("TechnicalResourceUpdatedBy")
-  technicalTendersOwned             Tender[]                    @relation("TechnicalTenderOwner")
-  technicalTendersLed               Tender[]                    @relation("TechnicalTenderTechnicalLead")
-  commercialTendersLed              Tender[]                    @relation("TechnicalTenderCommercialLead")
-  technicalTendersSubmitted         Tender[]                    @relation("TechnicalTenderSubmittedBy")
-  technicalTendersClosed            Tender[]                    @relation("TechnicalTenderClosedBy")
-  technicalTendersCreated           Tender[]                    @relation("TechnicalTenderCreatedBy")
-  technicalTendersUpdated           Tender[]                    @relation("TechnicalTenderUpdatedBy")
-  tenderRequirementsOwned           TenderRequirement[]         @relation("TenderRequirementOwner")
-  tenderRequirementsBlocked         TenderRequirement[]         @relation("TenderRequirementBlockedBy")
-  tenderReviewsAssigned             TenderReview[]              @relation("TenderReviewReviewer")
-  tenderReviewsRequested            TenderReview[]              @relation("TenderReviewRequestedBy")
-  tenderReviewsDecided              TenderReview[]              @relation("TenderReviewDecidedBy")
-  artifactsUploaded                 FileAttachment[]            @relation("ArtifactUploadedBy")
-  artifactsDeleted                  FileAttachment[]            @relation("ArtifactDeletedBy")
-  artifactLinksCreated              ArtifactLink[]              @relation("ArtifactLinkCreatedBy")
-  taskReviewArtifactsAdded          TaskReviewArtifact[]        @relation("TaskReviewArtifactAddedBy")
+  customerCompanyMemberships        CustomerCompanyMembership[]    @relation("CustomerMembershipUser")
+  customerMembershipsInvited        CustomerCompanyMembership[]    @relation("CustomerMembershipInvitedBy")
+  customerInvitationsSent           CustomerInvitation[]           @relation("CustomerInvitationInvitedBy")
+  customerInvitationsAccepted       CustomerInvitation[]           @relation("CustomerInvitationAcceptedBy")
+  customerRequestTypesCreated       CustomerRequestType[]          @relation("CustomerRequestTypeCreatedBy")
+  customerRequestFormsPublished     CustomerRequestFormVersion[]   @relation("CustomerRequestFormPublishedBy")
+  customerRequestsCreated           CustomerRequest[]              @relation("CustomerRequestCreator")
+  customerRequestStatusesChanged    CustomerRequestStatusHistory[] @relation("CustomerRequestStatusInternalActor")
+  technicalReleasesCreated          TechnicalRelease[]             @relation("TechnicalReleaseCreatedBy")
+  technicalReleasesUpdated          TechnicalRelease[]             @relation("TechnicalReleaseUpdatedBy")
+  knowledgeArticlesOwned            KnowledgeBaseArticle[]         @relation("KnowledgeArticleOwner")
+  knowledgeArticlesAuthored         KnowledgeBaseArticle[]         @relation("KnowledgeArticleAuthor")
+  knowledgeArticlesReviewed         KnowledgeBaseArticle[]         @relation("KnowledgeArticleReviewer")
+  technicalDocumentsOwned           TechnicalDocument[]            @relation("TechnicalDocumentOwner")
+  technicalDocumentsCreated         TechnicalDocument[]            @relation("TechnicalDocumentCreatedBy")
+  technicalDocumentsUpdated         TechnicalDocument[]            @relation("TechnicalDocumentUpdatedBy")
+  technicalDocumentVersionsCreated  TechnicalDocumentVersion[]     @relation("TechnicalDocumentVersionCreatedBy")
+  technicalDocumentVersionsApproved TechnicalDocumentVersion[]     @relation("TechnicalDocumentVersionApprovedBy")
+  technicalResourcesOwned           TechnicalResource[]            @relation("TechnicalResourceOwner")
+  technicalResourcesCreated         TechnicalResource[]            @relation("TechnicalResourceCreatedBy")
+  technicalResourcesUpdated         TechnicalResource[]            @relation("TechnicalResourceUpdatedBy")
+  technicalTendersOwned             Tender[]                       @relation("TechnicalTenderOwner")
+  technicalTendersLed               Tender[]                       @relation("TechnicalTenderTechnicalLead")
+  commercialTendersLed              Tender[]                       @relation("TechnicalTenderCommercialLead")
+  technicalTendersSubmitted         Tender[]                       @relation("TechnicalTenderSubmittedBy")
+  technicalTendersClosed            Tender[]                       @relation("TechnicalTenderClosedBy")
+  technicalTendersCreated           Tender[]                       @relation("TechnicalTenderCreatedBy")
+  technicalTendersUpdated           Tender[]                       @relation("TechnicalTenderUpdatedBy")
+  tenderRequirementsOwned           TenderRequirement[]            @relation("TenderRequirementOwner")
+  tenderRequirementsBlocked         TenderRequirement[]            @relation("TenderRequirementBlockedBy")
+  tenderReviewsAssigned             TenderReview[]                 @relation("TenderReviewReviewer")
+  tenderReviewsRequested            TenderReview[]                 @relation("TenderReviewRequestedBy")
+  tenderReviewsDecided              TenderReview[]                 @relation("TenderReviewDecidedBy")
+  artifactsUploaded                 FileAttachment[]               @relation("ArtifactUploadedBy")
+  artifactsDeleted                  FileAttachment[]               @relation("ArtifactDeletedBy")
+  artifactLinksCreated              ArtifactLink[]                 @relation("ArtifactLinkCreatedBy")
+  taskReviewArtifactsAdded          TaskReviewArtifact[]           @relation("TaskReviewArtifactAddedBy")
   platformAuthority                 PlatformAuthority?
 
   notificationCoreEventActions  NotificationEvent[]           @relation("NotificationCoreEventActor")
@@ -760,6 +791,9 @@ model Organization {
   memberships                   OrganizationMembership[]
   customerCompanyMemberships    CustomerCompanyMembership[]
   customerInvitations           CustomerInvitation[]
+  customerRequestTypes          CustomerRequestType[]
+  customerRequests              CustomerRequest[]
+  customerRequestStatusHistory  CustomerRequestStatusHistory[]
   ssoProviders                  SsoProvider[]
   ssoRoutes                     SsoProviderRoute[]
   ssoAuthTransactions           SsoAuthTransaction[]
@@ -1236,14 +1270,16 @@ model Company {
   tenders                 Tender[]
   timesheetEntries        TimesheetEntry[]
 
-  organizationId      String                      @default("00000000-0000-4000-8000-000000000001")
-  organization        Organization                @relation(fields: [organizationId], references: [id])
-  portalEnabled       Boolean                     @default(false)
-  portalEnabledAt     DateTime?
-  portalEnabledById   String?
-  portalEnabledBy     User?                       @relation("CompanyPortalEnabledBy", fields: [portalEnabledById], references: [id], onDelete: SetNull)
-  customerMemberships CustomerCompanyMembership[]
-  customerInvitations CustomerInvitation[]
+  organizationId                  String                                   @default("00000000-0000-4000-8000-000000000001")
+  organization                    Organization                             @relation(fields: [organizationId], references: [id])
+  portalEnabled                   Boolean                                  @default(false)
+  portalEnabledAt                 DateTime?
+  portalEnabledById               String?
+  portalEnabledBy                 User?                                    @relation("CompanyPortalEnabledBy", fields: [portalEnabledById], references: [id], onDelete: SetNull)
+  customerMemberships             CustomerCompanyMembership[]
+  customerInvitations             CustomerInvitation[]
+  customerRequestTypeAvailability CustomerRequestTypeCompanyAvailability[]
+  customerRequests                CustomerRequest[]
 
   @@unique([id, organizationId])
   @@index([ownerId])
@@ -1265,31 +1301,167 @@ model Company {
 }
 
 model CustomerCompanyMembership {
-  id             String                   @id @default(uuid())
-  organizationId String
-  organization   Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  companyId      String
-  company        Company                  @relation(fields: [companyId, organizationId], references: [id, organizationId], onDelete: Cascade)
-  userId         String
-  user           User                     @relation("CustomerMembershipUser", fields: [userId], references: [id], onDelete: Cascade)
-  role           CustomerRole
-  status         CustomerMembershipStatus @default(INVITED)
-  invitedById    String?
-  invitedBy      User?                    @relation("CustomerMembershipInvitedBy", fields: [invitedById], references: [id], onDelete: SetNull)
-  invitedAt      DateTime?
-  activatedAt    DateTime?
-  suspendedAt    DateTime?
-  revokedAt      DateTime?
-  lastAccessAt   DateTime?
-  createdAt      DateTime                 @default(now())
-  updatedAt      DateTime                 @updatedAt
+  id              String                   @id @default(uuid())
+  organizationId  String
+  organization    Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  companyId       String
+  company         Company                  @relation(fields: [companyId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  userId          String
+  user            User                     @relation("CustomerMembershipUser", fields: [userId], references: [id], onDelete: Cascade)
+  role            CustomerRole
+  status          CustomerMembershipStatus @default(INVITED)
+  invitedById     String?
+  invitedBy       User?                    @relation("CustomerMembershipInvitedBy", fields: [invitedById], references: [id], onDelete: SetNull)
+  invitedAt       DateTime?
+  activatedAt     DateTime?
+  suspendedAt     DateTime?
+  revokedAt       DateTime?
+  lastAccessAt    DateTime?
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+  requestsCreated CustomerRequest[]        @relation("CustomerRequestCreatorMembership")
+  requestShares   CustomerRequestShare[]   @relation("CustomerRequestSharedMembership")
 
   @@unique([companyId, userId])
   @@unique([id, organizationId])
+  @@unique([id, organizationId, companyId])
   @@index([organizationId, companyId, status])
   @@index([userId, status])
   @@index([companyId, role, status])
   @@map("customer_company_memberships")
+}
+
+model CustomerRequestType {
+  id                        String                                   @id @default(uuid())
+  organizationId            String
+  organization              Organization                             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  code                      String
+  displayName               String
+  description               String?
+  presentation              Json?
+  displayOrder              Int                                      @default(0)
+  availabilityPolicy        CustomerRequestAvailabilityPolicy        @default(ALL_PORTAL_COMPANIES)
+  isEnabled                 Boolean                                  @default(true)
+  retiredAt                 DateTime?
+  currentPublishedVersionId String?                                  @unique
+  currentPublishedVersion   CustomerRequestFormVersion?              @relation("CurrentPublishedCustomerRequestForm", fields: [currentPublishedVersionId], references: [id], onDelete: SetNull)
+  createdById               String
+  createdBy                 User                                     @relation("CustomerRequestTypeCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt                 DateTime                                 @default(now())
+  updatedAt                 DateTime                                 @updatedAt
+  formVersions              CustomerRequestFormVersion[]             @relation("CustomerRequestTypeForms")
+  companyAvailability       CustomerRequestTypeCompanyAvailability[]
+  requests                  CustomerRequest[]
+
+  @@unique([organizationId, code])
+  @@unique([id, organizationId])
+  @@index([organizationId, isEnabled, retiredAt, displayOrder])
+  @@map("customer_request_types")
+}
+
+model CustomerRequestFormVersion {
+  id             String                           @id @default(uuid())
+  requestTypeId  String
+  requestType    CustomerRequestType              @relation("CustomerRequestTypeForms", fields: [requestTypeId], references: [id], onDelete: Cascade)
+  version        Int
+  status         CustomerRequestFormVersionStatus @default(DRAFT)
+  schema         Json
+  publishedAt    DateTime?
+  publishedById  String?
+  publishedBy    User?                            @relation("CustomerRequestFormPublishedBy", fields: [publishedById], references: [id], onDelete: SetNull)
+  createdAt      DateTime                         @default(now())
+  updatedAt      DateTime                         @updatedAt
+  currentForType CustomerRequestType?             @relation("CurrentPublishedCustomerRequestForm")
+  requests       CustomerRequest[]
+
+  @@unique([requestTypeId, version])
+  @@index([requestTypeId, status, version])
+  @@map("customer_request_form_versions")
+}
+
+model CustomerRequestTypeCompanyAvailability {
+  id             String              @id @default(uuid())
+  organizationId String
+  requestTypeId  String
+  requestType    CustomerRequestType @relation(fields: [requestTypeId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  companyId      String
+  company        Company             @relation(fields: [companyId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  createdAt      DateTime            @default(now())
+
+  @@unique([requestTypeId, companyId])
+  @@index([organizationId, companyId])
+  @@map("customer_request_type_company_availability")
+}
+
+model CustomerRequest {
+  id                  String                         @id @default(uuid())
+  organizationId      String
+  organization        Organization                   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  companyId           String
+  company             Company                        @relation(fields: [companyId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  requestTypeId       String
+  requestType         CustomerRequestType            @relation(fields: [requestTypeId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  formVersionId       String
+  formVersion         CustomerRequestFormVersion     @relation(fields: [formVersionId], references: [id], onDelete: Restrict)
+  creatorUserId       String
+  creator             User                           @relation("CustomerRequestCreator", fields: [creatorUserId], references: [id], onDelete: Restrict)
+  creatorMembershipId String
+  creatorMembership   CustomerCompanyMembership      @relation("CustomerRequestCreatorMembership", fields: [creatorMembershipId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  trackingNumber      String?                        @unique
+  title               String
+  status              CustomerRequestStatus          @default(DRAFT)
+  answers             Json
+  submittedAt         DateTime?
+  closedAt            DateTime?
+  createdAt           DateTime                       @default(now())
+  updatedAt           DateTime                       @updatedAt
+  histories           CustomerRequestStatusHistory[]
+  shares              CustomerRequestShare[]
+
+  @@unique([id, organizationId, companyId])
+  @@index([organizationId, companyId, status, updatedAt])
+  @@index([organizationId, requestTypeId, submittedAt])
+  @@index([creatorMembershipId, status])
+  @@map("customer_requests")
+}
+
+model CustomerRequestStatusHistory {
+  id                         String                   @id @default(uuid())
+  organizationId             String
+  organization               Organization             @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  companyId                  String
+  requestId                  String
+  request                    CustomerRequest          @relation(fields: [requestId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Cascade)
+  previousStatus             CustomerRequestStatus?
+  newStatus                  CustomerRequestStatus
+  actorType                  CustomerRequestActorType
+  actorId                    String?
+  internalActor              User?                    @relation("CustomerRequestStatusInternalActor", fields: [actorId], references: [id], onDelete: SetNull)
+  customerVisibleExplanation String?
+  internalReason             String?
+  createdAt                  DateTime                 @default(now())
+
+  @@index([requestId, createdAt])
+  @@index([organizationId, companyId, createdAt])
+  @@map("customer_request_status_history")
+}
+
+model CustomerRequestShare {
+  id              String                    @id @default(uuid())
+  organizationId  String
+  companyId       String
+  requestId       String
+  request         CustomerRequest           @relation(fields: [requestId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Cascade)
+  membershipId    String
+  membership      CustomerCompanyMembership @relation("CustomerRequestSharedMembership", fields: [membershipId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Restrict)
+  sharedByUserId  String
+  revokedAt       DateTime?
+  revokedByUserId String?
+  createdAt       DateTime                  @default(now())
+
+  @@unique([requestId, membershipId])
+  @@index([organizationId, companyId, membershipId, revokedAt])
+  @@map("customer_request_shares")
 }
 
 model CustomerInvitation {

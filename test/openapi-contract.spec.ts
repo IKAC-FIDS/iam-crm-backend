@@ -36,7 +36,7 @@ describe("fix 000094 canonical OpenAPI contract", () => {
   const ops = operations(doc);
 
   it("documents every current HTTP operation with stable unique IDs", () => {
-    expect(ops).toHaveLength(557);
+    expect(ops).toHaveLength(579);
     const ids = ops.map(({ operation }) => operation.operationId);
     expect(ids.every(Boolean)).toBe(true);
     expect(new Set(ids).size).toBe(ids.length);
@@ -141,6 +141,24 @@ describe("fix 000094 canonical OpenAPI contract", () => {
     expect(
       doc.paths["/api/admin/plans/{planId}/quotas"].get.description,
     ).toContain("PlatformAdmin-only");
+  });
+
+  it("documents Stage 3 internal and portal request boundaries", () => {
+    expect(doc.paths["/api/portal/request-types"].get.security).toEqual([
+      { bearerAuth: [] },
+    ]);
+    expect(doc.paths["/api/portal/requests"].post.security).toEqual([
+      { bearerAuth: [] },
+    ]);
+    expect(doc.paths["/api/portal/requests/{id}/shares"].post.security).toEqual([
+      { bearerAuth: [] },
+    ]);
+    expect(doc.paths["/api/customer-requests"].get.security).toEqual([
+      { bearerAuth: [] },
+    ]);
+    expect(doc.paths["/api/admin/customer-request-types/{id}/form-publish"].post.security).toEqual([
+      { bearerAuth: [] },
+    ]);
   });
 
   it("documents multipart upload without storage internals", () => {

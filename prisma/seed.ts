@@ -153,7 +153,7 @@ async function main() {
   // ============================================================
   const adminEmail = 'admin@yourcompany.com';
 
-  await prisma.user.upsert({
+  const defaultAdmin = await prisma.user.upsert({
     where: { normalizedEmail: adminEmail.toLowerCase() },
     update: {
       fullName: 'مدیر سیستم',
@@ -192,6 +192,27 @@ async function main() {
       locale: 'fa-IR',
     },
   });
+
+  const initialCustomerRequestTypes = [
+    ['TECHNICAL_SUPPORT', 'پشتیبانی فنی'],
+    ['LICENSE', 'فعال‌سازی یا تمدید مجوز'],
+    ['INSTALLATION', 'نصب و استقرار'],
+    ['SDK_INTEGRATION', 'راهنمایی SDK و یکپارچه‌سازی'],
+    ['HARDWARE_MAINTENANCE', 'نگهداری و تعمیر سخت‌افزار'],
+    ['TRAINING', 'آموزش'],
+    ['COMMERCIAL_INQUIRY', 'استعلام تجاری، ارتقا یا خرید بیشتر'],
+    ['GENERAL_SERVICE', 'درخواست عمومی خدمات'],
+  ] as const;
+  for (const [index, [code, displayName]] of initialCustomerRequestTypes.entries()) {
+    const requestType = await prisma.customerRequestType.upsert({
+      where: { organizationId_code: { organizationId: defaultOrganization.id, code } },
+      update: { displayName, displayOrder: index * 10, isEnabled: true },
+      create: { organizationId: defaultOrganization.id, code, displayName, displayOrder: index * 10, createdById: defaultAdmin.id },
+    });
+    let published = await prisma.customerRequestFormVersion.findFirst({ where: { requestTypeId: requestType.id, status: 'PUBLISHED' }, orderBy: { version: 'desc' } });
+    if (!published) published = await prisma.customerRequestFormVersion.create({ data: { requestTypeId: requestType.id, version: 1, status: 'PUBLISHED', schema: { fields: [{ key: 'description', type: 'TEXTAREA', label: 'شرح درخواست', required: true, minLength: 10, maxLength: 4000 }] }, publishedAt: new Date(), publishedById: defaultAdmin.id } });
+    if (requestType.currentPublishedVersionId !== published.id) await prisma.customerRequestType.update({ where: { id: requestType.id }, data: { currentPublishedVersionId: published.id } });
+  }
 
   await prisma.user.updateMany({
     where: {
@@ -830,6 +851,10 @@ async function main() {
     { action: 'company:update', description: 'ویرایش شرکت' },
     { action: 'company-customer-user:view', description: 'مشاهده کاربران پرتال شرکت' },
     { action: 'company-customer-user:manage', description: 'مدیریت کاربران پرتال شرکت' },
+    { action: 'customer-request-type:view', description: 'مشاهده انواع درخواست مشتری' },
+    { action: 'customer-request-type:manage', description: 'مدیریت انواع درخواست مشتری' },
+    { action: 'customer-request:view', description: 'مشاهده درخواست‌های مشتری' },
+    { action: 'customer-request:manage', description: 'مدیریت درخواست‌های مشتری' },
     { action: 'company:delete', description: 'حذف شرکت' },
     { action: 'company:archive', description: 'بایگانی شرکت' },
     { action: 'company:restore', description: 'بازیابی شرکت بایگانی‌شده' },

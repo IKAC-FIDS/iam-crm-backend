@@ -57,6 +57,7 @@ import { PersonalTodosModule } from "./personal-todos/personal-todos.module";
 import { CollaborationModule } from "./collaboration/collaboration.module";
 import { PortalAuthModule } from "./portal-auth/portal-auth.module";
 import { CustomerUsersModule } from "./customer-users/customer-users.module";
+import { CustomerRequestsModule } from "./customer-requests/customer-requests.module";
 
 @Module({
   imports: [
@@ -130,6 +131,7 @@ import { CustomerUsersModule } from "./customer-users/customer-users.module";
     CollaborationModule,
     PortalAuthModule,
     CustomerUsersModule,
+    CustomerRequestsModule,
   ],
   providers: [
     {
