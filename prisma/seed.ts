@@ -154,15 +154,17 @@ async function main() {
   const adminEmail = 'admin@yourcompany.com';
 
   await prisma.user.upsert({
-    where: { email: adminEmail },
+    where: { normalizedEmail: adminEmail.toLowerCase() },
     update: {
       fullName: 'مدیر سیستم',
+      normalizedEmail: adminEmail.toLowerCase(),
       role: UserRole.ADMIN,
       isActive: true,
     },
     create: {
       fullName: 'مدیر سیستم',
       email: adminEmail,
+      normalizedEmail: adminEmail.toLowerCase(),
       passwordHash: await bcrypt.hash('ChangeMe123!', 10),
       role: UserRole.ADMIN,
       isActive: true,
@@ -826,6 +828,8 @@ async function main() {
     { action: 'company:view', description: 'مشاهده شرکت‌ها' },
     { action: 'company:create', description: 'ایجاد شرکت' },
     { action: 'company:update', description: 'ویرایش شرکت' },
+    { action: 'company-customer-user:view', description: 'مشاهده کاربران پرتال شرکت' },
+    { action: 'company-customer-user:manage', description: 'مدیریت کاربران پرتال شرکت' },
     { action: 'company:delete', description: 'حذف شرکت' },
     { action: 'company:archive', description: 'بایگانی شرکت' },
     { action: 'company:restore', description: 'بازیابی شرکت بایگانی‌شده' },

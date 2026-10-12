@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { AuditActorType, AuditResult, AuditSource, User, UserRole } from '@prisma/client';
+import { AuthSessionAudience, AuditActorType, AuditResult, AuditSource, User, UserPrincipalType, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { createHash } from 'node:crypto';
 import type { Request } from 'express';
@@ -73,7 +73,7 @@ export class AuthService {
     );
 
     const user = await this.prisma.user.findUnique({
-      where: { email: dto.email },
+      where: { normalizedEmail: dto.email.trim().toLowerCase() },
     });
 
     this.logger.log(
@@ -84,7 +84,7 @@ export class AuthService {
       }),
     );
 
-    if (!user || !user.isActive) {
+    if (!user || !user.isActive || user.principalType !== UserPrincipalType.INTERNAL) {
       this.logger.warn(
         user ? 'Login rejected: user is inactive' : 'Login rejected: user not found',
         JSON.stringify(this.buildAuthLogContext(dto.email, req)),
@@ -150,7 +150,13 @@ export class AuthService {
     refreshToken: string,
     req?: Request,
   ): Promise<AuthSessionLoginResponse> {
-    const activeSession = await this.refreshTokenService.getActiveSession(refreshToken);
+    const activeSession = await this.refreshTokenService.getActiveSession(
+      refreshToken,
+      AuthSessionAudience.INTERNAL,
+    );
+    if (activeSession.user.principalType !== UserPrincipalType.INTERNAL) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
     const refreshContext = activeSession.tenantContext;
     const effective = refreshContext && !('platformOnly' in refreshContext)
       ? await this.tenantResolver.resolveAuthenticatedTenant(activeSession.user.id, {
@@ -171,6 +177,7 @@ export class AuthService {
             membershipId: effective.membershipId,
           }
         : { platformOnly: true },
+      AuthSessionAudience.INTERNAL,
     );
 
     const accessResponse = await this.buildLoginResponse(rotated.user, effective);
@@ -193,8 +200,9 @@ export class AuthService {
   }
 
   async logoutAll(userId: string): Promise<{ revokedCount: number }> {
-    const revokedCount = await this.refreshTokenService.revokeAllUserSessions(
+    const revokedCount = await this.refreshTokenService.revokeAllUserSessionsByAudience(
       userId,
+      AuthSessionAudience.INTERNAL,
       'LOGOUT_ALL',
     );
 
@@ -225,6 +233,7 @@ export class AuthService {
               membershipId: effective.membershipId,
             }
           : { platformOnly: true },
+        AuthSessionAudience.INTERNAL,
       );
 
       this.logger.log('Login token generation succeeded', JSON.stringify(context));
@@ -265,7 +274,9 @@ export class AuthService {
     await this.memberships.touchLastAccess(effective?.membershipId ?? null);
 
     return {
-      accessToken: await this.jwtService.signAsync(payload),
+      accessToken: await this.jwtService.signAsync(payload, {
+        audience: 'neshane-op-internal',
+      }),
       accessTokenExpiresIn: this.config.get<string>('JWT_EXPIRES_IN', '15m'),
       user: {
         id: user.id,
@@ -327,7 +338,10 @@ export class AuthService {
   ): Promise<AuthSessionLoginResponse> {
     const requestId = this.requestId(req);
     try {
-      const activeSession = await this.refreshTokenService.getActiveSession(refreshToken);
+      const activeSession = await this.refreshTokenService.getActiveSession(
+        refreshToken,
+        AuthSessionAudience.INTERNAL,
+      );
       if (activeSession.user.id !== user.userId) {
         throw new ForbiddenException('Tenant selection is not permitted');
       }
@@ -362,6 +376,7 @@ export class AuthService {
           activeOrganizationId: selected.organizationId,
           membershipId: selected.membershipId,
         },
+        AuthSessionAudience.INTERNAL,
       );
       const accessResponse = await this.buildLoginResponse(
         activeSession.user,

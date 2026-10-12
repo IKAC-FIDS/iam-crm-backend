@@ -11,6 +11,7 @@ import {
   SsoProvider,
   SsoProviderType,
   SsoRoutingKind,
+  UserPrincipalType,
   UserRole,
 } from "@prisma/client";
 import * as bcrypt from "bcryptjs";
@@ -207,10 +208,13 @@ export class OidcService {
           },
           include: { user: true },
         });
+        if (linked?.user.principalType !== undefined && linked.user.principalType !== UserPrincipalType.INTERNAL) {
+          throw new UnauthorizedException("SSO identity is not an internal CRM principal");
+        }
         let user =
           linked?.user ??
-          (await tx.user.findUnique({ where: { email: identity.email } }));
-        if (user && !user.isActive)
+          (await tx.user.findUnique({ where: { normalizedEmail: identity.email.trim().toLowerCase() } }));
+        if (user && (!user.isActive || user.principalType !== UserPrincipalType.INTERNAL))
           throw new UnauthorizedException("SSO user is inactive");
         if (!user && !provider.autoProvision)
           throw new UnauthorizedException("SSO auto-provisioning is disabled");
@@ -218,6 +222,7 @@ export class OidcService {
           user = await tx.user.create({
             data: {
               email: identity.email,
+              normalizedEmail: identity.email.trim().toLowerCase(),
               fullName: identity.fullName,
               passwordHash,
               role: UserRole.REP,

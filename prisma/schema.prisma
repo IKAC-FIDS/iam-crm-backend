@@ -23,6 +23,28 @@ enum UserRole {
   BOARDS
 }
 
+enum UserPrincipalType {
+  INTERNAL
+  CUSTOMER
+}
+
+enum AuthSessionAudience {
+  INTERNAL
+  PORTAL
+}
+
+enum CustomerRole {
+  CUSTOMER_ADMIN
+  CUSTOMER_USER
+}
+
+enum CustomerMembershipStatus {
+  INVITED
+  ACTIVE
+  SUSPENDED
+  REVOKED
+}
+
 enum PlatformRole {
   PLATFORM_ADMIN
 }
@@ -533,6 +555,8 @@ model User {
   id                    String                     @id @default(uuid())
   fullName              String
   email                 String                     @unique
+  normalizedEmail       String                     @unique
+  principalType         UserPrincipalType          @default(INTERNAL)
   passwordHash          String
   role                  UserRole                   @default(REP)
   roleId                String?
@@ -557,24 +581,25 @@ model User {
   failedLoginAttempts Int       @default(0)
   lockedUntil         DateTime?
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
   lastSeenAt DateTime?
 
-  ownedCompanies          Company[]                 @relation("CompanyOwner")
-  archivedCompanies       Company[]                 @relation("CompanyArchivedBy")
-  engagementUpdatedCompanies Company[]              @relation("CompanyEngagementUpdatedBy")
-  companyPreferences      CompanyUserPreference[]
-  ownedOpportunities      Opportunity[]             @relation("OpportunityOwner")
-  archivedOpportunities   Opportunity[]             @relation("OpportunityArchivedBy")
-  opportunityStageChanges OpportunityStageHistory[]
-  activities              Activity[]
-  completedActivities     Activity[]                @relation("ActivityCompletedBy")
-  stageChangesMade        PipelineStageHistory[]
-  passkeys                UserPasskey[]
-  externalIdentities      ExternalIdentity[]
-  ssoLoginTickets         SsoLoginTicket[]
-  refreshSessions         RefreshSession[]
+  ownedCompanies             Company[]                 @relation("CompanyOwner")
+  archivedCompanies          Company[]                 @relation("CompanyArchivedBy")
+  engagementUpdatedCompanies Company[]                 @relation("CompanyEngagementUpdatedBy")
+  portalEnabledCompanies     Company[]                 @relation("CompanyPortalEnabledBy")
+  companyPreferences         CompanyUserPreference[]
+  ownedOpportunities         Opportunity[]             @relation("OpportunityOwner")
+  archivedOpportunities      Opportunity[]             @relation("OpportunityArchivedBy")
+  opportunityStageChanges    OpportunityStageHistory[]
+  activities                 Activity[]
+  completedActivities        Activity[]                @relation("ActivityCompletedBy")
+  stageChangesMade           PipelineStageHistory[]
+  passkeys                   UserPasskey[]
+  externalIdentities         ExternalIdentity[]
+  ssoLoginTickets            SsoLoginTicket[]
+  refreshSessions            RefreshSession[]
 
   assignedTasks        Task[]            @relation("TaskAssignedTo")
   createdTasks         Task[]            @relation("TaskCreatedBy")
@@ -593,39 +618,43 @@ model User {
   exchangeRatesCreated   CurrencyExchangeRate[] @relation("ExchangeRateCreatedBy")
   productPriceChanges    ProductPriceHistory[]  @relation("ProductPriceHistoryChangedBy")
 
-  notifications                     Notification[]             @relation("NotificationRecipient")
-  notificationActions               Notification[]             @relation("NotificationActor")
-  managedTeams                      Team[]                     @relation("TeamManager")
+  notifications                     Notification[]              @relation("NotificationRecipient")
+  notificationActions               Notification[]              @relation("NotificationActor")
+  managedTeams                      Team[]                      @relation("TeamManager")
   organizationMemberships           OrganizationMembership[]
-  technicalReleasesCreated          TechnicalRelease[]         @relation("TechnicalReleaseCreatedBy")
-  technicalReleasesUpdated          TechnicalRelease[]         @relation("TechnicalReleaseUpdatedBy")
-  knowledgeArticlesOwned            KnowledgeBaseArticle[]     @relation("KnowledgeArticleOwner")
-  knowledgeArticlesAuthored         KnowledgeBaseArticle[]     @relation("KnowledgeArticleAuthor")
-  knowledgeArticlesReviewed         KnowledgeBaseArticle[]     @relation("KnowledgeArticleReviewer")
-  technicalDocumentsOwned           TechnicalDocument[]        @relation("TechnicalDocumentOwner")
-  technicalDocumentsCreated         TechnicalDocument[]        @relation("TechnicalDocumentCreatedBy")
-  technicalDocumentsUpdated         TechnicalDocument[]        @relation("TechnicalDocumentUpdatedBy")
-  technicalDocumentVersionsCreated  TechnicalDocumentVersion[] @relation("TechnicalDocumentVersionCreatedBy")
-  technicalDocumentVersionsApproved TechnicalDocumentVersion[] @relation("TechnicalDocumentVersionApprovedBy")
-  technicalResourcesOwned           TechnicalResource[]        @relation("TechnicalResourceOwner")
-  technicalResourcesCreated         TechnicalResource[]        @relation("TechnicalResourceCreatedBy")
-  technicalResourcesUpdated         TechnicalResource[]        @relation("TechnicalResourceUpdatedBy")
-  technicalTendersOwned             Tender[]                   @relation("TechnicalTenderOwner")
-  technicalTendersLed               Tender[]                   @relation("TechnicalTenderTechnicalLead")
-  commercialTendersLed              Tender[]                   @relation("TechnicalTenderCommercialLead")
-  technicalTendersSubmitted         Tender[]                   @relation("TechnicalTenderSubmittedBy")
-  technicalTendersClosed            Tender[]                   @relation("TechnicalTenderClosedBy")
-  technicalTendersCreated           Tender[]                   @relation("TechnicalTenderCreatedBy")
-  technicalTendersUpdated           Tender[]                   @relation("TechnicalTenderUpdatedBy")
-  tenderRequirementsOwned           TenderRequirement[]        @relation("TenderRequirementOwner")
-  tenderRequirementsBlocked         TenderRequirement[]        @relation("TenderRequirementBlockedBy")
-  tenderReviewsAssigned             TenderReview[]             @relation("TenderReviewReviewer")
-  tenderReviewsRequested            TenderReview[]             @relation("TenderReviewRequestedBy")
-  tenderReviewsDecided              TenderReview[]             @relation("TenderReviewDecidedBy")
-  artifactsUploaded                 FileAttachment[]           @relation("ArtifactUploadedBy")
-  artifactsDeleted                  FileAttachment[]           @relation("ArtifactDeletedBy")
-  artifactLinksCreated              ArtifactLink[]             @relation("ArtifactLinkCreatedBy")
-  taskReviewArtifactsAdded          TaskReviewArtifact[]       @relation("TaskReviewArtifactAddedBy")
+  customerCompanyMemberships        CustomerCompanyMembership[] @relation("CustomerMembershipUser")
+  customerMembershipsInvited        CustomerCompanyMembership[] @relation("CustomerMembershipInvitedBy")
+  customerInvitationsSent           CustomerInvitation[]        @relation("CustomerInvitationInvitedBy")
+  customerInvitationsAccepted       CustomerInvitation[]        @relation("CustomerInvitationAcceptedBy")
+  technicalReleasesCreated          TechnicalRelease[]          @relation("TechnicalReleaseCreatedBy")
+  technicalReleasesUpdated          TechnicalRelease[]          @relation("TechnicalReleaseUpdatedBy")
+  knowledgeArticlesOwned            KnowledgeBaseArticle[]      @relation("KnowledgeArticleOwner")
+  knowledgeArticlesAuthored         KnowledgeBaseArticle[]      @relation("KnowledgeArticleAuthor")
+  knowledgeArticlesReviewed         KnowledgeBaseArticle[]      @relation("KnowledgeArticleReviewer")
+  technicalDocumentsOwned           TechnicalDocument[]         @relation("TechnicalDocumentOwner")
+  technicalDocumentsCreated         TechnicalDocument[]         @relation("TechnicalDocumentCreatedBy")
+  technicalDocumentsUpdated         TechnicalDocument[]         @relation("TechnicalDocumentUpdatedBy")
+  technicalDocumentVersionsCreated  TechnicalDocumentVersion[]  @relation("TechnicalDocumentVersionCreatedBy")
+  technicalDocumentVersionsApproved TechnicalDocumentVersion[]  @relation("TechnicalDocumentVersionApprovedBy")
+  technicalResourcesOwned           TechnicalResource[]         @relation("TechnicalResourceOwner")
+  technicalResourcesCreated         TechnicalResource[]         @relation("TechnicalResourceCreatedBy")
+  technicalResourcesUpdated         TechnicalResource[]         @relation("TechnicalResourceUpdatedBy")
+  technicalTendersOwned             Tender[]                    @relation("TechnicalTenderOwner")
+  technicalTendersLed               Tender[]                    @relation("TechnicalTenderTechnicalLead")
+  commercialTendersLed              Tender[]                    @relation("TechnicalTenderCommercialLead")
+  technicalTendersSubmitted         Tender[]                    @relation("TechnicalTenderSubmittedBy")
+  technicalTendersClosed            Tender[]                    @relation("TechnicalTenderClosedBy")
+  technicalTendersCreated           Tender[]                    @relation("TechnicalTenderCreatedBy")
+  technicalTendersUpdated           Tender[]                    @relation("TechnicalTenderUpdatedBy")
+  tenderRequirementsOwned           TenderRequirement[]         @relation("TenderRequirementOwner")
+  tenderRequirementsBlocked         TenderRequirement[]         @relation("TenderRequirementBlockedBy")
+  tenderReviewsAssigned             TenderReview[]              @relation("TenderReviewReviewer")
+  tenderReviewsRequested            TenderReview[]              @relation("TenderReviewRequestedBy")
+  tenderReviewsDecided              TenderReview[]              @relation("TenderReviewDecidedBy")
+  artifactsUploaded                 FileAttachment[]            @relation("ArtifactUploadedBy")
+  artifactsDeleted                  FileAttachment[]            @relation("ArtifactDeletedBy")
+  artifactLinksCreated              ArtifactLink[]              @relation("ArtifactLinkCreatedBy")
+  taskReviewArtifactsAdded          TaskReviewArtifact[]        @relation("TaskReviewArtifactAddedBy")
   platformAuthority                 PlatformAuthority?
 
   notificationCoreEventActions  NotificationEvent[]           @relation("NotificationCoreEventActor")
@@ -638,10 +667,10 @@ model User {
   conversationMessagesAuthored  ConversationMessage[]         @relation("ConversationMessageAuthor")
   conversationMessagesDeleted   ConversationMessage[]         @relation("ConversationMessageDeletedBy")
   conversationParticipants      ConversationParticipant[]
-  collaborationTopicsCreated    CollaborationTopic[]         @relation("CollaborationTopicCreatedBy")
-  collaborationChannelsCreated  CollaborationChannel[]       @relation("CollaborationChannelCreatedBy")
-  collaborationMemberships      CollaborationChannelMember[] @relation("CollaborationChannelMemberUser")
-  collaborationMembersAdded     CollaborationChannelMember[] @relation("CollaborationChannelMemberAddedBy")
+  collaborationTopicsCreated    CollaborationTopic[]          @relation("CollaborationTopicCreatedBy")
+  collaborationChannelsCreated  CollaborationChannel[]        @relation("CollaborationChannelCreatedBy")
+  collaborationMemberships      CollaborationChannelMember[]  @relation("CollaborationChannelMemberUser")
+  collaborationMembersAdded     CollaborationChannelMember[]  @relation("CollaborationChannelMemberAddedBy")
   timesheetEntries              TimesheetEntry[]
   leaveRequests                 LeaveRequest[]
 
@@ -710,46 +739,48 @@ model Organization {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users                User[]
-  teams                Team[]
-  companies            Company[]
-  companyUserPreferences CompanyUserPreference[]
-  opportunities        Opportunity[]
-  tasks                Task[]
-  personalTodos        PersonalTodo[]
-  notifications        Notification[]
-  fileAttachments      FileAttachment[]
-  artifactLinks        ArtifactLink[]
-  taskReviewRounds     TaskReviewRound[]
-  auditLogs            AuditLog[]
-  meetings             Meeting[]
-  conversationThreads  ConversationThread[]
-  conversationMessages ConversationMessage[]
+  users                         User[]
+  teams                         Team[]
+  companies                     Company[]
+  companyUserPreferences        CompanyUserPreference[]
+  opportunities                 Opportunity[]
+  tasks                         Task[]
+  personalTodos                 PersonalTodo[]
+  notifications                 Notification[]
+  fileAttachments               FileAttachment[]
+  artifactLinks                 ArtifactLink[]
+  taskReviewRounds              TaskReviewRound[]
+  auditLogs                     AuditLog[]
+  meetings                      Meeting[]
+  conversationThreads           ConversationThread[]
+  conversationMessages          ConversationMessage[]
   conversationMessageReferences ConversationMessageReference[]
-  collaborationTopics  CollaborationTopic[]
-  collaborationChannels CollaborationChannel[]
-  memberships          OrganizationMembership[]
-  ssoProviders         SsoProvider[]
-  ssoRoutes            SsoProviderRoute[]
-  ssoAuthTransactions  SsoAuthTransaction[]
-  tenantSettings       OrganizationSettings?
-  branding             OrganizationBranding?
-  domains              OrganizationDomain[]
-  tenantRoles          Role[]                      @relation("TenantRoles")
-  subscriptions        Subscription[]
-  entitlements         OrganizationEntitlement[]
-  quotaOverrides       OrganizationQuotaOverride[]
-  usageCounters        UsageCounter[]
-  usageSnapshots       UsageSnapshot[]
-  quotaThresholds      QuotaThresholdEvent[]
-  usageReservations    UsageReservation[]
-  usageEvents          UsageEvent[]
-  technicalReleases    TechnicalRelease[]
-  knowledgeArticles    KnowledgeBaseArticle[]
-  technicalDocuments   TechnicalDocument[]
-  technicalResources   TechnicalResource[]
-  tenders              Tender[]
-  tenderReviews        TenderReview[]
+  collaborationTopics           CollaborationTopic[]
+  collaborationChannels         CollaborationChannel[]
+  memberships                   OrganizationMembership[]
+  customerCompanyMemberships    CustomerCompanyMembership[]
+  customerInvitations           CustomerInvitation[]
+  ssoProviders                  SsoProvider[]
+  ssoRoutes                     SsoProviderRoute[]
+  ssoAuthTransactions           SsoAuthTransaction[]
+  tenantSettings                OrganizationSettings?
+  branding                      OrganizationBranding?
+  domains                       OrganizationDomain[]
+  tenantRoles                   Role[]                         @relation("TenantRoles")
+  subscriptions                 Subscription[]
+  entitlements                  OrganizationEntitlement[]
+  quotaOverrides                OrganizationQuotaOverride[]
+  usageCounters                 UsageCounter[]
+  usageSnapshots                UsageSnapshot[]
+  quotaThresholds               QuotaThresholdEvent[]
+  usageReservations             UsageReservation[]
+  usageEvents                   UsageEvent[]
+  technicalReleases             TechnicalRelease[]
+  knowledgeArticles             KnowledgeBaseArticle[]
+  technicalDocuments            TechnicalDocument[]
+  technicalResources            TechnicalResource[]
+  tenders                       Tender[]
+  tenderReviews                 TenderReview[]
 
   notificationCoreEvents       NotificationEvent[]            @relation("NotificationCoreEvents")
   notificationCoreRules        NotificationRule[]             @relation("NotificationCoreRules")
@@ -778,17 +809,17 @@ model Organization {
 }
 
 model CollaborationTopic {
-  id             String   @id @default(uuid())
+  id             String                     @id @default(uuid())
   organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization   Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   name           String
   description    String?
   category       CollaborationTopicCategory @default(INTERNAL)
   createdById    String
-  createdBy      User     @relation("CollaborationTopicCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  createdBy      User                       @relation("CollaborationTopicCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   archivedAt     DateTime?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime                   @default(now())
+  updatedAt      DateTime                   @updatedAt
   channels       CollaborationChannel[]
 
   @@unique([organizationId, name])
@@ -798,19 +829,19 @@ model CollaborationTopic {
 }
 
 model CollaborationChannel {
-  id             String   @id @default(uuid())
+  id             String                         @id @default(uuid())
   organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization   Organization                   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   topicId        String
-  topic          CollaborationTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  topic          CollaborationTopic             @relation(fields: [topicId], references: [id], onDelete: Cascade)
   name           String
   description    String?
   visibility     CollaborationChannelVisibility @default(PUBLIC)
   createdById    String
-  createdBy      User     @relation("CollaborationChannelCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  createdBy      User                           @relation("CollaborationChannelCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   archivedAt     DateTime?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime                       @default(now())
+  updatedAt      DateTime                       @updatedAt
   members        CollaborationChannelMember[]
 
   @@unique([topicId, name])
@@ -821,13 +852,13 @@ model CollaborationChannel {
 
 model CollaborationChannelMember {
   channelId String
-  channel   CollaborationChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  channel   CollaborationChannel           @relation(fields: [channelId], references: [id], onDelete: Cascade)
   userId    String
-  user      User @relation("CollaborationChannelMemberUser", fields: [userId], references: [id], onDelete: Cascade)
+  user      User                           @relation("CollaborationChannelMemberUser", fields: [userId], references: [id], onDelete: Cascade)
   role      CollaborationChannelMemberRole @default(MEMBER)
-  joinedAt  DateTime @default(now())
+  joinedAt  DateTime                       @default(now())
   addedById String?
-  addedBy   User? @relation("CollaborationChannelMemberAddedBy", fields: [addedById], references: [id], onDelete: SetNull)
+  addedBy   User?                          @relation("CollaborationChannelMemberAddedBy", fields: [addedById], references: [id], onDelete: SetNull)
 
   @@id([channelId, userId])
   @@index([userId, joinedAt])
@@ -1082,7 +1113,9 @@ model RefreshSession {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  refreshTokenHash String @unique
+  refreshTokenHash           String              @unique
+  audience                   AuthSessionAudience @default(INTERNAL)
+  activeCustomerMembershipId String?
 
   userAgent String?
   ipAddress String?
@@ -1099,6 +1132,8 @@ model RefreshSession {
   @@index([expiresAt])
   @@index([revokedAt])
   @@index([userId, revokedAt, expiresAt])
+  @@index([userId, audience, revokedAt, expiresAt])
+  @@index([activeCustomerMembershipId])
   @@map("refresh_sessions")
 }
 
@@ -1110,31 +1145,31 @@ model Company {
   id       String @id @default(uuid())
   leadCode String @unique @default(uuid())
 
-  legalName           String
-  brandName           String?
-  registrationNo      String?
-  registrationNumber  String?
-  nationalId          String?
-  economicCode        String?
-  establishmentDate   DateTime?
-  foundedYear         Int?
-  companyType         String?
-  ownership           CompanyOwnership?
-  activityStatus      CompanyActivityStatus      @default(UNKNOWN)
-  engagementStatus    CompanyEngagementStatus    @default(NEEDS_ACTION)
-  engagementReason    String?
-  nextReviewAt        DateTime?
-  engagementUpdatedAt DateTime?
+  legalName             String
+  brandName             String?
+  registrationNo        String?
+  registrationNumber    String?
+  nationalId            String?
+  economicCode          String?
+  establishmentDate     DateTime?
+  foundedYear           Int?
+  companyType           String?
+  ownership             CompanyOwnership?
+  activityStatus        CompanyActivityStatus      @default(UNKNOWN)
+  engagementStatus      CompanyEngagementStatus    @default(NEEDS_ACTION)
+  engagementReason      String?
+  nextReviewAt          DateTime?
+  engagementUpdatedAt   DateTime?
   engagementUpdatedById String?
-  engagementUpdatedBy User? @relation("CompanyEngagementUpdatedBy", fields: [engagementUpdatedById], references: [id], onDelete: SetNull)
-  activityGroup       String?
-  marketSize          String?
-  logoStorageProvider AttachmentStorageProvider?
-  logoBucket          String?
-  logoObjectKey       String?
-  logoStoragePath     String?
-  logoMimeType        String?
-  logoOriginalName    String?
+  engagementUpdatedBy   User?                      @relation("CompanyEngagementUpdatedBy", fields: [engagementUpdatedById], references: [id], onDelete: SetNull)
+  activityGroup         String?
+  marketSize            String?
+  logoStorageProvider   AttachmentStorageProvider?
+  logoBucket            String?
+  logoObjectKey         String?
+  logoStoragePath       String?
+  logoMimeType          String?
+  logoOriginalName      String?
 
   industryId  String?
   industryRef Industry? @relation("CompanyIndustry", fields: [industryId], references: [id], onDelete: SetNull)
@@ -1201,8 +1236,14 @@ model Company {
   tenders                 Tender[]
   timesheetEntries        TimesheetEntry[]
 
-  organizationId String       @default("00000000-0000-4000-8000-000000000001")
-  organization   Organization @relation(fields: [organizationId], references: [id])
+  organizationId      String                      @default("00000000-0000-4000-8000-000000000001")
+  organization        Organization                @relation(fields: [organizationId], references: [id])
+  portalEnabled       Boolean                     @default(false)
+  portalEnabledAt     DateTime?
+  portalEnabledById   String?
+  portalEnabledBy     User?                       @relation("CompanyPortalEnabledBy", fields: [portalEnabledById], references: [id], onDelete: SetNull)
+  customerMemberships CustomerCompanyMembership[]
+  customerInvitations CustomerInvitation[]
 
   @@unique([id, organizationId])
   @@index([ownerId])
@@ -1219,7 +1260,61 @@ model Company {
   @@index([organizationId])
   @@index([organizationId, ownerId])
   @@index([organizationId, engagementStatus, nextReviewAt])
+  @@index([organizationId, portalEnabled, archivedAt])
   @@map("companies")
+}
+
+model CustomerCompanyMembership {
+  id             String                   @id @default(uuid())
+  organizationId String
+  organization   Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  companyId      String
+  company        Company                  @relation(fields: [companyId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  userId         String
+  user           User                     @relation("CustomerMembershipUser", fields: [userId], references: [id], onDelete: Cascade)
+  role           CustomerRole
+  status         CustomerMembershipStatus @default(INVITED)
+  invitedById    String?
+  invitedBy      User?                    @relation("CustomerMembershipInvitedBy", fields: [invitedById], references: [id], onDelete: SetNull)
+  invitedAt      DateTime?
+  activatedAt    DateTime?
+  suspendedAt    DateTime?
+  revokedAt      DateTime?
+  lastAccessAt   DateTime?
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+
+  @@unique([companyId, userId])
+  @@unique([id, organizationId])
+  @@index([organizationId, companyId, status])
+  @@index([userId, status])
+  @@index([companyId, role, status])
+  @@map("customer_company_memberships")
+}
+
+model CustomerInvitation {
+  id                     String       @id @default(uuid())
+  organizationId         String
+  organization           Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  companyId              String
+  company                Company      @relation(fields: [companyId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  normalizedEmail        String
+  role                   CustomerRole
+  tokenHash              String       @unique
+  invitedById            String
+  invitedBy              User         @relation("CustomerInvitationInvitedBy", fields: [invitedById], references: [id], onDelete: Restrict)
+  expiresAt              DateTime
+  acceptedAt             DateTime?
+  acceptedById           String?
+  acceptedBy             User?        @relation("CustomerInvitationAcceptedBy", fields: [acceptedById], references: [id], onDelete: SetNull)
+  revokedAt              DateTime?
+  replacedByInvitationId String?
+  createdAt              DateTime     @default(now())
+
+  @@index([organizationId, companyId, normalizedEmail])
+  @@index([normalizedEmail, expiresAt])
+  @@index([companyId, acceptedAt, revokedAt, expiresAt])
+  @@map("customer_invitations")
 }
 
 model CompanyUserPreference {
@@ -2206,30 +2301,30 @@ enum ConversationBotStatus {
 }
 
 model ConversationMessage {
-  id              String                  @id @default(uuid())
+  id              String                         @id @default(uuid())
   organizationId  String
-  organization    Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization    Organization                   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   threadId        String
-  thread          ConversationThread      @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  thread          ConversationThread             @relation(fields: [threadId], references: [id], onDelete: Cascade)
   authorId        String?
-  author          User?                   @relation("ConversationMessageAuthor", fields: [authorId], references: [id], onDelete: Restrict)
-  senderType      ConversationSenderType  @default(USER)
-  botRequestKey   String?                 @unique
+  author          User?                          @relation("ConversationMessageAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+  senderType      ConversationSenderType         @default(USER)
+  botRequestKey   String?                        @unique
   botStatus       ConversationBotStatus?
-  botResponseToId String?                 @unique
-  botResponseTo   ConversationMessage?    @relation("ConversationBotResponse", fields: [botResponseToId], references: [id], onDelete: Restrict)
-  botResponse     ConversationMessage?    @relation("ConversationBotResponse")
+  botResponseToId String?                        @unique
+  botResponseTo   ConversationMessage?           @relation("ConversationBotResponse", fields: [botResponseToId], references: [id], onDelete: Restrict)
+  botResponse     ConversationMessage?           @relation("ConversationBotResponse")
   parentMessageId String?
-  parentMessage   ConversationMessage?    @relation("ConversationMessageReplies", fields: [parentMessageId], references: [id], onDelete: Restrict)
-  replies         ConversationMessage[]   @relation("ConversationMessageReplies")
-  type            ConversationMessageType @default(COMMENT)
+  parentMessage   ConversationMessage?           @relation("ConversationMessageReplies", fields: [parentMessageId], references: [id], onDelete: Restrict)
+  replies         ConversationMessage[]          @relation("ConversationMessageReplies")
+  type            ConversationMessageType        @default(COMMENT)
   body            String
   editedAt        DateTime?
   deletedAt       DateTime?
   deletedById     String?
-  deletedBy       User?                   @relation("ConversationMessageDeletedBy", fields: [deletedById], references: [id], onDelete: SetNull)
-  createdAt       DateTime                @default(now())
-  updatedAt       DateTime                @updatedAt
+  deletedBy       User?                          @relation("ConversationMessageDeletedBy", fields: [deletedById], references: [id], onDelete: SetNull)
+  createdAt       DateTime                       @default(now())
+  updatedAt       DateTime                       @updatedAt
   references      ConversationMessageReference[]
 
   @@index([organizationId, threadId, createdAt])
@@ -2239,15 +2334,15 @@ model ConversationMessage {
 }
 
 model ConversationMessageReference {
-  id             String @id @default(uuid())
+  id             String                           @id @default(uuid())
   organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization   Organization                     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   messageId      String
-  message        ConversationMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  message        ConversationMessage              @relation(fields: [messageId], references: [id], onDelete: Cascade)
   referenceType  ConversationMessageReferenceType
   referenceId    String
   labelSnapshot  String
-  createdAt      DateTime @default(now())
+  createdAt      DateTime                         @default(now())
 
   @@unique([messageId, referenceType, referenceId])
   @@index([organizationId, referenceType, referenceId])
@@ -2450,19 +2545,19 @@ model PipelineStageHistory {
 }
 
 model PipelineStage {
-  id           String   @id @default(uuid())
-  code         String   @unique
-  label        String
-  description  String?
+  id              String   @id @default(uuid())
+  code            String   @unique
+  label           String
+  description     String?
   maxDurationDays Int?
-  sortOrder    Int      @default(0)
-  color        String?
-  isActive     Boolean  @default(true)
-  isTerminal   Boolean  @default(false)
-  terminalType String?
-  isDefault    Boolean  @default(false)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  sortOrder       Int      @default(0)
+  color           String?
+  isActive        Boolean  @default(true)
+  isTerminal      Boolean  @default(false)
+  terminalType    String?
+  isDefault       Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   opportunities            Opportunity[]
   opportunityHistoriesFrom OpportunityStageHistory[] @relation("OpportunityHistoryFromStage")

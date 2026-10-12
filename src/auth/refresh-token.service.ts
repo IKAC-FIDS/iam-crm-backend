@@ -4,7 +4,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Prisma, User } from '@prisma/client';
+import { AuthSessionAudience, Prisma, User } from '@prisma/client';
 import { createHash, randomBytes } from 'crypto';
 import type { Request } from 'express';
 import { PrismaService } from '../prisma/prisma.service';
@@ -30,12 +30,20 @@ export interface PlatformRefreshContext {
   platformOnly: true;
 }
 
-export type RefreshSessionContext = RefreshTenantContext | PlatformRefreshContext;
+export interface PortalRefreshContext {
+  portal: true;
+  activeOrganizationId: string;
+  activeCompanyId: string;
+  customerMembershipId: string;
+}
+
+export type RefreshSessionContext = RefreshTenantContext | PlatformRefreshContext | PortalRefreshContext;
 
 export interface ActiveRefreshSession {
   user: User;
   refreshSessionId: string;
   tenantContext: RefreshSessionContext | null;
+  audience: AuthSessionAudience;
 }
 
 export interface UserSessionResponse {
@@ -59,7 +67,10 @@ export class RefreshTokenService {
     return (await this.getActiveSession(refreshToken)).user;
   }
 
-  async getActiveSession(refreshToken: string): Promise<ActiveRefreshSession> {
+  async getActiveSession(
+    refreshToken: string,
+    expectedAudience?: AuthSessionAudience,
+  ): Promise<ActiveRefreshSession> {
     const session = await this.prisma.refreshSession.findUnique({
       where: { refreshTokenHash: this.hashRefreshToken(refreshToken) },
       include: { user: true },
@@ -72,7 +83,8 @@ export class RefreshTokenService {
       !session ||
       session.revokedAt ||
       session.expiresAt <= new Date() ||
-      !session.user.isActive
+      !session.user.isActive ||
+      (expectedAudience && session.audience !== expectedAudience)
     ) {
       throw new UnauthorizedException('Invalid refresh token');
     }
@@ -80,6 +92,7 @@ export class RefreshTokenService {
       user: session.user,
       refreshSessionId: session.id,
       tenantContext: this.parseTenantContext(refreshToken),
+      audience: session.audience,
     };
   }
 
@@ -88,6 +101,7 @@ export class RefreshTokenService {
     req?: Request,
     tx?: Prisma.TransactionClient,
     tenantContext?: RefreshSessionContext | null,
+    audience: AuthSessionAudience = AuthSessionAudience.INTERNAL,
   ): Promise<CreatedRefreshSession> {
     const prisma = tx ?? this.prisma;
 
@@ -103,6 +117,11 @@ export class RefreshTokenService {
         userAgent: this.extractUserAgent(req),
         ipAddress: this.extractIpAddress(req),
         expiresAt: refreshTokenExpiresAt,
+        audience,
+        activeCustomerMembershipId:
+          tenantContext && 'portal' in tenantContext
+            ? tenantContext.customerMembershipId
+            : null,
       },
     });
 
@@ -119,6 +138,7 @@ export class RefreshTokenService {
     refreshToken: string,
     req?: Request,
     nextTenantContext?: RefreshSessionContext | null,
+    expectedAudience?: AuthSessionAudience,
   ): Promise<RotatedRefreshSession> {
     const oldHash = this.hashRefreshToken(refreshToken);
 
@@ -129,6 +149,9 @@ export class RefreshTokenService {
 
     if (!existingSession) {
       throw new UnauthorizedException('Invalid refresh token');
+    }
+    if (expectedAudience && existingSession.audience !== expectedAudience) {
+      throw new UnauthorizedException('Invalid refresh token audience');
     }
 
     if (existingSession.revokedAt) {
@@ -180,6 +203,11 @@ export class RefreshTokenService {
           revokedAt: now,
           revokedReason: 'ROTATED',
           lastUsedAt: now,
+          audience: existingSession.audience,
+          activeCustomerMembershipId:
+            tenantContext && 'portal' in tenantContext
+              ? tenantContext.customerMembershipId
+              : null,
         },
       });
 
@@ -195,6 +223,11 @@ export class RefreshTokenService {
           ipAddress: this.extractIpAddress(req),
           expiresAt: refreshTokenExpiresAt,
           lastUsedAt: now,
+          audience: existingSession.audience,
+          activeCustomerMembershipId:
+            tenantContext && 'portal' in tenantContext
+              ? tenantContext.customerMembershipId
+              : null,
         },
       });
 
@@ -254,6 +287,18 @@ export class RefreshTokenService {
       },
     });
 
+    return result.count;
+  }
+
+  async revokeAllUserSessionsByAudience(
+    userId: string,
+    audience: AuthSessionAudience,
+    reason = 'LOGOUT_ALL',
+  ): Promise<number> {
+    const result = await this.prisma.refreshSession.updateMany({
+      where: { userId, audience, revokedAt: null, expiresAt: { gt: new Date() } },
+      data: { revokedAt: new Date(), revokedReason: reason },
+    });
     return result.count;
   }
 
@@ -383,6 +428,19 @@ async revokeAllUserSessionsExceptToken(
       const payload = Buffer.from(JSON.stringify({ v: 3, platformOnly: true }), 'utf8').toString('base64url');
       return `rt3.${payload}.${random}`;
     }
+    if ('portal' in tenantContext) {
+      const payload = Buffer.from(
+        JSON.stringify({
+          v: 4,
+          portal: true,
+          activeOrganizationId: tenantContext.activeOrganizationId,
+          activeCompanyId: tenantContext.activeCompanyId,
+          customerMembershipId: tenantContext.customerMembershipId,
+        }),
+        'utf8',
+      ).toString('base64url');
+      return `rt4.${payload}.${random}`;
+    }
     const payload = Buffer.from(
       JSON.stringify({
         v: 2,
@@ -396,13 +454,28 @@ async revokeAllUserSessionsExceptToken(
 
   private parseTenantContext(refreshToken: string): RefreshSessionContext | null {
     const parts = refreshToken.split('.');
-    if (parts.length !== 3 || !['rt2', 'rt3'].includes(parts[0])) return null;
+    if (parts.length !== 3 || !['rt2', 'rt3', 'rt4'].includes(parts[0])) return null;
     try {
       const value = JSON.parse(
         Buffer.from(parts[1], 'base64url').toString('utf8'),
       ) as Record<string, unknown>;
       if (parts[0] === 'rt3' && value.v === 3 && value.platformOnly === true) {
         return { platformOnly: true };
+      }
+      if (
+        parts[0] === 'rt4' &&
+        value.v === 4 &&
+        value.portal === true &&
+        typeof value.activeOrganizationId === 'string' &&
+        typeof value.activeCompanyId === 'string' &&
+        typeof value.customerMembershipId === 'string'
+      ) {
+        return {
+          portal: true,
+          activeOrganizationId: value.activeOrganizationId,
+          activeCompanyId: value.activeCompanyId,
+          customerMembershipId: value.customerMembershipId,
+        };
       }
       if (
         value.v !== 2 ||

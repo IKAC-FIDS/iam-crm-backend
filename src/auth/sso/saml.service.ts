@@ -15,6 +15,7 @@ import {
   SsoProvider,
   SsoProviderType,
   SsoRoutingKind,
+  UserPrincipalType,
   UserRole,
 } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
@@ -382,7 +383,7 @@ export class SamlService {
     });
 
     if (existingIdentity) {
-      if (!existingIdentity.user.isActive) {
+      if (!existingIdentity.user.isActive || existingIdentity.user.principalType !== UserPrincipalType.INTERNAL) {
         throw new BadRequestException("User is inactive");
       }
 
@@ -397,12 +398,12 @@ export class SamlService {
 
     const existingUser = await this.prisma.user.findUnique({
       where: {
-        email: input.email,
+        normalizedEmail: input.email.trim().toLowerCase(),
       },
     });
 
     if (existingUser) {
-      if (!existingUser.isActive) {
+      if (!existingUser.isActive || existingUser.principalType !== UserPrincipalType.INTERNAL) {
         throw new BadRequestException("User is inactive");
       }
 
@@ -435,6 +436,7 @@ export class SamlService {
       const user = await tx.user.create({
         data: {
           email: input.email,
+          normalizedEmail: input.email.trim().toLowerCase(),
           fullName: input.fullName,
           passwordHash,
           role: UserRole.REP,

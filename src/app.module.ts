@@ -55,6 +55,8 @@ import { CrmAssistantModule } from "./crm-assistant/crm-assistant.module";
 import { OperationsModule } from "./operations/operations.module";
 import { PersonalTodosModule } from "./personal-todos/personal-todos.module";
 import { CollaborationModule } from "./collaboration/collaboration.module";
+import { PortalAuthModule } from "./portal-auth/portal-auth.module";
+import { CustomerUsersModule } from "./customer-users/customer-users.module";
 
 @Module({
   imports: [
@@ -126,6 +128,8 @@ import { CollaborationModule } from "./collaboration/collaboration.module";
     OperationsModule,
     PersonalTodosModule,
     CollaborationModule,
+    PortalAuthModule,
+    CustomerUsersModule,
   ],
   providers: [
     {

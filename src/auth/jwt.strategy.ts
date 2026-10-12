@@ -6,6 +6,8 @@ import type { Request } from 'express';
 import type { RequestWithRequestId } from '../common/logging/http-log-context';
 import { TenantResolverService } from '../organization-memberships/tenant-resolver.service';
 import { AuditRequestContextService } from '../audit-log/audit-request-context.service';
+import { UserPrincipalType } from '@prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
 
 interface JwtPayload {
   sub?: string;
@@ -26,6 +28,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     configService: ConfigService,
     private readonly tenantResolver: TenantResolverService,
     private readonly auditRequestContext: AuditRequestContextService,
+    private readonly prisma: PrismaService,
   ) {
     const secret = configService.get<string>('JWT_SECRET');
 
@@ -38,6 +41,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       ignoreExpiration: false,
       secretOrKey: secret,
       passReqToCallback: true,
+      audience: 'neshane-op-internal',
     });
   }
 
@@ -47,6 +51,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     }
 
     const requestId = (req as RequestWithRequestId).requestId ?? null;
+    const principal = await this.prisma.user.findUnique({
+      where: { id: payload.sub },
+      select: { principalType: true },
+    });
+    if (principal?.principalType !== UserPrincipalType.INTERNAL) {
+      throw new UnauthorizedException('Invalid token principal');
+    }
     const effective = await this.tenantResolver
       .resolveAuthenticatedTenant(payload.sub, {
         claims: {

@@ -154,7 +154,8 @@ export class UsersService {
         const created = await tx.user.create({
           data: {
             fullName: dto.fullName,
-            email: dto.email,
+            email: dto.email.trim(),
+            normalizedEmail: dto.email.trim().toLowerCase(),
             passwordHash,
             role: dto.role,
             team: teamAssignment.team,

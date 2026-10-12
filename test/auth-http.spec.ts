@@ -15,12 +15,13 @@ import { AuditRequestContextService } from '../src/audit-log/audit-request-conte
 import { ApiExceptionFilter } from '../src/common/filters/api-exception.filter';
 import { ApiResponseInterceptor } from '../src/common/interceptors/api-response.interceptor';
 import { buildRefreshTokenCookieOptions } from '../src/common/cookies/refresh-token-cookie';
+import { PrismaService } from '../src/prisma/prisma.service';
 
 // HTTP/controller/service integration with synthetic persistence. No environment DB connection.
 describe('auth HTTP session contract', () => {
   let app: INestApplication;
   const env = { ...process.env };
-  const user = { id: 'user-test', fullName: 'Synthetic', email: 'user@example.test', role: 'REP', roleId: null, isActive: true, passwordHash: hashSync('synthetic-password', 4), failedLoginAttempts: 0 };
+  const user = { id: 'user-test', fullName: 'Synthetic', email: 'user@example.test', normalizedEmail: 'user@example.test', principalType: 'INTERNAL', role: 'REP', roleId: null, isActive: true, passwordHash: hashSync('synthetic-password', 4), failedLoginAttempts: 0 };
   const rows = new Map<string, any>();
   const tenant = { organizationId: 'tenant-test', membershipId: 'membership-test', role: 'REP', roleId: null, permissions: [], userId: user.id };
   const resolver = { resolveAuthenticatedTenant: jest.fn(async () => tenant), selectTenant: jest.fn(async () => ({ ...tenant, organizationId: 'tenant-next' })) };
@@ -32,7 +33,7 @@ describe('auth HTTP session contract', () => {
     return row[key] === value;
   });
   const prisma: any = {
-    user: { findUnique: jest.fn(async ({ where }: any) => where.email === user.email || where.id === user.id ? { ...user } : null), update: jest.fn(async () => user) },
+    user: { findUnique: jest.fn(async ({ where }: any) => where.normalizedEmail === user.normalizedEmail || where.id === user.id ? { ...user } : null), update: jest.fn(async () => user) },
     role: { findUnique: jest.fn(async () => null) },
     organizationSettings: { findUnique: jest.fn(async () => null) },
     refreshSession: {
@@ -54,6 +55,7 @@ describe('auth HTTP session contract', () => {
     { provide: AuthService, useValue: service }, JwtStrategy,
     { provide: ConfigService, useValue: config },
     { provide: TenantResolverService, useValue: resolver },
+    { provide: PrismaService, useValue: prisma },
     { provide: AuditRequestContextService, useValue: { setOrganizationId() {}, setActor() {} } },
   ] })
   class TestModule {}
@@ -71,7 +73,7 @@ describe('auth HTTP session contract', () => {
     app.useGlobalInterceptors(new ApiResponseInterceptor());
     await app.init();
   });
-  beforeEach(() => { rows.clear(); user.isActive = true; resolver.resolveAuthenticatedTenant.mockImplementation(async () => tenant); });
+  beforeEach(() => { rows.clear(); user.isActive = true; user.principalType = 'INTERNAL'; resolver.resolveAuthenticatedTenant.mockImplementation(async () => tenant); });
   afterAll(async () => { await app.close(); process.env = env; });
   const post = (path: string) => request(app.getHttpServer()).post(`/api/auth/${path}`).set('Origin', 'https://crm.example.test');
   const login = () => post('login').send({ email: user.email, password: 'synthetic-password' });
@@ -90,6 +92,10 @@ describe('auth HTTP session contract', () => {
     const response = await post('login').send({ email: user.email, password: 'incorrect-password' }).expect(401);
     expect(response.body).toMatchObject({ success: false, error: { code: 'UNAUTHORIZED' }, statusCode: 401 });
     expect(response.headers['set-cookie']).toBeUndefined();
+  });
+  it('rejects customer principals at the internal login boundary', async () => {
+    user.principalType = 'CUSTOMER';
+    await login().expect(401);
   });
   it('rejects refresh without cookie', async () => { await post('refresh').expect(401); });
   it('rotates the cookie and detects later replay by revoking active sessions', async () => {
