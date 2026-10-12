@@ -1,4 +1,5 @@
-import { UserRole } from '@prisma/client';
+import { UnauthorizedException } from '@nestjs/common';
+import { UserPrincipalType, UserRole } from '@prisma/client';
 import { JwtStrategy } from '../src/auth/jwt.strategy';
 
 describe('JwtStrategy Tenant boundary', () => {
@@ -21,6 +22,13 @@ describe('JwtStrategy Tenant boundary', () => {
       { get: jest.fn().mockReturnValue('test-secret') } as any,
       resolver as any,
       { setOrganizationId: jest.fn() } as any,
+      {
+        user: {
+          findUnique: jest.fn().mockResolvedValue({
+            principalType: UserPrincipalType.INTERNAL,
+          }),
+        },
+      } as any,
     );
     const req = {
       requestId: 'request-1',
@@ -53,5 +61,30 @@ describe('JwtStrategy Tenant boundary', () => {
       activeOrganizationId: 'org-a',
       membershipId: 'membership-a',
     });
+  });
+
+  it('rejects a customer principal at the internal JWT strategy boundary', async () => {
+    const resolver = { resolveAuthenticatedTenant: jest.fn() };
+    const strategy = new JwtStrategy(
+      { get: jest.fn().mockReturnValue('test-secret') } as any,
+      resolver as any,
+      { setOrganizationId: jest.fn(), setActor: jest.fn() } as any,
+      {
+        user: {
+          findUnique: jest.fn().mockResolvedValue({
+            principalType: UserPrincipalType.CUSTOMER,
+          }),
+        },
+      } as any,
+    );
+
+    await expect(
+      strategy.validate({ headers: {} } as any, {
+        sub: 'customer-a',
+        email: 'customer@example.test',
+        role: UserRole.REP,
+      }),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(resolver.resolveAuthenticatedTenant).not.toHaveBeenCalled();
   });
 });

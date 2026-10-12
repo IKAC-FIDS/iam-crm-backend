@@ -1,5 +1,9 @@
 import { ForbiddenException } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
+import {
+  AuthSessionAudience,
+  UserPrincipalType,
+  UserRole,
+} from '@prisma/client';
 import { AuthService } from '../src/auth/auth.service';
 
 const account = {
@@ -7,6 +11,7 @@ const account = {
   email: 'user@example.test',
   fullName: 'User A',
   role: UserRole.REP,
+  principalType: UserPrincipalType.INTERNAL,
 };
 
 const context = (organizationId: string, membershipId: string) => ({
@@ -114,6 +119,7 @@ describe('AuthService Tenant switch', () => {
       'old-refresh-token',
       expect.anything(),
       { activeOrganizationId: 'org-b', membershipId: 'membership-b' },
+      AuthSessionAudience.INTERNAL,
     );
     expect(jwt.signAsync).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -121,6 +127,7 @@ describe('AuthService Tenant switch', () => {
         activeOrganizationId: 'org-b',
         membershipId: 'membership-b',
       }),
+      expect.objectContaining({ audience: 'neshane-op-internal' }),
     );
     expect(audit.record).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -166,6 +173,7 @@ describe('AuthService Tenant switch', () => {
         'current-refresh-token',
         undefined,
         { activeOrganizationId: 'org-a', membershipId: 'membership-a' },
+        AuthSessionAudience.INTERNAL,
       );
     },
   );
@@ -208,6 +216,7 @@ describe('AuthService Tenant switch', () => {
       'old-refresh-token',
       undefined,
       { activeOrganizationId: 'org-a', membershipId: 'membership-a' },
+      AuthSessionAudience.INTERNAL,
     );
   });
 

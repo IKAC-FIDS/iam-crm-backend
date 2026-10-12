@@ -38,6 +38,9 @@ const PUBLIC_OPERATIONS = new Set([
   "GET /api/auth/saml/:providerId/metadata",
   "POST /api/auth/passkeys/authentication/options",
   "POST /api/auth/passkeys/authentication/verify",
+  "POST /api/portal/auth/login",
+  "POST /api/portal/auth/select-company",
+  "POST /api/portal/auth/accept-invitation",
 ]);
 
 const PLATFORM_PATHS = [
@@ -93,6 +96,16 @@ export function createOpenApiDocument(app: INestApplication): OpenAPIObject {
         description: "HttpOnly refresh cookie used by auth/session flows.",
       },
       "refreshCookie",
+    )
+    .addCookieAuth(
+      "portalRefreshToken",
+      {
+        type: "apiKey",
+        in: "cookie",
+        description:
+          "HttpOnly portal refresh cookie used only by /api/portal/auth flows.",
+      },
+      "portalRefreshCookie",
     )
     .build();
 
@@ -160,7 +173,10 @@ function normalizeOperations(document: OpenAPIObject) {
           path,
         ) ||
           /^\/api\/auth\/(sessions|account|passkeys)(\/|$)/.test(path) ||
-          path === "/api/auth/sso/exchange")
+          path === "/api/auth/sso/exchange" ||
+          /^\/api\/portal\/auth\/(login|select-company|refresh|switch-company|accept-invitation|logout|logout-all)$/.test(
+            path,
+          ))
       ) {
         operation.parameters.push({
           name: "Origin",
@@ -217,8 +233,10 @@ function normalizeResponses(
     };
     return;
   }
-  const successCode = operation.responses?.["201"]
-    ? "201"
+  const successCode = operation.responses?.["200"]
+    ? "200"
+    : operation.responses?.["201"]
+      ? "201"
     : method === "post"
       ? "201"
       : "200";
@@ -478,6 +496,12 @@ function contractDescription(path: string, existing?: string) {
 }
 function securityFor(key: string) {
   if (PUBLIC_OPERATIONS.has(key)) return [];
+  if (key === "POST /api/portal/auth/refresh")
+    return [{ portalRefreshCookie: [] }];
+  if (key === "POST /api/portal/auth/logout")
+    return [{ portalRefreshCookie: [] }, {}];
+  if (key === "POST /api/portal/auth/switch-company")
+    return [{ bearerAuth: [], portalRefreshCookie: [] }];
   if (key === "POST /api/auth/refresh") return [{ refreshCookie: [] }];
   if (key === "POST /api/auth/logout") return [{ refreshCookie: [] }, {}];
   if (key === "POST /api/auth/switch-tenant")

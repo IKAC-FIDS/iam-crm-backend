@@ -120,6 +120,17 @@ describe("fix 000094 canonical OpenAPI contract", () => {
     );
     expect(doc.paths["/api/health"].get.security).toEqual([]);
     expect(doc.paths["/api/auth/login"].post.security).toEqual([]);
+    expect(doc.paths["/api/portal/auth/login"].post.security).toEqual([]);
+    expect(doc.paths["/api/portal/auth/accept-invitation"].post.security).toEqual([]);
+    expect(doc.paths["/api/portal/auth/refresh"].post.security).toEqual([
+      { portalRefreshCookie: [] },
+    ]);
+    expect(doc.paths["/api/portal/auth/switch-company"].post.security).toEqual([
+      { bearerAuth: [], portalRefreshCookie: [] },
+    ]);
+    expect(
+      doc.paths["/api/portal/auth/login"].post.responses?.["200"],
+    ).toBeDefined();
     expect(doc.paths["/api/auth/sso/providers"].get.security).toEqual([]);
     expect(doc.paths["/api/auth/refresh"].post.security).toEqual([
       { refreshCookie: [] },

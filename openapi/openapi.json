@@ -7139,6 +7139,12 @@
         "scheme": "bearer",
         "type": "http"
       },
+      "portalRefreshCookie": {
+        "description": "HttpOnly portal refresh cookie used only by /api/portal/auth flows.",
+        "in": "cookie",
+        "name": "portalRefreshToken",
+        "type": "apiKey"
+      },
       "refreshCookie": {
         "description": "HttpOnly refresh cookie used by auth/session flows.",
         "in": "cookie",
@@ -36497,7 +36503,7 @@
           "required": true
         },
         "responses": {
-          "201": {
+          "200": {
             "content": {
               "application/json": {
                 "schema": {
@@ -36671,7 +36677,7 @@
           }
         ],
         "responses": {
-          "201": {
+          "200": {
             "content": {
               "application/json": {
                 "schema": {
@@ -37019,7 +37025,7 @@
           "required": true
         },
         "responses": {
-          "201": {
+          "200": {
             "content": {
               "application/json": {
                 "schema": {
@@ -37189,7 +37195,7 @@
           }
         ],
         "responses": {
-          "201": {
+          "200": {
             "content": {
               "application/json": {
                 "schema": {
@@ -37364,7 +37370,7 @@
           }
         ],
         "responses": {
-          "201": {
+          "200": {
             "content": {
               "application/json": {
                 "schema": {
@@ -37692,7 +37698,7 @@
           "required": true
         },
         "responses": {
-          "201": {
+          "200": {
             "content": {
               "application/json": {
                 "schema": {
@@ -37872,7 +37878,7 @@
           "required": true
         },
         "responses": {
-          "201": {
+          "200": {
             "content": {
               "application/json": {
                 "schema": {
@@ -38042,7 +38048,7 @@
           }
         ],
         "responses": {
-          "201": {
+          "200": {
             "content": {
               "application/json": {
                 "schema": {
@@ -39128,7 +39134,7 @@
           "required": true
         },
         "responses": {
-          "201": {
+          "200": {
             "content": {
               "application/json": {
                 "schema": {
@@ -56725,7 +56731,7 @@
           "required": true
         },
         "responses": {
-          "201": {
+          "200": {
             "content": {
               "application/json": {
                 "schema": {
@@ -56899,7 +56905,7 @@
           "required": true
         },
         "responses": {
-          "201": {
+          "200": {
             "content": {
               "application/json": {
                 "schema": {
@@ -78811,6 +78817,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "Must exactly match CORS_ORIGINS. Missing, null or untrusted origins return 403 AUTH_ORIGIN_REJECTED. Missing Origin is allowed only by explicit non-production AUTH_ALLOW_MISSING_ORIGIN=true.",
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "format": "uri",
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -78824,7 +78840,7 @@
           "required": true
         },
         "responses": {
-          "201": {
+          "200": {
             "content": {
               "application/json": {
                 "schema": {
@@ -78962,11 +78978,7 @@
             }
           }
         },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
+        "security": [],
         "tags": [
           "Portal"
         ]
@@ -79149,6 +79161,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "Must exactly match CORS_ORIGINS. Missing, null or untrusted origins return 403 AUTH_ORIGIN_REJECTED. Missing Origin is allowed only by explicit non-production AUTH_ALLOW_MISSING_ORIGIN=true.",
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "format": "uri",
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -79162,7 +79184,7 @@
           "required": true
         },
         "responses": {
-          "201": {
+          "200": {
             "content": {
               "application/json": {
                 "schema": {
@@ -79300,11 +79322,7 @@
             }
           }
         },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
+        "security": [],
         "tags": [
           "Portal"
         ]
@@ -79323,10 +79341,20 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "Must exactly match CORS_ORIGINS. Missing, null or untrusted origins return 403 AUTH_ORIGIN_REJECTED. Missing Origin is allowed only by explicit non-production AUTH_ALLOW_MISSING_ORIGIN=true.",
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "format": "uri",
+              "type": "string"
+            }
           }
         ],
         "responses": {
-          "201": {
+          "200": {
             "content": {
               "application/json": {
                 "schema": {
@@ -79466,8 +79494,9 @@
         },
         "security": [
           {
-            "bearerAuth": []
-          }
+            "portalRefreshCookie": []
+          },
+          {}
         ],
         "tags": [
           "Portal"
@@ -79487,10 +79516,20 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "Must exactly match CORS_ORIGINS. Missing, null or untrusted origins return 403 AUTH_ORIGIN_REJECTED. Missing Origin is allowed only by explicit non-production AUTH_ALLOW_MISSING_ORIGIN=true.",
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "format": "uri",
+              "type": "string"
+            }
           }
         ],
         "responses": {
-          "201": {
+          "200": {
             "content": {
               "application/json": {
                 "schema": {
@@ -79651,10 +79690,20 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "Must exactly match CORS_ORIGINS. Missing, null or untrusted origins return 403 AUTH_ORIGIN_REJECTED. Missing Origin is allowed only by explicit non-production AUTH_ALLOW_MISSING_ORIGIN=true.",
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "format": "uri",
+              "type": "string"
+            }
           }
         ],
         "responses": {
-          "201": {
+          "200": {
             "content": {
               "application/json": {
                 "schema": {
@@ -79794,7 +79843,7 @@
         },
         "security": [
           {
-            "bearerAuth": []
+            "portalRefreshCookie": []
           }
         ],
         "tags": [
@@ -79815,6 +79864,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "Must exactly match CORS_ORIGINS. Missing, null or untrusted origins return 403 AUTH_ORIGIN_REJECTED. Missing Origin is allowed only by explicit non-production AUTH_ALLOW_MISSING_ORIGIN=true.",
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "format": "uri",
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -79828,7 +79887,7 @@
           "required": true
         },
         "responses": {
-          "201": {
+          "200": {
             "content": {
               "application/json": {
                 "schema": {
@@ -79966,11 +80025,7 @@
             }
           }
         },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
+        "security": [],
         "tags": [
           "Portal"
         ]
@@ -80153,6 +80208,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "Must exactly match CORS_ORIGINS. Missing, null or untrusted origins return 403 AUTH_ORIGIN_REJECTED. Missing Origin is allowed only by explicit non-production AUTH_ALLOW_MISSING_ORIGIN=true.",
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "format": "uri",
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -80166,7 +80231,7 @@
           "required": true
         },
         "responses": {
-          "201": {
+          "200": {
             "content": {
               "application/json": {
                 "schema": {
@@ -80306,7 +80371,8 @@
         },
         "security": [
           {
-            "bearerAuth": []
+            "bearerAuth": [],
+            "portalRefreshCookie": []
           }
         ],
         "tags": [
