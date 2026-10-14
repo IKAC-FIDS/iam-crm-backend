@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import { MeetingMode, UserRole } from '@prisma/client';
+import { MeetingMode, MeetingStatus, UserRole } from '@prisma/client';
 import { MeetingsService } from '../src/meetings/meetings.service';
 import { MeetingsController } from '../src/meetings/meetings.controller';
 import { PERMISSIONS_KEY } from '../src/common/decorators/permissions.decorator';
@@ -15,6 +15,46 @@ function setup() {
 }
 
 describe('MeetingsService', () => {
+  it('updates the outcome of a completed meeting', async () => {
+    const current = { id: 'meeting-1', organizationId, status: MeetingStatus.COMPLETED, completionNote: null };
+    const updated = { ...current, completionNote: 'جمع‌بندی نهایی' };
+    const prisma = {
+      meeting: {
+        findFirst: jest.fn().mockResolvedValue(current),
+        update: jest.fn().mockResolvedValue(updated),
+      },
+    };
+    const audit = { record: jest.fn().mockResolvedValue(undefined) };
+    const service = new MeetingsService(prisma as any, audit as any, {} as any, {} as any);
+
+    await expect(service.updateOutcome(current.id, { completionNote: '  جمع‌بندی نهایی  ' }, user)).resolves.toEqual(updated);
+    expect(prisma.meeting.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: current.id },
+      data: { completionNote: 'جمع‌بندی نهایی' },
+    }));
+    expect(audit.record).toHaveBeenCalledWith(expect.objectContaining({ action: 'meeting.outcome_updated' }));
+  });
+
+  it('rejects outcome updates before a meeting is completed', async () => {
+    const prisma = {
+      meeting: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'meeting-1', organizationId, status: MeetingStatus.SCHEDULED }),
+      },
+    };
+    const service = new MeetingsService(prisma as any, { record: jest.fn() } as any, {} as any, {} as any);
+
+    await expect(service.updateOutcome('meeting-1', { completionNote: 'نتیجه' }, user)).rejects.toThrow(
+      'Only completed meetings can have an outcome',
+    );
+  });
+
+  it('protects outcome updates with meeting:update', () => {
+    expect(Reflect.getMetadata(PERMISSIONS_KEY, MeetingsController.prototype.updateOutcome)).toEqual({
+      actions: ['meeting:update'],
+      mode: 'all',
+    });
+  });
+
   it('selects company logos and user avatars for meeting cards', async () => {
     const prisma = {
       meeting: {

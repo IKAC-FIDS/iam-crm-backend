@@ -10,6 +10,7 @@ import { CompleteMeetingDto } from './dto/complete-meeting.dto';
 import { CreateMeetingDto } from './dto/create-meeting.dto';
 import { FindMeetingsDto } from './dto/find-meetings.dto';
 import { UpdateMeetingDto } from './dto/update-meeting.dto';
+import { UpdateMeetingOutcomeDto } from './dto/update-meeting-outcome.dto';
 import { EmailService } from '../email/email.service';
 import { meetingAssigneeEmail } from './meeting-email.template';
 import { NotificationCoreService } from '../notification-core/notification-core.service';
@@ -99,6 +100,27 @@ export class MeetingsService {
     if (current.status !== MeetingStatus.SCHEDULED) throw new BadRequestException('Cancelled meeting cannot be completed');
     const updated = await this.prisma.meeting.update({ where: { id }, data: { status: MeetingStatus.COMPLETED, completedAt: new Date(), completedById: user.userId, completionNote: dto.completionNote?.trim() || null }, include: meetingInclude });
     await this.audit.record({ actorId: user.userId, entityType: 'meeting', entityId: id, action: 'meeting.completed', before: current, after: updated }); return updated;
+  }
+
+  async updateOutcome(id: string, dto: UpdateMeetingOutcomeDto, user: CurrentUserPayload) {
+    const current = await this.get(id, user);
+    if (current.status !== MeetingStatus.COMPLETED) {
+      throw new BadRequestException('Only completed meetings can have an outcome');
+    }
+    const updated = await this.prisma.meeting.update({
+      where: { id },
+      data: { completionNote: dto.completionNote.trim() || null },
+      include: meetingInclude,
+    });
+    await this.audit.record({
+      actorId: user.userId,
+      entityType: 'meeting',
+      entityId: id,
+      action: 'meeting.outcome_updated',
+      before: current,
+      after: updated,
+    });
+    return updated;
   }
 
   async cancel(id: string, dto: CancelMeetingDto, user: CurrentUserPayload) {
