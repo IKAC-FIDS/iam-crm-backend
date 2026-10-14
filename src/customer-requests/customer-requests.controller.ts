@@ -7,7 +7,8 @@ import { CurrentPortalPrincipal } from '../customer-access/current-portal-princi
 import { PortalJwtAuthGuard } from '../customer-access/portal-jwt-auth.guard';
 import type { PortalPrincipal } from '../customer-access/portal-principal';
 import { CustomerRequestsService } from './customer-requests.service';
-import { ConfigureAvailabilityDto, CreatePortalRequestDto, CreateRequestTypeDto, FormSchemaDto, RequestListDto, RequestTypeListDto, ShareRequestDto, UpdateDraftDto, UpdateRequestStatusDto, UpdateRequestTypeDto } from './dto/customer-request.dto';
+import { CustomerRequestOperationsService } from './customer-request-operations.service';
+import { ConfigureAvailabilityDto, CreateLinkedOpportunityDto, CreateLinkedTaskDto, CreateLinkedTechnicalDocumentDto, CreatePortalRequestDto, CreateRequestTypeDto, FormSchemaDto, LinkCustomerRequestRecordDto, PortalRequestListDto, RequestListDto, RequestTypeListDto, ShareRequestDto, UnlinkCustomerRequestRecordDto, UpdateDraftDto, UpdateRequestStatusDto, UpdateRequestTriageDto, UpdateRequestTypeDto } from './dto/customer-request.dto';
 
 @Controller('admin/customer-request-types')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
@@ -32,7 +33,7 @@ export class PortalRequestTypesController {
 @Controller('portal/requests') @UseGuards(PortalJwtAuthGuard)
 export class PortalRequestsController {
   constructor(private service: CustomerRequestsService) {}
-  @Get() list(@Query() q: RequestListDto, @CurrentPortalPrincipal() p: PortalPrincipal) { return this.service.listPortal(q, p); }
+  @Get() list(@Query() q: PortalRequestListDto, @CurrentPortalPrincipal() p: PortalPrincipal) { return this.service.listPortal(q, p); }
   @Post() create(@Body() d: CreatePortalRequestDto, @CurrentPortalPrincipal() p: PortalPrincipal) { return this.service.createPortalRequest(d, p); }
   @Get(':id') detail(@Param('id') id: string, @CurrentPortalPrincipal() p: PortalPrincipal) { return this.service.portalDetail(id, p); }
   @Patch(':id/draft') draft(@Param('id') id: string, @Body() d: UpdateDraftDto, @CurrentPortalPrincipal() p: PortalPrincipal) { return this.service.updateDraft(id, d, p); }
@@ -46,8 +47,18 @@ export class PortalRequestsController {
 
 @Controller('customer-requests') @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class InternalRequestsController {
-  constructor(private service: CustomerRequestsService) {}
+  constructor(private service: CustomerRequestsService, private operations: CustomerRequestOperationsService) {}
   @Get() @Permissions('customer-request:view') list(@Query() q: RequestListDto, @CurrentUser() u: CurrentUserPayload) { return this.service.listInternal(q, u); }
+  @Get('triage') @Permissions('customer-request:view') triage(@Query() q: RequestListDto, @CurrentUser() u: CurrentUserPayload) { return this.operations.list(q, u); }
+  @Get('triage-options') @Permissions('customer-request:view') triageOptions(@CurrentUser() u: CurrentUserPayload) { return this.operations.options(u); }
+  @Patch(':id/triage') @Permissions('customer-request:triage') updateTriage(@Param('id') id: string, @Body() d: UpdateRequestTriageDto, @CurrentUser() u: CurrentUserPayload) { return this.operations.updateTriage(id, d, u); }
+  @Get(':id/triage-history') @Permissions('customer-request:view') triageHistory(@Param('id') id: string, @CurrentUser() u: CurrentUserPayload) { return this.operations.history(id, u); }
+  @Get(':id/crm-links') @Permissions('customer-request:view') links(@Param('id') id: string, @CurrentUser() u: CurrentUserPayload) { return this.operations.links(id, u); }
+  @Post(':id/crm-links') @Permissions('customer-request:link') link(@Param('id') id: string, @Body() d: LinkCustomerRequestRecordDto, @CurrentUser() u: CurrentUserPayload) { return this.operations.linkExisting(id, d, u); }
+  @Delete(':id/crm-links/:linkId') @Permissions('customer-request:link') unlink(@Param('id') id: string, @Param('linkId') linkId: string, @Body() d: UnlinkCustomerRequestRecordDto, @CurrentUser() u: CurrentUserPayload) { return this.operations.unlink(id, linkId, d.reason, u); }
+  @Post(':id/crm-links/tasks') @Permissions('customer-request:link') createTask(@Param('id') id: string, @Body() d: CreateLinkedTaskDto, @CurrentUser() u: CurrentUserPayload) { return this.operations.createTask(id, d, u); }
+  @Post(':id/crm-links/opportunities') @Permissions('customer-request:link') createOpportunity(@Param('id') id: string, @Body() d: CreateLinkedOpportunityDto, @CurrentUser() u: CurrentUserPayload) { return this.operations.createOpportunity(id, d, u); }
+  @Post(':id/crm-links/technical-documents') @Permissions('customer-request:link') createDocument(@Param('id') id: string, @Body() d: CreateLinkedTechnicalDocumentDto, @CurrentUser() u: CurrentUserPayload) { return this.operations.createTechnicalDocument(id, d, u); }
   @Get(':id') @Permissions('customer-request:view') detail(@Param('id') id: string, @CurrentUser() u: CurrentUserPayload) { return this.service.internalDetail(id, u); }
   @Patch(':id/status') @Permissions('customer-request:manage') status(@Param('id') id: string, @Body() d: UpdateRequestStatusDto, @CurrentUser() u: CurrentUserPayload) { return this.service.changeStatus(id, d, u); }
 }

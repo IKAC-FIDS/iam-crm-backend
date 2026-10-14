@@ -54,7 +54,7 @@ export class UsersController {
   }
 
   @Get('assignee-options')
-  @AnyPermission('meeting:create', 'meeting:update', 'task:create', 'task:update', 'task:assign', 'task:reassign', 'task:create-subtask', 'technical-tender:manage', 'technical-tender:review-technical', 'technical-tender:review-commercial')
+  @AnyPermission('meeting:create', 'meeting:update', 'task:create', 'task:update', 'task:assign', 'task:reassign', 'task:create-subtask', 'technical-tender:manage', 'technical-tender:review-technical', 'technical-tender:review-commercial', 'customer-request:assign', 'customer-request:triage')
   findAssigneeOptions(@Query() query: FindAssigneeOptionsDto, @CurrentUser() user: CurrentUserPayload) {
     return this.usersService.findAssigneeOptions(user, query);
   }

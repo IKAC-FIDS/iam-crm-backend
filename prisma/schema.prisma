@@ -72,6 +72,31 @@ enum CustomerRequestActorType {
   SYSTEM
 }
 
+enum CustomerRequestPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum CustomerRequestTriageStatus {
+  UNTRIAGED
+  TRIAGED
+}
+
+enum CustomerRequestRoutingDestination {
+  MANUAL
+  TASK
+  TECHNICAL_DOCUMENT
+  OPPORTUNITY
+}
+
+enum CustomerRequestCrmTargetType {
+  TASK
+  TECHNICAL_DOCUMENT
+  OPPORTUNITY
+}
+
 enum PlatformRole {
   PLATFORM_ADMIN
 }
@@ -645,47 +670,53 @@ model User {
   exchangeRatesCreated   CurrencyExchangeRate[] @relation("ExchangeRateCreatedBy")
   productPriceChanges    ProductPriceHistory[]  @relation("ProductPriceHistoryChangedBy")
 
-  notifications                     Notification[]                 @relation("NotificationRecipient")
-  notificationActions               Notification[]                 @relation("NotificationActor")
-  managedTeams                      Team[]                         @relation("TeamManager")
+  notifications                     Notification[]                      @relation("NotificationRecipient")
+  notificationActions               Notification[]                      @relation("NotificationActor")
+  managedTeams                      Team[]                              @relation("TeamManager")
   organizationMemberships           OrganizationMembership[]
-  customerCompanyMemberships        CustomerCompanyMembership[]    @relation("CustomerMembershipUser")
-  customerMembershipsInvited        CustomerCompanyMembership[]    @relation("CustomerMembershipInvitedBy")
-  customerInvitationsSent           CustomerInvitation[]           @relation("CustomerInvitationInvitedBy")
-  customerInvitationsAccepted       CustomerInvitation[]           @relation("CustomerInvitationAcceptedBy")
-  customerRequestTypesCreated       CustomerRequestType[]          @relation("CustomerRequestTypeCreatedBy")
-  customerRequestFormsPublished     CustomerRequestFormVersion[]   @relation("CustomerRequestFormPublishedBy")
-  customerRequestsCreated           CustomerRequest[]              @relation("CustomerRequestCreator")
-  customerRequestStatusesChanged    CustomerRequestStatusHistory[] @relation("CustomerRequestStatusInternalActor")
-  technicalReleasesCreated          TechnicalRelease[]             @relation("TechnicalReleaseCreatedBy")
-  technicalReleasesUpdated          TechnicalRelease[]             @relation("TechnicalReleaseUpdatedBy")
-  knowledgeArticlesOwned            KnowledgeBaseArticle[]         @relation("KnowledgeArticleOwner")
-  knowledgeArticlesAuthored         KnowledgeBaseArticle[]         @relation("KnowledgeArticleAuthor")
-  knowledgeArticlesReviewed         KnowledgeBaseArticle[]         @relation("KnowledgeArticleReviewer")
-  technicalDocumentsOwned           TechnicalDocument[]            @relation("TechnicalDocumentOwner")
-  technicalDocumentsCreated         TechnicalDocument[]            @relation("TechnicalDocumentCreatedBy")
-  technicalDocumentsUpdated         TechnicalDocument[]            @relation("TechnicalDocumentUpdatedBy")
-  technicalDocumentVersionsCreated  TechnicalDocumentVersion[]     @relation("TechnicalDocumentVersionCreatedBy")
-  technicalDocumentVersionsApproved TechnicalDocumentVersion[]     @relation("TechnicalDocumentVersionApprovedBy")
-  technicalResourcesOwned           TechnicalResource[]            @relation("TechnicalResourceOwner")
-  technicalResourcesCreated         TechnicalResource[]            @relation("TechnicalResourceCreatedBy")
-  technicalResourcesUpdated         TechnicalResource[]            @relation("TechnicalResourceUpdatedBy")
-  technicalTendersOwned             Tender[]                       @relation("TechnicalTenderOwner")
-  technicalTendersLed               Tender[]                       @relation("TechnicalTenderTechnicalLead")
-  commercialTendersLed              Tender[]                       @relation("TechnicalTenderCommercialLead")
-  technicalTendersSubmitted         Tender[]                       @relation("TechnicalTenderSubmittedBy")
-  technicalTendersClosed            Tender[]                       @relation("TechnicalTenderClosedBy")
-  technicalTendersCreated           Tender[]                       @relation("TechnicalTenderCreatedBy")
-  technicalTendersUpdated           Tender[]                       @relation("TechnicalTenderUpdatedBy")
-  tenderRequirementsOwned           TenderRequirement[]            @relation("TenderRequirementOwner")
-  tenderRequirementsBlocked         TenderRequirement[]            @relation("TenderRequirementBlockedBy")
-  tenderReviewsAssigned             TenderReview[]                 @relation("TenderReviewReviewer")
-  tenderReviewsRequested            TenderReview[]                 @relation("TenderReviewRequestedBy")
-  tenderReviewsDecided              TenderReview[]                 @relation("TenderReviewDecidedBy")
-  artifactsUploaded                 FileAttachment[]               @relation("ArtifactUploadedBy")
-  artifactsDeleted                  FileAttachment[]               @relation("ArtifactDeletedBy")
-  artifactLinksCreated              ArtifactLink[]                 @relation("ArtifactLinkCreatedBy")
-  taskReviewArtifactsAdded          TaskReviewArtifact[]           @relation("TaskReviewArtifactAddedBy")
+  customerCompanyMemberships        CustomerCompanyMembership[]         @relation("CustomerMembershipUser")
+  customerMembershipsInvited        CustomerCompanyMembership[]         @relation("CustomerMembershipInvitedBy")
+  customerInvitationsSent           CustomerInvitation[]                @relation("CustomerInvitationInvitedBy")
+  customerInvitationsAccepted       CustomerInvitation[]                @relation("CustomerInvitationAcceptedBy")
+  customerRequestTypesCreated       CustomerRequestType[]               @relation("CustomerRequestTypeCreatedBy")
+  customerRequestFormsPublished     CustomerRequestFormVersion[]        @relation("CustomerRequestFormPublishedBy")
+  customerRequestsCreated           CustomerRequest[]                   @relation("CustomerRequestCreator")
+  customerRequestStatusesChanged    CustomerRequestStatusHistory[]      @relation("CustomerRequestStatusInternalActor")
+  customerRequestsAssigned          CustomerRequest[]                   @relation("CustomerRequestAssignee")
+  customerRequestsTriaged           CustomerRequest[]                   @relation("CustomerRequestTriagedBy")
+  customerRequestOperations         CustomerRequestOperationalHistory[] @relation("CustomerRequestOperationActor")
+  customerRequestCrmLinksCreated    CustomerRequestCrmLink[]            @relation("CustomerRequestCrmLinkCreatedBy")
+  customerRequestCrmLinksUnlinked   CustomerRequestCrmLink[]            @relation("CustomerRequestCrmLinkUnlinkedBy")
+  customerRequestCrmAttempts        CustomerRequestCrmCreationAttempt[] @relation("CustomerRequestCrmAttemptCreatedBy")
+  technicalReleasesCreated          TechnicalRelease[]                  @relation("TechnicalReleaseCreatedBy")
+  technicalReleasesUpdated          TechnicalRelease[]                  @relation("TechnicalReleaseUpdatedBy")
+  knowledgeArticlesOwned            KnowledgeBaseArticle[]              @relation("KnowledgeArticleOwner")
+  knowledgeArticlesAuthored         KnowledgeBaseArticle[]              @relation("KnowledgeArticleAuthor")
+  knowledgeArticlesReviewed         KnowledgeBaseArticle[]              @relation("KnowledgeArticleReviewer")
+  technicalDocumentsOwned           TechnicalDocument[]                 @relation("TechnicalDocumentOwner")
+  technicalDocumentsCreated         TechnicalDocument[]                 @relation("TechnicalDocumentCreatedBy")
+  technicalDocumentsUpdated         TechnicalDocument[]                 @relation("TechnicalDocumentUpdatedBy")
+  technicalDocumentVersionsCreated  TechnicalDocumentVersion[]          @relation("TechnicalDocumentVersionCreatedBy")
+  technicalDocumentVersionsApproved TechnicalDocumentVersion[]          @relation("TechnicalDocumentVersionApprovedBy")
+  technicalResourcesOwned           TechnicalResource[]                 @relation("TechnicalResourceOwner")
+  technicalResourcesCreated         TechnicalResource[]                 @relation("TechnicalResourceCreatedBy")
+  technicalResourcesUpdated         TechnicalResource[]                 @relation("TechnicalResourceUpdatedBy")
+  technicalTendersOwned             Tender[]                            @relation("TechnicalTenderOwner")
+  technicalTendersLed               Tender[]                            @relation("TechnicalTenderTechnicalLead")
+  commercialTendersLed              Tender[]                            @relation("TechnicalTenderCommercialLead")
+  technicalTendersSubmitted         Tender[]                            @relation("TechnicalTenderSubmittedBy")
+  technicalTendersClosed            Tender[]                            @relation("TechnicalTenderClosedBy")
+  technicalTendersCreated           Tender[]                            @relation("TechnicalTenderCreatedBy")
+  technicalTendersUpdated           Tender[]                            @relation("TechnicalTenderUpdatedBy")
+  tenderRequirementsOwned           TenderRequirement[]                 @relation("TenderRequirementOwner")
+  tenderRequirementsBlocked         TenderRequirement[]                 @relation("TenderRequirementBlockedBy")
+  tenderReviewsAssigned             TenderReview[]                      @relation("TenderReviewReviewer")
+  tenderReviewsRequested            TenderReview[]                      @relation("TenderReviewRequestedBy")
+  tenderReviewsDecided              TenderReview[]                      @relation("TenderReviewDecidedBy")
+  artifactsUploaded                 FileAttachment[]                    @relation("ArtifactUploadedBy")
+  artifactsDeleted                  FileAttachment[]                    @relation("ArtifactDeletedBy")
+  artifactLinksCreated              ArtifactLink[]                      @relation("ArtifactLinkCreatedBy")
+  taskReviewArtifactsAdded          TaskReviewArtifact[]                @relation("TaskReviewArtifactAddedBy")
   platformAuthority                 PlatformAuthority?
 
   notificationCoreEventActions  NotificationEvent[]           @relation("NotificationCoreEventActor")
@@ -736,6 +767,7 @@ model Team {
   timesheetEntries        TimesheetEntry[]
   leaveRequests           LeaveRequest[]
   workSchedules           WorkSchedule[]
+  customerRequests        CustomerRequest[]
 
   @@unique([id, organizationId])
   @@unique([organizationId, code])
@@ -770,51 +802,54 @@ model Organization {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users                         User[]
-  teams                         Team[]
-  companies                     Company[]
-  companyUserPreferences        CompanyUserPreference[]
-  opportunities                 Opportunity[]
-  tasks                         Task[]
-  personalTodos                 PersonalTodo[]
-  notifications                 Notification[]
-  fileAttachments               FileAttachment[]
-  artifactLinks                 ArtifactLink[]
-  taskReviewRounds              TaskReviewRound[]
-  auditLogs                     AuditLog[]
-  meetings                      Meeting[]
-  conversationThreads           ConversationThread[]
-  conversationMessages          ConversationMessage[]
-  conversationMessageReferences ConversationMessageReference[]
-  collaborationTopics           CollaborationTopic[]
-  collaborationChannels         CollaborationChannel[]
-  memberships                   OrganizationMembership[]
-  customerCompanyMemberships    CustomerCompanyMembership[]
-  customerInvitations           CustomerInvitation[]
-  customerRequestTypes          CustomerRequestType[]
-  customerRequests              CustomerRequest[]
-  customerRequestStatusHistory  CustomerRequestStatusHistory[]
-  ssoProviders                  SsoProvider[]
-  ssoRoutes                     SsoProviderRoute[]
-  ssoAuthTransactions           SsoAuthTransaction[]
-  tenantSettings                OrganizationSettings?
-  branding                      OrganizationBranding?
-  domains                       OrganizationDomain[]
-  tenantRoles                   Role[]                         @relation("TenantRoles")
-  subscriptions                 Subscription[]
-  entitlements                  OrganizationEntitlement[]
-  quotaOverrides                OrganizationQuotaOverride[]
-  usageCounters                 UsageCounter[]
-  usageSnapshots                UsageSnapshot[]
-  quotaThresholds               QuotaThresholdEvent[]
-  usageReservations             UsageReservation[]
-  usageEvents                   UsageEvent[]
-  technicalReleases             TechnicalRelease[]
-  knowledgeArticles             KnowledgeBaseArticle[]
-  technicalDocuments            TechnicalDocument[]
-  technicalResources            TechnicalResource[]
-  tenders                       Tender[]
-  tenderReviews                 TenderReview[]
+  users                              User[]
+  teams                              Team[]
+  companies                          Company[]
+  companyUserPreferences             CompanyUserPreference[]
+  opportunities                      Opportunity[]
+  tasks                              Task[]
+  personalTodos                      PersonalTodo[]
+  notifications                      Notification[]
+  fileAttachments                    FileAttachment[]
+  artifactLinks                      ArtifactLink[]
+  taskReviewRounds                   TaskReviewRound[]
+  auditLogs                          AuditLog[]
+  meetings                           Meeting[]
+  conversationThreads                ConversationThread[]
+  conversationMessages               ConversationMessage[]
+  conversationMessageReferences      ConversationMessageReference[]
+  collaborationTopics                CollaborationTopic[]
+  collaborationChannels              CollaborationChannel[]
+  memberships                        OrganizationMembership[]
+  customerCompanyMemberships         CustomerCompanyMembership[]
+  customerInvitations                CustomerInvitation[]
+  customerRequestTypes               CustomerRequestType[]
+  customerRequests                   CustomerRequest[]
+  customerRequestStatusHistory       CustomerRequestStatusHistory[]
+  customerRequestOperationalHistory  CustomerRequestOperationalHistory[]
+  customerRequestCrmLinks            CustomerRequestCrmLink[]
+  customerRequestCrmCreationAttempts CustomerRequestCrmCreationAttempt[]
+  ssoProviders                       SsoProvider[]
+  ssoRoutes                          SsoProviderRoute[]
+  ssoAuthTransactions                SsoAuthTransaction[]
+  tenantSettings                     OrganizationSettings?
+  branding                           OrganizationBranding?
+  domains                            OrganizationDomain[]
+  tenantRoles                        Role[]                              @relation("TenantRoles")
+  subscriptions                      Subscription[]
+  entitlements                       OrganizationEntitlement[]
+  quotaOverrides                     OrganizationQuotaOverride[]
+  usageCounters                      UsageCounter[]
+  usageSnapshots                     UsageSnapshot[]
+  quotaThresholds                    QuotaThresholdEvent[]
+  usageReservations                  UsageReservation[]
+  usageEvents                        UsageEvent[]
+  technicalReleases                  TechnicalRelease[]
+  knowledgeArticles                  KnowledgeBaseArticle[]
+  technicalDocuments                 TechnicalDocument[]
+  technicalResources                 TechnicalResource[]
+  tenders                            Tender[]
+  tenderReviews                      TenderReview[]
 
   notificationCoreEvents       NotificationEvent[]            @relation("NotificationCoreEvents")
   notificationCoreRules        NotificationRule[]             @relation("NotificationCoreRules")
@@ -1280,6 +1315,7 @@ model Company {
   customerInvitations             CustomerInvitation[]
   customerRequestTypeAvailability CustomerRequestTypeCompanyAvailability[]
   customerRequests                CustomerRequest[]
+  customerRequestCrmLinks         CustomerRequestCrmLink[]
 
   @@unique([id, organizationId])
   @@index([ownerId])
@@ -1341,6 +1377,7 @@ model CustomerRequestType {
   presentation              Json?
   displayOrder              Int                                      @default(0)
   availabilityPolicy        CustomerRequestAvailabilityPolicy        @default(ALL_PORTAL_COMPANIES)
+  defaultRoutingDestination CustomerRequestRoutingDestination        @default(MANUAL)
   isEnabled                 Boolean                                  @default(true)
   retiredAt                 DateTime?
   currentPublishedVersionId String?                                  @unique
@@ -1394,35 +1431,138 @@ model CustomerRequestTypeCompanyAvailability {
 }
 
 model CustomerRequest {
-  id                  String                         @id @default(uuid())
+  id                  String                              @id @default(uuid())
   organizationId      String
-  organization        Organization                   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  organization        Organization                        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   companyId           String
-  company             Company                        @relation(fields: [companyId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  company             Company                             @relation(fields: [companyId, organizationId], references: [id, organizationId], onDelete: Restrict)
   requestTypeId       String
-  requestType         CustomerRequestType            @relation(fields: [requestTypeId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  requestType         CustomerRequestType                 @relation(fields: [requestTypeId, organizationId], references: [id, organizationId], onDelete: Restrict)
   formVersionId       String
-  formVersion         CustomerRequestFormVersion     @relation(fields: [formVersionId], references: [id], onDelete: Restrict)
+  formVersion         CustomerRequestFormVersion          @relation(fields: [formVersionId], references: [id], onDelete: Restrict)
   creatorUserId       String
-  creator             User                           @relation("CustomerRequestCreator", fields: [creatorUserId], references: [id], onDelete: Restrict)
+  creator             User                                @relation("CustomerRequestCreator", fields: [creatorUserId], references: [id], onDelete: Restrict)
   creatorMembershipId String
-  creatorMembership   CustomerCompanyMembership      @relation("CustomerRequestCreatorMembership", fields: [creatorMembershipId, organizationId], references: [id, organizationId], onDelete: Restrict)
-  trackingNumber      String?                        @unique
+  creatorMembership   CustomerCompanyMembership           @relation("CustomerRequestCreatorMembership", fields: [creatorMembershipId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  trackingNumber      String?                             @unique
   title               String
-  status              CustomerRequestStatus          @default(DRAFT)
+  status              CustomerRequestStatus               @default(DRAFT)
+  priority            CustomerRequestPriority             @default(NORMAL)
+  triageStatus        CustomerRequestTriageStatus         @default(UNTRIAGED)
+  assignedToId        String?
+  assignedTo          User?                               @relation("CustomerRequestAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  responsibleTeamId   String?
+  responsibleTeam     Team?                               @relation(fields: [responsibleTeamId], references: [id], onDelete: SetNull)
+  triagedAt           DateTime?
+  triagedById         String?
+  triagedBy           User?                               @relation("CustomerRequestTriagedBy", fields: [triagedById], references: [id], onDelete: SetNull)
+  routingDestination  CustomerRequestRoutingDestination?
+  triageReason        String?
+  revision            Int                                 @default(1)
   answers             Json
   submittedAt         DateTime?
   closedAt            DateTime?
-  createdAt           DateTime                       @default(now())
-  updatedAt           DateTime                       @updatedAt
+  createdAt           DateTime                            @default(now())
+  updatedAt           DateTime                            @updatedAt
   histories           CustomerRequestStatusHistory[]
   shares              CustomerRequestShare[]
+  operationalHistory  CustomerRequestOperationalHistory[]
+  crmLinks            CustomerRequestCrmLink[]
+  crmCreationAttempts CustomerRequestCrmCreationAttempt[]
 
   @@unique([id, organizationId, companyId])
   @@index([organizationId, companyId, status, updatedAt])
   @@index([organizationId, requestTypeId, submittedAt])
   @@index([creatorMembershipId, status])
+  @@index([organizationId, triageStatus, priority, submittedAt])
+  @@index([organizationId, assignedToId, status])
+  @@index([organizationId, responsibleTeamId, status])
   @@map("customer_requests")
+}
+
+model CustomerRequestOperationalHistory {
+  id                         String                             @id @default(uuid())
+  organizationId             String
+  organization               Organization                       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  companyId                  String
+  requestId                  String
+  request                    CustomerRequest                    @relation(fields: [requestId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Cascade)
+  action                     String
+  actorId                    String
+  actor                      User                               @relation("CustomerRequestOperationActor", fields: [actorId], references: [id], onDelete: Restrict)
+  previousPriority           CustomerRequestPriority?
+  newPriority                CustomerRequestPriority?
+  previousAssigneeId         String?
+  newAssigneeId              String?
+  previousTeamId             String?
+  newTeamId                  String?
+  previousRoutingDestination CustomerRequestRoutingDestination?
+  newRoutingDestination      CustomerRequestRoutingDestination?
+  internalReason             String?
+  metadata                   Json?
+  createdAt                  DateTime                           @default(now())
+
+  @@index([requestId, createdAt])
+  @@index([organizationId, companyId, createdAt])
+  @@map("customer_request_operational_history")
+}
+
+model CustomerRequestCrmLink {
+  id                  String                       @id @default(uuid())
+  organizationId      String
+  organization        Organization                 @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  companyId           String
+  company             Company                      @relation(fields: [companyId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  requestId           String
+  request             CustomerRequest              @relation(fields: [requestId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Cascade)
+  targetType          CustomerRequestCrmTargetType
+  taskId              String?
+  task                Task?                        @relation(fields: [taskId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  technicalDocumentId String?
+  technicalDocument   TechnicalDocument?           @relation(fields: [technicalDocumentId], references: [id], onDelete: Restrict)
+  opportunityId       String?
+  opportunity         Opportunity?                 @relation(fields: [opportunityId], references: [id], onDelete: Restrict)
+  purpose             String?
+  idempotencyKey      String?
+  createdById         String
+  createdBy           User                         @relation("CustomerRequestCrmLinkCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt           DateTime                     @default(now())
+  unlinkedAt          DateTime?
+  unlinkedById        String?
+  unlinkedBy          User?                        @relation("CustomerRequestCrmLinkUnlinkedBy", fields: [unlinkedById], references: [id], onDelete: SetNull)
+  unlinkReason        String?
+
+  @@unique([requestId, taskId])
+  @@unique([requestId, technicalDocumentId])
+  @@unique([requestId, opportunityId])
+  @@unique([requestId, idempotencyKey])
+  @@index([organizationId, companyId, requestId, unlinkedAt])
+  @@index([taskId])
+  @@index([technicalDocumentId])
+  @@index([opportunityId])
+  @@map("customer_request_crm_links")
+}
+
+model CustomerRequestCrmCreationAttempt {
+  id             String                       @id @default(uuid())
+  organizationId String
+  organization   Organization                 @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  companyId      String
+  requestId      String
+  request        CustomerRequest              @relation(fields: [requestId, organizationId, companyId], references: [id, organizationId, companyId], onDelete: Cascade)
+  targetType     CustomerRequestCrmTargetType
+  idempotencyKey String
+  targetId       String?
+  status         String                       @default("PENDING")
+  errorCode      String?
+  createdById    String
+  createdBy      User                         @relation("CustomerRequestCrmAttemptCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt      DateTime                     @default(now())
+  updatedAt      DateTime                     @updatedAt
+
+  @@unique([requestId, idempotencyKey])
+  @@index([organizationId, requestId, status])
+  @@map("customer_request_crm_creation_attempts")
 }
 
 model CustomerRequestStatusHistory {
@@ -1851,18 +1991,19 @@ model Opportunity {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  stageHistories      OpportunityStageHistory[]
-  activities          Activity[]
-  lineItems           OpportunityLineItem[]
-  commercialDocuments OpportunityCommercialDocument[]
-  payments            OpportunityPayment[]
-  tasks               Task[]
-  personalTodos       PersonalTodo[]
-  meetings            Meeting[]
-  technicalDocuments  TechnicalDocument[]
-  tenders             Tender[]
-  organizationId      String                          @default("00000000-0000-4000-8000-000000000001")
-  organization        Organization                    @relation(fields: [organizationId], references: [id])
+  stageHistories       OpportunityStageHistory[]
+  activities           Activity[]
+  lineItems            OpportunityLineItem[]
+  commercialDocuments  OpportunityCommercialDocument[]
+  payments             OpportunityPayment[]
+  tasks                Task[]
+  personalTodos        PersonalTodo[]
+  meetings             Meeting[]
+  technicalDocuments   TechnicalDocument[]
+  customerRequestLinks CustomerRequestCrmLink[]
+  tenders              Tender[]
+  organizationId       String                          @default("00000000-0000-4000-8000-000000000001")
+  organization         Organization                    @relation(fields: [organizationId], references: [id])
 
   @@index([companyId])
   @@index([ownerId])
@@ -2188,13 +2329,14 @@ model Task {
   cancelledAt  DateTime?
   cancelReason String?
 
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
-  organizationId    String              @default("00000000-0000-4000-8000-000000000001")
-  organization      Organization        @relation(fields: [organizationId], references: [id])
-  TenderRequirement TenderRequirement[]
-  timesheetEntries  TimesheetEntry[]
-  personalTodos     PersonalTodo[]
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+  organizationId       String                   @default("00000000-0000-4000-8000-000000000001")
+  organization         Organization             @relation(fields: [organizationId], references: [id])
+  TenderRequirement    TenderRequirement[]
+  timesheetEntries     TimesheetEntry[]
+  personalTodos        PersonalTodo[]
+  customerRequestLinks CustomerRequestCrmLink[]
 
   @@unique([id, organizationId])
   @@index([status])
@@ -3659,38 +3801,39 @@ model KnowledgeBaseArticle {
 }
 
 model TechnicalDocument {
-  id              String                     @id @default(uuid())
-  organizationId  String
-  organization    Organization               @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  title           String
-  description     String?
-  documentType    String
-  status          TechnicalDocumentStatus    @default(DRAFT)
-  confidentiality TechnicalConfidentiality   @default(INTERNAL)
-  ownerId         String
-  owner           User                       @relation("TechnicalDocumentOwner", fields: [ownerId], references: [id], onDelete: Restrict)
-  productId       String?
-  product         ProductCatalogItem?        @relation(fields: [productId], references: [id], onDelete: SetNull)
-  releaseId       String?
-  release         TechnicalRelease?          @relation(fields: [releaseId], references: [id], onDelete: SetNull)
-  companyId       String?
-  company         Company?                   @relation(fields: [companyId], references: [id], onDelete: SetNull)
-  opportunityId   String?
-  opportunity     Opportunity?               @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
-  tenderId        String?
-  tender          Tender?                    @relation(fields: [tenderId], references: [id], onDelete: SetNull)
-  effectiveFrom   DateTime?
-  expiresAt       DateTime?
-  createdById     String
-  createdBy       User                       @relation("TechnicalDocumentCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
-  updatedById     String
-  updatedBy       User                       @relation("TechnicalDocumentUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
-  revision        Int                        @default(1)
-  createdAt       DateTime                   @default(now())
-  updatedAt       DateTime                   @updatedAt
-  archivedAt      DateTime?
-  versions        TechnicalDocumentVersion[]
-  deliverables    TenderDeliverable[]
+  id                   String                     @id @default(uuid())
+  organizationId       String
+  organization         Organization               @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  title                String
+  description          String?
+  documentType         String
+  status               TechnicalDocumentStatus    @default(DRAFT)
+  confidentiality      TechnicalConfidentiality   @default(INTERNAL)
+  ownerId              String
+  owner                User                       @relation("TechnicalDocumentOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  productId            String?
+  product              ProductCatalogItem?        @relation(fields: [productId], references: [id], onDelete: SetNull)
+  releaseId            String?
+  release              TechnicalRelease?          @relation(fields: [releaseId], references: [id], onDelete: SetNull)
+  companyId            String?
+  company              Company?                   @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  opportunityId        String?
+  opportunity          Opportunity?               @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+  tenderId             String?
+  tender               Tender?                    @relation(fields: [tenderId], references: [id], onDelete: SetNull)
+  effectiveFrom        DateTime?
+  expiresAt            DateTime?
+  createdById          String
+  createdBy            User                       @relation("TechnicalDocumentCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedById          String
+  updatedBy            User                       @relation("TechnicalDocumentUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+  revision             Int                        @default(1)
+  createdAt            DateTime                   @default(now())
+  updatedAt            DateTime                   @updatedAt
+  archivedAt           DateTime?
+  versions             TechnicalDocumentVersion[]
+  deliverables         TenderDeliverable[]
+  customerRequestLinks CustomerRequestCrmLink[]
 
   @@index([organizationId, status])
   @@index([organizationId, productId])

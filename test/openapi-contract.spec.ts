@@ -36,7 +36,7 @@ describe("fix 000094 canonical OpenAPI contract", () => {
   const ops = operations(doc);
 
   it("documents every current HTTP operation with stable unique IDs", () => {
-    expect(ops).toHaveLength(579);
+    expect(ops).toHaveLength(589);
     const ids = ops.map(({ operation }) => operation.operationId);
     expect(ids.every(Boolean)).toBe(true);
     expect(new Set(ids).size).toBe(ids.length);
@@ -159,6 +159,27 @@ describe("fix 000094 canonical OpenAPI contract", () => {
     expect(doc.paths["/api/admin/customer-request-types/{id}/form-publish"].post.security).toEqual([
       { bearerAuth: [] },
     ]);
+  });
+
+  it("documents Stage 4 triage and CRM-link operations as internal-only APIs", () => {
+    for (const [path, method] of [
+      ["/api/customer-requests/triage", "get"],
+      ["/api/customer-requests/triage-options", "get"],
+      ["/api/customer-requests/{id}/triage", "patch"],
+      ["/api/customer-requests/{id}/triage-history", "get"],
+      ["/api/customer-requests/{id}/crm-links", "get"],
+      ["/api/customer-requests/{id}/crm-links", "post"],
+      ["/api/customer-requests/{id}/crm-links/{linkId}", "delete"],
+      ["/api/customer-requests/{id}/crm-links/tasks", "post"],
+      ["/api/customer-requests/{id}/crm-links/opportunities", "post"],
+      ["/api/customer-requests/{id}/crm-links/technical-documents", "post"],
+    ] as const) {
+      expect(doc.paths[path]?.[method]?.security).toEqual([{ bearerAuth: [] }]);
+    }
+    expect(doc.paths["/api/portal/requests/{id}/crm-links"]).toBeUndefined();
+    expect(JSON.stringify(doc.paths["/api/portal/requests"])).not.toMatch(
+      /assignedTo|routingDestination|crmLinks|triageReason/,
+    );
   });
 
   it("documents multipart upload without storage internals", () => {
