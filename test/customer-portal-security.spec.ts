@@ -118,6 +118,55 @@ describe('customer portal security boundary', () => {
     expect(prisma.user.findUnique).toHaveBeenCalledWith({ where: { normalizedEmail: 'same@example.com' } });
   });
 
+  it('uses the configured public frontend URL in invitation emails', async () => {
+    const expiresAt = new Date('2026-10-19T00:00:00.000Z');
+    const tx = {
+      customerInvitation: {
+        findMany: jest.fn().mockResolvedValue([]),
+        updateMany: jest.fn(),
+        create: jest.fn().mockResolvedValue({ id: 'invitation-1', expiresAt }),
+      },
+    };
+    const prisma = {
+      user: { findUnique: jest.fn().mockResolvedValue(null) },
+      $transaction: jest.fn((work: (client: typeof tx) => Promise<unknown>) => work(tx)),
+    } as any;
+    const access = {
+      assertCompany: jest.fn().mockResolvedValue({
+        id: 'company-1',
+        portalEnabled: true,
+        legalName: 'شرکت نمونه',
+        brandName: null,
+      }),
+    } as any;
+    const audit = { record: jest.fn().mockResolvedValue(undefined) } as any;
+    const email = { send: jest.fn().mockResolvedValue(undefined) } as any;
+    const config = {
+      get: jest.fn((key: string, fallback: string) =>
+        key === 'FRONTEND_URL' ? 'https://op.neshane.co/' : fallback,
+      ),
+    } as any;
+    const service = new CustomerUsersService(prisma, access, audit, email, config);
+
+    await service.invite(
+      'company-1',
+      'organization-1',
+      'customer@example.com',
+      CustomerRole.CUSTOMER_ADMIN,
+      'actor-1',
+    );
+
+    expect(email.send).toHaveBeenCalledWith(
+      'organization-1',
+      expect.objectContaining({
+        to: 'customer@example.com',
+        text: expect.stringMatching(
+          /^برای فعال‌سازی حساب پرتال از این پیوند استفاده کنید:\nhttps:\/\/op\.neshane\.co\/portal\/invitation\/[A-Za-z0-9_-]+\n/,
+        ),
+      }),
+    );
+  });
+
   it('prevents removing the final active customer admin', async () => {
     const membership = { id: 'm1', companyId: 'c1', organizationId: 'o1', userId: 'u1', role: CustomerRole.CUSTOMER_ADMIN, status: CustomerMembershipStatus.ACTIVE, activatedAt: new Date() };
     const tx = { customerCompanyMembership: { count: jest.fn().mockResolvedValue(0) } };

@@ -99,6 +99,13 @@ export const envValidationSchema = Joi.object({
         'boolean.base': 'CORS_CREDENTIALS باید true یا false باشد',
       }),
 
+  FRONTEND_URL: Joi.string()
+    .uri()
+    .default('http://localhost:5173')
+    .messages({
+      'string.uri': 'FRONTEND_URL باید یک URL معتبر باشد',
+    }),
+
   // ---------- SSO ----------
   SSO_SECRET_ENCRYPTION_KEY: Joi.string()
       .min(32)
