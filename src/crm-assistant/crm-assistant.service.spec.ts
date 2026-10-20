@@ -309,6 +309,32 @@ describe('CrmAssistantService model intelligence and provider handling', () => {
     expect(result.toolsUsed).toEqual(['get_sales_team_performance']);
   });
 
+  it('answers sales-team weakness questions with evidence instead of the generic improvement response', async () => {
+    const definition = { name: 'get_sales_team_performance', description: 'team performance', inputSchema: {} };
+    const { service, mcp } = modelService([definition]);
+    mcp.call.mockResolvedValue({
+      period: { startDate: '2026-09-20', endDate: '2026-10-20' },
+      memberCount: 2,
+      companiesCreated: 8,
+      opportunities: { total: 40, active: 30, won: 4, lost: 6 },
+      conversionRate: 10,
+      activity: { total: 220 },
+      meetings: 12,
+      tasksAssigned: { total: 18, completed: 12, incomplete: 6 },
+      members: [
+        { fullName: 'مهتاب امیری', conversionRate: 12 },
+        { fullName: 'کارشناس دوم', conversionRate: 8 },
+      ],
+    });
+
+    const result = await service.ask({ message: 'نقاط ضعف تیم فروش چیه؟', history: [] }, currentUser());
+
+    expect(result.answer).toContain('### نقاط ضعف تیم فروش');
+    expect(result.answer).toContain('#### نقاط ضعف قابل مشاهده در داده‌ها');
+    expect(result.answer).toContain('انباشت فرصت‌های فعال');
+    expect(result.answer).not.toContain('#### برنامه پیشنهادی بهبود');
+  });
+
   it('uses an OpenAI-compatible chat-completions proxy when configured', async () => {
     const { service } = modelService([], {
       LLM_API_KEY: 'proxy-api-key',

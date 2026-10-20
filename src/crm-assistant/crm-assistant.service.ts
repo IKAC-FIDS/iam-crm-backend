@@ -552,15 +552,46 @@ export class CrmAssistantService {
     const members = Array.isArray(result.members) ? result.members as Array<Record<string, any>> : [];
     const ranked = [...members].sort((left, right) => Number(right.conversionRate ?? 0) - Number(left.conversionRate ?? 0));
     const active = Number(opportunities.active) || 0;
+    const total = Number(opportunities.total) || 0;
+    const won = Number(opportunities.won) || 0;
+    const lost = Number(opportunities.lost) || 0;
+    const meetings = Number(result.meetings) || 0;
     const conversion = Number(result.conversionRate) || 0;
+    const asksForWeaknesses = /(نقاط?\s*ضعف|ضعف|چالش|مشکل|کمبود|گلوگاه)/u.test(message);
+    const asksForImprovement = /(بهتر|بهبود|پیشنهاد|راهکار|چه\s*کار|چطور|چگونه)/u.test(message);
     const recommendations = [
       active > 0 ? `برای ${number(active)} فرصت فعال، اقدام بعدی و تاریخ پیگیری ثبت شود.` : 'پایپ‌لاین فعال تیم بازبینی شود.',
       conversion < 10 ? `نرخ تبدیل ${number(conversion)}٪ پایین است؛ معیار ورود فرصت و علت شکست‌ها بازبینی شود.` : 'نرخ تبدیل در محدوده قابل‌قبول است و باید بر پایداری آن تمرکز شود.',
       'الگوی کارشناسان با تبدیل بالاتر بررسی و به‌صورت هفتگی با تیم مرور شود.',
     ];
+    const weaknesses = [
+      conversion < 10
+        ? `نرخ تبدیل **${number(conversion)}٪** است؛ از ${number(total)} فرصت فقط ${number(won)} مورد برنده شده است.`
+        : null,
+      total > 0 && active / total >= 0.7
+        ? `انباشت فرصت‌های فعال بالاست: **${number(active)} از ${number(total)} فرصت** هنوز تعیین تکلیف نشده‌اند.`
+        : null,
+      total > 0 && meetings / total < 0.6
+        ? `تعداد جلسات نسبت به فرصت‌ها پایین است: **${number(meetings)} جلسه برای ${number(total)} فرصت**؛ بخشی از فرصت‌ها احتمالاً به گفت‌وگوی جدی با تصمیم‌گیرنده نرسیده‌اند.`
+        : null,
+      lost > won
+        ? `فرصت‌های ازدست‌رفته (${number(lost)}) از فرصت‌های برنده (${number(won)}) بیشتر است و دلایل شکست باید دسته‌بندی و بازبینی شوند.`
+        : null,
+    ].filter((item): item is string => Boolean(item));
+    const analysisSection = asksForWeaknesses
+      ? [
+          '#### نقاط ضعف قابل مشاهده در داده‌ها',
+          ...(weaknesses.length
+            ? weaknesses.map((item, index) => `${number(index + 1)}. ${item}`)
+            : ['- در شاخص‌های موجود ضعف قطعی و برجسته‌ای قابل استنتاج نیست؛ برای تحلیل دقیق‌تر به زمان ماندگاری مراحل و علت شکست‌ها نیاز است.']),
+        ]
+      : [
+          asksForImprovement ? '#### برنامه پیشنهادی بهبود' : '#### اقدام‌های پیشنهادی',
+          ...recommendations.map((item, index) => `${number(index + 1)}. ${item}`),
+        ];
     return {
       answer: [
-        '### تحلیل عملکرد کل تیم فروش',
+        asksForWeaknesses ? '### نقاط ضعف تیم فروش' : '### تحلیل عملکرد کل تیم فروش',
         '',
         `بازه گزارش: ${this.formatPerformanceDate(result.period?.startDate)} تا ${this.formatPerformanceDate(result.period?.endDate)}`,
         '',
@@ -574,8 +605,7 @@ export class CrmAssistantService {
         '#### برترین نرخ‌های تبدیل',
         ...(ranked.length ? ranked.slice(0, 5).map((member) => `- ${String(member.fullName)}${member.teamName ? ` — ${String(member.teamName)}` : ''}: ${number(member.conversionRate)}٪`) : ['- داده کافی نیست.']),
         '',
-        '#### اقدام‌های پیشنهادی',
-        ...recommendations.map((item, index) => `${number(index + 1)}. ${item}`),
+        ...analysisSection,
         '',
         'این گزارش فقط از داده‌های قابل‌دسترسی شما در CRM محاسبه شده است.',
       ].join('\n'),
