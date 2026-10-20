@@ -224,6 +224,33 @@ describe('CrmAssistantService model intelligence and provider handling', () => {
     expect(result.toolsUsed).toEqual(['search_opportunities']);
   });
 
+  it('routes performance improvement questions through model reasoning instead of the report-only shortcut', async () => {
+    const definition = { name: 'get_sales_rep_performance', description: 'performance', inputSchema: {} };
+    const { service, mcp } = modelService([definition]);
+    jest.spyOn(global, 'fetch')
+      .mockResolvedValueOnce(providerResponse({
+        output: [{
+          type: 'function_call',
+          name: definition.name,
+          call_id: 'call-performance',
+          arguments: '{"userId":null,"userName":"مهتاب","startDate":null,"endDate":null}',
+        }],
+      }))
+      .mockResolvedValueOnce(providerResponse({
+        output_text: 'نرخ تبدیل ۴٪ با وجود ۲۴ فرصت فعال نشان می‌دهد اولویت باید بر بازبینی فرصت‌ها و ثبت پیگیری باشد.',
+      }));
+    mcp.call.mockResolvedValue(performanceReport('مهتاب امیری', 29, 1, 4, 163, 0));
+
+    const result = await service.ask({
+      message: 'میتونی عملکرد مهتاب رو بگی چطوری بهتر میشه؟',
+      history: [],
+    }, currentUser());
+
+    expect(mcp.call).toHaveBeenCalledWith('get_sales_rep_performance', expect.objectContaining({ userName: 'مهتاب' }), expect.anything());
+    expect(result.answer).toContain('نرخ تبدیل ۴٪');
+    expect(result.toolsUsed).toEqual(['get_sales_rep_performance']);
+  });
+
   it('uses an OpenAI-compatible chat-completions proxy when configured', async () => {
     const { service } = modelService([], {
       LLM_API_KEY: 'proxy-api-key',

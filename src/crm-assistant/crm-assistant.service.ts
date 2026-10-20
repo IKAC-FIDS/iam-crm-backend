@@ -441,6 +441,9 @@ export class CrmAssistantService {
     definitions: CrmAssistantToolDefinition[],
   ) {
     if (!/(عملکرد|کارنامه|ارزیابی)/u.test(message)) return null;
+    // Advice/diagnosis requests need the model to combine the authorized report
+    // with reasoning. The deterministic path below is intentionally report-only.
+    if (/(بهتر|بهبود|پیشنهاد|راهکار|توصیه|تحلیل|نق(?:طه|اط)\s*(?:ضعف|قوت)|تقویت|چه\s*کار|چکار|چرا|علت)/u.test(message)) return null;
     if (!definitions.some((tool) => tool.name === 'get_sales_rep_performance')) return null;
 
     const result = await this.mcp.call('get_sales_rep_performance', {
