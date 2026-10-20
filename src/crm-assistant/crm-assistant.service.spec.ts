@@ -226,8 +226,9 @@ describe('CrmAssistantService model intelligence and provider handling', () => {
 
   it('routes performance improvement questions through model reasoning instead of the report-only shortcut', async () => {
     const definition = { name: 'get_sales_rep_performance', description: 'performance', inputSchema: {} };
-    const { service, mcp } = modelService([definition]);
-    jest.spyOn(global, 'fetch')
+    const unrelatedDefinition = { name: 'search_companies', description: 'companies', inputSchema: {} };
+    const { service, mcp } = modelService([definition, unrelatedDefinition]);
+    const fetchMock = jest.spyOn(global, 'fetch')
       .mockResolvedValueOnce(providerResponse({
         output: [{
           type: 'function_call',
@@ -247,6 +248,8 @@ describe('CrmAssistantService model intelligence and provider handling', () => {
     }, currentUser());
 
     expect(mcp.call).toHaveBeenCalledWith('get_sales_rep_performance', expect.objectContaining({ userName: 'مهتاب' }), expect.anything());
+    const firstRequest = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
+    expect(firstRequest.tools.map((tool: { name: string }) => tool.name)).toEqual(['get_sales_rep_performance']);
     expect(result.answer).toContain('نرخ تبدیل ۴٪');
     expect(result.toolsUsed).toEqual(['get_sales_rep_performance']);
   });

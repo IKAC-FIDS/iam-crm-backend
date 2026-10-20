@@ -102,6 +102,7 @@ export class CrmAssistantService {
     if (!provider) {
       throw new ServiceUnavailableException('دستیار هوشمند هنوز پیکربندی نشده است');
     }
+    const modelToolDefinitions = this.selectModelTools(dto.message, toolDefinitions);
     if (collaboration) await collaboration.assertAccess();
     const input: unknown[] = [
       ...(collaboration ? [{ role: 'user', content: JSON.stringify({ collaborationData: collaboration.context }) }] : []),
@@ -111,7 +112,7 @@ export class CrmAssistantService {
     const usedTools: string[] = [];
     const toolData: AssistantToolData[] = [];
     const pendingActions: Array<Record<string, unknown>> = [];
-    let response = await this.createResponse(provider, input, toolDefinitions, Boolean(collaboration));
+    let response = await this.createResponse(provider, input, modelToolDefinitions, Boolean(collaboration));
 
     for (let round = 0; round < MAX_TOOL_ROUNDS; round += 1) {
       const calls = (response.output ?? []).filter((item) => item.type === 'function_call');
@@ -121,7 +122,7 @@ export class CrmAssistantService {
       for (const call of calls) {
         if (!call.name || !call.call_id) continue;
         if (collaboration) await collaboration.assertAccess();
-        if (!toolDefinitions.some((tool) => tool.name === call.name)) throw new ForbiddenException('ابزار مجاز نیست');
+        if (!modelToolDefinitions.some((tool) => tool.name === call.name)) throw new ForbiddenException('ابزار مجاز نیست');
         const args = this.parseArguments(call.arguments);
         const result = await this.callTool(call.name, args, user);
         if (this.mcp.isAction(call.name)) pendingActions.push(result as Record<string, unknown>);
@@ -133,7 +134,7 @@ export class CrmAssistantService {
           output: JSON.stringify(result),
         });
       }
-      response = await this.createResponse(provider, input, toolDefinitions, Boolean(collaboration));
+      response = await this.createResponse(provider, input, modelToolDefinitions, Boolean(collaboration));
     }
 
     if ((response.output ?? []).some((item) => item.type === 'function_call')) {
@@ -441,7 +442,7 @@ export class CrmAssistantService {
     if (!/(عملکرد|کارنامه|ارزیابی)/u.test(message)) return null;
     // Advice/diagnosis requests need the model to combine the authorized report
     // with reasoning. The deterministic path below is intentionally report-only.
-    if (/(بهتر|بهبود|پیشنهاد|راهکار|توصیه|تحلیل|نق(?:طه|اط)\s*(?:ضعف|قوت)|تقویت|چه\s*کار|چکار|چرا|علت)/u.test(message)) return null;
+    if (this.isPerformanceAnalysisRequest(message)) return null;
     if (!definitions.some((tool) => tool.name === 'get_sales_rep_performance')) return null;
 
     const result = await this.mcp.call('get_sales_rep_performance', {
@@ -483,6 +484,17 @@ export class CrmAssistantService {
       'این گزارش فقط از داده‌های قابل‌دسترسی شما در CRM محاسبه شده است.',
     ].join('\n');
     return { answer, toolData: [{ tool: 'get_sales_rep_performance', data: result }] as AssistantToolData[] };
+  }
+
+  private selectModelTools(message: string, definitions: CrmAssistantToolDefinition[]) {
+    if (!this.isPerformanceAnalysisRequest(message)) return definitions;
+    const performanceTools = new Set(['search_report_users', 'get_sales_rep_performance']);
+    return definitions.filter((tool) => performanceTools.has(tool.name));
+  }
+
+  private isPerformanceAnalysisRequest(message: string) {
+    return /(عملکرد|کارنامه|ارزیابی)/u.test(message)
+      && /(بهتر|بهبود|پیشنهاد|راهکار|توصیه|تحلیل|نق(?:طه|اط)\s*(?:ضعف|قوت)|تقویت|چه\s*کار|چکار|چرا|علت)/u.test(message);
   }
 
   private async tryDirectEntityList(
