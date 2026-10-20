@@ -244,6 +244,8 @@ describe('CrmAssistantService model intelligence and provider handling', () => {
     expect(mcp.call).toHaveBeenCalledWith('get_sales_rep_performance', expect.objectContaining({ userName: expect.stringContaining('مهتاب') }), expect.anything());
     const firstRequest = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
     expect(firstRequest.tools).toEqual([]);
+    expect(firstRequest.instructions).toContain('شما تحلیلگر فروش هستید');
+    expect(firstRequest.instructions).not.toContain('ابزارهای propose');
     expect(firstRequest.input).toEqual(expect.arrayContaining([
       expect.objectContaining({ content: expect.stringContaining('authorizedCrmPerformanceData') }),
     ]));

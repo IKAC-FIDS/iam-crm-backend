@@ -133,7 +133,10 @@ export class CrmAssistantService {
       ? []
       : [{ tool: 'get_sales_rep_performance', data: performanceAnalysisData }];
     const pendingActions: Array<Record<string, unknown>> = [];
-    let response = await this.createResponse(provider, input, modelToolDefinitions, Boolean(collaboration));
+    const instructionsOverride = performanceAnalysisData === undefined
+      ? undefined
+      : 'شما تحلیلگر فروش هستید. فقط بر اساس داده CRM ارائه‌شده، نقاط قوت، نقاط قابل بهبود و سه پیشنهاد عملی و اولویت‌بندی‌شده به زبان فارسی ارائه دهید. برای شاخص‌های بدون داده نتیجه‌گیری قطعی نکنید.';
+    let response = await this.createResponse(provider, input, modelToolDefinitions, Boolean(collaboration), instructionsOverride);
 
     for (let round = 0; round < MAX_TOOL_ROUNDS; round += 1) {
       const calls = (response.output ?? []).filter((item) => item.type === 'function_call');
@@ -155,7 +158,7 @@ export class CrmAssistantService {
           output: JSON.stringify(result),
         });
       }
-      response = await this.createResponse(provider, input, modelToolDefinitions, Boolean(collaboration));
+      response = await this.createResponse(provider, input, modelToolDefinitions, Boolean(collaboration), instructionsOverride);
     }
 
     if ((response.output ?? []).some((item) => item.type === 'function_call')) {
@@ -210,10 +213,11 @@ export class CrmAssistantService {
     input: unknown[],
     definitions: CrmAssistantToolDefinition[],
     collaboration = false,
+    instructionsOverride?: string,
   ): Promise<OpenAIResponse> {
     const request = provider.apiMode === 'chat_completions'
-      ? this.chatCompletionsRequest(provider, input, definitions, collaboration)
-      : this.responsesRequest(provider, input, definitions, collaboration);
+      ? this.chatCompletionsRequest(provider, input, definitions, collaboration, instructionsOverride)
+      : this.responsesRequest(provider, input, definitions, collaboration, instructionsOverride);
     const endpoint = provider.apiMode === 'chat_completions' ? 'chat/completions' : 'responses';
     let lastTransientStatus: number | undefined;
     for (let attempt = 0; attempt < MAX_PROVIDER_ATTEMPTS; attempt += 1) {
@@ -253,13 +257,14 @@ export class CrmAssistantService {
     input: unknown[],
     definitions: CrmAssistantToolDefinition[],
     collaboration: boolean,
+    instructionsOverride?: string,
   ) {
     return {
       method: 'POST',
       headers: { Authorization: `Bearer ${provider.apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: provider.model,
-        instructions: this.modelInstructions(collaboration),
+        instructions: instructionsOverride ?? this.modelInstructions(collaboration),
         input,
         tools: definitions.map((tool) => ({
           type: 'function',
@@ -279,6 +284,7 @@ export class CrmAssistantService {
     input: unknown[],
     definitions: CrmAssistantToolDefinition[],
     collaboration: boolean,
+    instructionsOverride?: string,
   ) {
     const tools = definitions.map((tool) => ({
       type: 'function',
@@ -293,7 +299,7 @@ export class CrmAssistantService {
       headers: { Authorization: `Bearer ${provider.apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: provider.model,
-        messages: this.toChatMessages(this.modelInstructions(collaboration), input),
+        messages: this.toChatMessages(instructionsOverride ?? this.modelInstructions(collaboration), input),
         stream: false,
         ...(tools.length ? { tools, tool_choice: 'auto' } : {}),
       }),
