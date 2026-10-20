@@ -92,6 +92,12 @@ export class CrmAssistantService {
         return { answer: directComparison.answer, toolsUsed: directComparison.toolsUsed, pendingActions: [], toolData: directComparison.toolData ?? [] };
       }
 
+      const teamPerformance = await this.tryDirectTeamPerformanceAnswer(dto.message, user, toolDefinitions);
+      if (teamPerformance) {
+        await this.recordDeterministicAnswer(user, dto.message, teamPerformance.toolsUsed, 'deterministic-team-performance');
+        return { ...teamPerformance, pendingActions: [] };
+      }
+
       const performanceAnalysis = await this.tryPerformanceAnalysisContext(dto.message, user, toolDefinitions);
       if (performanceAnalysis?.answer) {
         await this.recordDeterministicAnswer(user, dto.message, performanceAnalysis.toolsUsed, 'deterministic-report-selection');
@@ -528,6 +534,54 @@ export class CrmAssistantService {
       'این گزارش فقط از داده‌های قابل‌دسترسی شما در CRM محاسبه شده است.',
     ].join('\n');
     return { answer, toolData: [{ tool: 'get_sales_rep_performance', data: result }] as AssistantToolData[] };
+  }
+
+  private async tryDirectTeamPerformanceAnswer(
+    message: string,
+    user: CurrentUserPayload,
+    definitions: CrmAssistantToolDefinition[],
+  ) {
+    if (!/(کل\s*تیم|تیم\s*فروش|عملکرد\s*تیم|گزارش\s*تیم)/u.test(message)) return null;
+    if (!definitions.some((tool) => tool.name === 'get_sales_team_performance')) return null;
+    const result = await this.mcp.call('get_sales_team_performance', {
+      startDate: null,
+      endDate: null,
+    }, user) as Record<string, any>;
+    const number = (value: unknown) => new Intl.NumberFormat('fa-IR', { maximumFractionDigits: 1 }).format(Number(value) || 0);
+    const opportunities = result.opportunities ?? {};
+    const members = Array.isArray(result.members) ? result.members as Array<Record<string, any>> : [];
+    const ranked = [...members].sort((left, right) => Number(right.conversionRate ?? 0) - Number(left.conversionRate ?? 0));
+    const active = Number(opportunities.active) || 0;
+    const conversion = Number(result.conversionRate) || 0;
+    const recommendations = [
+      active > 0 ? `برای ${number(active)} فرصت فعال، اقدام بعدی و تاریخ پیگیری ثبت شود.` : 'پایپ‌لاین فعال تیم بازبینی شود.',
+      conversion < 10 ? `نرخ تبدیل ${number(conversion)}٪ پایین است؛ معیار ورود فرصت و علت شکست‌ها بازبینی شود.` : 'نرخ تبدیل در محدوده قابل‌قبول است و باید بر پایداری آن تمرکز شود.',
+      'الگوی کارشناسان با تبدیل بالاتر بررسی و به‌صورت هفتگی با تیم مرور شود.',
+    ];
+    return {
+      answer: [
+        '### تحلیل عملکرد کل تیم فروش',
+        '',
+        `بازه گزارش: ${String(result.period?.startDate ?? '—')} تا ${String(result.period?.endDate ?? '—')}`,
+        '',
+        `- اعضای قابل‌دسترسی: **${number(result.memberCount)}**`,
+        `- شرکت‌های ایجادشده: **${number(result.companiesCreated)}**`,
+        `- فرصت‌ها: **${number(opportunities.total)}**؛ ${number(opportunities.active)} فعال، ${number(opportunities.won)} برنده و ${number(opportunities.lost)} ازدست‌رفته`,
+        `- نرخ تبدیل تیم: **${number(conversion)}٪**`,
+        `- فعالیت‌ها: **${number(result.activity?.total)}**؛ جلسات: **${number(result.meetings)}**`,
+        `- کارهای محول‌شده: **${number(result.tasksAssigned?.total)}**`,
+        '',
+        '#### برترین نرخ‌های تبدیل',
+        ...(ranked.length ? ranked.slice(0, 5).map((member) => `- ${String(member.fullName)}: ${number(member.conversionRate)}٪`) : ['- داده کافی نیست.']),
+        '',
+        '#### اقدام‌های پیشنهادی',
+        ...recommendations.map((item, index) => `${number(index + 1)}. ${item}`),
+        '',
+        'این گزارش فقط از داده‌های قابل‌دسترسی شما در CRM محاسبه شده است.',
+      ].join('\n'),
+      toolsUsed: ['get_sales_team_performance'],
+      toolData: [{ tool: 'get_sales_team_performance', data: result }],
+    };
   }
 
   private async tryPerformanceAnalysisContext(

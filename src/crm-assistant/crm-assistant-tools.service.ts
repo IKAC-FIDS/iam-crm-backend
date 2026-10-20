@@ -123,6 +123,19 @@ export class CrmAssistantToolsService {
         required: ['userId', 'userName', 'startDate', 'endDate'],
       },
     },
+    {
+      name: 'get_sales_team_performance',
+      description: 'گزارش تجمیعی عملکرد کل تیم فروش قابل‌دسترسی، شامل فرصت‌ها، نرخ تبدیل، فعالیت‌ها، جلسات و کارها.',
+      permission: 'report:view',
+      inputSchema: {
+        type: 'object', additionalProperties: false,
+        properties: {
+          startDate: { type: ['string', 'null'], description: 'تاریخ شروع YYYY-MM-DD؛ در صورت null سی روز اخیر' },
+          endDate: { type: ['string', 'null'], description: 'تاریخ پایان YYYY-MM-DD؛ در صورت null امروز' },
+        },
+        required: ['startDate', 'endDate'],
+      },
+    },
   ];
 
   constructor(
@@ -150,6 +163,7 @@ export class CrmAssistantToolsService {
 
     if (name === 'search_report_users' || name === 'search_assignment_users' || name === 'search_meeting_users') return this.searchReportUsers(rawArguments, user);
     if (name === 'get_sales_rep_performance') return this.salesRepPerformance(rawArguments, user);
+    if (name === 'get_sales_team_performance') return this.salesTeamPerformance(rawArguments, user);
     if (name === 'get_meeting_details') return this.meetingDetails(rawArguments, user);
     if (name === 'get_user_meetings') return this.userMeetings(rawArguments, user);
 
@@ -370,6 +384,58 @@ export class CrmAssistantToolsService {
         opportunityBasis: 'فرصت‌های ایجادشده توسط کارشناس در بازه بر اساس audit.createdAt',
         activityBasis: 'فعالیت بر اساس occurredAt', meetingBasis: 'جلسه بر اساس startAt', taskBasis: 'کار بر اساس createdAt/completedAt',
       },
+    };
+  }
+
+  private async salesTeamPerformance(value: unknown, user: CurrentUserPayload) {
+    const input = value && typeof value === 'object' ? value as Record<string, unknown> : {};
+    const options = await this.reports.getFilterOptions(user);
+    const userIds = options.users.map((item) => item.id);
+    const today = new Date();
+    const defaultStart = new Date(today.getTime() - 30 * 86_400_000);
+    const startDate = this.reportDate(input.startDate, defaultStart);
+    const endDate = this.reportDate(input.endDate, today);
+    if (new Date(startDate) > new Date(endDate)) throw new BadRequestException('تاریخ شروع گزارش بعد از تاریخ پایان است');
+    if (new Date(endDate).getTime() - new Date(startDate).getTime() > 366 * 86_400_000) {
+      throw new BadRequestException('بازه گزارش عملکرد نمی‌تواند بیشتر از ۳۶۶ روز باشد');
+    }
+    if (!userIds.length) {
+      return { period: { startDate, endDate }, memberCount: 0, members: [] };
+    }
+
+    const filters = { userIds, ownerIds: userIds, startDate, endDate, page: 1, limit: Math.max(userIds.length, 1) };
+    const [performance, pipeline] = await Promise.all([
+      this.reports.getUserPerformance(filters, user),
+      this.reports.getPipelineByOwner(filters, user),
+    ]);
+    const pipelineByOwner = new Map(pipeline.map((item) => [item.ownerId, item]));
+    const opportunities = performance.opportunities;
+    const conversionRate = opportunities.total > 0
+      ? Math.round((opportunities.won / opportunities.total) * 1000) / 10
+      : 0;
+
+    return {
+      period: performance.period,
+      memberCount: performance.members.length,
+      companiesCreated: performance.companiesCreated,
+      opportunities,
+      conversionRate,
+      activity: performance.activity,
+      meetings: performance.meetings,
+      tasksCreated: performance.tasksCreated,
+      tasksAssigned: performance.tasksAssigned,
+      members: performance.members.map((member) => ({
+        id: member.user.id,
+        fullName: member.user.fullName,
+        teamName: member.user.teamName ?? null,
+        companiesCreated: member.companiesCreated,
+        opportunities: member.opportunities,
+        activities: member.activity.total,
+        meetings: member.meetings,
+        tasksAssigned: member.tasksAssigned,
+        conversionRate: pipelineByOwner.get(member.user.id)?.conversionRate ?? 0,
+      })),
+      financialVisible: performance.financialVisible,
     };
   }
 
