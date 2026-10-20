@@ -539,7 +539,46 @@ export class CrmAssistantService {
       };
     }
 
-    return { data: result, toolsUsed: ['get_sales_rep_performance'] };
+    return { data: this.performanceAnalysisSnapshot(result), toolsUsed: ['get_sales_rep_performance'] };
+  }
+
+  private performanceAnalysisSnapshot(result: Record<string, unknown>) {
+    const source = result as Record<string, any>;
+    return {
+      period: {
+        startDate: source.period?.startDate ?? null,
+        endDate: source.period?.endDate ?? null,
+      },
+      employee: {
+        fullName: source.employee?.fullName ?? null,
+        teamName: source.employee?.teamName ?? null,
+      },
+      companiesCreated: source.sales?.companiesCreated ?? 0,
+      opportunities: {
+        total: source.sales?.opportunities?.total ?? 0,
+        active: source.sales?.opportunities?.active ?? 0,
+        won: source.sales?.opportunities?.won ?? 0,
+        lost: source.sales?.opportunities?.lost ?? 0,
+      },
+      pipeline: {
+        conversionRate: source.sales?.pipeline?.conversionRate ?? 0,
+      },
+      activities: {
+        total: source.activity?.total ?? 0,
+      },
+      meetings: {
+        createdCount: source.meetings?.createdCount ?? 0,
+        executionRate: source.meetings?.employee?.executionRate ?? 0,
+      },
+      tasks: {
+        assigned: {
+          total: source.tasks?.assigned?.total ?? 0,
+          completed: source.tasks?.assigned?.completed ?? 0,
+          incomplete: source.tasks?.assigned?.incomplete ?? 0,
+        },
+        onTimeCompletionRate: source.tasks?.employee?.onTimeCompletionRate ?? 0,
+      },
+    };
   }
 
   private selectModelTools(message: string, definitions: CrmAssistantToolDefinition[]) {

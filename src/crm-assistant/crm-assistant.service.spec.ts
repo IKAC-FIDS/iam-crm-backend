@@ -231,7 +231,10 @@ describe('CrmAssistantService model intelligence and provider handling', () => {
     const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue(providerResponse({
       output_text: 'نرخ تبدیل ۴٪ با وجود ۲۴ فرصت فعال نشان می‌دهد اولویت باید بر بازبینی فرصت‌ها و ثبت پیگیری باشد.',
     }));
-    mcp.call.mockResolvedValue(performanceReport('مهتاب امیری', 29, 1, 4, 163, 0));
+    mcp.call.mockResolvedValue({
+      ...performanceReport('مهتاب امیری', 29, 1, 4, 163, 0),
+      internalLargeField: 'must-not-reach-the-model',
+    });
 
     const result = await service.ask({
       message: 'میتونی عملکرد مهتاب رو بگی چطوری بهتر میشه؟',
@@ -244,6 +247,7 @@ describe('CrmAssistantService model intelligence and provider handling', () => {
     expect(firstRequest.input).toEqual(expect.arrayContaining([
       expect.objectContaining({ content: expect.stringContaining('authorizedCrmPerformanceData') }),
     ]));
+    expect(JSON.stringify(firstRequest)).not.toContain('must-not-reach-the-model');
     expect(result.answer).toContain('نرخ تبدیل ۴٪');
     expect(result.toolsUsed).toEqual(['get_sales_rep_performance']);
   });
