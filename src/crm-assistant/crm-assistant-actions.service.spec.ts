@@ -56,6 +56,48 @@ describe('CrmAssistantActionsService', () => {
     const proposal = await service.propose('propose_create_task', { title: 'پیگیری مشتری' }, user as any);
     await expect(service.confirm(proposal.token, { ...user, userId: '55555555-5555-4555-8555-555555555555' } as any))
       .rejects.toBeInstanceOf(UnauthorizedException);
+    await expect(service.confirm(proposal.token, {
+      ...user,
+      activeOrganizationId: '66666666-6666-4666-8666-666666666666',
+      tenantContext: {
+        ...user.tenantContext,
+        tenantId: '66666666-6666-4666-8666-666666666666',
+        organizationId: '66666666-6666-4666-8666-666666666666',
+      },
+    } as any)).rejects.toBeInstanceOf(UnauthorizedException);
     expect(tasks.create).not.toHaveBeenCalled();
+  });
+
+  it('rechecks permissions at confirmation time', async () => {
+    const proposal = await service.propose('propose_create_task', { title: 'پیگیری مشتری' }, user as any);
+    const revoked = { ...user, tenantContext: { ...user.tenantContext, permissions: [] } };
+
+    await expect(service.confirm(proposal.token, revoked as any)).rejects.toBeInstanceOf(ForbiddenException);
+    expect(tasks.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects an expired confirmation token', async () => {
+    const now = Date.now();
+    const clock = jest.spyOn(Date, 'now').mockReturnValue(now);
+    const proposal = await service.propose('propose_create_task', { title: 'پیگیری مشتری' }, user as any);
+    clock.mockReturnValue(now + 5 * 60_000 + 1);
+
+    await expect(service.confirm(proposal.token, user as any)).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(tasks.create).not.toHaveBeenCalled();
+    clock.mockRestore();
+  });
+
+  it('allows only one concurrent confirmation to create the entity', async () => {
+    companies.create.mockResolvedValue({ id: '44444444-4444-4444-8444-444444444444', legalName: 'شرکت آزمون', brandName: null });
+    const proposal = await service.propose('propose_create_company', { legalName: 'شرکت آزمون' }, user as any);
+
+    const results = await Promise.allSettled([
+      service.confirm(proposal.token, user as any),
+      service.confirm(proposal.token, user as any),
+    ]);
+
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1);
+    expect(companies.create).toHaveBeenCalledTimes(1);
   });
 });

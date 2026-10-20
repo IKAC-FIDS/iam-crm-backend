@@ -1,4 +1,4 @@
-import { BadGatewayException, BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
+import { BadGatewayException, BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException, Optional, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AuditLogService } from '../audit-log/audit-log.service';
 import type { CurrentUserPayload } from '../common/decorators/current-user.decorator';
@@ -6,6 +6,7 @@ import { getCurrentOrganizationId } from '../common/tenant/tenant-scope.util';
 import type { AskCrmAssistantDto, CrmAssistantHistoryItemDto } from './dto/ask-crm-assistant.dto';
 import type { CrmAssistantToolDefinition } from './crm-assistant-tools.service';
 import { CrmMcpGatewayService } from './crm-mcp-gateway.service';
+import { CrmAssistantIntentRouter, type AssistantRoutingDecision } from './crm-assistant-intent-router';
 
 type ResponseOutputItem = {
   type: string;
@@ -50,66 +51,38 @@ const MAX_TOOL_ROUNDS = 4;
 @Injectable()
 export class CrmAssistantService {
   private readonly logger = new Logger(CrmAssistantService.name);
+  private readonly intentRouter: CrmAssistantIntentRouter;
 
   constructor(
     private readonly config: ConfigService,
     private readonly mcp: CrmMcpGatewayService,
     private readonly audit: AuditLogService,
-  ) {}
+    @Optional() intentRouter?: CrmAssistantIntentRouter,
+  ) {
+    this.intentRouter = intentRouter ?? new CrmAssistantIntentRouter();
+  }
 
   async ask(dto: AskCrmAssistantDto, user: CurrentUserPayload, collaboration?: { context: unknown; assertAccess: () => Promise<unknown> }) {
+    const requestStartedAt = Date.now();
     const toolDefinitions = this.mcp.listFor(user).filter((tool) => !collaboration || !this.mcp.isAction(tool.name));
     let performanceAnalysisData: unknown;
-    // Channel requests need their server-built context, including for deterministic intents.
-    if (!collaboration) {
-      const directEntityList = await this.tryDirectEntityList(dto.message, user, toolDefinitions);
-      if (directEntityList) {
-        await this.recordDeterministicAnswer(user, dto.message, directEntityList.toolsUsed, 'deterministic-entity-list');
-        return { ...directEntityList, pendingActions: [] };
-      }
-
-      const directUserMeetings = await this.tryDirectUserMeetings(dto.message, user, toolDefinitions);
-      if (directUserMeetings) {
-        await this.recordDeterministicAnswer(user, dto.message, directUserMeetings.toolsUsed, 'deterministic-user-meetings');
-        return { ...directUserMeetings, pendingActions: [] };
-      }
-
-      const directMeetingParticipants = await this.tryDirectMeetingParticipants(dto.message, dto.history ?? [], user, toolDefinitions);
-      if (directMeetingParticipants) {
-        await this.recordDeterministicAnswer(user, dto.message, directMeetingParticipants.toolsUsed, 'deterministic-meeting-details');
-        return { ...directMeetingParticipants, pendingActions: [] };
-      }
-
-      const directTask = await this.tryDirectTaskProposal(dto.message, user, toolDefinitions);
-      if (directTask) {
-        await this.recordDeterministicAnswer(user, dto.message, directTask.toolsUsed, 'deterministic-action-proposal', directTask.pendingActions.map((item) => item.actionType));
-        return directTask;
-      }
-
-      const directComparison = await this.tryDirectPerformanceComparison(dto.message, dto.history ?? [], user, toolDefinitions);
-      if (directComparison) {
-        await this.recordDeterministicAnswer(user, dto.message, directComparison.toolsUsed, 'deterministic-comparison');
-        return { answer: directComparison.answer, toolsUsed: directComparison.toolsUsed, pendingActions: [], toolData: directComparison.toolData ?? [] };
-      }
-
-      const teamPerformance = await this.tryDirectTeamPerformanceAnswer(dto.message, user, toolDefinitions);
-      if (teamPerformance) {
-        await this.recordDeterministicAnswer(user, dto.message, teamPerformance.toolsUsed, 'deterministic-team-performance');
-        return { ...teamPerformance, pendingActions: [] };
-      }
-
+    const routing = this.intentRouter.route({
+      collaboration: Boolean(collaboration),
+      historyLength: dto.history?.length ?? 0,
+      message: dto.message,
+    });
+    this.logRoutingDecision(routing);
+    if (routing.mode === 'deterministic') {
+      const direct = await this.executeDeterministic(routing.handler, dto.message, user, toolDefinitions, requestStartedAt);
+      if (direct) return direct;
+    } else if (!collaboration && !this.isTeamPerformanceRequest(dto.message)) {
       const performanceAnalysis = await this.tryPerformanceAnalysisContext(dto.message, user, toolDefinitions);
       if (performanceAnalysis?.answer) {
-        await this.recordDeterministicAnswer(user, dto.message, performanceAnalysis.toolsUsed, 'deterministic-report-selection');
+        await this.recordDeterministicAnswer(user, dto.message, performanceAnalysis.toolsUsed, 'deterministic-report-selection', [], requestStartedAt);
         return { answer: performanceAnalysis.answer, toolsUsed: performanceAnalysis.toolsUsed, pendingActions: [], toolData: [] };
       }
       performanceAnalysisData = performanceAnalysis?.data;
 
-      const directPerformance = await this.tryDirectPerformanceAnswer(dto.message, user, toolDefinitions);
-      if (directPerformance) {
-        await this.recordDeterministicAnswer(user, dto.message, ['get_sales_rep_performance'], 'deterministic-report');
-        return { answer: directPerformance.answer, toolsUsed: ['get_sales_rep_performance'], pendingActions: [], toolData: directPerformance.toolData };
-      }
     }
 
     const provider = this.resolveProvider();
@@ -155,6 +128,8 @@ export class CrmAssistantService {
           dto.message,
           ['get_sales_rep_performance'],
           'deterministic-performance-analysis-fallback',
+          [],
+          requestStartedAt,
         );
         return { answer, toolsUsed: ['get_sales_rep_performance'], pendingActions: [], toolData };
       }
@@ -202,10 +177,60 @@ export class CrmAssistantService {
         modelProvider: provider.provider,
         model: provider.model,
         proposedActions: pendingActions.map((item) => item.actionType),
+        routingMode: 'llm',
+        toolExecutionCount: usedTools.length,
+        durationMs: Date.now() - requestStartedAt,
       },
     });
 
     return { answer, toolsUsed: [...new Set(usedTools)], pendingActions, toolData };
+  }
+
+  private async executeDeterministic(
+    handler: 'entity-list' | 'task-proposal' | 'user-meetings' | 'performance-report',
+    message: string,
+    user: CurrentUserPayload,
+    definitions: CrmAssistantToolDefinition[],
+    requestStartedAt: number,
+  ) {
+    if (handler === 'entity-list') {
+      const result = await this.tryDirectEntityList(message, user, definitions);
+      if (!result) return null;
+      await this.recordDeterministicAnswer(user, message, result.toolsUsed, 'deterministic-entity-list', [], requestStartedAt);
+      return { ...result, pendingActions: [] };
+    }
+    if (handler === 'user-meetings') {
+      const result = await this.tryDirectUserMeetings(message, user, definitions);
+      if (!result) return null;
+      await this.recordDeterministicAnswer(user, message, result.toolsUsed, 'deterministic-user-meetings', [], requestStartedAt);
+      return { ...result, pendingActions: [] };
+    }
+    if (handler === 'task-proposal') {
+      const result = await this.tryDirectTaskProposal(message, user, definitions);
+      if (!result) return null;
+      await this.recordDeterministicAnswer(
+        user,
+        message,
+        result.toolsUsed,
+        'deterministic-action-proposal',
+        result.pendingActions.map((item) => item.actionType),
+        requestStartedAt,
+      );
+      return result;
+    }
+    const result = await this.tryDirectPerformanceAnswer(message, user, definitions);
+    if (!result) return null;
+    await this.recordDeterministicAnswer(user, message, ['get_sales_rep_performance'], 'deterministic-report', [], requestStartedAt);
+    return { answer: result.answer, toolsUsed: ['get_sales_rep_performance'], pendingActions: [], toolData: result.toolData };
+  }
+
+  private logRoutingDecision(decision: AssistantRoutingDecision) {
+    const handler = decision.mode === 'deterministic' ? ` handler=${decision.handler}` : '';
+    this.logger.log?.(`CRM assistant routing mode=${decision.mode}${handler} reason=${decision.reason}`);
+  }
+
+  private isTeamPerformanceRequest(message: string) {
+    return /(کل\s*تیم|تیم\s*فروش|عملکرد\s*تیم|گزارش\s*تیم|نقاط?\s*(?:ضعف|قوت)\s*تیم)/u.test(message);
   }
 
   private async recordDeterministicAnswer(
@@ -214,6 +239,7 @@ export class CrmAssistantService {
     tools: string[],
     modelProvider: string,
     proposedActions: unknown[] = [],
+    requestStartedAt = Date.now(),
   ) {
     await this.audit.recordTenantEvent({
       actorId: user.userId,
@@ -227,6 +253,9 @@ export class CrmAssistantService {
         modelProvider,
         model: 'internal-report-services',
         proposedActions,
+        routingMode: 'deterministic',
+        toolExecutionCount: tools.length,
+        durationMs: Date.now() - requestStartedAt,
       },
     });
   }
@@ -751,8 +780,11 @@ export class CrmAssistantService {
   }
 
   private selectModelTools(message: string, definitions: CrmAssistantToolDefinition[]) {
+    if (this.isTeamPerformanceRequest(message)) {
+      return definitions.filter((tool) => tool.name === 'get_sales_team_performance');
+    }
     if (!this.isPerformanceAnalysisRequest(message)) return definitions;
-    const performanceTools = new Set(['search_report_users', 'get_sales_rep_performance']);
+    const performanceTools = new Set(['search_report_users', 'get_sales_rep_performance', 'get_sales_team_performance']);
     return definitions.filter((tool) => performanceTools.has(tool.name));
   }
 
@@ -1133,7 +1165,11 @@ export class CrmAssistantService {
 
   private parseArguments(value?: string) {
     if (!value) return {};
-    try { return JSON.parse(value) as unknown; } catch { return {}; }
+    try {
+      return JSON.parse(value) as unknown;
+    } catch {
+      throw new BadRequestException('آرگومان ابزار تولیدشده توسط سرویس هوش مصنوعی معتبر نیست');
+    }
   }
 
   private extractText(output?: ResponseOutputItem[]) {

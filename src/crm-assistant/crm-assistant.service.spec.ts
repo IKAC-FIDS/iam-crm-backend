@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
-import { ForbiddenException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { CrmAssistantService } from './crm-assistant.service';
 
 describe('CrmAssistantService deterministic performance comparison', () => {
@@ -87,23 +87,10 @@ describe('CrmAssistantService deterministic performance comparison', () => {
     expect(config.get).not.toHaveBeenCalled();
   });
 
-  it('answers a meeting-participants follow-up through MCP tools without an LLM provider', async () => {
-    const meetingId = '11111111-1111-4111-8111-111111111111';
-    const mcp = {
-      listFor: jest.fn().mockReturnValue([{ name: 'search_meetings' }, { name: 'get_meeting_details' }]),
-      call: jest.fn<(...args: any[]) => Promise<any>>(async (name: string) => name === 'search_meetings'
-        ? { data: [{ id: meetingId, title: 'دیدار دوستانه', startAt: '2026-10-04T05:00:00.000Z' }] }
-        : {
-          id: meetingId,
-          title: 'دیدار دوستانه',
-          organizer: { name: 'فرزاد نوروزی فرد' },
-          assignees: [{ name: 'مهتاب امیری' }],
-          attendees: [{ name: 'مخاطب نمونه', title: 'مدیرعامل' }],
-        }),
-    };
-    const audit = { recordTenantEvent: jest.fn<(...args: any[]) => Promise<any>>().mockResolvedValue(undefined) };
-    const config = { get: jest.fn().mockReturnValue(undefined) };
-    const service = new CrmAssistantService(config as never, mcp as never, audit as never);
+  it('routes a meeting-participants follow-up through the model because it requires conversation context', async () => {
+    const definition = { name: 'get_meeting_details', description: 'meeting details', inputSchema: {} };
+    const { service, mcp } = modelService([definition]);
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue(providerResponse({ output_text: 'شرکت‌کنندگان جلسه از متن گفتگو مشخص شدند.' }));
 
     const result = await service.ask({
       message: 'شرکت کنندگان جلسه چه کسانی هستن؟',
@@ -113,11 +100,9 @@ describe('CrmAssistantService deterministic performance comparison', () => {
       }],
     }, currentUser());
 
-    expect(result.answer).toContain('شرکت‌کنندگان جلسه دیدار دوستانه');
-    expect(result.answer).toContain('فرزاد نوروزی فرد');
-    expect(result.answer).toContain('مخاطب نمونه');
-    expect(result.toolsUsed).toEqual(['search_meetings', 'get_meeting_details']);
-    expect(config.get).not.toHaveBeenCalled();
+    expect(result.answer).toContain('شرکت‌کنندگان جلسه');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(mcp.call).not.toHaveBeenCalled();
   });
 
   it('creates a confirmation proposal for a task without calling an LLM provider', async () => {
@@ -150,31 +135,13 @@ describe('CrmAssistantService deterministic performance comparison', () => {
     expect(config.get).not.toHaveBeenCalled();
   });
 
-  it('uses conversation context and internal reports without calling an LLM provider', async () => {
-    const reports: Record<string, Record<string, unknown>> = {
-      'user-mahtab': performanceReport('مهتاب امیری', 16, 3, 19, 118, 100),
-      'user-peer': performanceReport('کارشناس هم‌تیم', 10, 1, 10, 80, 75),
-    };
-    const mcp = {
-      listFor: jest.fn().mockReturnValue([
-        { name: 'search_report_users' },
-        { name: 'get_sales_rep_performance' },
-      ]),
-      call: jest.fn<(...args: any[]) => Promise<any>>(async (name: string, args: Record<string, string>) => {
-        if (name === 'search_report_users') {
-          return {
-            data: [
-              { id: 'user-mahtab', fullName: 'مهتاب امیری', teamId: 'sales', teamName: 'فروش سازمانی' },
-              { id: 'user-peer', fullName: 'کارشناس هم‌تیم', teamId: 'sales', teamName: 'فروش سازمانی' },
-            ],
-          };
-        }
-        return reports[args.userId];
-      }),
-    };
-    const audit = { recordTenantEvent: jest.fn<(...args: any[]) => Promise<any>>().mockResolvedValue(undefined) };
-    const config = { get: jest.fn().mockReturnValue(undefined) };
-    const service = new CrmAssistantService(config as never, mcp as never, audit as never);
+  it('routes contextual performance comparisons to the model', async () => {
+    const definitions = [
+      { name: 'search_report_users', description: 'users', inputSchema: {} },
+      { name: 'get_sales_rep_performance', description: 'performance', inputSchema: {} },
+    ];
+    const { service, mcp } = modelService(definitions);
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue(providerResponse({ output_text: 'مقایسه داده‌محور دو کارشناس آماده شد.' }));
 
     const result = await service.ask({
       message: 'میتونی با کارشناس های فروش دیگه مقایسش کنی؟',
@@ -184,16 +151,32 @@ describe('CrmAssistantService deterministic performance comparison', () => {
       ],
     }, currentUser());
 
-    expect(result.answer).toContain('مقایسه عملکرد مهتاب امیری');
-    expect(result.answer).toContain('کارشناس هم‌تیم');
-    expect(result.answer).toContain('رتبه');
-    expect(result.toolsUsed).toEqual(['search_report_users', 'get_sales_rep_performance']);
-    expect(config.get).not.toHaveBeenCalled();
+    expect(result.answer).toContain('مقایسه داده‌محور');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(mcp.call).not.toHaveBeenCalled();
   });
 });
 
 describe('CrmAssistantService model intelligence and provider handling', () => {
   afterEach(() => { jest.restoreAllMocks(); });
+
+  it('records privacy-safe routing and execution diagnostics', async () => {
+    const definition = { name: 'search_companies', description: 'search', inputSchema: {} };
+    const { service, mcp, audit } = modelService([definition]);
+    mcp.call.mockResolvedValue({ data: [], meta: { total: 0 } });
+
+    await service.ask({ message: 'آخرین ۵ شرکت را نشان بده', history: [] }, currentUser());
+
+    expect(audit.recordTenantEvent).toHaveBeenCalledWith(expect.objectContaining({
+      metadata: expect.objectContaining({
+        routingMode: 'deterministic',
+        tools: ['search_companies'],
+        toolExecutionCount: 1,
+        durationMs: expect.any(Number),
+      }),
+    }));
+    expect(JSON.stringify(audit.recordTenantEvent.mock.calls)).not.toContain('آخرین ۵ شرکت');
+  });
 
   it('answers a general question directly without requiring a tool call', async () => {
     const { service, mcp } = modelService([{ name: 'search_companies', description: 'search', inputSchema: {} }]);
@@ -283,9 +266,12 @@ describe('CrmAssistantService model intelligence and provider handling', () => {
     expect(result.toolsUsed).toEqual(['get_sales_rep_performance']);
   });
 
-  it('answers whole sales-team performance requests without treating the team as a person name', async () => {
+  it('routes whole sales-team analysis to the model with the authorized team tool', async () => {
     const definition = { name: 'get_sales_team_performance', description: 'team performance', inputSchema: {} };
     const { service, mcp } = modelService([definition]);
+    jest.spyOn(global, 'fetch')
+      .mockResolvedValueOnce(providerResponse({ output: [{ type: 'function_call', name: definition.name, call_id: 'team-1', arguments: '{"startDate":null,"endDate":null}' }] }))
+      .mockResolvedValueOnce(providerResponse({ output_text: 'تحلیل عملکرد کل تیم فروش با پیشنهادهای اولویت‌بندی‌شده.' }));
     mcp.call.mockResolvedValue({
       period: { startDate: '2026-09-20', endDate: '2026-10-20' },
       memberCount: 2,
@@ -305,13 +291,15 @@ describe('CrmAssistantService model intelligence and provider handling', () => {
 
     expect(mcp.call).toHaveBeenCalledWith('get_sales_team_performance', { startDate: null, endDate: null }, expect.anything());
     expect(result.answer).toContain('تحلیل عملکرد کل تیم فروش');
-    expect(result.answer).toContain('مهتاب امیری');
     expect(result.toolsUsed).toEqual(['get_sales_team_performance']);
   });
 
-  it('answers sales-team weakness questions with evidence instead of the generic improvement response', async () => {
+  it('lets the model distinguish a sales-team weakness question from generic reporting', async () => {
     const definition = { name: 'get_sales_team_performance', description: 'team performance', inputSchema: {} };
     const { service, mcp } = modelService([definition]);
+    const fetchMock = jest.spyOn(global, 'fetch')
+      .mockResolvedValueOnce(providerResponse({ output: [{ type: 'function_call', name: definition.name, call_id: 'team-2', arguments: '{"startDate":null,"endDate":null}' }] }))
+      .mockResolvedValueOnce(providerResponse({ output_text: 'نقاط ضعف قابل مشاهده شامل انباشت فرصت‌های فعال است.' }));
     mcp.call.mockResolvedValue({
       period: { startDate: '2026-09-20', endDate: '2026-10-20' },
       memberCount: 2,
@@ -329,10 +317,11 @@ describe('CrmAssistantService model intelligence and provider handling', () => {
 
     const result = await service.ask({ message: 'نقاط ضعف تیم فروش چیه؟', history: [] }, currentUser());
 
-    expect(result.answer).toContain('### نقاط ضعف تیم فروش');
-    expect(result.answer).toContain('#### نقاط ضعف قابل مشاهده در داده‌ها');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const firstRequest = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
+    expect(firstRequest.tools.map((tool: { name: string }) => tool.name)).toEqual(['get_sales_team_performance']);
     expect(result.answer).toContain('انباشت فرصت‌های فعال');
-    expect(result.answer).not.toContain('#### برنامه پیشنهادی بهبود');
+    expect(result.toolsUsed).toEqual(['get_sales_team_performance']);
   });
 
   it('uses an OpenAI-compatible chat-completions proxy when configured', async () => {
@@ -518,6 +507,29 @@ describe('CrmAssistantService model intelligence and provider handling', () => {
     await expect(service.ask({ message: 'درخواست پیچیده', history: [] }, currentUser()))
       .rejects.toMatchObject({ response: expect.objectContaining({ message: expect.stringContaining('مراحل بیشتری') }) });
     expect(mcp.call).toHaveBeenCalledTimes(4);
+  });
+
+  it('rejects malformed model tool arguments before gateway execution', async () => {
+    const definition = { name: 'search_tasks', description: 'search', inputSchema: {} };
+    const { service, mcp } = modelService([definition]);
+    jest.spyOn(global, 'fetch').mockResolvedValue(providerResponse({
+      output: [{ type: 'function_call', name: definition.name, call_id: 'bad-args', arguments: '{invalid-json' }],
+    }));
+
+    await expect(service.ask({ message: 'کارهای مرتبط را بررسی کن', history: [] }, currentUser()))
+      .rejects.toBeInstanceOf(BadRequestException);
+    expect(mcp.call).not.toHaveBeenCalled();
+  });
+
+  it('rejects an unregistered model-selected tool', async () => {
+    const { service, mcp } = modelService([]);
+    jest.spyOn(global, 'fetch').mockResolvedValue(providerResponse({
+      output: [{ type: 'function_call', name: 'arbitrary_sql', call_id: 'forbidden-tool', arguments: '{}' }],
+    }));
+
+    await expect(service.ask({ message: 'داده‌های داخلی را بررسی کن', history: [] }, currentUser()))
+      .rejects.toBeInstanceOf(ForbiddenException);
+    expect(mcp.call).not.toHaveBeenCalled();
   });
 
   it('returns recoverable domain outcomes to the model but preserves authorization failures', async () => {
