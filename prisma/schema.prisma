@@ -599,6 +599,12 @@ enum ConversationThreadStatus {
   RESOLVED
 }
 
+enum AssistantActionExecutionStatus {
+  EXECUTING
+  SUCCEEDED
+  REQUIRES_RECONCILIATION
+}
+
 // ============================================================
 // Users & Auth
 // ============================================================
@@ -735,6 +741,7 @@ model User {
   collaborationMembersAdded     CollaborationChannelMember[]  @relation("CollaborationChannelMemberAddedBy")
   timesheetEntries              TimesheetEntry[]
   leaveRequests                 LeaveRequest[]
+  assistantActionExecutions     AssistantActionExecution[]
 
   @@unique([id, organizationId])
   @@index([organizationId])
@@ -828,6 +835,7 @@ model Organization {
   customerRequestStatusHistory       CustomerRequestStatusHistory[]
   customerRequestOperationalHistory  CustomerRequestOperationalHistory[]
   customerRequestCrmLinks            CustomerRequestCrmLink[]
+  assistantActionExecutions          AssistantActionExecution[]
   customerRequestCrmCreationAttempts CustomerRequestCrmCreationAttempt[]
   ssoProviders                       SsoProvider[]
   ssoRoutes                          SsoProviderRoute[]
@@ -2411,6 +2419,30 @@ model PersonalTodo {
   @@map("personal_todos")
 }
 
+model AssistantActionExecution {
+  id              String                         @id @default(uuid())
+  nonce           String                         @unique
+  organizationId  String
+  organization    Organization                   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  userId          String
+  user            User                           @relation(fields: [userId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  membershipId    String?
+  membership      OrganizationMembership?        @relation(fields: [membershipId, organizationId, userId], references: [id, organizationId, userId], onDelete: Restrict)
+  actionType      String
+  status          AssistantActionExecutionStatus @default(EXECUTING)
+  tokenExpiresAt  DateTime
+  responsePayload Json?
+  errorCode       String?
+  startedAt       DateTime                       @default(now())
+  completedAt     DateTime?
+  createdAt       DateTime                       @default(now())
+  updatedAt       DateTime                       @updatedAt
+
+  @@index([organizationId, userId, createdAt])
+  @@index([organizationId, status, updatedAt])
+  @@map("assistant_action_executions")
+}
+
 // ============================================================
 // Technical timesheet and leave management
 // ============================================================
@@ -3262,12 +3294,13 @@ model OrganizationMembership {
   createdAt      DateTime                     @default(now())
   updatedAt      DateTime                     @updatedAt
 
-  timesheetEntries         TimesheetEntry[]           @relation("TimesheetEmployeeMembership")
-  leaveRequests            LeaveRequest[]             @relation("LeaveEmployeeMembership")
-  workSchedules            WorkSchedule[]             @relation("WorkScheduleUserMembership")
-  reviewedTimesheetEntries TimesheetEntry[]           @relation("TimesheetReviewerMembership")
-  reviewedLeaveRequests    LeaveRequest[]             @relation("LeaveReviewerMembership")
-  approvalHistoryActions   TimesheetApprovalHistory[] @relation("TimesheetApprovalActorMembership")
+  timesheetEntries          TimesheetEntry[]           @relation("TimesheetEmployeeMembership")
+  leaveRequests             LeaveRequest[]             @relation("LeaveEmployeeMembership")
+  workSchedules             WorkSchedule[]             @relation("WorkScheduleUserMembership")
+  reviewedTimesheetEntries  TimesheetEntry[]           @relation("TimesheetReviewerMembership")
+  reviewedLeaveRequests     LeaveRequest[]             @relation("LeaveReviewerMembership")
+  approvalHistoryActions    TimesheetApprovalHistory[] @relation("TimesheetApprovalActorMembership")
+  assistantActionExecutions AssistantActionExecution[]
 
   @@unique([userId, organizationId])
   @@unique([id, organizationId])

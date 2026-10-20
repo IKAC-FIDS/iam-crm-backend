@@ -6,12 +6,15 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { AssistantActionExecutionStatus, Prisma } from '@prisma/client';
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { AuditLogService } from '../audit-log/audit-log.service';
 import type { CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { getCurrentOrganizationId } from '../common/tenant/tenant-scope.util';
+import { tenantScope } from '../common/tenant/tenant-scope.util';
+import { PrismaService } from '../prisma/prisma.service';
 import { CompaniesService } from '../companies/companies.service';
 import { CreateCompanyDto } from '../companies/dto/create-company.dto';
 import { OpportunitiesService } from '../opportunities/opportunities.service';
@@ -33,8 +36,6 @@ type ActionType =
   | 'company.create' | 'opportunity.create' | 'task.create'
   | 'person.create' | 'activity.create' | 'meeting.create'
   | 'timesheet.create' | 'leave.create';
-type TokenState = 'executing' | 'executed';
-
 interface ActionTokenPayload {
   v: 1;
   action: ActionType;
@@ -45,6 +46,12 @@ interface ActionTokenPayload {
   iat: number;
   exp: number;
   nonce: string;
+}
+
+interface ActionConfirmationResult {
+  actionType: ActionType;
+  entity: { id: string; label: string; href: string };
+  message: string;
 }
 
 interface ActionDefinition extends CrmAssistantToolDefinition {
@@ -58,8 +65,6 @@ const nullableUuid = (description: string) => ({ type: ['string', 'null'], descr
 
 @Injectable()
 export class CrmAssistantActionsService {
-  private readonly tokenStates = new Map<string, { state: TokenState; expiresAt: number }>();
-
   readonly definitions: readonly ActionDefinition[] = [
     {
       name: 'propose_create_company', action: 'company.create', title: 'ایجاد شرکت', permission: 'company:create',
@@ -180,6 +185,7 @@ export class CrmAssistantActionsService {
 
   constructor(
     private readonly config: ConfigService,
+    private readonly prisma: PrismaService,
     private readonly companies: CompaniesService,
     private readonly opportunities: OpportunitiesService,
     private readonly tasks: TasksService,
@@ -214,14 +220,14 @@ export class CrmAssistantActionsService {
   }
 
   async confirm(token: string, user: CurrentUserPayload) {
-    this.cleanupStates();
     const payload = this.verify(token, user);
     const permission = this.permissionFor(payload.action);
     if (!this.hasPermission(user, permission)) throw new ForbiddenException('دسترسی لازم برای این عملیات را ندارید');
-    if (this.tokenStates.has(payload.nonce)) throw new ConflictException('این عملیات قبلاً اجرا شده یا هم‌اکنون در حال اجرا است');
-    this.tokenStates.set(payload.nonce, { state: 'executing', expiresAt: payload.exp });
+    const dto = await this.validateAction(payload.action, payload.args);
+    const existingResult = await this.claimExecution(payload, user);
+    if (existingResult) return existingResult;
+    let successPersisted = false;
     try {
-      const dto = await this.validateAction(payload.action, payload.args);
       let entity: { id: string; label: string; href: string };
       if (payload.action === 'company.create') {
         const created = await this.companies.create(dto as CreateCompanyDto, user);
@@ -248,17 +254,133 @@ export class CrmAssistantActionsService {
         const created = await this.leaveRequests.create(dto as CreateLeaveRequestDto, user);
         entity = { id: created.id, label: 'درخواست مرخصی', href: '/account/leave-requests' };
       }
-      this.tokenStates.set(payload.nonce, { state: 'executed', expiresAt: payload.exp });
+      const result: ActionConfirmationResult = {
+        actionType: payload.action,
+        entity,
+        message: `${this.titleFor(payload.action)} با موفقیت انجام شد.`,
+      };
+      await this.persistSuccess(payload, user, result);
+      successPersisted = true;
       await this.audit.recordTenantEvent({
         actorId: user.userId, actorMembershipId: user.membershipId,
         organizationId: payload.organizationId, entityType: 'crm-assistant', entityId: entity.id,
         action: 'crm-assistant.action_confirmed', metadata: { actionType: payload.action, nonce: payload.nonce },
       });
-      return { actionType: payload.action, entity, message: `${this.titleFor(payload.action)} با موفقیت انجام شد.` };
+      return result;
     } catch (error) {
-      if (this.tokenStates.get(payload.nonce)?.state === 'executing') this.tokenStates.delete(payload.nonce);
+      if (!successPersisted) await this.markForReconciliation(payload, user, error);
       throw error;
     }
+  }
+
+  private async claimExecution(payload: ActionTokenPayload, user: CurrentUserPayload): Promise<ActionConfirmationResult | null> {
+    const context = tenantScope.require(user);
+    try {
+      await this.prisma.withTenantTransaction(context, (tx) => tx.assistantActionExecution.create({
+        data: {
+          nonce: payload.nonce,
+          organizationId: payload.organizationId,
+          userId: payload.userId,
+          membershipId: payload.membershipId,
+          actionType: payload.action,
+          tokenExpiresAt: new Date(payload.exp),
+        },
+      }));
+      return null;
+    } catch (error) {
+      if (!this.isUniqueConflict(error)) throw error;
+      const existing = await this.prisma.withTenantTransaction(context, (tx) => tx.assistantActionExecution.findFirst({
+        where: {
+          nonce: payload.nonce,
+          organizationId: payload.organizationId,
+          userId: payload.userId,
+          membershipId: payload.membershipId,
+          actionType: payload.action,
+        },
+      }));
+      if (!existing) throw new UnauthorizedException('این عملیات متعلق به نشست جاری نیست');
+      if (existing.status === AssistantActionExecutionStatus.SUCCEEDED) {
+        return this.parseStoredResult(existing.responsePayload, payload.action);
+      }
+      if (existing.status === AssistantActionExecutionStatus.REQUIRES_RECONCILIATION) {
+        throw new ConflictException('وضعیت اجرای این عملیات نیازمند بررسی است و برای جلوگیری از ثبت تکراری دوباره اجرا نمی‌شود');
+      }
+      throw new ConflictException('این عملیات هم‌اکنون در حال اجرا است و دوباره اجرا نمی‌شود');
+    }
+  }
+
+  private async persistSuccess(
+    payload: ActionTokenPayload,
+    user: CurrentUserPayload,
+    result: ActionConfirmationResult,
+  ) {
+    const updated = await this.prisma.withTenantTransaction(tenantScope.require(user), (tx) => tx.assistantActionExecution.updateMany({
+      where: {
+        nonce: payload.nonce,
+        organizationId: payload.organizationId,
+        userId: payload.userId,
+        membershipId: payload.membershipId,
+        actionType: payload.action,
+        status: AssistantActionExecutionStatus.EXECUTING,
+      },
+      data: {
+        status: AssistantActionExecutionStatus.SUCCEEDED,
+        responsePayload: result as unknown as Prisma.InputJsonValue,
+        completedAt: new Date(),
+        errorCode: null,
+      },
+    }));
+    if (updated.count !== 1) {
+      throw new ConflictException('نتیجه عملیات ثبت شد اما وضعیت تأیید نیازمند بررسی است؛ عملیات را دوباره اجرا نکنید');
+    }
+  }
+
+  private async markForReconciliation(
+    payload: ActionTokenPayload,
+    user: CurrentUserPayload,
+    error: unknown,
+  ) {
+    try {
+      await this.prisma.withTenantTransaction(tenantScope.require(user), (tx) => tx.assistantActionExecution.updateMany({
+        where: {
+          nonce: payload.nonce,
+          organizationId: payload.organizationId,
+          userId: payload.userId,
+          membershipId: payload.membershipId,
+          actionType: payload.action,
+          status: AssistantActionExecutionStatus.EXECUTING,
+        },
+        data: {
+          status: AssistantActionExecutionStatus.REQUIRES_RECONCILIATION,
+          errorCode: error instanceof Error ? error.name.slice(0, 120) : 'UNKNOWN',
+        },
+      }));
+    } catch {
+      // The durable EXECUTING claim is intentionally retained. A retry remains
+      // fail-closed and cannot create a duplicate after an ambiguous failure.
+    }
+  }
+
+  private parseStoredResult(value: Prisma.JsonValue | null, action: ActionType): ActionConfirmationResult {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      throw new ConflictException('نتیجه ذخیره‌شده این عملیات نیازمند بررسی است');
+    }
+    const entity = value.entity;
+    if (
+      value.actionType !== action || typeof value.message !== 'string' ||
+      !entity || typeof entity !== 'object' || Array.isArray(entity) ||
+      typeof entity.id !== 'string' || typeof entity.label !== 'string' || typeof entity.href !== 'string'
+    ) throw new ConflictException('نتیجه ذخیره‌شده این عملیات نیازمند بررسی است');
+    return {
+      actionType: action,
+      message: value.message,
+      entity: { id: entity.id, label: entity.label, href: entity.href },
+    };
+  }
+
+  private isUniqueConflict(error: unknown) {
+    return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002'
+      || !!error && typeof error === 'object' && 'code' in error && error.code === 'P2002';
   }
 
   private async validateAction(action: ActionType, args: Record<string, unknown>) {
@@ -348,5 +470,4 @@ export class CrmAssistantActionsService {
       'timesheet.create': 'ثبت کارکرد', 'leave.create': 'ثبت درخواست مرخصی',
     } as const)[action];
   }
-  private cleanupStates() { const now = Date.now(); for (const [nonce, value] of this.tokenStates) if (value.expiresAt <= now) this.tokenStates.delete(nonce); }
 }
