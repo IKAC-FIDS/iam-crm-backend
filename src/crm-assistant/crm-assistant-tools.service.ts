@@ -390,7 +390,8 @@ export class CrmAssistantToolsService {
   private async salesTeamPerformance(value: unknown, user: CurrentUserPayload) {
     const input = value && typeof value === 'object' ? value as Record<string, unknown> : {};
     const options = await this.reports.getFilterOptions(user);
-    const userIds = options.users.map((item) => item.id);
+    const salesOwners = [...new Map(options.owners.map((item) => [item.id, item])).values()];
+    const userIds = salesOwners.map((item) => item.id);
     const today = new Date();
     const defaultStart = new Date(today.getTime() - 30 * 86_400_000);
     const startDate = this.reportDate(input.startDate, defaultStart);

@@ -562,7 +562,7 @@ export class CrmAssistantService {
       answer: [
         '### تحلیل عملکرد کل تیم فروش',
         '',
-        `بازه گزارش: ${String(result.period?.startDate ?? '—')} تا ${String(result.period?.endDate ?? '—')}`,
+        `بازه گزارش: ${this.formatPerformanceDate(result.period?.startDate)} تا ${this.formatPerformanceDate(result.period?.endDate)}`,
         '',
         `- اعضای قابل‌دسترسی: **${number(result.memberCount)}**`,
         `- شرکت‌های ایجادشده: **${number(result.companiesCreated)}**`,
@@ -572,7 +572,7 @@ export class CrmAssistantService {
         `- کارهای محول‌شده: **${number(result.tasksAssigned?.total)}**`,
         '',
         '#### برترین نرخ‌های تبدیل',
-        ...(ranked.length ? ranked.slice(0, 5).map((member) => `- ${String(member.fullName)}: ${number(member.conversionRate)}٪`) : ['- داده کافی نیست.']),
+        ...(ranked.length ? ranked.slice(0, 5).map((member) => `- ${String(member.fullName)}${member.teamName ? ` — ${String(member.teamName)}` : ''}: ${number(member.conversionRate)}٪`) : ['- داده کافی نیست.']),
         '',
         '#### اقدام‌های پیشنهادی',
         ...recommendations.map((item, index) => `${number(index + 1)}. ${item}`),
@@ -580,8 +580,26 @@ export class CrmAssistantService {
         'این گزارش فقط از داده‌های قابل‌دسترسی شما در CRM محاسبه شده است.',
       ].join('\n'),
       toolsUsed: ['get_sales_team_performance'],
-      toolData: [{ tool: 'get_sales_team_performance', data: result }],
+      toolData: [{
+        tool: 'get_sales_team_performance',
+        data: {
+          memberCount: result.memberCount,
+          companiesCreated: result.companiesCreated,
+          opportunities: result.opportunities,
+          conversionRate: result.conversionRate,
+          activities: result.activity?.total ?? 0,
+          meetings: result.meetings,
+          tasksAssigned: result.tasksAssigned,
+        },
+      }],
     };
+  }
+
+  private formatPerformanceDate(value: unknown) {
+    if (typeof value !== 'string' || Number.isNaN(Date.parse(value))) return '—';
+    return new Intl.DateTimeFormat('fa-IR-u-ca-persian', {
+      year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Tehran',
+    }).format(new Date(value));
   }
 
   private async tryPerformanceAnalysisContext(

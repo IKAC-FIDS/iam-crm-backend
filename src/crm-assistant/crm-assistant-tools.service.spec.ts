@@ -90,4 +90,43 @@ describe('CrmAssistantToolsService', () => {
     expect(result.employee).toEqual({ id: userId, fullName: 'مهتاب امیری' });
     expect(reports.getUserPerformance).toHaveBeenCalledWith(expect.objectContaining({ userIds: [userId] }), reportUser);
   });
+
+  it('aggregates team performance from sales owners and excludes non-sales report users', async () => {
+    const reportUser = { ...user, tenantContext: { permissions: ['report:view'] } } as unknown as CurrentUserPayload;
+    reports.getFilterOptions.mockResolvedValue({
+      users: [
+        { id: 'admin', fullName: 'مدیر سیستم', role: 'ADMIN' },
+        { id: 'rep-1', fullName: 'مهتاب امیری', role: 'REP' },
+      ],
+      owners: [
+        { id: 'rep-1', fullName: 'مهتاب امیری', role: 'REP' },
+        { id: 'rep-1', fullName: 'مهتاب امیری', role: 'REP' },
+      ],
+    });
+    reports.getUserPerformance.mockResolvedValue({
+      period: { startDate: '2026-09-20', endDate: '2026-10-20' },
+      members: [{
+        user: { id: 'rep-1', fullName: 'مهتاب امیری' },
+        companiesCreated: 2,
+        opportunities: { total: 3, active: 2, won: 1, lost: 0 },
+        activity: { total: 8 },
+        meetings: 2,
+        tasksAssigned: { total: 3, completed: 2, incomplete: 1 },
+      }],
+      companiesCreated: 2,
+      opportunities: { total: 3, active: 2, won: 1, lost: 0 },
+      activity: { total: 8 },
+      meetings: 2,
+      tasksCreated: 3,
+      tasksAssigned: { total: 3, completed: 2, incomplete: 1 },
+      financialVisible: false,
+    });
+    reports.getPipelineByOwner.mockResolvedValue([{ ownerId: 'rep-1', conversionRate: 33 }]);
+
+    const result = await service.call('get_sales_team_performance', { startDate: null, endDate: null }, reportUser) as any;
+
+    expect(reports.getUserPerformance).toHaveBeenCalledWith(expect.objectContaining({ userIds: ['rep-1'], ownerIds: ['rep-1'] }), reportUser);
+    expect(result.memberCount).toBe(1);
+    expect(result.members.map((member: { fullName: string }) => member.fullName)).toEqual(['مهتاب امیری']);
+  });
 });
