@@ -136,7 +136,24 @@ export class CrmAssistantService {
     const instructionsOverride = performanceAnalysisData === undefined
       ? undefined
       : 'شما تحلیلگر فروش هستید. فقط بر اساس داده CRM ارائه‌شده، نقاط قوت، نقاط قابل بهبود و سه پیشنهاد عملی و اولویت‌بندی‌شده به زبان فارسی ارائه دهید. برای شاخص‌های بدون داده نتیجه‌گیری قطعی نکنید.';
-    let response = await this.createResponse(provider, input, modelToolDefinitions, Boolean(collaboration), instructionsOverride);
+    let response: OpenAIResponse;
+    try {
+      response = await this.createResponse(provider, input, modelToolDefinitions, Boolean(collaboration), instructionsOverride);
+    } catch (error) {
+      if (performanceAnalysisData !== undefined
+        && (error instanceof ServiceUnavailableException || error instanceof BadGatewayException)) {
+        this.logger.warn(`AI performance analysis fallback provider=${provider.provider} model=${provider.model}`);
+        const answer = this.performanceFallbackAnswer(performanceAnalysisData);
+        await this.recordDeterministicAnswer(
+          user,
+          dto.message,
+          ['get_sales_rep_performance'],
+          'deterministic-performance-analysis-fallback',
+        );
+        return { answer, toolsUsed: ['get_sales_rep_performance'], pendingActions: [], toolData };
+      }
+      throw error;
+    }
 
     for (let round = 0; round < MAX_TOOL_ROUNDS; round += 1) {
       const calls = (response.output ?? []).filter((item) => item.type === 'function_call');
@@ -585,6 +602,50 @@ export class CrmAssistantService {
         onTimeCompletionRate: source.tasks?.employee?.onTimeCompletionRate ?? 0,
       },
     };
+  }
+
+  private performanceFallbackAnswer(data: unknown) {
+    const snapshot = data as Record<string, any>;
+    const name = String(snapshot.employee?.fullName ?? 'این کارشناس');
+    const opportunities = Number(snapshot.opportunities?.total) || 0;
+    const active = Number(snapshot.opportunities?.active) || 0;
+    const won = Number(snapshot.opportunities?.won) || 0;
+    const lost = Number(snapshot.opportunities?.lost) || 0;
+    const conversion = Number(snapshot.pipeline?.conversionRate) || 0;
+    const activities = Number(snapshot.activities?.total) || 0;
+    const meetings = Number(snapshot.meetings?.createdCount) || 0;
+    const meetingRate = Number(snapshot.meetings?.executionRate) || 0;
+    const tasks = Number(snapshot.tasks?.assigned?.total) || 0;
+    const number = (value: number) => new Intl.NumberFormat('fa-IR').format(value);
+    const recommendations: string[] = [];
+
+    if (active > 0) {
+      recommendations.push(`**تعیین تکلیف ${number(active)} فرصت فعال:** برای هر فرصت، اقدام بعدی، مسئول و تاریخ پیگیری مشخص شود و فرصت‌های راکد از پایپ‌لاین فعال جدا شوند.`);
+    }
+    if (opportunities > 0 && conversion < 10) {
+      recommendations.push(`**افزایش کیفیت تبدیل:** نرخ تبدیل ${number(conversion)}٪ با ${number(won)} فرصت برنده نشان می‌دهد باید معیار ورود فرصت، شناسایی تصمیم‌گیرنده و علت شکست ${number(lost)} فرصت بازبینی شود.`);
+    }
+    if (activities > 0 && opportunities > 0) {
+      const perOpportunity = Math.round((activities / opportunities) * 10) / 10;
+      recommendations.push(`**تمرکز بر اثربخشی فعالیت‌ها:** ${number(activities)} فعالیت، یعنی حدود ${new Intl.NumberFormat('fa-IR', { maximumFractionDigits: 1 }).format(perOpportunity)} فعالیت به‌ازای هر فرصت ثبت شده است. به‌جای افزایش صرف تعداد، نتیجه هر تماس و قدم بعدی آن ثبت شود.`);
+    }
+    if (meetings < Math.max(1, Math.ceil(active / 5))) {
+      recommendations.push(`**افزایش جلسات هدفمند:** برای ${number(active)} فرصت فعال، ${number(meetings)} جلسه ثبت شده است. فرصت‌های بااولویت باید سریع‌تر به جلسه با تصمیم‌گیرنده برسند؛ نرخ اجرای جلسات فعلی ${number(meetingRate)}٪ است.`);
+    }
+    if (tasks === 0) {
+      recommendations.push('**اصلاح ثبت پیگیری:** صفر بودن کارهای محول‌شده لزوماً به معنای عدم فعالیت نیست؛ احتمالاً پیگیری‌ها در قالب Task ثبت نشده‌اند. برای هر فرصت فعال حداقل یک کار با مهلت مشخص ثبت شود.');
+    }
+
+    return [
+      `### تحلیل عملکرد ${name}`,
+      '',
+      `در این بازه ${number(opportunities)} فرصت، ${number(activities)} فعالیت و ${number(meetings)} جلسه ثبت شده است. حجم فعالیت قابل‌توجه است، اما نرخ تبدیل ${number(conversion)}٪ نشان می‌دهد اولویت اصلی باید بهبود کیفیت پیگیری و تعیین تکلیف فرصت‌ها باشد.`,
+      '',
+      '#### اقدام‌های پیشنهادی',
+      ...recommendations.slice(0, 5).map((item, index) => `${number(index + 1)}. ${item}`),
+      '',
+      'این تحلیل فقط از داده‌های قابل‌دسترسی CRM محاسبه شده است.',
+    ].join('\n');
   }
 
   private selectModelTools(message: string, definitions: CrmAssistantToolDefinition[]) {

@@ -254,6 +254,35 @@ describe('CrmAssistantService model intelligence and provider handling', () => {
     expect(result.toolsUsed).toEqual(['get_sales_rep_performance']);
   });
 
+  it('falls back to a useful grounded performance analysis when the model provider is unavailable', async () => {
+    immediateRetryTimers();
+    const definition = { name: 'get_sales_rep_performance', description: 'performance', inputSchema: {} };
+    const { service, mcp } = modelService([definition]);
+    jest.spyOn(global, 'fetch').mockResolvedValue(providerError(503, 'server_error', 'upstream_unavailable', 'private provider detail'));
+    mcp.call.mockResolvedValue({
+      period: { startDate: '2026-09-20', endDate: '2026-10-20' },
+      employee: { fullName: 'مهتاب امیری' },
+      sales: {
+        companiesCreated: 5,
+        opportunities: { total: 29, active: 24, won: 1, lost: 4 },
+        pipeline: { conversionRate: 4 },
+      },
+      activity: { total: 163 },
+      meetings: { createdCount: 4, employee: { executionRate: 75 } },
+      tasks: { assigned: { total: 0, completed: 0, incomplete: 0 }, employee: { onTimeCompletionRate: 0 } },
+    });
+
+    const result = await service.ask({
+      message: 'میتونی عملکرد مهتاب رو بگی چطوری بهتر میشه؟',
+      history: [],
+    }, currentUser());
+
+    expect(result.answer).toContain('تحلیل عملکرد مهتاب امیری');
+    expect(result.answer).toContain('نرخ تبدیل ۴٪');
+    expect(result.answer).toContain('صفر بودن کارهای محول‌شده');
+    expect(result.toolsUsed).toEqual(['get_sales_rep_performance']);
+  });
+
   it('uses an OpenAI-compatible chat-completions proxy when configured', async () => {
     const { service } = modelService([], {
       LLM_API_KEY: 'proxy-api-key',
