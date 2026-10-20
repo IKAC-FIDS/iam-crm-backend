@@ -276,6 +276,9 @@ describe('CrmAssistantService model intelligence and provider handling', () => {
         { role: 'user', content: 'سلام' },
       ],
     });
+    expect(request).not.toHaveProperty('tools');
+    expect(request).not.toHaveProperty('tool_choice');
+    expect(request).not.toHaveProperty('parallel_tool_calls');
     expect(result.answer).toBe('پاسخ مدل پروکسی');
   });
 
@@ -301,6 +304,9 @@ describe('CrmAssistantService model intelligence and provider handling', () => {
 
     expect(mcp.call).toHaveBeenCalledWith('search_tasks', { search: 'پیگیری', limit: 10 }, expect.anything());
     const secondRequest = JSON.parse(String(fetchMock.mock.calls[1][1]?.body));
+    const firstRequest = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
+    expect(firstRequest.tools[0].function).not.toHaveProperty('strict');
+    expect(firstRequest).not.toHaveProperty('parallel_tool_calls');
     expect(secondRequest.messages).toEqual(expect.arrayContaining([
       expect.objectContaining({ role: 'assistant', tool_calls: [expect.objectContaining({ id: 'call-1' })] }),
       expect.objectContaining({ role: 'tool', tool_call_id: 'call-1' }),

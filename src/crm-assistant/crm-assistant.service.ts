@@ -258,24 +258,22 @@ export class CrmAssistantService {
     definitions: CrmAssistantToolDefinition[],
     collaboration: boolean,
   ) {
+    const tools = definitions.map((tool) => ({
+      type: 'function',
+      function: {
+        name: tool.name,
+        description: tool.description,
+        parameters: tool.inputSchema,
+      },
+    }));
     return {
       method: 'POST',
       headers: { Authorization: `Bearer ${provider.apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: provider.model,
         messages: this.toChatMessages(this.modelInstructions(collaboration), input),
-        tools: definitions.map((tool) => ({
-          type: 'function',
-          function: {
-            name: tool.name,
-            description: tool.description,
-            parameters: tool.inputSchema,
-            strict: true,
-          },
-        })),
-        tool_choice: definitions.length ? 'auto' : 'none',
-        parallel_tool_calls: false,
         stream: false,
+        ...(tools.length ? { tools, tool_choice: 'auto' } : {}),
       }),
     };
   }
