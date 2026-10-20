@@ -17,11 +17,27 @@ type ResponseOutputItem = {
 
 type OpenAIResponse = { id: string; output?: ResponseOutputItem[]; output_text?: string };
 
+type ChatCompletionResponse = {
+  id?: string;
+  choices?: Array<{
+    message?: {
+      content?: string | Array<{ type?: string; text?: string }> | null;
+      tool_calls?: Array<{
+        id?: string;
+        type?: string;
+        function?: { name?: string; arguments?: string };
+      }>;
+    };
+  }>;
+};
+
 type ModelProviderConfig = {
   apiKey: string;
+  apiMode: 'responses' | 'chat_completions';
   baseUrl: string;
   model: string;
   provider: 'generic' | 'groq' | 'openai';
+  timeoutMs: number;
 };
 
 type AssistantToolData = { tool: string; data: unknown };
@@ -173,29 +189,23 @@ export class CrmAssistantService {
     definitions: CrmAssistantToolDefinition[],
     collaboration = false,
   ): Promise<OpenAIResponse> {
-    const request = {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${provider.apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: provider.model,
-        instructions: this.modelInstructions(collaboration),
-        input,
-        tools: definitions.map((tool) => ({
-          type: 'function',
-          name: tool.name,
-          description: tool.description,
-          parameters: tool.inputSchema,
-          strict: true,
-        })),
-        tool_choice: definitions.length ? 'auto' : 'none',
-        parallel_tool_calls: false,
-      }),
-    };
+    const request = provider.apiMode === 'chat_completions'
+      ? this.chatCompletionsRequest(provider, input, definitions, collaboration)
+      : this.responsesRequest(provider, input, definitions, collaboration);
+    const endpoint = provider.apiMode === 'chat_completions' ? 'chat/completions' : 'responses';
     let lastTransientStatus: number | undefined;
     for (let attempt = 0; attempt < MAX_PROVIDER_ATTEMPTS; attempt += 1) {
       try {
-        const response = await fetch(`${provider.baseUrl}/responses`, { ...request, signal: AbortSignal.timeout(30_000) });
-        if (response.ok) return response.json() as Promise<OpenAIResponse>;
+        const response = await fetch(`${provider.baseUrl}/${endpoint}`, {
+          ...request,
+          signal: AbortSignal.timeout(provider.timeoutMs),
+        });
+        if (response.ok) {
+          if (provider.apiMode === 'chat_completions') {
+            return this.normalizeChatCompletion(await response.json() as ChatCompletionResponse);
+          }
+          return response.json() as Promise<OpenAIResponse>;
+        }
         const metadata = await this.providerErrorMetadata(response);
         this.logProviderFailure(provider, response.status, attempt + 1, metadata);
         if (!RETRYABLE_PROVIDER_STATUSES.has(response.status)) {
@@ -214,6 +224,105 @@ export class CrmAssistantService {
       throw new ServiceUnavailableException('سرویس هوش مصنوعی در حال حاضر پرترافیک است؛ لطفاً کمی بعد دوباره تلاش کنید');
     }
     throw new ServiceUnavailableException('سرویس هوش مصنوعی موقتاً در دسترس نیست؛ لطفاً کمی بعد دوباره تلاش کنید');
+  }
+
+  private responsesRequest(
+    provider: ModelProviderConfig,
+    input: unknown[],
+    definitions: CrmAssistantToolDefinition[],
+    collaboration: boolean,
+  ) {
+    return {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${provider.apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: provider.model,
+        instructions: this.modelInstructions(collaboration),
+        input,
+        tools: definitions.map((tool) => ({
+          type: 'function',
+          name: tool.name,
+          description: tool.description,
+          parameters: tool.inputSchema,
+          strict: true,
+        })),
+        tool_choice: definitions.length ? 'auto' : 'none',
+        parallel_tool_calls: false,
+      }),
+    };
+  }
+
+  private chatCompletionsRequest(
+    provider: ModelProviderConfig,
+    input: unknown[],
+    definitions: CrmAssistantToolDefinition[],
+    collaboration: boolean,
+  ) {
+    return {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${provider.apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: provider.model,
+        messages: this.toChatMessages(this.modelInstructions(collaboration), input),
+        tools: definitions.map((tool) => ({
+          type: 'function',
+          function: {
+            name: tool.name,
+            description: tool.description,
+            parameters: tool.inputSchema,
+            strict: true,
+          },
+        })),
+        tool_choice: definitions.length ? 'auto' : 'none',
+        parallel_tool_calls: false,
+        stream: false,
+      }),
+    };
+  }
+
+  private toChatMessages(instructions: string, input: unknown[]) {
+    const messages: Array<Record<string, unknown>> = [{ role: 'system', content: instructions }];
+    let pendingToolCalls: Array<Record<string, unknown>> = [];
+    const flushToolCalls = () => {
+      if (!pendingToolCalls.length) return;
+      messages.push({ role: 'assistant', content: null, tool_calls: pendingToolCalls });
+      pendingToolCalls = [];
+    };
+
+    for (const rawItem of input) {
+      const item = rawItem as Record<string, unknown>;
+      if ((item.role === 'user' || item.role === 'assistant') && typeof item.content === 'string') {
+        flushToolCalls();
+        messages.push({ role: item.role, content: item.content });
+      } else if (item.type === 'function_call' && typeof item.call_id === 'string' && typeof item.name === 'string') {
+        pendingToolCalls.push({
+          id: item.call_id,
+          type: 'function',
+          function: { name: item.name, arguments: typeof item.arguments === 'string' ? item.arguments : '{}' },
+        });
+      } else if (item.type === 'function_call_output' && typeof item.call_id === 'string') {
+        flushToolCalls();
+        messages.push({ role: 'tool', tool_call_id: item.call_id, content: String(item.output ?? '') });
+      }
+    }
+    flushToolCalls();
+    return messages;
+  }
+
+  private normalizeChatCompletion(response: ChatCompletionResponse): OpenAIResponse {
+    const message = response.choices?.[0]?.message;
+    const content = typeof message?.content === 'string'
+      ? message.content
+      : message?.content?.map((item) => item.text ?? '').join('\n') ?? '';
+    const output = (message?.tool_calls ?? [])
+      .filter((call) => call.type === 'function' && call.id && call.function?.name)
+      .map((call) => ({
+        type: 'function_call',
+        call_id: call.id,
+        name: call.function?.name,
+        arguments: call.function?.arguments ?? '{}',
+      }));
+    return { id: response.id ?? '', output, output_text: content };
   }
 
   private modelInstructions(collaboration: boolean) {
@@ -292,25 +401,31 @@ export class CrmAssistantService {
     if (genericKey) {
       return {
         apiKey: genericKey,
+        apiMode: this.config.get<'responses' | 'chat_completions'>('LLM_API_MODE', 'responses'),
         baseUrl: this.cleanBaseUrl(this.config.get<string>('LLM_BASE_URL', 'https://api.groq.com/openai/v1')),
         model: this.config.get<string>('LLM_MODEL', 'openai/gpt-oss-120b'),
         provider: 'generic',
+        timeoutMs: this.config.get<number>('LLM_TIMEOUT_MS', 30_000),
       };
     }
     if (groqKey) {
       return {
         apiKey: groqKey,
+        apiMode: 'responses',
         baseUrl: this.cleanBaseUrl(this.config.get<string>('GROQ_BASE_URL', 'https://api.groq.com/openai/v1')),
         model: this.config.get<string>('GROQ_MODEL', 'openai/gpt-oss-120b'),
         provider: 'groq',
+        timeoutMs: 30_000,
       };
     }
     if (openAiKey) {
       return {
         apiKey: openAiKey,
+        apiMode: 'responses',
         baseUrl: this.cleanBaseUrl(this.config.get<string>('OPENAI_BASE_URL', 'https://api.openai.com/v1')),
         model: this.config.get<string>('OPENAI_MODEL', 'gpt-5.4'),
         provider: 'openai',
+        timeoutMs: 30_000,
       };
     }
     return null;

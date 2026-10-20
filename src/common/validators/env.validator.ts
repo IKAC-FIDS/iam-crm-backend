@@ -248,6 +248,8 @@ export const envValidationSchema = Joi.object({
   LLM_API_KEY: Joi.string().allow('').optional(),
   LLM_MODEL: Joi.string().default('openai/gpt-oss-120b'),
   LLM_BASE_URL: Joi.string().uri().default('https://api.groq.com/openai/v1'),
+  LLM_API_MODE: Joi.string().valid('responses', 'chat_completions').default('responses'),
+  LLM_TIMEOUT_MS: Joi.number().integer().min(1000).max(300000).default(30000),
   GROQ_API_KEY: Joi.string().allow('').optional(),
   GROQ_MODEL: Joi.string().default('openai/gpt-oss-120b'),
   GROQ_BASE_URL: Joi.string().uri().default('https://api.groq.com/openai/v1'),

@@ -224,6 +224,63 @@ describe('CrmAssistantService model intelligence and provider handling', () => {
     expect(result.toolsUsed).toEqual(['search_opportunities']);
   });
 
+  it('uses an OpenAI-compatible chat-completions proxy when configured', async () => {
+    const { service } = modelService([], {
+      LLM_API_KEY: 'proxy-api-key',
+      LLM_API_MODE: 'chat_completions',
+      LLM_BASE_URL: 'http://10.10.20.123:20128/v1/',
+      LLM_MODEL: 'ps/poolside/laguna-s-2.1',
+      LLM_TIMEOUT_MS: 120000,
+      OPENAI_API_KEY: '',
+    });
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue(providerResponse({
+      choices: [{ message: { content: 'پاسخ مدل پروکسی' } }],
+    }));
+
+    const result = await service.ask({ message: 'سلام', history: [] }, currentUser());
+
+    expect(fetchMock.mock.calls[0][0]).toBe('http://10.10.20.123:20128/v1/chat/completions');
+    const request = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
+    expect(request).toMatchObject({
+      model: 'ps/poolside/laguna-s-2.1',
+      stream: false,
+      messages: [
+        expect.objectContaining({ role: 'system' }),
+        { role: 'user', content: 'سلام' },
+      ],
+    });
+    expect(result.answer).toBe('پاسخ مدل پروکسی');
+  });
+
+  it('round-trips chat-completions tool calls through the existing MCP gateway', async () => {
+    const definition = { name: 'search_tasks', description: 'search', inputSchema: { type: 'object' } };
+    const { service, mcp } = modelService([definition], {
+      LLM_API_KEY: 'proxy-api-key',
+      LLM_API_MODE: 'chat_completions',
+      OPENAI_API_KEY: '',
+    });
+    const fetchMock = jest.spyOn(global, 'fetch')
+      .mockResolvedValueOnce(providerResponse({
+        choices: [{ message: { content: null, tool_calls: [{
+          id: 'call-1',
+          type: 'function',
+          function: { name: definition.name, arguments: '{"search":"پیگیری","limit":10}' },
+        }] } }],
+      }))
+      .mockResolvedValueOnce(providerResponse({ choices: [{ message: { content: 'یک کار باز پیدا شد.' } }] }));
+    mcp.call.mockResolvedValue({ data: [{ title: 'پیگیری' }] });
+
+    const result = await service.ask({ message: 'کارهای پیگیری را پیدا کن', history: [] }, currentUser());
+
+    expect(mcp.call).toHaveBeenCalledWith('search_tasks', { search: 'پیگیری', limit: 10 }, expect.anything());
+    const secondRequest = JSON.parse(String(fetchMock.mock.calls[1][1]?.body));
+    expect(secondRequest.messages).toEqual(expect.arrayContaining([
+      expect.objectContaining({ role: 'assistant', tool_calls: [expect.objectContaining({ id: 'call-1' })] }),
+      expect.objectContaining({ role: 'tool', tool_call_id: 'call-1' }),
+    ]));
+    expect(result.answer).toContain('یک کار باز');
+  });
+
   it('combines authorized CRM facts with model reasoning for a hybrid recommendation', async () => {
     const definition = { name: 'search_meetings', description: 'search', inputSchema: {} };
     const { service, mcp } = modelService([definition]);
@@ -407,13 +464,17 @@ function performanceReport(
   };
 }
 
-function modelService(definitions: Array<{ name: string; description: string; inputSchema: Record<string, unknown> }>) {
-  const configValues: Record<string, string> = {
+function modelService(
+  definitions: Array<{ name: string; description: string; inputSchema: Record<string, unknown> }>,
+  overrides: Record<string, string | number> = {},
+) {
+  const configValues: Record<string, string | number> = {
     OPENAI_API_KEY: 'test-api-key',
     OPENAI_BASE_URL: 'https://provider.example/v1',
     OPENAI_MODEL: 'test-model',
+    ...overrides,
   };
-  const config = { get: jest.fn((key: string, fallback?: string) => configValues[key] ?? fallback) };
+  const config = { get: jest.fn((key: string, fallback?: string | number) => configValues[key] ?? fallback) };
   const mcp = {
     listFor: jest.fn().mockReturnValue(definitions),
     isAction: jest.fn<(name: string) => boolean>().mockReturnValue(false),
