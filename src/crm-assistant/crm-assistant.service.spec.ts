@@ -228,18 +228,9 @@ describe('CrmAssistantService model intelligence and provider handling', () => {
     const definition = { name: 'get_sales_rep_performance', description: 'performance', inputSchema: {} };
     const unrelatedDefinition = { name: 'search_companies', description: 'companies', inputSchema: {} };
     const { service, mcp } = modelService([definition, unrelatedDefinition]);
-    const fetchMock = jest.spyOn(global, 'fetch')
-      .mockResolvedValueOnce(providerResponse({
-        output: [{
-          type: 'function_call',
-          name: definition.name,
-          call_id: 'call-performance',
-          arguments: '{"userId":null,"userName":"مهتاب","startDate":null,"endDate":null}',
-        }],
-      }))
-      .mockResolvedValueOnce(providerResponse({
-        output_text: 'نرخ تبدیل ۴٪ با وجود ۲۴ فرصت فعال نشان می‌دهد اولویت باید بر بازبینی فرصت‌ها و ثبت پیگیری باشد.',
-      }));
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue(providerResponse({
+      output_text: 'نرخ تبدیل ۴٪ با وجود ۲۴ فرصت فعال نشان می‌دهد اولویت باید بر بازبینی فرصت‌ها و ثبت پیگیری باشد.',
+    }));
     mcp.call.mockResolvedValue(performanceReport('مهتاب امیری', 29, 1, 4, 163, 0));
 
     const result = await service.ask({
@@ -247,9 +238,12 @@ describe('CrmAssistantService model intelligence and provider handling', () => {
       history: [],
     }, currentUser());
 
-    expect(mcp.call).toHaveBeenCalledWith('get_sales_rep_performance', expect.objectContaining({ userName: 'مهتاب' }), expect.anything());
+    expect(mcp.call).toHaveBeenCalledWith('get_sales_rep_performance', expect.objectContaining({ userName: expect.stringContaining('مهتاب') }), expect.anything());
     const firstRequest = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
-    expect(firstRequest.tools.map((tool: { name: string }) => tool.name)).toEqual(['get_sales_rep_performance']);
+    expect(firstRequest.tools).toEqual([]);
+    expect(firstRequest.input).toEqual(expect.arrayContaining([
+      expect.objectContaining({ content: expect.stringContaining('authorizedCrmPerformanceData') }),
+    ]));
     expect(result.answer).toContain('نرخ تبدیل ۴٪');
     expect(result.toolsUsed).toEqual(['get_sales_rep_performance']);
   });

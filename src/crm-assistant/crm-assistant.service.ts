@@ -59,6 +59,7 @@ export class CrmAssistantService {
 
   async ask(dto: AskCrmAssistantDto, user: CurrentUserPayload, collaboration?: { context: unknown; assertAccess: () => Promise<unknown> }) {
     const toolDefinitions = this.mcp.listFor(user).filter((tool) => !collaboration || !this.mcp.isAction(tool.name));
+    let performanceAnalysisData: unknown;
     // Channel requests need their server-built context, including for deterministic intents.
     if (!collaboration) {
       const directEntityList = await this.tryDirectEntityList(dto.message, user, toolDefinitions);
@@ -91,6 +92,13 @@ export class CrmAssistantService {
         return { answer: directComparison.answer, toolsUsed: directComparison.toolsUsed, pendingActions: [], toolData: directComparison.toolData ?? [] };
       }
 
+      const performanceAnalysis = await this.tryPerformanceAnalysisContext(dto.message, user, toolDefinitions);
+      if (performanceAnalysis?.answer) {
+        await this.recordDeterministicAnswer(user, dto.message, performanceAnalysis.toolsUsed, 'deterministic-report-selection');
+        return { answer: performanceAnalysis.answer, toolsUsed: performanceAnalysis.toolsUsed, pendingActions: [], toolData: [] };
+      }
+      performanceAnalysisData = performanceAnalysis?.data;
+
       const directPerformance = await this.tryDirectPerformanceAnswer(dto.message, user, toolDefinitions);
       if (directPerformance) {
         await this.recordDeterministicAnswer(user, dto.message, ['get_sales_rep_performance'], 'deterministic-report');
@@ -102,15 +110,28 @@ export class CrmAssistantService {
     if (!provider) {
       throw new ServiceUnavailableException('دستیار هوشمند هنوز پیکربندی نشده است');
     }
-    const modelToolDefinitions = this.selectModelTools(dto.message, toolDefinitions);
+    const modelToolDefinitions = performanceAnalysisData === undefined
+      ? this.selectModelTools(dto.message, toolDefinitions)
+      : [];
     if (collaboration) await collaboration.assertAccess();
     const input: unknown[] = [
       ...(collaboration ? [{ role: 'user', content: JSON.stringify({ collaborationData: collaboration.context }) }] : []),
       ...(dto.history ?? []).map((item) => ({ role: item.role, content: item.content })),
-      { role: 'user', content: dto.message.trim() },
+      {
+        role: 'user',
+        content: performanceAnalysisData === undefined
+          ? dto.message.trim()
+          : JSON.stringify({
+              userRequest: dto.message.trim(),
+              authorizedCrmPerformanceData: performanceAnalysisData,
+              instruction: 'داده‌های CRM را تحلیل کن، از نتیجه‌گیری قطعی برای شاخص‌های بدون داده خودداری کن و پیشنهادهای عملی و اولویت‌بندی‌شده بده.',
+            }),
+      },
     ];
-    const usedTools: string[] = [];
-    const toolData: AssistantToolData[] = [];
+    const usedTools: string[] = performanceAnalysisData === undefined ? [] : ['get_sales_rep_performance'];
+    const toolData: AssistantToolData[] = performanceAnalysisData === undefined
+      ? []
+      : [{ tool: 'get_sales_rep_performance', data: performanceAnalysisData }];
     const pendingActions: Array<Record<string, unknown>> = [];
     let response = await this.createResponse(provider, input, modelToolDefinitions, Boolean(collaboration));
 
@@ -484,6 +505,41 @@ export class CrmAssistantService {
       'این گزارش فقط از داده‌های قابل‌دسترسی شما در CRM محاسبه شده است.',
     ].join('\n');
     return { answer, toolData: [{ tool: 'get_sales_rep_performance', data: result }] as AssistantToolData[] };
+  }
+
+  private async tryPerformanceAnalysisContext(
+    message: string,
+    user: CurrentUserPayload,
+    definitions: CrmAssistantToolDefinition[],
+  ): Promise<{ data?: unknown; answer?: string; toolsUsed: string[] } | null> {
+    if (!this.isPerformanceAnalysisRequest(message)) return null;
+    if (!definitions.some((tool) => tool.name === 'get_sales_rep_performance')) return null;
+
+    const result = await this.mcp.call('get_sales_rep_performance', {
+      userId: null,
+      userName: message,
+      startDate: null,
+      endDate: null,
+    }, user) as Record<string, unknown>;
+
+    if (result.needsSelection) {
+      const candidates = Array.isArray(result.candidates) ? result.candidates as Array<Record<string, unknown>> : [];
+      if (!candidates.length) {
+        return {
+          answer: String(result.message ?? 'کارشناس موردنظر در محدوده مجاز پیدا نشد.'),
+          toolsUsed: ['get_sales_rep_performance'],
+        };
+      }
+      const choices = candidates
+        .map((item) => `- ${String(item.fullName ?? 'بدون نام')}${item.teamName ? ` — ${String(item.teamName)}` : ''}`)
+        .join('\n');
+      return {
+        answer: `${String(result.message ?? 'لطفاً کارشناس را مشخص کنید.') }\n\n${choices}`,
+        toolsUsed: ['get_sales_rep_performance'],
+      };
+    }
+
+    return { data: result, toolsUsed: ['get_sales_rep_performance'] };
   }
 
   private selectModelTools(message: string, definitions: CrmAssistantToolDefinition[]) {
